@@ -4,7 +4,7 @@ use crate::values::Value;
 use crate::{format, Vec};
 
 /// Represents a WebAssembly global instance
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Global {
     /// Global type
     global_type: GlobalType,

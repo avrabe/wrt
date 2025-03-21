@@ -64,13 +64,13 @@ test-wrt:
     # Default features
     cargo test -p wrt
     # No features
-    # TBD: disabled cargo test -p wrt --no-default-features
+    cargo test -p wrt --no-default-features
     # std feature only
     cargo test -p wrt --no-default-features --features std
     # no_std feature only
-    # TBD: disabled cargo test -p wrt --no-default-features --features no_std
+    cargo test -p wrt --no-default-features --features no_std
     # All features
-    # TBD: disabled cargo test -p wrt --all-features
+    cargo test -p wrt --all-features
 
 # Run tests for the WRT daemon
 test-wrtd:
@@ -467,7 +467,16 @@ clean:
 
 # Install rust targets required for the project
 setup-rust-targets:
-    rustup target add wasm32-wasip2 || rustup target add wasm32-wasip2
+    #!/usr/bin/env bash
+    echo "Installing required Rust targets..."
+
+    # Install the default Rust target for the host system
+    rustup target add wasm32-unknown-unknown || { echo "Failed to install wasm32-unknown-unknown target."; exit 1; }
+
+    # Install the ARMv8 target for Zephyr
+    rustup target add aarch64-unknown-none-softfloat || { echo "Failed to install aarch64-unknown-none-softfloat target."; exit 1; }
+
+    echo "Rust targets installed successfully!"
 
 # Install WebAssembly tools (wasmtime, wasm-tools)
 setup-wasm-tools:
@@ -611,6 +620,118 @@ setup-plantuml:
     fi
     echo "PlantUML test successful!"
 
+# Install Zephyr SDK and QEMU
+setup-zephyr-sdk:
+    #!/usr/bin/env bash
+    echo "Setting up Zephyr SDK and QEMU..."
+
+    # Detect the operating system
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "Detected macOS. Installing Zephyr SDK and QEMU..."
+        
+        # Install QEMU
+        brew install qemu || echo "QEMU installation failed. Please check manually."
+        
+        # Create a Python virtual environment
+        echo "Creating Python virtual environment for Zephyr tools..."
+        python3 -m venv .zephyr-venv || { echo "Failed to create virtual environment."; exit 1; }
+        
+        # Activate the virtual environment
+        source .zephyr-venv/bin/activate || { echo "Failed to activate virtual environment."; exit 1; }
+        
+        # Install west (Zephyr's meta-tool) in the virtual environment
+        pip install west || { echo "Failed to install west."; deactivate; exit 1; }
+        
+        # Provide instructions to source the virtual environment
+        echo "To use the Zephyr tools, activate the virtual environment by running:"
+        echo "  source .zephyr-venv/bin/activate"
+        
+        # Initialize Zephyr workspace locally
+        echo "Initializing Zephyr workspace in .zephyrproject..."
+        mkdir -p .zephyrproject
+        cd .zephyrproject || exit
+        west init -m https://github.com/zephyrproject-rtos/zephyr.git || echo "Failed to initialize Zephyr workspace."
+        west update || echo "Failed to fetch Zephyr modules."
+        west zephyr-export || echo "Failed to export Zephyr environment variables."
+        cd - || exit
+        
+        # Install Zephyr SDK
+        echo "Installing Zephyr SDK..."
+        west sdk-install || echo "Zephyr SDK installation failed. Please check manually."
+        
+        # Verify installation
+        if command -v qemu-system-aarch64 &> /dev/null; then
+            echo "Zephyr SDK and QEMU installed successfully on macOS."
+        else
+            echo "Zephyr SDK or QEMU installation failed. Please verify manually."
+        fi
+
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "Detected Linux. Installing Zephyr SDK and QEMU..."
+        
+        # Install dependencies
+        sudo apt update
+        sudo apt install -y python3-pip python3-venv git wget tar xz-utils build-essential qemu-system-arm qemu-system-aarch64
+        
+        # Create a Python virtual environment
+        echo "Creating Python virtual environment for Zephyr tools..."
+        python3 -m venv .zephyr-venv || { echo "Failed to create virtual environment."; exit 1; }
+        
+        # Activate the virtual environment
+        source .zephyr-venv/bin/activate || { echo "Failed to activate virtual environment."; exit 1; }
+        
+        # Install west (Zephyr's meta-tool) in the virtual environment
+        pip install west || { echo "Failed to install west."; deactivate; exit 1; }
+        
+        # Provide instructions to source the virtual environment
+        echo "To use the Zephyr tools, activate the virtual environment by running:"
+        echo "  source .zephyr-venv/bin/activate"
+        
+        # Initialize Zephyr workspace locally
+        echo "Initializing Zephyr workspace in .zephyrproject..."
+        mkdir -p .zephyrproject
+        cd .zephyrproject || exit
+        west init -m https://github.com/zephyrproject-rtos/zephyr.git || echo "Failed to initialize Zephyr workspace."
+        west update || echo "Failed to fetch Zephyr modules."
+        west zephyr-export || echo "Failed to export Zephyr environment variables."
+        cd - || exit
+        
+        # Install Zephyr SDK
+        echo "Installing Zephyr SDK..."
+        west sdk-install || echo "Zephyr SDK installation failed. Please check manually."
+        
+        # Verify installation
+        if command -v qemu-system-aarch64 &> /dev/null; then
+            echo "Zephyr SDK and QEMU installed successfully on Linux."
+        else
+            echo "Zephyr SDK or QEMU installation failed. Please verify manually."
+        fi
+
+    elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* || "$OSTYPE" == "win"* ]]; then
+        echo "Detected Windows. Installing Zephyr SDK and QEMU..."
+        
+        # Install dependencies
+        echo "Please download and install Python, west, and the Zephyr SDK manually from:"
+        echo "https://docs.zephyrproject.org/latest/develop/getting_started/index.html"
+        
+        echo "Installing QEMU using Chocolatey..."
+        if command -v choco &> /dev/null; then
+            choco install qemu -y || echo "QEMU installation failed. Please check manually."
+        else
+            echo "Chocolatey not found. Please install Chocolatey first or install QEMU manually."
+        fi
+        
+        # Provide instructions for manual setup
+        echo "To use the Zephyr tools on Windows, create a virtual environment and install west manually:"
+        echo "  python -m venv .zephyr-venv"
+        echo "  .zephyr-venv\\Scripts\\activate"
+        echo "  pip install west"
+        echo "Then initialize the Zephyr workspace and install the SDK as described in the documentation."
+    else
+        echo "Unsupported operating system. Please install the Zephyr SDK and QEMU manually."
+        echo "Refer to: https://docs.zephyrproject.org/latest/develop/getting_started/index.html"
+    fi
+
 # Install required tools for development (local development)
 setup: setup-hooks setup-rust-targets setup-wasm-tools setup-python-deps setup-plantuml
     @echo "✅ All development tools installed successfully."
@@ -637,4 +758,4 @@ setup-hooks:
 
 # Show help
 help:
-    @just --list 
+    @just --list

@@ -4,6 +4,8 @@ use crate::values::Value;
 use crate::{format, String, Vec};
 use crate::{Global, Memory, Table};
 #[cfg(not(feature = "std"))]
+use alloc::string::ToString;
+#[cfg(not(feature = "std"))]
 use alloc::vec;
 #[cfg(feature = "std")]
 use std::vec;

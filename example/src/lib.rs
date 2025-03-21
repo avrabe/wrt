@@ -16,44 +16,41 @@ wit_bindgen::generate!({
 
 // Import the generated logging functions
 use example::hello::logging;
+use exports::example::hello::example::Guest;
 
 struct HelloComponent;
 
 // Implement the example interface
-impl exports::example::hello::example::Guest for HelloComponent {
-    // Our main hello function that runs a loop for several iterations
+impl Guest for HelloComponent {
+    // Our main hello function for testing
     fn hello() -> i32 {
-        // Log a message using the imported WASI logging function
-        logging::log(
-            logging::Level::Info,
-            "example",
-            "TEST_MESSAGE: This is a test message from the component",
-        );
+        println!("SIMPLE_TEST: Minimal example with I32 operations");
 
-        let count = 0;
-        // let mut count = 0;
+        // Test I32 operations (these are known to work)
+        let a: i32 = 10;
+        let b: i32 = 20;
 
-        // // Loop for 5 iterations, logging each step
-        // for i in 0..5 {
-        //     count += 1;
+        // Test addition
+        let sum = a + b;
+        println!("I32 Add: 10 + 20 = {}", sum);
 
-        //     // Add some operations to consume more fuel
-        //     let mut _sum = 0;
-        //     for j in 0..i {
-        //         _sum += j;
-        //     }
-        // }
+        // Test subtraction
+        let diff = b - a;
+        println!("I32 Sub: 20 - 10 = {}", diff);
 
-        // // Log completion message
-        // let final_message = format!("Completed {} iterations", count);
-        // logging::log(logging::Level::Info, "example", &final_message);
-        logging::log(
-            logging::Level::Info,
-            "end",
-            "TEST_MESSAGE_END: This is a test message from the component",
-        );
+        // Test multiplication
+        let product = a * b;
+        println!("I32 Mul: 10 * 20 = {}", product);
 
-        // Return total iterations
-        count
+        // Test comparison
+        if a < b {
+            println!("I32 comparison: 10 < 20 (correct)");
+        } else {
+            println!("I32 comparison: 10 >= 20 (wrong)");
+            return 1;
+        }
+
+        // Return the sum as our result
+        sum
     }
 }

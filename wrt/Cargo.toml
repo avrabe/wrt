@@ -4,16 +4,35 @@ version = "0.1.0"
 edition = "2021"
 license.workspace = true
 description = "WebAssembly Runtime Library"
+build = "build.rs"
 
 [dependencies]
-# No dependencies required
+# Dependencies
+log = { version = "0.4", optional = true }
+proptest = "1.0"
+rayon = "1.5"
+structopt = "0.3"
+wabt = "0.10"
+wat = "1.0"
+wast = { version = "227.0.1", features = ["wasm-module", "component-model"] }
+wasm-bindgen-test = "0.3"
+wasm-bindgen-test-macro = "0.3"
 
 [lib]
 name = "wrt"
 path = "src/lib.rs"
+bench = false
 
 [dev-dependencies]
 criterion = "0.5"
+wat = "1.0.53"
+wast = { version = "227.0.1", features = ["wasm-module", "component-model"] }
+wasmparser = "0.116"
+tempfile = "3.8"
+dirs = "5.0"
+wast_proc_macro = { path = "tests/wast_proc_macro" }
+wasm-bindgen-test = "0.3"
+wasm-bindgen-test-macro = "0.3"
 
 [[bench]]
 name = "engine_benchmarks"
@@ -27,5 +46,18 @@ unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] }
 
 [features]
 default = ["std"]
-std = []
+std = ["log"]
 no_std = []
+# Proposal features
+relaxed_simd = []
+gc = []
+function_references = []
+multi_memory = []
+exception_handling = []
+threads = []
+extended_const = []
+tail_call = []
+wasm_3_0 = []
+wide_arithmetic = []
+custom_page_sizes = []
+annotations = []

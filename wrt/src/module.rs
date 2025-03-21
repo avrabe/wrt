@@ -187,8 +187,7 @@ impl Module {
             if section_end > bytes.len() {
                 // For components, we might have sections that extend beyond what we understand
                 // Instead of failing, we'll truncate the section and continue
-                #[cfg(feature = "std")]
-                eprintln!(
+                debug_println!(
                     "WARNING: Section extends beyond end of file, truncating (end: {}, len: {})",
                     section_end,
                     bytes.len()
@@ -648,6 +647,8 @@ fn parse_value_type(byte: u8) -> Result<ValueType> {
         0x7C => Ok(ValueType::F64),
         0x70 => Ok(ValueType::FuncRef),
         0x6F => Ok(ValueType::ExternRef),
+        0x7B => Ok(ValueType::V128),   // Added support for v128 (SIMD)
+        0x0B => Ok(ValueType::AnyRef), // Added support for anyref (reference types proposal)
         _ => Err(Error::Parse(format!("Invalid value type: 0x{:x}", byte))),
     }
 }
@@ -1981,8 +1982,186 @@ fn parse_instruction(bytes: &[u8], depth: &mut i32) -> Result<(Instruction, usiz
             }
         }
 
-        // For unimplemented instructions, log a warning and continue with Nop
-        // This helps us get past parsing issues
+        // SIMD instructions with 0xFD prefix
+        0xFD => {
+            // Read the SIMD sub-opcode
+            if cursor >= bytes.len() {
+                return Err(Error::Parse(
+                    "Unexpected end of 0xFD SIMD instruction".into(),
+                ));
+            }
+
+            let (sub_opcode, bytes_read) = read_leb128_u32(&bytes[cursor..])?;
+            cursor += bytes_read;
+
+            // Parse SIMD instructions
+            match sub_opcode {
+                // v128.load
+                0x00 => {
+                    // Read memory alignment
+                    let (align, bytes_read) = read_leb128_u32(&bytes[cursor..])?;
+                    cursor += bytes_read;
+
+                    // Read memory offset
+                    let (offset, bytes_read) = read_leb128_u32(&bytes[cursor..])?;
+                    cursor += bytes_read;
+
+                    Instruction::V128Load(align, offset)
+                }
+                // v128.store
+                0x0B => {
+                    // Read memory alignment
+                    let (align, bytes_read) = read_leb128_u32(&bytes[cursor..])?;
+                    cursor += bytes_read;
+
+                    // Read memory offset
+                    let (offset, bytes_read) = read_leb128_u32(&bytes[cursor..])?;
+                    cursor += bytes_read;
+
+                    Instruction::V128Store(align, offset)
+                }
+                // v128.const
+                0x0C => {
+                    // Read 16 bytes for v128 constant
+                    if cursor + 16 > bytes.len() {
+                        return Err(Error::Parse(
+                            "Unexpected end of v128.const instruction".into(),
+                        ));
+                    }
+                    let mut value_bytes = [0u8; 16];
+                    value_bytes.copy_from_slice(&bytes[cursor..cursor + 16]);
+                    cursor += 16;
+
+                    #[cfg(feature = "std")]
+                    eprintln!("DEBUG: Parsed V128Const with bytes: {:?}", value_bytes);
+
+                    Instruction::V128Const(value_bytes)
+                }
+                // i8x16.shuffle
+                0x0D => {
+                    // Read 16 lane indices for shuffle
+                    if cursor + 16 > bytes.len() {
+                        return Err(Error::Parse(
+                            "Unexpected end of i8x16.shuffle instruction".into(),
+                        ));
+                    }
+                    let mut lanes = [0u8; 16];
+                    lanes.copy_from_slice(&bytes[cursor..cursor + 16]);
+                    cursor += 16;
+                    Instruction::I8x16Shuffle(lanes)
+                }
+                // i8x16.swizzle
+                0x0E => Instruction::I8x16Swizzle,
+
+                // Splat instructions
+                0x0F => Instruction::I8x16Splat,
+                0x10 => Instruction::I16x8Splat,
+                0x11 => Instruction::I32x4Splat,
+                0x12 => Instruction::I64x2Splat,
+                0x13 => Instruction::F32x4Splat,
+                0x14 => Instruction::F64x2Splat,
+
+                // Lane extract/replace instructions
+                0x15 => {
+                    if cursor >= bytes.len() {
+                        return Err(Error::Parse(
+                            "Unexpected end of i8x16.extract_lane_s instruction".into(),
+                        ));
+                    }
+                    let lane_idx = bytes[cursor];
+                    cursor += 1;
+                    Instruction::I8x16ExtractLaneS(lane_idx)
+                }
+                0x16 => {
+                    if cursor >= bytes.len() {
+                        return Err(Error::Parse(
+                            "Unexpected end of i8x16.extract_lane_u instruction".into(),
+                        ));
+                    }
+                    let lane_idx = bytes[cursor];
+                    cursor += 1;
+                    Instruction::I8x16ExtractLaneU(lane_idx)
+                }
+                0x17 => {
+                    if cursor >= bytes.len() {
+                        return Err(Error::Parse(
+                            "Unexpected end of i8x16.replace_lane instruction".into(),
+                        ));
+                    }
+                    let lane_idx = bytes[cursor];
+                    cursor += 1;
+                    Instruction::I8x16ReplaceLane(lane_idx)
+                }
+                0x18 => {
+                    if cursor >= bytes.len() {
+                        return Err(Error::Parse(
+                            "Unexpected end of i16x8.extract_lane_s instruction".into(),
+                        ));
+                    }
+                    let lane_idx = bytes[cursor];
+                    cursor += 1;
+                    Instruction::I16x8ExtractLaneS(lane_idx)
+                }
+
+                // Handle other SIMD instructions (we'll implement more as needed)
+                // SIMD comparison operations
+                0x23 => Instruction::I8x16Eq,
+                0x24 => Instruction::I8x16Ne,
+                0x25 => Instruction::I8x16LtS,
+                0x26 => Instruction::I8x16LtU,
+                0x27 => Instruction::I8x16GtS,
+                0x28 => Instruction::I8x16GtU,
+
+                // SIMD arithmetic operations
+                0xAE => Instruction::I32x4Add,
+                0xB1 => Instruction::I32x4Sub,
+                0xB5 => Instruction::I32x4Mul,
+                0x4E => Instruction::I32x4DotI16x8S,
+                0x95 => Instruction::I32x4DotI16x8S, // Correct opcode for i32x4.dot_i16x8_s
+                0xBA => Instruction::I32x4DotI16x8S,
+
+                // Relaxed SIMD operations (only if the feature is enabled)
+                #[cfg(feature = "relaxed_simd")]
+                0xFC => Instruction::F32x4RelaxedMin,
+                #[cfg(feature = "relaxed_simd")]
+                0xFD => Instruction::F32x4RelaxedMax,
+                #[cfg(feature = "relaxed_simd")]
+                0xFE => Instruction::F64x2RelaxedMin,
+                #[cfg(feature = "relaxed_simd")]
+                0xFF => Instruction::F64x2RelaxedMax,
+                #[cfg(feature = "relaxed_simd")]
+                0x100 => Instruction::I16x8RelaxedQ15MulrS,
+                #[cfg(feature = "relaxed_simd")]
+                0x101 => Instruction::I16x8RelaxedDotI8x16I7x16S,
+                #[cfg(feature = "relaxed_simd")]
+                0x102 => Instruction::I32x4RelaxedDotI8x16I7x16AddS,
+                #[cfg(feature = "relaxed_simd")]
+                0x103 => Instruction::I8x16RelaxedSwizzle,
+                #[cfg(feature = "relaxed_simd")]
+                0x104 => Instruction::I32x4RelaxedTruncSatF32x4S,
+                #[cfg(feature = "relaxed_simd")]
+                0x105 => Instruction::I32x4RelaxedTruncSatF32x4U,
+                #[cfg(feature = "relaxed_simd")]
+                0x106 => Instruction::I32x4RelaxedTruncSatF64x2SZero,
+                #[cfg(feature = "relaxed_simd")]
+                0x107 => Instruction::I32x4RelaxedTruncSatF64x2UZero,
+
+                // Handle unknown SIMD instructions
+                _ => {
+                    #[cfg(feature = "std")]
+                    eprintln!(
+                        "DEBUG: Unimplemented SIMD instruction: 0xFD 0x{:x}",
+                        sub_opcode
+                    );
+
+                    return Err(Error::Parse(format!(
+                        "Unimplemented SIMD instruction: 0xFD 0x{:x}",
+                        sub_opcode
+                    )));
+                }
+            }
+        }
+
         _ => {
             // Log the unimplemented opcode
             #[cfg(feature = "std")]
@@ -2165,6 +2344,10 @@ fn parse_data_section(module: &mut Module, bytes: &[u8]) -> Result<()> {
 mod tests {
     use super::*;
     use crate::instructions::Instruction;
+    #[cfg(not(feature = "std"))]
+    use alloc::format;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn test_module_creation() {

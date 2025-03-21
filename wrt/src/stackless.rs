@@ -231,8 +231,7 @@ impl StacklessStack {
     pub fn get_label(&self, depth: u32) -> Result<&Label> {
         // If the label stack is empty, create a placeholder label for error recovery
         if self.labels.is_empty() {
-            #[cfg(feature = "std")]
-            eprintln!("Warning: Label stack is empty but branch instruction encountered. Using fake label for recovery.");
+            debug_println!("Warning: Label stack is empty but branch instruction encountered. Using fake label for recovery.");
 
             // Create a placeholder label that branches to instruction 0 (which should be a safe location)
             // By returning a fake label instead of an error, we allow execution to continue
@@ -254,8 +253,7 @@ impl StacklessStack {
         match self.labels.get(idx) {
             Some(label) => Ok(label),
             None => {
-                #[cfg(feature = "std")]
-                eprintln!(
+                debug_println!(
                     "Warning: Label at depth {} not found. Using fake label for recovery.",
                     depth
                 );
@@ -338,8 +336,7 @@ impl StacklessStack {
             Some(frame) => Ok(frame),
             None => {
                 // This is a major error, but we'll try to recover with a placeholder frame
-                #[cfg(feature = "std")]
-                eprintln!("Warning: No active frame but trying to continue execution with placeholder frame.");
+                debug_println!("Warning: No active frame but trying to continue execution with placeholder frame.");
 
                 // In a real world application, this would be handled differently
                 // For now, we'll just return an error since creating a valid Frame
@@ -580,8 +577,7 @@ impl StacklessEngine {
 
             // Skip if memory doesn't exist
             if memory_idx >= self.instances[instance_idx as usize].memories.len() {
-                #[cfg(feature = "std")]
-                eprintln!(
+                debug_println!(
                     "Skipping data segment for non-existent memory {}",
                     memory_idx
                 );
@@ -593,8 +589,7 @@ impl StacklessEngine {
                 match &data_segment.offset[0] {
                     Instruction::I32Const(val) => *val as u32,
                     _ => {
-                        #[cfg(feature = "std")]
-                        eprintln!(
+                        debug_println!(
                             "Unsupported offset expression in data segment: {:?}",
                             data_segment.offset
                         );
@@ -602,13 +597,13 @@ impl StacklessEngine {
                     }
                 }
             } else {
-                #[cfg(feature = "std")]
-                eprintln!("Unsupported offset expression in data segment (not a single constant)");
+                debug_println!(
+                    "Unsupported offset expression in data segment (not a single constant)"
+                );
                 continue;
             };
 
-            #[cfg(feature = "std")]
-            eprintln!("Data segment with offset {} from instruction", offset);
+            debug_println!("Data segment with offset {} from instruction", offset);
 
             // Store the information for writing later
             data_to_write.push((memory_idx, offset, data_segment.init.clone()));
@@ -623,10 +618,7 @@ impl StacklessEngine {
 
                 if is_likely_string && memory_idx == 0 {
                     offset = 1048576; // The canonical memory base address for most WebAssembly modules
-                    #[cfg(feature = "std")]
-                    eprintln!(
-                        "Adjusting data segment offset from 0 to 1048576 because it appears to contain string data"
-                    );
+                    debug_println!("Adjusting data segment offset from 0 to 1048576 because it appears to contain string data");
                 }
             }
 
@@ -635,8 +627,7 @@ impl StacklessEngine {
                 .write_bytes(offset, &data)
             {
                 Ok(()) => {
-                    #[cfg(feature = "std")]
-                    eprintln!(
+                    debug_println!(
                         "Wrote data segment to memory {}: {} bytes at offset {}",
                         memory_idx,
                         data.len(),
@@ -644,10 +635,10 @@ impl StacklessEngine {
                     );
                 }
                 Err(_e) => {
-                    #[cfg(feature = "std")]
-                    eprintln!(
+                    debug_println!(
                         "Failed to write data segment to memory {}: {}",
-                        memory_idx, _e
+                        memory_idx,
+                        _e
                     );
                 }
             }
@@ -1048,6 +1039,107 @@ impl StacklessEngine {
                 self.stack.push(Value::I32(if a > b { 1 } else { 0 }));
                 self.stack.set_pc(pc + 1);
             }
+            Instruction::ReturnCall(func_idx) => {
+                // First gather all the info we need from the frame
+                let table_addr;
+                let function_type;
+                let return_pc;
+                let instance_idx;
+
+                // Scope to limit the borrow of self.stack
+                {
+                    let frame = self.stack.current_frame()?;
+                    table_addr = frame.module.table_addrs[0].clone();
+                    return_pc = frame.return_pc;
+                    instance_idx = table_addr.instance_idx;
+
+                    // Get the function type
+                    let func = &frame.module.module.functions[*func_idx as usize];
+                    function_type = frame.module.module.types[func.type_idx as usize].clone();
+                }
+
+                // Get return arity from function type
+                let return_arity = function_type.results.len();
+
+                // Collect arguments from the stack
+                let mut args = Vec::new();
+                for _ in 0..return_arity {
+                    if let Ok(value) = self.stack.pop() {
+                        args.push(value);
+                    }
+                }
+                args.reverse(); // Maintain expected order
+
+                // Call the function with tail call optimization
+                // Note: We don't increment PC since we're replacing the current frame
+                self.stack
+                    .call_function(instance_idx, *func_idx, args, return_pc)?;
+            }
+            Instruction::ReturnCallIndirect(type_idx, table_idx) => {
+                // First gather all the info we need from the frame
+                let table_addr;
+                let expected_type;
+                let return_pc;
+
+                // Scope to limit the borrow of self.stack
+                {
+                    let frame = self.stack.current_frame()?;
+                    table_addr = frame.module.table_addrs[*table_idx as usize].clone();
+                    return_pc = frame.return_pc;
+                    expected_type = frame.module.module.types[*type_idx as usize].clone();
+                }
+
+                // Pop the function index from the stack
+                let func_idx = self
+                    .stack
+                    .pop()?
+                    .as_i32()
+                    .ok_or_else(|| Error::Execution("Expected i32 function index".into()))?;
+
+                // Get the instance
+                let instance = &self.instances[table_addr.instance_idx as usize];
+
+                // Verify function index is valid
+                if func_idx < 0 || func_idx as usize >= instance.module.functions.len() {
+                    return Err(Error::Execution(format!(
+                        "Invalid function index in table: {}",
+                        func_idx
+                    )));
+                }
+
+                // Get the function type
+                let func = &instance.module.functions[func_idx as usize];
+                let func_type = &instance.module.types[func.type_idx as usize];
+
+                // Verify function type matches
+                if func_type != &expected_type {
+                    return Err(Error::Execution(format!(
+                        "Function type mismatch in indirect call: expected {:?}, got {:?}",
+                        expected_type, func_type
+                    )));
+                }
+
+                // Get return arity from function type
+                let return_arity = func_type.results.len();
+
+                // Collect arguments from the stack
+                let mut args = Vec::new();
+                for _ in 0..return_arity {
+                    if let Ok(value) = self.stack.pop() {
+                        args.push(value);
+                    }
+                }
+                args.reverse(); // Maintain expected order
+
+                // Call the function with tail call optimization
+                // Note: We don't increment PC since we're replacing the current frame
+                self.stack.call_function(
+                    table_addr.instance_idx,
+                    func_idx as u32,
+                    args,
+                    return_pc,
+                )?;
+            }
             // Add cases for other instructions...
             _ => {
                 // For now, we'll just advance the PC
@@ -1215,6 +1307,11 @@ impl StacklessEngine {
     /// Resets execution statistics
     fn reset_stats(&mut self) {
         self.stats = ExecutionStats::default();
+    }
+
+    /// Returns true if the engine has no instances
+    pub fn has_no_instances(&self) -> bool {
+        self.instances.is_empty()
     }
 }
 

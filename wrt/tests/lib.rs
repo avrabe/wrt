@@ -1,6 +1,18 @@
 use std::str::FromStr;
 use wrt::*;
 
+// Include our WebAssembly spec test modules
+#[cfg(test)]
+mod simple_spec_tests;
+
+// Include SIMD instruction tests
+#[cfg(test)]
+mod simd_tests;
+
+// Include WebAssembly testsuite tests
+#[cfg(test)]
+mod wasm_testsuite;
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -3,7 +3,7 @@ use std::fmt;
 use crate::{String, Vec};
 
 /// Represents a WebAssembly value type
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy, Eq, Hash)]
 pub enum ValueType {
     /// 32-bit integer
     I32,
@@ -17,6 +17,10 @@ pub enum ValueType {
     FuncRef,
     /// External reference
     ExternRef,
+    /// 128-bit vector for SIMD operations
+    V128,
+    /// Any reference type (reference types proposal)
+    AnyRef,
 }
 
 /// Represents a WebAssembly function type
@@ -120,6 +124,8 @@ impl fmt::Display for ValueType {
             ValueType::F64 => write!(f, "f64"),
             ValueType::FuncRef => write!(f, "funcref"),
             ValueType::ExternRef => write!(f, "externref"),
+            ValueType::V128 => write!(f, "v128"),
+            ValueType::AnyRef => write!(f, "anyref"),
         }
     }
 }
@@ -130,21 +136,30 @@ impl ValueType {
         match self {
             ValueType::I32 | ValueType::F32 => 4,
             ValueType::I64 | ValueType::F64 => 8,
-            ValueType::FuncRef | ValueType::ExternRef => 8,
+            ValueType::FuncRef | ValueType::ExternRef | ValueType::AnyRef => 8,
+            ValueType::V128 => 16,
         }
     }
 
     /// Returns whether the value type is a reference type
     pub fn is_ref(&self) -> bool {
-        matches!(self, ValueType::FuncRef | ValueType::ExternRef)
+        matches!(
+            self,
+            ValueType::FuncRef | ValueType::ExternRef | ValueType::AnyRef
+        )
     }
 
     /// Returns whether the value type is a numeric type
     pub fn is_numeric(&self) -> bool {
         matches!(
             self,
-            ValueType::I32 | ValueType::I64 | ValueType::F32 | ValueType::F64
+            ValueType::I32 | ValueType::I64 | ValueType::F32 | ValueType::F64 | ValueType::V128
         )
+    }
+
+    /// Returns whether the value type is a vector type
+    pub fn is_vector(&self) -> bool {
+        matches!(self, ValueType::V128)
     }
 }
 
@@ -232,6 +247,8 @@ impl ComponentType {
 mod tests {
     use super::*;
     use crate::values::Value;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn test_value_type_equality() {

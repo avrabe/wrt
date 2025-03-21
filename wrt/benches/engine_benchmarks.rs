@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use wrt::{
     new_engine, new_stackless_engine, BlockType, FuncType, Function, Instruction, Module, Value,
     ValueType,
@@ -29,41 +29,27 @@ fn create_test_module() -> Module {
     module
 }
 
-fn create_complex_module() -> Module {
-    let mut module = Module::new();
-
-    // Function type (i32) -> i32
-    let func_type = FuncType {
-        params: vec![ValueType::I32],
-        results: vec![ValueType::I32],
-    };
-    module.types.push(func_type);
-
-    // Create a recursive countdown function that adds numbers from n down to 0
-    let function = Function {
-        type_idx: 0,
-        locals: vec![],
-        body: vec![
-            // if n == 0 return 0
-            Instruction::LocalGet(0),
-            Instruction::I32Const(0),
-            Instruction::I32Eq,
-            Instruction::If(BlockType::Type(ValueType::I32)),
-            Instruction::I32Const(0),
-            Instruction::Else,
-            // else return n + countdown(n-1)
-            Instruction::LocalGet(0),
-            Instruction::I32Const(1),
-            Instruction::I32Sub,
-            Instruction::Call(0),
-            Instruction::LocalGet(0),
-            Instruction::I32Add,
-            Instruction::End,
-        ],
-    };
-    module.functions.push(function);
-
-    module
+fn create_complex_module() -> Vec<u8> {
+    // Create a module that takes a number n and:
+    // 1. Adds 5 to n
+    // 2. Adds n to itself
+    // 3. Subtracts original n
+    // Result: n + 5 + n - n = n + 5
+    wat::parse_str(
+        r#"(module
+            (func (export "compute") (param i32) (result i32)
+                local.get 0     ;; get n
+                i32.const 5     ;; push 5
+                i32.add        ;; n + 5
+                local.get 0     ;; get n again
+                i32.add        ;; (n + 5) + n
+                local.get 0     ;; get n one more time
+                i32.sub        ;; ((n + 5) + n) - n = n + 5
+            )
+        )"#,
+    )
+    .unwrap()
+    .into()
 }
 
 fn create_memory_module() -> Module {
@@ -160,7 +146,10 @@ fn benchmark_complex_execution(c: &mut Criterion) {
     let mut group = c.benchmark_group("Complex Module Execution");
 
     // Create a complex module with multiple functions and control flow
-    let module = create_complex_module();
+    let wasm_bytes = create_complex_module();
+
+    // Create an empty module and load it from binary
+    let module = Module::new().load_from_binary(&wasm_bytes).unwrap();
 
     group.bench_function("normal_engine", |b| {
         b.iter(|| {
@@ -193,7 +182,9 @@ fn benchmark_memory_operations(c: &mut Criterion) {
         b.iter(|| {
             let mut engine = wrt::new_engine();
             engine.instantiate(module.clone()).unwrap();
-            engine.execute(0, 0, vec![]).unwrap()
+            engine
+                .execute(0, 0, vec![Value::I32(5), Value::I32(3)])
+                .unwrap()
         })
     });
 
@@ -201,7 +192,9 @@ fn benchmark_memory_operations(c: &mut Criterion) {
         b.iter(|| {
             let mut engine = wrt::new_stackless_engine();
             let instance_idx = engine.instantiate(module.clone()).unwrap();
-            engine.execute(instance_idx, 0, vec![]).unwrap()
+            engine
+                .execute(instance_idx, 0, vec![Value::I32(5), Value::I32(3)])
+                .unwrap()
         })
     });
 

@@ -3,6 +3,8 @@
 #[cfg(not(feature = "std"))]
 use core::cell::UnsafeCell;
 #[cfg(not(feature = "std"))]
+use core::fmt;
+#[cfg(not(feature = "std"))]
 use core::ops::{Deref, DerefMut};
 
 /// A simple mutex implementation for no_std environments
@@ -11,6 +13,7 @@ use core::ops::{Deref, DerefMut};
 /// provide thread safety. In a real implementation, we'd use
 /// a proper no_std mutex like spin::Mutex.
 #[cfg(not(feature = "std"))]
+#[derive(Debug)]
 pub struct Mutex<T> {
     data: UnsafeCell<T>,
 }
@@ -65,9 +68,25 @@ unsafe impl<T: Send> Send for MutexGuard<'_, T> {}
 #[cfg(not(feature = "std"))]
 unsafe impl<T: Sync> Sync for MutexGuard<'_, T> {}
 
+// Add a Debug implementation for MutexGuard
+#[cfg(not(feature = "std"))]
+impl<T: fmt::Debug> fmt::Debug for MutexGuard<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MutexGuard")
+            .field("value", &**self)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::String;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
 
     #[test]
     fn test_mutex_creation() {

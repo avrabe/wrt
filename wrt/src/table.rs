@@ -4,10 +4,10 @@ use crate::values::Value;
 use crate::Vec;
 
 /// Represents a WebAssembly table instance
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Table {
     /// Table type
-    table_type: TableType,
+    pub type_: TableType,
     /// Table elements
     elements: Vec<Option<Value>>,
 }
@@ -17,7 +17,7 @@ impl Table {
     pub fn new(table_type: TableType) -> Self {
         let initial_size = table_type.min;
         Self {
-            table_type,
+            type_: table_type,
             elements: {
                 let mut v = Vec::with_capacity(initial_size as usize);
                 v.resize(initial_size as usize, None);
@@ -28,7 +28,7 @@ impl Table {
 
     /// Returns the table type
     pub fn type_(&self) -> &TableType {
-        &self.table_type
+        &self.type_
     }
 
     /// Returns the current size
@@ -43,7 +43,7 @@ impl Table {
             .checked_add(delta)
             .ok_or_else(|| Error::Execution("Table size overflow".into()))?;
 
-        if new_size > self.table_type.max.unwrap_or(u32::MAX) {
+        if new_size > self.type_.max.unwrap_or(u32::MAX) {
             return Err(Error::Execution("Table size exceeds maximum".into()));
         }
 
@@ -129,6 +129,8 @@ impl Table {
 mod tests {
     use super::*;
     use crate::values::Value;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     fn create_test_table_type(min: u32, max: Option<u32>) -> TableType {
         TableType {

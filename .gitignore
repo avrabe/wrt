@@ -8,4 +8,15 @@ example/hello-world.wasm
 # Ignore all WASM files but keep WAT files which are the source format
 *.wasm
 
+# Ignore local Zephyr workspace
+.zephyrproject/
+.zephyr-venv/
+
+# Ignore external test repositories
+external/
+
+# Ignore duplicated directories
+wrt/wrt/
+
+
 

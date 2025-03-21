@@ -28,6 +28,24 @@ pub struct Engine {
     stats: ExecutionStats,
     /// Callback registry for host functions (logging, etc.)
     callbacks: Arc<Mutex<CallbackRegistry>>,
+    /// Module
+    module: Module,
+    /// Memories
+    memories: Vec<Memory>,
+    /// Tables
+    tables: Vec<Table>,
+    /// Globals
+    globals: Vec<Global>,
+    /// Functions
+    functions: Vec<Function>,
+    /// Function imports
+    function_imports: Vec<Function>,
+    /// Maximum call depth
+    max_call_depth: Option<usize>,
+    /// Polling loop counter
+    polling_loop_counter: usize,
+    /// Dropped elements
+    dropped_elems: HashSet<(u32, u32)>,
 }
 
 impl Default for Engine {
@@ -38,14 +56,23 @@ impl Default for Engine {
 
 impl Engine {
     /// Creates a new execution engine
-    pub fn new() -> Self {
+    pub fn new(module: Module) -> Self {
         Self {
             stack: Stack::new(),
             instances: Vec::new(),
             fuel: None, // No fuel limit by default
             state: ExecutionState::Idle,
             stats: ExecutionStats::default(),
-            callbacks: Arc::new(Mutex::new(CallbackRegistry::new())),
+            callbacks: Arc::new(Mutex::new(CallbackRegistry::default())),
+            module,
+            memories: Vec::new(),
+            tables: Vec::new(),
+            globals: Vec::new(),
+            functions: Vec::new(),
+            function_imports: Vec::new(),
+            max_call_depth: None,
+            polling_loop_counter: 0,
+            dropped_elems: HashSet::new(),
         }
     }
 
@@ -91,14 +118,14 @@ mod tests {
 
     #[test]
     fn test_engine_creation() {
-        let engine = Engine::new();
+        let engine = Engine::new(Module::default());
         // Engine starts with empty stack and no instances
         assert!(engine.instances.is_empty());
     }
 
     #[test]
     fn test_engine_creation_and_fuel() {
-        let mut engine = Engine::new();
+        let mut engine = Engine::new(Module::default());
 
         // Test initial state
         assert!(matches!(engine.state(), ExecutionState::Idle));
@@ -114,7 +141,7 @@ mod tests {
 
     #[test]
     fn test_engine_stats() {
-        let mut engine = Engine::new();
+        let mut engine = Engine::new(Module::default());
 
         // Test initial stats
         let stats = engine.stats();
@@ -133,7 +160,7 @@ mod tests {
 
     #[test]
     fn test_engine_callbacks() {
-        let engine = Engine::new();
+        let engine = Engine::new(Module::default());
         let callbacks = engine.callbacks();
 
         // Test log handler registration with correct LogOperation type

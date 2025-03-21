@@ -40,6 +40,12 @@ pub enum Value {
     /// External reference value, containing an optional reference index
     ExternRef(Option<u32>),
 
+    /// Any reference value, containing an optional reference index
+    AnyRef(Option<u32>),
+
+    /// 128-bit SIMD vector value
+    V128(u128),
+
     /// Record value from the component model, containing named fields
     /// with their corresponding values
     Record(Vec<(String, Box<Value>)>),
@@ -121,6 +127,8 @@ impl Value {
             ValueType::F64 => Value::F64(0.0),
             ValueType::FuncRef => Value::FuncRef(None),
             ValueType::ExternRef => Value::ExternRef(None),
+            ValueType::V128 => Value::V128(0),
+            ValueType::AnyRef => Value::AnyRef(None),
         }
     }
 
@@ -149,6 +157,8 @@ impl Value {
             Value::F64(_) => ValueType::F64,
             Value::FuncRef(_) => ValueType::FuncRef,
             Value::ExternRef(_) => ValueType::ExternRef,
+            Value::V128(_) => ValueType::V128,
+            Value::AnyRef(_) => ValueType::AnyRef,
             Value::Record(_) => ValueType::I32,
             Value::Tuple(_) => ValueType::I32,
             Value::List(_) => ValueType::I32,
@@ -183,7 +193,28 @@ impl Value {
     /// assert!(!value.matches_type(&ValueType::I64));
     /// ```
     pub fn matches_type(&self, ty: &ValueType) -> bool {
-        self.type_() == *ty
+        match (self, ty) {
+            (Value::I32(_), ValueType::I32) => true,
+            (Value::I64(_), ValueType::I64) => true,
+            (Value::F32(_), ValueType::F32) => true,
+            (Value::F64(_), ValueType::F64) => true,
+            (Value::FuncRef(_), ValueType::FuncRef) => true,
+            (Value::ExternRef(_), ValueType::ExternRef) => true,
+            (Value::V128(_), ValueType::V128) => true,
+            (Value::AnyRef(_), ValueType::AnyRef) => true,
+            (Value::Record(_), ValueType::I32) => true,
+            (Value::Tuple(_), ValueType::I32) => true,
+            (Value::List(_), ValueType::I32) => true,
+            (Value::Flags(_), ValueType::I32) => true,
+            (Value::Variant(_, _), ValueType::I32) => true,
+            (Value::Enum(_), ValueType::I32) => true,
+            (Value::Union(_), ValueType::I32) => true,
+            (Value::Option(_), ValueType::I32) => true,
+            (Value::Result(_), ValueType::I32) => true,
+            (Value::Future(_), ValueType::I32) => true,
+            (Value::Stream { .. }, ValueType::I32) => true,
+            _ => false,
+        }
     }
 
     /// Attempts to extract an i32 value if this Value is an I32.
@@ -613,6 +644,26 @@ impl Value {
             _ => None,
         }
     }
+
+    /// Get the SIMD v128 value, if this is a V128 value
+    pub fn as_v128(&self) -> Option<u128> {
+        match self {
+            Value::V128(val) => Some(*val),
+            _ => None,
+        }
+    }
+
+    /// Attempts to extract an anyref value if this Value is an AnyRef.
+    ///
+    /// # Returns
+    ///
+    /// Some reference to the anyref value if this is an AnyRef value, None otherwise
+    pub fn as_any_ref(&self) -> Option<Option<u32>> {
+        match self {
+            Value::AnyRef(ref_idx) => Some(*ref_idx),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for Value {
@@ -622,9 +673,14 @@ impl fmt::Display for Value {
             Value::I64(v) => write!(f, "i64: {}", v),
             Value::F32(v) => write!(f, "f32: {}", v),
             Value::F64(v) => write!(f, "f64: {}", v),
-            Value::FuncRef(v) => write!(f, "funcref: {:?}", v),
-            Value::ExternRef(v) => write!(f, "externref: {:?}", v),
-            Value::Record(v) => write!(f, "record: {:?}", v),
+            Value::FuncRef(Some(v)) => write!(f, "funcref: {}", v),
+            Value::FuncRef(None) => write!(f, "funcref: null"),
+            Value::ExternRef(Some(v)) => write!(f, "externref: {}", v),
+            Value::ExternRef(None) => write!(f, "externref: null"),
+            Value::AnyRef(Some(v)) => write!(f, "anyref: {}", v),
+            Value::AnyRef(None) => write!(f, "anyref: null"),
+            Value::V128(v) => write!(f, "v128: 0x{:032x}", v),
+            Value::Record(fields) => write!(f, "record: {:?}", fields),
             Value::Tuple(v) => write!(f, "tuple: {:?}", v),
             Value::List(v) => write!(f, "list: {:?}", v),
             Value::Flags(v) => write!(f, "flags: {:?}", v),
@@ -642,6 +698,12 @@ impl fmt::Display for Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::format;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn test_value_creation_and_type() {
@@ -816,8 +878,8 @@ mod tests {
         assert_eq!(Value::F64(3.14159).to_string(), "f64: 3.14159");
 
         // Test reference display
-        assert_eq!(Value::FuncRef(Some(1)).to_string(), "funcref: Some(1)");
-        assert_eq!(Value::ExternRef(None).to_string(), "externref: None");
+        assert_eq!(Value::FuncRef(Some(1)).to_string(), "funcref: 1");
+        assert_eq!(Value::ExternRef(None).to_string(), "externref: null");
 
         // Test component model value display
         let record = Value::Record(vec![("field1".to_string(), Box::new(Value::I32(1)))]);
