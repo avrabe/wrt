@@ -20,7 +20,7 @@ serde_json = { version = "1.0", optional = true }
 bincode = { version = "1.3", optional = true }
 
 # For no_std support
-spin = { version = "0.9.8", default-features = false, features = ["spin_mutex"], optional = true }
+spin = { version = "0.10.0", default-features = false, features = ["spin_mutex"], optional = true }
 num-traits = "0.2.19"
 
 [lib]
