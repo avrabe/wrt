@@ -1,7 +1,10 @@
+use wrt::interface::{CanonicalABI, InterfaceValue};
+use wrt::resource::ResourceData;
 use wrt::resource::ResourceRepresentation;
+use wrt::resource::ResourceTable;
 use wrt::resource::ResourceType;
 use wrt::types::*;
-use wrt::{CanonicalABI, Component, Error, InterfaceValue, ResourceTable, Result, ValueType};
+use wrt::{Component, Error, Result, ValueType};
 
 use std::sync::Arc;
 
@@ -89,7 +92,7 @@ fn test_resource_handling() -> Result<()> {
         value: String,
     }
 
-    impl wrt::ResourceData for TestResourceData {
+    impl ResourceData for TestResourceData {
         // ResourceData requires Debug + Send + Sync and as_any
         fn as_any(&self) -> &dyn std::any::Any {
             self

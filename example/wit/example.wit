@@ -1,34 +1,20 @@
-package example:hello;
+package example:hello-world@0.1.0;
 
 // Define the imported WASI logging interface
-interface logging {
-    // A log level, describing a kind of message.
-    enum level {
-       trace,
-       debug,
-       info,
-       warn,
-       error,
-       critical,
-    }
-
-    // Emit a log message with level, context, and message.
-    log: func(level: level, context: string, message: string);
-}
+use wasi:logging/logging@0.2.0;
 
 // Define our main component interface
-interface example {
-    // Main function that runs a loop for 100 iterations
-    // and logs the counter for each iteration
-    // Returns the total number of iterations completed
+interface greeter {
+    // Main function that runs a simple test and logs steps
+    // Returns an i32 result (e.g., 0 for success, non-zero for failure)
     hello: func() -> s32;
 }
 
 // Define our world
-world hello {
+world hello-world {
     // Import logging interface
     import logging;
     
     // Export our main interface
-    export example;
+    export greeter;
 }

@@ -27,6 +27,8 @@ WRT is a pure Rust implementation of a WebAssembly runtime that supports both th
 
 - Rust 1.70 or newer
 - For development: [just](https://github.com/casey/just) command runner
+- Python 3 (for documentation and hooks)
+- Java (optional, for PlantUML diagrams in documentation)
 
 ```bash
 # Install Rust (if not already installed)
@@ -35,8 +37,15 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 # Install just command runner
 cargo install just
 
-# Setup project dependencies
+# Setup project dependencies (installs Rust targets, Wasm tools, Python deps, etc.)
+# Note: May require manual steps on Windows for PlantUML/Java.
 just setup
+
+# Alternatively, install components individually:
+# just setup-rust-targets
+# just setup-wasm-tools
+# just setup-python-deps
+# just setup-plantuml # (Requires manual steps on Windows)
 ```
 
 ## Getting Started
@@ -60,10 +69,11 @@ just build-example  # Build the example component
 The project includes an example WebAssembly component that demonstrates basic functionality:
 
 ```bash
-# Build and run the example
-just build-example
-just link-example
+# Build and run the example using wasmtime
 just run-example
+
+# Build and run the example using wrtd
+just test-wrtd-example
 ```
 
 ### Using WRT in Your Project
@@ -121,16 +131,17 @@ just build
 just test
 
 # Generate code coverage report
-just coverage      # Creates HTML report at target/coverage/html/index.html
+just coverage      # Creates HTML report at target/coverage/tarpaulin-report.html
 
 # Code quality checks
 just check
-just check-imports  # Check import organization
-just check-udeps    # Check for unused dependencies 
+just check-imports  # Check import organization (via xtask)
+just check-udeps    # Check for unused dependencies (via cargo-machete)
 just check-all      # Run all checks
 
 # Documentation
-just docs-html      # Build HTML documentation
+just docs           # Build HTML documentation with diagrams (Default)
+just docs-html      # Build basic HTML documentation
 just docs-pdf       # Build PDF documentation (requires LaTeX)
 
 # Clean build artifacts
@@ -157,13 +168,15 @@ WRT uses two documentation systems:
 1. **Rust API Documentation**: Generated with `cargo doc`
 
    ```bash
-   cargo doc --open
+   # Build docs for all workspace members (excluding xtask)
+   cargo doc --workspace --exclude xtask --all-features --open
    ```
 
 2. **Requirements and Specifications**: Using Sphinx with sphinx-needs
 
    ```bash
-   just docs-html
+   # Build Sphinx docs (HTML with diagrams by default)
+   just docs
    # Documentation will be available in docs/_build/html
    ```
 

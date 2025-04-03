@@ -1,6 +1,9 @@
 use crate::String;
 use std::boxed::Box;
 use std::fmt;
+use wast::Error as WastError;
+#[cfg(feature = "wat-parsing")]
+use wat::Error as WatError;
 
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
@@ -48,6 +51,9 @@ pub enum Error {
     /// This is useful for extension points or for wrapping errors from
     /// other libraries.
     Custom(String),
+
+    /// Represents accessing memory, table, or other indexed resource outside its limits.
+    OutOfBounds,
 
     /// Represents a stack underflow error that occurs when trying to pop from an empty stack.
     StackUnderflow,
@@ -670,9 +676,27 @@ pub enum Error {
     /// Represents an error when a function reference is null.
     NullFunctionReference,
 
+    /// Represents an error when parsing a hexadecimal floating point literal fails.
+    InvalidHexFloat { message: String },
+
     /// Represents a state change in the execution engine.
     /// This is not a true error but a signal that execution state has changed.
     StateChange(Box<crate::stackless::StacklessExecutionState>),
+
+    /// Represents an error when a lock could not be acquired (poisoned).
+    PoisonError(String),
+
+    /// Represents an error when a memory grows beyond its limit.
+    MemoryGrowError(String),
+
+    /// Represents an error when accessing memory out of bounds.
+    MemoryAccessOutOfBounds(String),
+
+    /// Represents an error when accessing an element out of bounds.
+    InvalidElementAccess(String),
+
+    /// Represents an error when an element index is invalid.
+    InvalidElementIndex(u32),
 }
 
 impl Clone for Error {
@@ -705,9 +729,17 @@ impl Error {
 /// A Result type that uses the Error type.
 pub type Result<T> = std::result::Result<T, Error>;
 
-impl From<wat::Error> for Error {
-    fn from(e: wat::Error) -> Self {
-        Self::Parse(e.to_string())
+/// Implement conversion from wast::Error to wrt::Error.
+impl From<WastError> for Error {
+    fn from(err: WastError) -> Self {
+        Error::Parse(err.to_string())
+    }
+}
+
+#[cfg(feature = "wat-parsing")]
+impl From<WatError> for Error {
+    fn from(err: WatError) -> Self {
+        Error::Parse(err.to_string())
     }
 }
 
@@ -721,6 +753,7 @@ impl fmt::Display for Error {
             Self::Parse(msg) => write!(f, "Parse error: {msg}"),
             Self::Component(msg) => write!(f, "Component error: {msg}"),
             Self::Custom(msg) => write!(f, "Custom error: {msg}"),
+            Self::OutOfBounds => write!(f, "Out of bounds"),
             Self::StackUnderflow => write!(f, "Stack underflow"),
             Self::Serialization(msg) => write!(f, "Serialization error: {msg}"),
             Self::ExportNotFound(name) => write!(f, "Export not found: {name}"),
@@ -783,6 +816,12 @@ impl fmt::Display for Error {
             Self::InvalidCustom(msg) => write!(f, "Invalid custom: {msg}"),
             Self::InvalidVersion(msg) => write!(f, "Invalid version: {msg}"),
             Self::PoisonedLock => write!(f, "Poisoned lock"),
+            Self::InvalidHexFloat { message } => write!(f, "Invalid hexadecimal float: {message}"),
+            Self::PoisonError(msg) => write!(f, "Poison error: {msg}"),
+            Self::MemoryGrowError(msg) => write!(f, "Memory grow error: {msg}"),
+            Self::MemoryAccessOutOfBounds(msg) => write!(f, "Memory access out of bounds: {msg}"),
+            Self::InvalidElementAccess(msg) => write!(f, "Invalid element access: {msg}"),
+            Self::InvalidElementIndex(idx) => write!(f, "Invalid element index: {idx}"),
             // Add any other variants as needed
             _ => write!(f, "Unknown error: {self:?}"),
         }
@@ -811,8 +850,18 @@ impl fmt::Debug for Error {
             Self::StateChange(state) => write!(f, "StateChange({state:?})"),
             Self::PoisonedLock => write!(f, "PoisonedLock"),
             Self::TypeMismatch(msg) => write!(f, "TypeMismatch({msg})"),
+            Self::InvalidHexFloat { message } => write!(f, "InvalidHexFloat({message})"),
+            Self::PoisonError(msg) => write!(f, "PoisonError({msg})"),
             // Add a catch-all for all other variants to prevent future issues
             _ => write!(f, "{self}"),
         }
+    }
+}
+
+// Implement From<std::io::Error> for wrt::Error
+#[cfg(feature = "std")]
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
+        Error::IO(err.to_string())
     }
 }

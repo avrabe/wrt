@@ -1,4 +1,6 @@
-use wrt::{Engine, Error, Module, Result, Value};
+use std::path::PathBuf;
+
+use wrt::{Error, Module, Result, StacklessEngine, Value};
 
 /// Test bitwise operations independently
 #[test]
@@ -32,11 +34,11 @@ fn test_bitwise_operations() -> Result<()> {
         .map_err(|e| Error::Parse(format!("Failed to parse WAT: {}", e)))?;
 
     // Create a module
-    let mut module = Module::new();
+    let mut module = Module::new()?;
     let module = module.load_from_binary(&wasm_binary)?;
 
     // Create an engine
-    let mut engine = Engine::new(module.clone());
+    let mut engine = StacklessEngine::new_with_module(module.clone());
 
     // Instantiate the module
     engine.instantiate(module)?;

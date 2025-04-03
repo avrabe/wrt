@@ -2,10 +2,9 @@
 //! This test demonstrates using the memory search functionality.
 
 use wrt::memory::Memory;
-use wrt::stackless::MemoryAddr;
+use wrt::module_instance::MemoryAddr;
 use wrt::types::MemoryType;
 use wrt::Module;
-use wrt::{Export, ExportKind};
 
 /// A simple memory search test
 ///
@@ -44,15 +43,19 @@ fn test_memory_search() {
     }
 
     // Create a module for Engine tests
-    let mut module = Module::new();
+    let mut module = Module::new().unwrap();
 
-    // Add memory export to the module
-    module.memories.push(MemoryType { min: 1, max: None });
-    module.exports.push(Export {
-        name: "memory".to_string(),
-        kind: ExportKind::Memory,
-        index: 0,
-    });
+    // Add memory export to the module (using the new API)
+    {
+        use std::sync::Arc;
+        let memory_type = MemoryType { min: 1, max: None };
+        let memory = Memory::new(memory_type);
+        let mut memories = module.memories.write().unwrap();
+        memories.push(Arc::new(memory));
+    }
+
+    // Add memory export
+    module.add_memory_export("memory".to_string(), 0);
 
     println!("\nSkipping engine memory search test - functionality not implemented yet");
     println!("\nMemory search test complete!");

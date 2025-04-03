@@ -1,4 +1,8 @@
-use wrt::{Engine, Error as WrtError, Module, Result, Value};
+use std::{
+    // path::{Path, PathBuf}, // Remove unused
+    sync::{Arc, Mutex},
+};
+use wrt::{Error as WrtError, Module, Result, StacklessEngine, Value};
 
 #[test]
 fn test_v128_load_store() -> Result<()> {
@@ -9,51 +13,49 @@ fn test_v128_load_store() -> Result<()> {
       (export "memory" (memory 0))
       
       ;; Store a v128 constant in memory
-      (func $store (export "store") 
-        (v128.const i32x4 0x10203040 0x50607080 0x90A0B0C0 0xD0E0F0FF)
+      (func $store_v128 (export "store_v128") 
         (i32.const 0)  ;; address
+        (v128.const i32x4 1 2 3 4) ;; Using [1, 2, 3, 4] as i32 lanes
         (v128.store)
       )
       
       ;; Load a v128 value from memory
-      (func $load (export "load") (result v128)
+      (func $load_v128 (export "load_v128") (result v128)
         (i32.const 0)  ;; address
         (v128.load)
       )
     )
     "#;
 
-    // Convert WAT to binary WebAssembly
-    let wasm = wat::parse_str(wat).expect("Failed to parse WAT");
-
-    // Load the module from binary
-    let mut empty_module = Module::new();
-    let module = empty_module.load_from_binary(&wasm)?;
-
-    // Create an engine with the loaded module
-    let mut engine = Engine::new(module.clone());
+    // Parse WAT and create module
+    let wasm = wat::parse_str(wat).map_err(|e| wrt::Error::Parse(e.to_string()))?;
+    let module = Module::new()?.load_from_binary(&wasm)?;
+    let mut engine = StacklessEngine::new(module.clone());
 
     // Instantiate the module
-    engine.instantiate(module)?;
+    let instance_idx = engine.instantiate(module.clone())?;
 
-    println!("Running v128.load/store test");
+    // Execute the store function defined in WAT
+    let store_func_idx = module.get_export("store_v128").unwrap().index;
+    engine.execute(instance_idx, store_func_idx, vec![])?;
 
-    // Execute the store function to put a v128 value in memory
-    engine.execute(0usize, 0, vec![])?;
+    // Get the V128 load function
+    let load_func_idx = module.get_export("load_v128").unwrap().index;
 
-    // Load the value back with the load function
-    let result = engine.execute(0usize, 1, vec![])?;
+    // Invoke the load function
+    let result = engine.execute(instance_idx, load_func_idx, vec![])?;
 
-    // Expected v128 value (0xD0E0F0FF_90A0B0C0_50607080_10203040 in little-endian representation)
-    let expected_value = Value::V128(0xD0E0F0FF_90A0B0C0_50607080_10203040);
-    if result == vec![expected_value.clone()] {
-        println!("✅ v128.load/store test passed: {:?}", expected_value);
-    } else {
-        println!(
-            "❌ v128.load/store test failed: expected {:?}, got {:?}",
-            expected_value, result
+    // Check the result
+    if let Some(Value::V128(v)) = result.first() {
+        let actual_bytes = v; // v is already [u8; 16]
+        let expected_bytes: [u8; 16] = [1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0]; // Little-endian representation of i32x4 [1, 2, 3, 4]
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "v128.load/store returned incorrect value"
         );
-        return Err(WrtError::Custom("v128.load/store test failed".to_string()));
+    } else {
+        panic!("Expected V128 result");
     }
 
     Ok(())
@@ -96,97 +98,108 @@ fn test_v128_splat() -> Result<()> {
     )
     "#;
 
-    // Convert WAT to binary WebAssembly
-    let wasm = wat::parse_str(wat).expect("Failed to parse WAT");
-
-    // Load the module from binary
-    let mut empty_module = Module::new();
-    let module = empty_module.load_from_binary(&wasm)?;
-
-    // Create an engine with the loaded module
-    let mut engine = Engine::new(module.clone());
+    // Parse WAT and create module
+    let wasm = wat::parse_str(wat).map_err(|e| wrt::Error::Parse(e.to_string()))?;
+    let module = Module::new()?.load_from_binary(&wasm)?;
+    let mut engine = StacklessEngine::new(module.clone());
 
     // Instantiate the module
-    engine.instantiate(module)?;
+    let instance_idx = engine.instantiate(module.clone())?;
 
     println!("Running v128 splat tests");
 
-    // Test i8x16.splat with value 0x42
-    let result = engine.execute(0usize, 0, vec![Value::I32(0x42)])?;
-    let expected = Value::V128(0x4242424242424242_4242424242424242);
-    if result == vec![expected.clone()] {
-        println!("✅ i8x16.splat test passed: {:?}", expected);
-    } else {
-        println!(
-            "❌ i8x16.splat test failed: expected {:?}, got {:?}",
-            expected, result
+    // Test i8x16.splat
+    let func_idx = module.get_export("i8x16_splat").unwrap().index;
+    let result = engine.execute(instance_idx, func_idx, vec![Value::I32(10)])?;
+    if let Some(Value::V128(v)) = result.first() {
+        let actual_bytes = v;
+        let expected_bytes: [u8; 16] = [10; 16];
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i8x16.splat returned incorrect value"
         );
-        return Err(WrtError::Custom("i8x16.splat test failed".to_string()));
+    } else {
+        panic!("Expected V128 result for i8x16.splat");
     }
 
-    // Test i16x8.splat with value 0x4243
-    let result = engine.execute(0usize, 1, vec![Value::I32(0x4243)])?;
-    let expected = Value::V128(0x4243424342434243_4243424342434243);
-    if result == vec![expected.clone()] {
-        println!("✅ i16x8.splat test passed: {:?}", expected);
-    } else {
-        println!(
-            "❌ i16x8.splat test failed: expected {:?}, got {:?}",
-            expected, result
+    // Test i16x8.splat
+    let func_idx = module.get_export("i16x8_splat").unwrap().index;
+    let result = engine.execute(instance_idx, func_idx, vec![Value::I32(2000)])?;
+    if let Some(Value::V128(v)) = result.first() {
+        let actual_bytes = v;
+        let expected_bytes: [u8; 16] = [
+            208, 7, 208, 7, 208, 7, 208, 7, 208, 7, 208, 7, 208, 7, 208, 7,
+        ]; // 2000 in little-endian i16
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i16x8.splat returned incorrect value"
         );
-        return Err(WrtError::Custom("i16x8.splat test failed".to_string()));
+    } else {
+        panic!("Expected V128 result for i16x8.splat");
     }
 
-    // Test i32x4.splat with value 0x10203040
-    let result = engine.execute(0usize, 2, vec![Value::I32(0x10203040)])?;
-    let expected = Value::V128(0x1020304010203040_1020304010203040);
-    if result == vec![expected.clone()] {
-        println!("✅ i32x4.splat test passed: {:?}", expected);
-    } else {
-        println!(
-            "❌ i32x4.splat test failed: expected {:?}, got {:?}",
-            expected, result
+    // Test i32x4.splat
+    let func_idx = module.get_export("i32x4_splat").unwrap().index;
+    let result = engine.execute(instance_idx, func_idx, vec![Value::I32(300000)])?;
+    if let Some(Value::V128(v)) = result.first() {
+        let actual_bytes = v;
+        let expected_bytes: [u8; 16] = [
+            224, 147, 4, 0, 224, 147, 4, 0, 224, 147, 4, 0, 224, 147, 4, 0,
+        ];
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i32x4.splat returned incorrect value"
         );
-        return Err(WrtError::Custom("i32x4.splat test failed".to_string()));
+    } else {
+        panic!("Expected V128 result for i32x4.splat");
     }
 
-    // Test i64x2.splat with value 0x1122334455667788
-    let result = engine.execute(0usize, 3, vec![Value::I64(0x1122334455667788)])?;
-    let expected = Value::V128(0x1122334455667788_1122334455667788);
-    if result == vec![expected.clone()] {
-        println!("✅ i64x2.splat test passed: {:?}", expected);
-    } else {
-        println!(
-            "❌ i64x2.splat test failed: expected {:?}, got {:?}",
-            expected, result
+    // Test i64x2.splat
+    let func_idx = module.get_export("i64x2_splat").unwrap().index;
+    let result = engine.execute(instance_idx, func_idx, vec![Value::I64(4000000000)])?;
+    if let Some(Value::V128(v)) = result.first() {
+        let actual_bytes = v;
+        let expected_bytes: [u8; 16] = [0, 40, 107, 238, 0, 0, 0, 0, 0, 40, 107, 238, 0, 0, 0, 0]; // 4000000000 in little-endian i64
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i64x2.splat returned incorrect value"
         );
-        return Err(WrtError::Custom("i64x2.splat test failed".to_string()));
+    } else {
+        panic!("Expected V128 result for i64x2.splat");
     }
 
-    // Test f32x4.splat with value 3.14159
-    let result = engine.execute(0usize, 4, vec![Value::F32(3.14159)])?;
-    // We can't easily represent the exact expected bit pattern for floats, so just check that we got a v128 back
-    if let Some(Value::V128(_)) = result.first() {
-        println!("✅ f32x4.splat test passed: {:?}", result[0]);
-    } else {
-        println!(
-            "❌ f32x4.splat test failed: expected V128, got {:?}",
-            result
+    // Test f32x4.splat
+    let func_idx = module.get_export("f32x4_splat").unwrap().index;
+    let result = engine.execute(instance_idx, func_idx, vec![Value::F32(5.5)])?;
+    if let Some(Value::V128(v)) = result.first() {
+        let actual_bytes = v;
+        let expected_bytes: [u8; 16] = [0, 0, 176, 64, 0, 0, 176, 64, 0, 0, 176, 64, 0, 0, 176, 64]; // 5.5 in little-endian f32
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "f32x4.splat returned incorrect value"
         );
-        return Err(WrtError::Custom("f32x4.splat test failed".to_string()));
+    } else {
+        panic!("Expected V128 result for f32x4.splat");
     }
 
-    // Test f64x2.splat with value 2.71828
-    let result = engine.execute(0usize, 5, vec![Value::F64(2.71828)])?;
-    // We can't easily represent the exact expected bit pattern for floats, so just check that we got a v128 back
-    if let Some(Value::V128(_)) = result.first() {
-        println!("✅ f64x2.splat test passed: {:?}", result[0]);
-    } else {
-        println!(
-            "❌ f64x2.splat test failed: expected V128, got {:?}",
-            result
+    // Test f64x2.splat
+    let func_idx = module.get_export("f64x2_splat").unwrap().index;
+    let result = engine.execute(instance_idx, func_idx, vec![Value::F64(6.25)])?;
+    if let Some(Value::V128(v)) = result.first() {
+        let actual_bytes = v;
+        let expected_bytes: [u8; 16] = [0, 0, 0, 0, 0, 0, 25, 64, 0, 0, 0, 0, 0, 0, 25, 64]; // 6.25 in little-endian f64
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "f64x2.splat returned incorrect value"
         );
-        return Err(WrtError::Custom("f64x2.splat test failed".to_string()));
+    } else {
+        panic!("Expected V128 result for f64x2.splat");
     }
 
     Ok(())
@@ -211,35 +224,29 @@ fn test_v128_shuffle() -> Result<()> {
     )
     "#;
 
-    // Convert WAT to binary WebAssembly
-    let wasm = wat::parse_str(wat).expect("Failed to parse WAT");
-
-    // Load the module from binary
-    let mut empty_module = Module::new();
-    let module = empty_module.load_from_binary(&wasm)?;
-
-    // Create an engine with the loaded module
-    let mut engine = Engine::new(module.clone());
+    // Parse WAT and create module
+    let wasm = wat::parse_str(wat).map_err(|e| wrt::Error::Parse(e.to_string()))?;
+    let module = Module::new()?.load_from_binary(&wasm)?;
+    let mut engine = StacklessEngine::new(module.clone());
 
     // Instantiate the module
-    engine.instantiate(module)?;
+    let instance_idx = engine.instantiate(module.clone())?;
 
-    println!("Running i8x16.shuffle test");
-
-    // Execute the shuffle function
-    let result = engine.execute(0usize, 0, vec![])?;
-
-    // The expected result is a vector with the lanes selected as specified in the shuffle
-    // The lanes should be [31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16]
-    let expected = Value::V128(0x1011121314151617_18191A1B1C1D1E1F);
-    if result == vec![expected.clone()] {
-        println!("✅ i8x16.shuffle test passed: {:?}", expected);
-    } else {
-        println!(
-            "❌ i8x16.shuffle test failed: expected {:?}, got {:?}",
-            expected, result
+    // Test i8x16.shuffle
+    let func_idx = module.get_export("shuffle").unwrap().index;
+    let result = engine.execute(instance_idx, func_idx, vec![])?;
+    if let Some(Value::V128(v)) = result.first() {
+        let actual_bytes = v;
+        let expected_bytes: [u8; 16] = [
+            31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16,
+        ]; // Corrected expected shuffled bytes
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i8x16.shuffle returned incorrect value"
         );
-        return Err(WrtError::Custom("i8x16.shuffle test failed".to_string()));
+    } else {
+        panic!("Expected V128 result for i8x16.shuffle");
     }
 
     Ok(())
@@ -270,81 +277,57 @@ fn test_v128_arithmetic() -> Result<()> {
     )
     "#;
 
-    // Convert WAT to binary WebAssembly
-    let wasm = wat::parse_str(wat).expect("Failed to parse WAT");
-
-    // Load the module from binary
-    let mut empty_module = Module::new();
-    let module = empty_module.load_from_binary(&wasm)?;
-
-    // Create an engine with the loaded module
-    let mut engine = Engine::new(module.clone());
+    // Parse WAT and create module
+    let wasm = wat::parse_str(wat).map_err(|e| wrt::Error::Parse(e.to_string()))?;
+    let module = Module::new()?.load_from_binary(&wasm)?;
+    let mut engine = StacklessEngine::new(module.clone());
 
     // Instantiate the module
-    engine.instantiate(module)?;
-
-    println!("Running SIMD arithmetic tests");
+    let instance_idx = engine.instantiate(module.clone())?;
 
     // Test i32x4.add
-    let result = engine.execute(0usize, 0, vec![])?;
-    // Expected: [1+5, 2+6, 3+7, 4+8] = [6, 8, 10, 12]
-    let expected = Value::V128(0x0000000C0000000A_0000000800000006);
-    if result == vec![expected.clone()] {
-        println!("✅ i32x4.add test passed: {:?}", expected);
-    } else {
-        println!(
-            "❌ i32x4.add test failed: expected {:?}, got {:?}",
-            expected, result
+    let func_idx_add = module.get_export("i32x4_add").unwrap().index;
+    let result_add = engine.execute(instance_idx, func_idx_add, vec![])?;
+    if let Some(Value::V128(v)) = result_add.first() {
+        let actual_bytes = v;
+        let expected_bytes: [u8; 16] = [6, 0, 0, 0, 8, 0, 0, 0, 10, 0, 0, 0, 12, 0, 0, 0]; // Expected result of adding [1,2,3,4] and [5,6,7,8]
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i32x4.add returned incorrect value"
         );
-        return Err(WrtError::Custom("i32x4.add test failed".to_string()));
+    } else {
+        panic!("Expected V128 result for i32x4.add");
     }
 
     // Test i32x4.sub
-    let result = engine.execute(0usize, 1, vec![])?;
-    // Expected: [10-1, 20-2, 30-3, 40-4] = [9, 18, 27, 36]
-    let expected = Value::V128(0x000000240000001B_0000001200000009);
-
-    // Debug output for expected and actual bytes
-    if let Value::V128(expected_val) = expected {
-        println!("Expected bytes: {:02X?}", expected_val.to_le_bytes());
-    }
-
-    if let Value::V128(actual_val) = result[0].clone() {
-        println!("Actual bytes: {:02X?}", actual_val.to_le_bytes());
-    }
-
-    if result == vec![expected.clone()] {
-        println!("✅ i32x4.sub test passed: {:?}", expected);
-    } else {
-        println!(
-            "❌ i32x4.sub test failed: expected {:?}, got {:?}",
-            expected, result
+    let func_idx_sub = module.get_export("i32x4_sub").unwrap().index;
+    let result_sub = engine.execute(instance_idx, func_idx_sub, vec![])?;
+    if let Some(Value::V128(v)) = result_sub.first() {
+        let actual_bytes = v;
+        let expected_bytes: [u8; 16] = [9, 0, 0, 0, 18, 0, 0, 0, 27, 0, 0, 0, 36, 0, 0, 0];
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i32x4.sub returned incorrect value"
         );
-        return Err(WrtError::Custom("i32x4.sub test failed".to_string()));
+    } else {
+        panic!("Expected V128 result for i32x4.sub");
     }
 
     // Test i32x4.mul
-    let result = engine.execute(0usize, 2, vec![])?;
-    // Expected: [1*5, 2*6, 3*7, 4*8] = [5, 12, 21, 32]
-    let expected = Value::V128(0x0000002000000015_0000000C00000005);
-
-    // Debug output for expected and actual bytes
-    if let Value::V128(expected_val) = expected {
-        println!("Expected mul bytes: {:02X?}", expected_val.to_le_bytes());
-    }
-
-    if let Value::V128(actual_val) = result[0].clone() {
-        println!("Actual mul bytes: {:02X?}", actual_val.to_le_bytes());
-    }
-
-    if result == vec![expected.clone()] {
-        println!("✅ i32x4.mul test passed: {:?}", expected);
-    } else {
-        println!(
-            "❌ i32x4.mul test failed: expected {:?}, got {:?}",
-            expected, result
+    let func_idx_mul = module.get_export("i32x4_mul").unwrap().index;
+    let result_mul = engine.execute(instance_idx, func_idx_mul, vec![])?;
+    if let Some(Value::V128(v)) = result_mul.first() {
+        let actual_bytes = v;
+        let expected_bytes: [u8; 16] = [5, 0, 0, 0, 12, 0, 0, 0, 21, 0, 0, 0, 32, 0, 0, 0]; // Expected result of multiplying [1,2,3,4] and [5,6,7,8]
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i32x4.mul returned incorrect value"
         );
-        return Err(WrtError::Custom("i32x4.mul test failed".to_string()));
+    } else {
+        panic!("Expected V128 result for i32x4.mul");
     }
 
     Ok(())

@@ -9,20 +9,16 @@ use std::cmp;
 #[cfg(not(feature = "std"))]
 use core::cmp;
 
-use crate::{
-    behavior::FrameBehavior,
-    error::{Error, Result},
-    stack::Stack,
-    values::Value,
-};
+use crate::behavior::FrameBehavior;
+use crate::error::{Error, Result};
+use crate::stack::Stack;
+use crate::values::Value;
+use crate::StacklessEngine;
 
-use super::common::{pop_v128, push_v128, V128};
+use super::common::{pop_v128, push_v128 /*, V128 */};
 
 /// Replicate an i8 value to all lanes of a v128
-pub fn i8x16_splat(
-    stack: &mut (impl Stack + ?Sized),
-    _frame: &mut (impl FrameBehavior + ?Sized),
-) -> Result<()> {
+pub fn i8x16_splat(stack: &mut impl Stack, _frame: &mut impl FrameBehavior) -> Result<()> {
     // Pop the i32 value from the stack and extract the low 8 bits
     let value = match stack.pop()? {
         Value::I32(v) => v as i8,
@@ -342,7 +338,10 @@ pub fn i8x16_max_u(
     push_v128(stack, result)
 }
 
-// Additional comparison operations
+/// Compare lanes for greater than (signed)
+///
+/// Pops two v128 values (a, b), compares corresponding i8 lanes for a > b,
+/// pushes a v128 mask (0xFF if true, 0x00 if false).
 pub fn i8x16_gt_s(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
@@ -362,6 +361,10 @@ pub fn i8x16_gt_s(
     push_v128(stack, result)
 }
 
+/// Compare lanes for greater than (unsigned)
+///
+/// Pops two v128 values (a, b), compares corresponding u8 lanes for a > b,
+/// pushes a v128 mask (0xFF if true, 0x00 if false).
 pub fn i8x16_gt_u(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
@@ -381,6 +384,10 @@ pub fn i8x16_gt_u(
     push_v128(stack, result)
 }
 
+/// Compare lanes for less than or equal (signed)
+///
+/// Pops two v128 values (a, b), compares corresponding i8 lanes for a <= b,
+/// pushes a v128 mask (0xFF if true, 0x00 if false).
 pub fn i8x16_le_s(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
@@ -404,6 +411,10 @@ pub fn i8x16_le_s(
     push_v128(stack, result)
 }
 
+/// Compare lanes for less than or equal (unsigned)
+///
+/// Pops two v128 values (a, b), compares corresponding u8 lanes for a <= b,
+/// pushes a v128 mask (0xFF if true, 0x00 if false).
 pub fn i8x16_le_u(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
@@ -423,6 +434,10 @@ pub fn i8x16_le_u(
     push_v128(stack, result)
 }
 
+/// Compare lanes for greater than or equal (signed)
+///
+/// Pops two v128 values (a, b), compares corresponding i8 lanes for a >= b,
+/// pushes a v128 mask (0xFF if true, 0x00 if false).
 pub fn i8x16_ge_s(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
@@ -446,6 +461,10 @@ pub fn i8x16_ge_s(
     push_v128(stack, result)
 }
 
+/// Compare lanes for greater than or equal (unsigned)
+///
+/// Pops two v128 values (a, b), compares corresponding u8 lanes for a >= b,
+/// pushes a v128 mask (0xFF if true, 0x00 if false).
 pub fn i8x16_ge_u(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
@@ -465,6 +484,10 @@ pub fn i8x16_ge_u(
     push_v128(stack, result)
 }
 
+/// Calculate absolute value for each lane
+///
+/// Pops a v128 value, calculates the absolute value of each signed i8 lane,
+/// and pushes the resulting v128.
 pub fn i8x16_abs(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
@@ -484,6 +507,10 @@ pub fn i8x16_abs(
     push_v128(stack, result)
 }
 
+/// Create bitmask from lanes
+///
+/// Pops a v128 value, sets the corresponding bit in the result i32
+/// if the most significant bit of the lane is set.
 pub fn i8x16_bitmask(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
@@ -502,6 +529,10 @@ pub fn i8x16_bitmask(
     push_v128(stack, result)
 }
 
+/// Check if all lanes are true
+///
+/// Pops a v128 value, checks if all i8 lanes are non-zero (true),
+/// pushes 1 if all are true, 0 otherwise.
 pub fn i8x16_all_true(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
@@ -520,6 +551,10 @@ pub fn i8x16_all_true(
     push_v128(stack, result)
 }
 
+/// Calculate population count for each lane
+///
+/// Pops a v128 value, calculates the population count (number of set bits)
+/// for each i8 lane, and pushes the resulting v128.
 pub fn i8x16_popcnt(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
@@ -536,4 +571,38 @@ pub fn i8x16_popcnt(
 
     // Push the result v128 to the stack
     push_v128(stack, result)
+}
+
+// Add stubs for missing functions
+
+pub fn i8x16_shr_s(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i8x16_shr_s")
+}
+
+pub fn i8x16_shr_u(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i8x16_shr_u")
+}
+
+pub fn i8x16_narrow_i16x8_s(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i8x16_narrow_i16x8_s")
+}
+
+pub fn i8x16_narrow_i16x8_u(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i8x16_narrow_i16x8_u")
 }

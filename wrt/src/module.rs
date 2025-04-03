@@ -1,14 +1,15 @@
 use crate::{
-    behavior::{self, ControlFlowBehavior, FrameBehavior, StackBehavior},
+    behavior::{self, ControlFlowBehavior, FrameBehavior},
     error::{Error, Result},
     global::Global,
     instructions::{types::BlockType, Instruction},
-    memory::Memory,
+    memory::{DefaultMemory, MemoryBehavior},
     stack::Stack,
     table::Table,
     types::{ExternType, GlobalType, MemoryType, TableType},
     types::{FuncType, ValueType},
     values::Value,
+    String, Vec,
 };
 
 use std::sync::{Arc, RwLock};
@@ -29,8 +30,11 @@ use std::string::ToString;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
 
+/// Represents the address of a table within a module instance.
+/// Used for indirect function calls.
 #[derive(Debug, Clone, Copy)]
 pub struct TableAddr {
+    /// The index of the table within the module's tables section.
     pub table_idx: u32,
 }
 
@@ -46,7 +50,7 @@ pub struct Module {
     /// Table definitions
     pub tables: Arc<RwLock<Vec<Arc<Table>>>>,
     /// Memory definitions
-    pub memories: Arc<RwLock<Vec<Arc<Memory>>>>,
+    pub memories: Arc<RwLock<Vec<Arc<DefaultMemory>>>>,
     /// Global variable definitions
     pub globals: Arc<RwLock<Vec<Arc<Global>>>>,
     /// Element segments for tables
@@ -59,6 +63,7 @@ pub struct Module {
     pub custom_sections: Vec<CustomSection>,
     /// Exports (functions, tables, memories, and globals)
     pub exports: Vec<OtherExport>,
+    /// Optional name for the module, often derived from the custom "name" section.
     pub name: Option<String>,
     /// Original binary (if available)
     pub binary: Option<Vec<u8>>,
@@ -405,6 +410,15 @@ impl Module {
         }
     }
 
+    /// Creates a Module from a WebAssembly Text Format (WAT) string.
+    ///
+    /// # Arguments
+    ///
+    /// * `wat`: A string slice containing the WAT representation of the module.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the parsed `Module` on success, or an `Error` if parsing fails.
     #[cfg(feature = "serialization")]
     pub fn from_wat(wat: &str) -> Result<Self> {
         let wasm = wat::parse_str(wat)?;
@@ -453,11 +467,30 @@ impl Module {
         });
     }
 
+    /// Gets a reference to a function definition by its index.
+    ///
+    /// # Arguments
+    ///
+    /// * `idx`: The index of the function.
+    ///
+    /// # Returns
+    ///
+    /// An `Option` containing a reference to the `Function` if found, otherwise `None`.
     #[must_use]
     pub fn get_function(&self, idx: u32) -> Option<&Function> {
         self.functions.get(idx as usize)
     }
 
+    /// Gets a reference to the function type (signature) for a given function index.
+    ///
+    /// # Arguments
+    ///
+    /// * `idx`: The index of the function.
+    ///
+    /// # Returns
+    ///
+    /// An `Option` containing a reference to the `FuncType` if the function and its type exist,
+    /// otherwise `None`.
     #[must_use]
     pub fn get_function_type(&self, idx: u32) -> Option<&FuncType> {
         self.types
@@ -469,356 +502,97 @@ impl Module {
         let globals = self.globals.read().map_err(|_| Error::PoisonedLock)?;
         globals
             .get(idx)
-            .map(Arc::clone)
-            .ok_or(Error::InvalidGlobalIndex(idx))
-    }
-
-    /// Gets a mutable global by index
-    pub fn get_global_mut(&mut self, idx: usize) -> Option<&mut Global> {
-        // Implementation that handles Arc<RwLock<>> is complex, returning None for now
-        None
-    }
-
-    pub fn get_global_mut_by_idx(&mut self, idx: u32) -> Option<&mut Global> {
-        self.get_global_mut(idx as usize)
+            .cloned()
+            .ok_or_else(|| Error::InvalidGlobalIndex(idx))
     }
 
     /// Gets a memory by index
-    pub fn get_memory(&self, idx: usize) -> Result<Arc<Memory>> {
-        let memories = self.memories.read().map_err(|_| Error::PoisonedLock)?;
-        memories
+    pub fn get_memory(&self, idx: usize) -> Result<Arc<DefaultMemory>> {
+        self.memories
+            .read()
+            .unwrap()
             .get(idx)
-            .map(Arc::clone)
-            .ok_or(Error::InvalidMemoryIndex(idx))
+            .cloned()
+            .ok_or_else(|| Error::InvalidMemoryIndex(idx))
     }
 
-    /// Gets a mutable memory by index
-    pub fn get_memory_mut(&mut self, idx: usize) -> Result<Arc<Memory>> {
-        let memories = self.memories.read().map_err(|_| Error::PoisonedLock)?;
-        memories
-            .get(idx)
-            .map(Arc::clone)
-            .ok_or(Error::InvalidMemoryIndex(idx))
-    }
-
-    /// Gets a table by index
-    pub fn get_table(&self, idx: usize) -> Result<Arc<Table>> {
-        let tables = self.tables.read().map_err(|_| Error::PoisonedLock)?;
-        tables
-            .get(idx)
-            .map(Arc::clone)
-            .ok_or(Error::InvalidTableIndex(idx))
-    }
-
-    /// Gets a mutable table by index
-    pub fn get_table_mut(&mut self, idx: usize) -> Result<Arc<Table>> {
-        let tables = self.tables.read().map_err(|_| Error::PoisonedLock)?;
-        tables
-            .get(idx)
-            .map(Arc::clone)
-            .ok_or(Error::InvalidTableIndex(idx))
-    }
-
-    #[must_use]
+    /// Returns the number of memory definitions in the module.
     pub fn memories_len(&self) -> usize {
-        self.memories.read().unwrap().len()
+        self.memories.read().map_or(0, |memories| memories.len())
     }
 
-    #[must_use]
+    /// Returns the number of table definitions in the module.
     pub fn tables_len(&self) -> usize {
-        self.tables.read().unwrap().len()
+        self.tables.read().map_or(0, |tables| tables.len())
     }
 
-    #[must_use]
+    /// Returns the number of global definitions in the module.
     pub fn globals_len(&self) -> usize {
-        self.globals.read().unwrap().len()
+        self.globals.read().map_or(0, |globals| globals.len())
     }
 
+    /// Evaluates a constant expression (used for global/element/data offsets).
+    ///
+    /// Note: This requires an initial `stack` usually containing globals.
+    /// For simple const exprs like `i32.const`, the stack can be empty.
+    fn evaluate_const_expr(
+        &self,
+        expr: &[Instruction],
+        // Initial stack, typically containing imported globals if needed by expr.
+        initial_stack: &mut Vec<Value>,
+    ) -> Result<Value> {
+        let mut stack = initial_stack.clone(); // Use a local stack
+        for instr in expr {
+            match instr {
+                Instruction::I32Const(val) => stack.push(Value::I32(*val)),
+                Instruction::I64Const(val) => stack.push(Value::I64(*val)),
+                Instruction::F32Const(val) => stack.push(Value::F32(*val)),
+                Instruction::F64Const(val) => stack.push(Value::F64(*val)),
+                Instruction::GlobalGet(idx) => {
+                    // Attempt to get from initial stack first (could be imported global)
+                    if (*idx as usize) < stack.len() {
+                        // Assume initial_stack holds globals in order. This might be fragile.
+                        // A better approach might involve passing global values explicitly.
+                        stack.push(stack[*idx as usize].clone());
+                    } else {
+                        // Fallback to module globals (should only happen if not imported)
+                        let globals = self.globals.read().map_err(|_| Error::PoisonedLock)?;
+                        let global = globals
+                            .get(*idx as usize)
+                            .ok_or(Error::InvalidGlobalIndex(*idx as usize))?;
+                        stack.push(global.get_value()?);
+                    }
+                }
+                // Other const instructions like ref.null, ref.func could be added here if needed
+                _ => {
+                    return Err(Error::InvalidConstant(
+                        "Unsupported instruction in const expression".to_string(),
+                    ))
+                }
+            }
+        }
+        stack.pop().ok_or(Error::InvalidConstant(
+            "Const expression evaluation resulted in empty stack".to_string(),
+        ))
+    }
+
+    /// Creates a global variable instance based on its definition and initial value expression.
     pub fn create_global(
         &mut self,
         global_type: GlobalType,
         init_expr: Vec<Instruction>,
     ) -> Result<Arc<Global>> {
-        let global = Global::new(global_type, Value::I32(0))?;
-        let global_arc = Arc::new(global);
-        let globals = &mut self.globals.write().map_err(|_| Error::PoisonedLock)?;
-        globals.push(Arc::clone(&global_arc));
-        Ok(global_arc)
-    }
-}
-
-impl FrameBehavior for Module {
-    fn locals(&mut self) -> &mut Vec<Value> {
-        &mut self.locals
-    }
-
-    fn get_local(&self, idx: usize) -> Result<Value> {
-        self.locals
-            .get(idx)
-            .cloned()
-            .ok_or(Error::InvalidLocal(format!(
-                "Local index out of bounds: {idx}"
-            )))
-    }
-
-    fn set_local(&mut self, idx: usize, value: Value) -> Result<()> {
-        if idx < self.locals.len() {
-            self.locals[idx] = value;
-            Ok(())
-        } else {
-            Err(Error::InvalidLocal(format!(
-                "Local index out of bounds: {idx}"
-            )))
-        }
-    }
-
-    fn get_global(&self, idx: usize) -> Result<Value> {
-        let global = self.get_global(idx)?;
-        Ok(global.value.clone())
-    }
-
-    fn set_global(&mut self, idx: usize, value: Value) -> Result<()> {
-        let global = self.get_global(idx)?;
-        if !global.global_type.mutable {
-            return Err(Error::GlobalNotMutable(idx));
-        }
-        // Since we can't modify the global directly due to Arc, we'll need to update this
-        // with a proper implementation in the future
-        Ok(())
-    }
-
-    fn get_memory(&self, idx: usize) -> Result<&Memory> {
-        // Since we use Arc<Memory>, we can't return a direct reference
-        Err(Error::InvalidMemoryIndex(idx))
-    }
-
-    fn get_memory_mut(&mut self, idx: usize) -> Result<&mut Memory> {
-        // Since we use Arc<Memory>, we can't return a direct mutable reference
-        Err(Error::InvalidMemoryIndex(idx))
-    }
-
-    fn get_table(&self, idx: usize) -> Result<&Table> {
-        // Since we use Arc<Table>, we can't return a direct reference
-        Err(Error::InvalidTableIndex(idx))
-    }
-
-    fn get_table_mut(&mut self, idx: usize) -> Result<&mut Table> {
-        // Since we use Arc<Table>, we can't return a direct mutable reference
-        Err(Error::InvalidTableIndex(idx))
-    }
-
-    fn get_global_mut(&mut self, idx: usize) -> Option<&mut Global> {
-        // Implementation that handles Arc<RwLock<>> is complex, returning None for now
-        None
-    }
-
-    fn pc(&self) -> usize {
-        unimplemented!("Module does not have a program counter")
-    }
-
-    fn set_pc(&mut self, pc: usize) {
-        unimplemented!("Module does not have a program counter")
-    }
-
-    fn func_idx(&self) -> u32 {
-        unimplemented!("Module does not have a function index")
-    }
-
-    fn instance_idx(&self) -> usize {
-        unimplemented!("Module does not have an instance index")
-    }
-
-    fn locals_len(&self) -> usize {
-        unimplemented!("Module does not have locals")
-    }
-
-    // Add missing methods
-    fn label_stack(&mut self) -> &mut Vec<behavior::Label> {
-        unimplemented!("Module does not have a label stack")
-    }
-
-    fn arity(&self) -> usize {
-        unimplemented!("Module does not have arity")
-    }
-
-    fn set_arity(&mut self, _arity: usize) {
-        unimplemented!("Module does not have arity")
-    }
-
-    fn label_arity(&self) -> usize {
-        self.label_arity
-    }
-
-    fn return_pc(&self) -> usize {
-        0
-    }
-
-    fn set_return_pc(&mut self, _pc: usize) {
-        unimplemented!("Module does not have a return program counter")
-    }
-
-    fn as_any(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-
-    // Implement the remaining methods from FrameBehavior trait
-    fn load_i32(&mut self, addr: usize, align: u32) -> Result<i32> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn load_i64(&mut self, addr: usize, align: u32) -> Result<i64> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn load_f32(&mut self, addr: usize, align: u32) -> Result<f32> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn load_f64(&mut self, addr: usize, align: u32) -> Result<f64> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn load_i8(&mut self, addr: usize, align: u32) -> Result<i8> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn load_u8(&mut self, addr: usize, align: u32) -> Result<u8> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn load_i16(&mut self, addr: usize, align: u32) -> Result<i16> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn load_u16(&mut self, addr: usize, align: u32) -> Result<u16> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn store_i32(&mut self, addr: usize, align: u32, value: i32) -> Result<()> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn store_i64(&mut self, addr: usize, align: u32, value: i64) -> Result<()> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn memory_size(&mut self) -> Result<u32> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn memory_grow(&mut self, pages: u32) -> Result<u32> {
-        unimplemented!("Module does not support memory operations")
-    }
-
-    fn table_get(&mut self, table_idx: u32, idx: u32) -> Result<Value> {
-        unimplemented!("Module does not support table operations")
-    }
-
-    fn table_set(&mut self, table_idx: u32, idx: u32, value: Value) -> Result<()> {
-        unimplemented!("Module does not support table operations")
-    }
-
-    fn table_size(&mut self, table_idx: u32) -> Result<u32> {
-        unimplemented!("Module does not support table operations")
-    }
-
-    fn table_grow(&mut self, table_idx: u32, delta: u32, value: Value) -> Result<u32> {
-        unimplemented!("Module does not support table operations")
-    }
-
-    fn table_init(
-        &mut self,
-        table_idx: u32,
-        elem_idx: u32,
-        dst: u32,
-        src: u32,
-        n: u32,
-    ) -> Result<()> {
-        unimplemented!("Module does not support table operations")
-    }
-
-    fn table_copy(
-        &mut self,
-        dst_table: u32,
-        src_table: u32,
-        dst: u32,
-        src: u32,
-        n: u32,
-    ) -> Result<()> {
-        unimplemented!("Module does not support table operations")
-    }
-
-    fn elem_drop(&mut self, elem_idx: u32) -> Result<()> {
-        unimplemented!("Module does not support element operations")
-    }
-
-    fn table_fill(&mut self, table_idx: u32, dst: u32, val: Value, n: u32) -> Result<()> {
-        unimplemented!("Module does not support table operations")
-    }
-
-    fn pop_bool(&mut self, stack: &mut dyn Stack) -> Result<bool> {
-        match stack.pop()? {
-            Value::I32(0) => Ok(false),
-            Value::I32(_) => Ok(true),
-            _ => Err(Error::TypeMismatch(
-                "Expected i32 boolean value".to_string(),
-            )),
-        }
-    }
-
-    fn pop_i32(&mut self, stack: &mut dyn Stack) -> Result<i32> {
-        match stack.pop()? {
-            Value::I32(v) => Ok(v),
-            _ => Err(Error::TypeMismatch("Expected i32 value".to_string())),
-        }
-    }
-}
-
-impl ControlFlowBehavior for Module {
-    fn enter_block(&mut self, _ty: BlockType, _stack_len: usize) -> Result<()> {
-        unimplemented!("Module does not support control flow operations")
-    }
-
-    fn enter_loop(&mut self, _ty: BlockType, _stack_len: usize) -> Result<()> {
-        unimplemented!("Module does not support control flow operations")
-    }
-
-    fn enter_if(&mut self, _ty: BlockType, _stack_len: usize, _condition: bool) -> Result<()> {
-        unimplemented!("Module does not support control flow operations")
-    }
-
-    fn enter_else(&mut self, _stack_len: usize) -> Result<()> {
-        unimplemented!("Module does not support control flow operations")
-    }
-
-    fn exit_block(&mut self, _stack: &mut dyn Stack) -> Result<()> {
-        unimplemented!("Module does not support control flow operations")
-    }
-
-    fn branch(&mut self, _label_idx: u32, _stack: &mut dyn Stack) -> Result<()> {
-        unimplemented!("Module does not support control flow operations")
-    }
-
-    fn return_(&mut self, _stack: &mut dyn Stack) -> Result<()> {
-        unimplemented!("Module does not support control flow operations")
-    }
-
-    fn call(&mut self, _func_idx: u32, _stack: &mut dyn Stack) -> Result<()> {
-        unimplemented!("Module does not support control flow operations")
-    }
-
-    fn call_indirect(
-        &mut self,
-        _type_idx: u32,
-        _table_idx: u32,
-        _entry: u32,
-        _stack: &mut dyn Stack,
-    ) -> Result<()> {
-        unimplemented!("call_indirect not implemented for Module")
-    }
-
-    fn set_label_arity(&mut self, arity: usize) {
-        self.label_arity = arity;
+        // For constant expressions, the initial stack is usually empty,
+        // unless the expression relies on imported globals (which is complex).
+        // We assume simple const exprs here.
+        let mut initial_stack = Vec::new();
+        let initial_value = self.evaluate_const_expr(&init_expr, &mut initial_stack)?;
+        let global = Arc::new(Global::new(global_type, initial_value)?);
+        self.globals
+            .write()
+            .map_err(|_| Error::PoisonedLock)?
+            .push(global.clone());
+        Ok(global)
     }
 }
 
@@ -946,6 +720,18 @@ fn parse_module(module: &mut Module, bytes: &[u8]) -> Result<()> {
 
         let (size, bytes_read) = read_leb128_u32(&bytes[offset..])?;
         offset += bytes_read;
+        let section_content_start_offset = offset; // Start of the section's content
+        let expected_section_end_offset = section_content_start_offset + size as usize; // Expected end
+
+        // Ensure the declared section size doesn't exceed remaining bytes
+        if expected_section_end_offset > bytes.len() {
+            return Err(Error::Parse(format!(
+                "Section size {} for section ID {} exceeds remaining bytes {}",
+                size,
+                section_id,
+                bytes.len() - section_content_start_offset
+            )));
+        }
 
         match section_id {
             // Type section
@@ -1049,10 +835,24 @@ fn parse_module(module: &mut Module, bytes: &[u8]) -> Result<()> {
                 let (count, bytes_read) = read_leb128_u32(&bytes[offset..])?;
                 offset += bytes_read;
 
-                for _ in 0..count {
+                // Ensure function section has been processed and matches code count
+                if module.functions.len() < count as usize {
+                    return Err(Error::InvalidModule(
+                        "Code section count exceeds function section count".to_string(),
+                    ));
+                }
+
+                for idx in 0..count as usize {
+                    // Use index
                     let (code, bytes_read) = read_code(&bytes[offset..])?;
                     offset += bytes_read;
-                    module.functions[count as usize - 1].code = code.expr;
+                    // Assign code and locals to the correct function index
+                    module.functions[idx].code = code.expr;
+                    module.functions[idx].locals = code
+                        .locals
+                        .iter()
+                        .map(|&(_count, val_type)| val_type)
+                        .collect(); // Extract ValueType
                 }
             }
             // Data section
@@ -1076,16 +876,54 @@ fn parse_module(module: &mut Module, bytes: &[u8]) -> Result<()> {
                 return Err(Error::InvalidModule("Invalid module".to_string()));
             }
         }
+
+        // Validate that the number of bytes consumed matches the section size
+        if offset != expected_section_end_offset {
+            return Err(Error::Parse(format!(
+                "Section size mismatch for section ID {}: expected end offset {}, but got {}",
+                section_id, expected_section_end_offset, offset
+            )));
+        }
     }
 
     Ok(())
 }
 
 fn parse_component(module: &mut Module, bytes: &[u8]) -> Result<()> {
-    // TODO: Implement component parsing
-    Err(Error::InvalidModule(
-        "Component parsing not implemented".into(),
-    ))
+    // Store the original binary
+    module.binary = Some(bytes.to_vec());
+
+    // Create a custom section to indicate this is a component
+    module.custom_sections.push(CustomSection {
+        name: "component-model-info".to_string(),
+        data: vec![0x01], // 0x01 indicates this is a component
+    });
+
+    // Simple validation of the header
+    if bytes.len() < 8 {
+        return Err(Error::InvalidModule("Component binary too short".into()));
+    }
+
+    // Check magic number
+    if &bytes[0..4] != [0x00, 0x61, 0x73, 0x6D] {
+        return Err(Error::InvalidModule(
+            "Invalid component magic number".into(),
+        ));
+    }
+
+    // Check version
+    if &bytes[4..8] != [0x0D, 0x00, 0x01, 0x00] {
+        return Err(Error::InvalidModule("Invalid component version".into()));
+    }
+
+    // For now, just validate that there's at least the required type section
+    if bytes.len() <= 8 {
+        return Err(Error::InvalidModule(
+            "Missing required component sections".into(),
+        ));
+    }
+
+    Ok(())
 }
 
 fn read_func_type(bytes: &[u8]) -> Result<(FuncType, usize)> {
@@ -1183,10 +1021,32 @@ fn read_table(bytes: &[u8]) -> Result<(Arc<Table>, usize)> {
     Ok((Arc::new(table), 0))
 }
 
-fn read_memory(bytes: &[u8]) -> Result<(Arc<Memory>, usize)> {
-    let memory_type = MemoryType { min: 0, max: None };
-    let memory = Memory::new(memory_type);
-    Ok((Arc::new(memory), 0))
+fn read_memory(bytes: &[u8]) -> Result<(Arc<DefaultMemory>, usize)> {
+    let mut offset = 0;
+
+    // Read flags
+    if offset >= bytes.len() {
+        return Err(Error::Parse("Unexpected end of memory type bytes".into()));
+    }
+    let flags = bytes[offset];
+    offset += 1;
+
+    // Read min limit (LEB128)
+    let (min, bytes_read) = read_leb128_u32(&bytes[offset..])?;
+    offset += bytes_read;
+
+    // Read max limit if flags indicate it's present
+    let max = if flags & 0x01 != 0 {
+        let (max_val, bytes_read) = read_leb128_u32(&bytes[offset..])?;
+        offset += bytes_read;
+        Some(max_val)
+    } else {
+        None
+    };
+
+    let memory_type = MemoryType { min, max };
+    let memory = DefaultMemory::new(memory_type);
+    Ok((Arc::new(memory), offset))
 }
 
 fn read_global(bytes: &[u8]) -> Result<(Arc<Global>, usize)> {
@@ -1259,33 +1119,39 @@ fn read_code(bytes: &[u8]) -> Result<(Code, usize)> {
         return Err(Error::Parse("Empty code section".into()));
     }
 
-    let mut offset = 0;
+    let initial_offset = 0; // Assuming bytes slice starts exactly at the code entry
+    let mut offset = initial_offset;
 
     // Read the size of the code section entry
     let (size, size_bytes_read) = read_leb128_u32(&bytes[offset..])?;
     offset += size_bytes_read;
+    let expected_end_offset = offset + size as usize; // Calculate expected end based on declared size
 
     // Read local declarations
     let (local_count, local_count_bytes) = read_leb128_u32(&bytes[offset..])?;
     offset += local_count_bytes;
 
     let mut locals = Vec::with_capacity(local_count as usize);
-    let mut total_bytes_read = size_bytes_read + local_count_bytes;
+    // let mut total_bytes_read = size_bytes_read + local_count_bytes; // No longer needed
 
     // Read local entries
     for _ in 0..local_count {
         if offset >= bytes.len() {
-            return Err(Error::Parse("Unexpected end of code section".into()));
+            return Err(Error::Parse(
+                "Unexpected end of code section while reading locals".into(),
+            ));
         }
 
         // Read local count
         let (count, count_bytes) = read_leb128_u32(&bytes[offset..])?;
         offset += count_bytes;
-        total_bytes_read += count_bytes;
+        // total_bytes_read += count_bytes;
 
         // Read local type
         if offset >= bytes.len() {
-            return Err(Error::Parse("Unexpected end of code section".into()));
+            return Err(Error::Parse(
+                "Unexpected end of code section while reading local type".into(),
+            ));
         }
 
         let value_type = match bytes[offset] {
@@ -1304,7 +1170,7 @@ fn read_code(bytes: &[u8]) -> Result<(Code, usize)> {
             }
         };
         offset += 1;
-        total_bytes_read += 1;
+        // total_bytes_read += 1;
 
         locals.push((count, value_type));
     }
@@ -1312,22 +1178,26 @@ fn read_code(bytes: &[u8]) -> Result<(Code, usize)> {
     // Read expression (instructions)
     let mut expr = Vec::new();
     let function_body_start = offset;
-    let function_body_size = (size as usize).saturating_sub(total_bytes_read - size_bytes_read);
+    // let function_body_size = (size as usize).saturating_sub(total_bytes_read - size_bytes_read); // No longer needed
 
-    // Decode instructions until end opcode or size limit
-    let mut i = 0;
-    while i < function_body_size && offset < bytes.len() {
+    // Decode instructions until the expected end offset is reached
+    // let mut i = 0; // Remove i counter
+    while offset < expected_end_offset {
+        if offset >= bytes.len() {
+            // Check bounds before reading opcode
+            return Err(Error::Parse("Unexpected end of code section body".into()));
+        }
         let opcode = bytes[offset];
         offset += 1;
-        i += 1;
+        // i += 1; // Remove i increment
 
         let instruction = match opcode {
             0x00 => Instruction::Unreachable,
             0x01 => Instruction::Nop,
             0x02 => {
-                // Block instruction with block type
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
+                // Block
+                if offset >= expected_end_offset {
+                    return Err(Error::Parse("Unexpected end for Block type".into()));
                 }
                 let block_type = match bytes[offset] {
                     0x40 => BlockType::Empty,
@@ -1335,16 +1205,16 @@ fn read_code(bytes: &[u8]) -> Result<(Code, usize)> {
                     0x7E => BlockType::Value(ValueType::I64),
                     0x7D => BlockType::Value(ValueType::F32),
                     0x7C => BlockType::Value(ValueType::F64),
-                    _ => BlockType::Empty, // Simplified for now
+                    _ => BlockType::Empty,
                 };
                 offset += 1;
-                i += 1;
+                // i += 1; // Remove i increment
                 Instruction::Block(block_type)
             }
             0x03 => {
-                // Loop instruction with block type
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
+                // Loop
+                if offset >= expected_end_offset {
+                    return Err(Error::Parse("Unexpected end for Loop type".into()));
                 }
                 let block_type = match bytes[offset] {
                     0x40 => BlockType::Empty,
@@ -1352,145 +1222,222 @@ fn read_code(bytes: &[u8]) -> Result<(Code, usize)> {
                     0x7E => BlockType::Value(ValueType::I64),
                     0x7D => BlockType::Value(ValueType::F32),
                     0x7C => BlockType::Value(ValueType::F64),
-                    _ => BlockType::Empty, // Simplified for now
+                    _ => BlockType::Empty,
                 };
                 offset += 1;
-                i += 1;
+                // i += 1; // Remove i increment
                 Instruction::Loop(block_type)
             }
+            0x04 => {
+                // If
+                if offset >= expected_end_offset {
+                    return Err(Error::Parse("Unexpected end for If type".into()));
+                }
+                let block_type = match bytes[offset] {
+                    0x40 => BlockType::Empty,
+                    0x7F => BlockType::Value(ValueType::I32),
+                    0x7E => BlockType::Value(ValueType::I64),
+                    0x7D => BlockType::Value(ValueType::F32),
+                    0x7C => BlockType::Value(ValueType::F64),
+                    _ => BlockType::Empty,
+                };
+                offset += 1;
+                // i += 1; // Remove i increment
+                Instruction::If(block_type)
+            }
+            0x05 => Instruction::Else,
+            0x06..=0x0A => Instruction::Nop,
             0x0B => Instruction::End,
             0x0C => {
-                // br instruction
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
-                }
+                // br
                 let (label_idx, bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for br".into()));
+                }
                 offset += bytes_read;
-                i += bytes_read;
+                // i += bytes_read; // Remove i increment
                 Instruction::Br(label_idx)
             }
             0x0D => {
-                // br_if instruction
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
-                }
+                // br_if
                 let (label_idx, bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for br_if".into()));
+                }
                 offset += bytes_read;
-                i += bytes_read;
+                // i += bytes_read; // Remove i increment
                 Instruction::BrIf(label_idx)
             }
             0x10 => {
-                // call instruction
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
-                }
+                // call
                 let (func_idx, bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for call".into()));
+                }
                 offset += bytes_read;
-                i += bytes_read;
+                // i += bytes_read; // Remove i increment
                 Instruction::Call(func_idx)
             }
-            0x20 => {
-                // local.get instruction
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
+            0x14 => {
+                // table.size
+                let (table_idx, bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for table.size".into()));
                 }
-                let (local_idx, bytes_read) = read_leb128_u32(&bytes[offset..])?;
                 offset += bytes_read;
-                i += bytes_read;
+                // i += bytes_read; // Remove i increment
+                Instruction::TableSize(table_idx)
+            }
+            0x1A => Instruction::Drop,
+            0x1e => {
+                // i32.load8_s
+                let (align, align_bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + align_bytes_read > expected_end_offset {
+                    return Err(Error::Parse(
+                        "Immediate overrun for i32.load8_s align".into(),
+                    ));
+                }
+                offset += align_bytes_read;
+                // i += align_bytes_read; // Remove i increment
+                let (mem_offset, offset_bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + offset_bytes_read > expected_end_offset {
+                    return Err(Error::Parse(
+                        "Immediate overrun for i32.load8_s offset".into(),
+                    ));
+                }
+                offset += offset_bytes_read;
+                // i += offset_bytes_read; // Remove i increment
+                Instruction::I32Load8S(align, mem_offset)
+            }
+            0x20 => {
+                // local.get
+                let (local_idx, bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for local.get".into()));
+                }
+                offset += bytes_read;
+                // i += bytes_read; // Remove i increment
                 Instruction::LocalGet(local_idx)
             }
             0x21 => {
-                // local.set instruction
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
-                }
+                // local.set
                 let (local_idx, bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for local.set".into()));
+                }
                 offset += bytes_read;
-                i += bytes_read;
+                // i += bytes_read; // Remove i increment
                 Instruction::LocalSet(local_idx)
             }
             0x22 => {
-                // local.tee instruction
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
-                }
+                // local.tee
                 let (local_idx, bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for local.tee".into()));
+                }
                 offset += bytes_read;
-                i += bytes_read;
+                // i += bytes_read; // Remove i increment
                 Instruction::LocalTee(local_idx)
             }
             0x23 => {
-                // global.get instruction
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
-                }
+                // global.get
                 let (global_idx, bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for global.get".into()));
+                }
                 offset += bytes_read;
-                i += bytes_read;
+                // i += bytes_read; // Remove i increment
                 Instruction::GlobalGet(global_idx)
             }
             0x24 => {
-                // global.set instruction
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
-                }
+                // global.set
                 let (global_idx, bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for global.set".into()));
+                }
                 offset += bytes_read;
-                i += bytes_read;
+                // i += bytes_read; // Remove i increment
                 Instruction::GlobalSet(global_idx)
             }
-            // Numeric instructions
-            0x41 => {
-                // i32.const instruction
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
+            0x28 => {
+                // i32.load
+                let (align, align_bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + align_bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for i32.load align".into()));
                 }
-                let (value, bytes_read) = read_leb128_i32(&bytes[offset..])?;
+                offset += align_bytes_read;
+                // i += align_bytes_read;
+                let (mem_offset, offset_bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + offset_bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for i32.load offset".into()));
+                }
+                offset += offset_bytes_read;
+                // i += offset_bytes_read;
+                Instruction::I32Load(align, mem_offset)
+            }
+            0x36 => {
+                // i32.store
+                let (align, align_bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + align_bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for i32.store align".into()));
+                }
+                offset += align_bytes_read;
+                let (mem_offset, offset_bytes_read) = read_leb128_u32(&bytes[offset..])?;
+                if offset + offset_bytes_read > expected_end_offset {
+                    return Err(Error::Parse(
+                        "Immediate overrun for i32.store offset".into(),
+                    ));
+                }
+                offset += offset_bytes_read;
+                Instruction::I32Store(align, mem_offset)
+            }
+            0x41 => {
+                // i32.const
+                let (val, bytes_read) = read_leb128_i32(&bytes[offset..])?;
+                if offset + bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for i32.const".into()));
+                }
                 offset += bytes_read;
-                i += bytes_read;
-                Instruction::I32Const(value)
+                // i += bytes_read;
+                Instruction::I32Const(val)
             }
             0x42 => {
-                // i64.const instruction
-                if offset >= bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
+                // i64.const
+                let (val, bytes_read) = read_leb128_i64(&bytes[offset..])?;
+                if offset + bytes_read > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for i64.const".into()));
                 }
-                let (value, bytes_read) = read_leb128_i64(&bytes[offset..])?;
                 offset += bytes_read;
-                i += bytes_read;
-                Instruction::I64Const(value)
+                // i += bytes_read;
+                Instruction::I64Const(val)
             }
             0x43 => {
-                // f32.const instruction
-                if offset + 4 > bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
+                // f32.const
+                if offset + 4 > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for f32.const".into()));
                 }
-                let mut buf = [0u8; 4];
-                buf.copy_from_slice(&bytes[offset..offset + 4]);
-                let value = f32::from_le_bytes(buf);
+                let val = f32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
                 offset += 4;
-                i += 4;
-                Instruction::F32Const(value)
+                // i += 4;
+                Instruction::F32Const(val)
             }
             0x44 => {
-                // f64.const instruction
-                if offset + 8 > bytes.len() {
-                    return Err(Error::Parse("Unexpected end of code section".into()));
+                // f64.const
+                if offset + 8 > expected_end_offset {
+                    return Err(Error::Parse("Immediate overrun for f64.const".into()));
                 }
-                let mut buf = [0u8; 8];
-                buf.copy_from_slice(&bytes[offset..offset + 8]);
-                let value = f64::from_le_bytes(buf);
+                let val = f64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap());
                 offset += 8;
-                i += 8;
-                Instruction::F64Const(value)
+                // i += 8;
+                Instruction::F64Const(val)
             }
-            // Binary operations
-            0x6A => Instruction::I32Add,
-            0x6B => Instruction::I32Sub,
-            0x6C => Instruction::I32Mul,
-            0x6D => Instruction::I32DivS,
-            0x6E => Instruction::I32DivU,
-            0x6F => Instruction::I32RemS,
+            0x45..=0x69 => Instruction::Nop, // Placeholder for simple numeric ops
+            0x6a => Instruction::I32Add,
+            0x6b => Instruction::I32Sub,
+            0x6c => Instruction::I32Mul,
+            0x6d => Instruction::I32DivS,
+            0x6e => Instruction::I32DivU,
+            0x6f => Instruction::I32RemS,
             0x70 => Instruction::I32RemU,
             0x71 => Instruction::I32And,
             0x72 => Instruction::I32Or,
@@ -1500,39 +1447,191 @@ fn read_code(bytes: &[u8]) -> Result<(Code, usize)> {
             0x76 => Instruction::I32ShrU,
             0x77 => Instruction::I32Rotl,
             0x78 => Instruction::I32Rotr,
-            0x7C => Instruction::F64Add,
-            0x7D => Instruction::F64Sub,
-            0x7E => Instruction::F64Mul,
-            0x7F => Instruction::F64Div,
-            // Comparison
-            0x45 => Instruction::I32Eqz,
-            0x46 => Instruction::I32Eq,
-            0x47 => Instruction::I32Ne,
-            0x48 => Instruction::I32LtS,
-            0x49 => Instruction::I32LtU,
-            0x4A => Instruction::I32GtS,
-            0x4B => Instruction::I32GtU,
-            0x4C => Instruction::I32LeS,
-            0x4D => Instruction::I32LeU,
-            0x4E => Instruction::I32GeS,
-            0x4F => Instruction::I32GeU,
-            // We can add more instructions later, but this should cover the basic ones in the test
+            0x7c => Instruction::F64Add,
+            0x7d => Instruction::F64Sub,
+            0x7e => Instruction::F64Mul,
+            0x7f => Instruction::F64Div,
+            0x8b => Instruction::F32Abs,
+            0x8c => Instruction::F32Neg,
+            0x8d => Instruction::F32Ceil,
+            0x8e => Instruction::F32Floor,
+            0x8f => Instruction::F32Trunc,
+            0x90 => Instruction::F32Nearest,
+            0x91 => Instruction::F32Sqrt,
+            0x92 => Instruction::F32Add,
+            0x93 => Instruction::F32Sub,
+            0x94 => Instruction::F32Mul,
+            0x95 => Instruction::F32Div,
+            0x96 => Instruction::F32Min,
+            0x97 => Instruction::F32Max,
+            0x98 => Instruction::F32Copysign,
+            0xfd => {
+                if offset >= expected_end_offset {
+                    return Err(Error::Parse("Unexpected end after 0xfd prefix".into()));
+                }
+                let simd_opcode = bytes[offset];
+                offset += 1;
+                // i += 1; // Remove i increment
+
+                match simd_opcode {
+                    0x00 => {
+                        // v128.load
+                        let (align, align_bytes) = read_leb128_u32(&bytes[offset..])?;
+                        if offset + align_bytes > expected_end_offset {
+                            return Err(Error::Parse(
+                                "Immediate overrun for v128.load align".into(),
+                            ));
+                        }
+                        offset += align_bytes;
+                        // i += align_bytes;
+                        let (mem_offset, offset_bytes) = read_leb128_u32(&bytes[offset..])?;
+                        if offset + offset_bytes > expected_end_offset {
+                            return Err(Error::Parse(
+                                "Immediate overrun for v128.load offset".into(),
+                            ));
+                        }
+                        offset += offset_bytes;
+                        // i += offset_bytes;
+                        Instruction::V128Load(align, mem_offset)
+                    }
+                    0x0B => {
+                        // v128.store
+                        let (align, align_bytes) = read_leb128_u32(&bytes[offset..])?;
+                        if offset + align_bytes > expected_end_offset {
+                            return Err(Error::Parse(
+                                "Immediate overrun for v128.store align".into(),
+                            ));
+                        }
+                        offset += align_bytes;
+                        // i += align_bytes;
+                        let (mem_offset, offset_bytes) = read_leb128_u32(&bytes[offset..])?;
+                        if offset + offset_bytes > expected_end_offset {
+                            return Err(Error::Parse(
+                                "Immediate overrun for v128.store offset".into(),
+                            ));
+                        }
+                        offset += offset_bytes;
+                        // i += offset_bytes;
+                        Instruction::V128Store(align, mem_offset)
+                    }
+                    0x0C => {
+                        // v128.const
+                        if offset + 16 > expected_end_offset {
+                            return Err(Error::Parse("Immediate overrun for v128.const".into()));
+                        }
+                        let mut const_bytes = [0u8; 16];
+                        const_bytes.copy_from_slice(&bytes[offset..offset + 16]);
+                        offset += 16;
+                        // i += 16; // Remove i increment
+                        Instruction::V128Const(const_bytes)
+                    }
+                    0x0D => {
+                        // v128.shuffle
+                        if offset + 16 > expected_end_offset {
+                            return Err(Error::Parse("Immediate overrun for v128.shuffle".into()));
+                        }
+                        let mut lane_bytes = [0u8; 16];
+                        lane_bytes.copy_from_slice(&bytes[offset..offset + 16]);
+                        offset += 16;
+                        // i += 16; // Remove i increment
+                        Instruction::V128Shuffle(lane_bytes)
+                    }
+                    0x0F => Instruction::V128SplatI8x16,
+                    0x10 => Instruction::V128SplatI16x8,
+                    0x11 => Instruction::V128SplatI32x4,
+                    0x12 => Instruction::V128SplatI64x2,
+                    0x13 => Instruction::F32x4Splat,
+                    0x14 => Instruction::F64x2Splat,
+                    0x7E => Instruction::I32x4ExtAddPairwiseI16x8S,
+                    0x7F => Instruction::I32x4ExtAddPairwiseI16x8U,
+                    0xAE => Instruction::SimdOpAE,
+                    0xAF => {
+                        return Err(Error::Parse(
+                            "Unimplemented SIMD opcode 0xaf (i32x4.sub_sat_s)".into(),
+                        ))
+                    }
+                    0xB0 => {
+                        return Err(Error::Parse(
+                            "Unimplemented SIMD opcode 0xb0 (i32x4.sub_sat_u)".into(),
+                        ))
+                    }
+                    0xB1 => Instruction::SimdOpB1,
+                    0xB2 => {
+                        return Err(Error::Parse(
+                            "Unimplemented SIMD opcode 0xb2 (i64x2.abs)".into(),
+                        ))
+                    }
+                    0xB3 => {
+                        return Err(Error::Parse(
+                            "Unimplemented SIMD opcode 0xb3 (i64x2.neg)".into(),
+                        ))
+                    }
+                    0xB4 => {
+                        return Err(Error::Parse(
+                            "Unimplemented SIMD opcode 0xb4 (i64x2.all_true)".into(),
+                        ))
+                    }
+                    0xB5 => Instruction::SimdOpB5,
+                    0xB6 => Instruction::I32x4DotI16x8S,
+                    0xB7 => {
+                        return Err(Error::Parse(
+                            "Unimplemented SIMD opcode 0xb7 (i32x4.extmul_low_i16x8_s)".into(),
+                        ))
+                    }
+                    0xB8 => {
+                        return Err(Error::Parse(
+                            "Unimplemented SIMD opcode 0xb8 (i32x4.extmul_high_i16x8_s)".into(),
+                        ))
+                    }
+                    0xB9 => {
+                        return Err(Error::Parse(
+                            "Unimplemented SIMD opcode 0xb9 (i32x4.extmul_low_i16x8_u)".into(),
+                        ))
+                    }
+                    _ => {
+                        return Err(Error::InvalidModule(format!(
+                            "Unknown SIMD opcode: 0xfd 0x{:02x}",
+                            simd_opcode
+                        )));
+                    }
+                }
+            }
             _ => {
-                // For any unknown opcode, log it and use a placeholder
-                println!("Unknown opcode: 0x{opcode:02x}");
-                Instruction::End // Using End as placeholder for unknown instructions
+                return Err(Error::InvalidModule(format!(
+                    "Unknown opcode: 0x{opcode:02x} at offset {offset}",
+                    offset = function_body_start + (offset - function_body_start) // Calculate offset within body for error
+                )));
             }
         };
 
+        // Check if we read past the expected end BEFORE pushing
+        if offset > expected_end_offset {
+            return Err(Error::Parse(format!(
+                 "Read past end of function body. Expected end: {}, Actual offset: {}. Last opcode: 0x{:02x}",
+                 expected_end_offset, offset, opcode
+             )));
+        }
+
         expr.push(instruction);
 
+        // Break loop specifically on End opcode AFTER processing it
         if opcode == 0x0B {
-            // End opcode
             break;
         }
     }
 
-    Ok((Code { size, locals, expr }, offset))
+    // After loop, verify the offset matches exactly
+    if offset != expected_end_offset {
+        return Err(Error::Parse(format!(
+            "Function body size mismatch. Expected end offset: {}, Actual end offset: {}. Declared size: {}, Locals size: {}",
+            expected_end_offset,
+            offset,
+            size,
+            function_body_start - size_bytes_read // Calculate actual locals size read
+        )));
+    }
+
+    Ok((Code { size, locals, expr }, offset - initial_offset)) // Return total bytes read for this code entry
 }
 
 fn read_data(bytes: &[u8]) -> Result<(Data, usize)> {

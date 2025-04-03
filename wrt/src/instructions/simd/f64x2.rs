@@ -3,12 +3,14 @@
 //! This module contains implementations for WebAssembly SIMD instructions
 //! that operate on 128-bit vectors as two 64-bit floating point lanes.
 
-use crate::{
-    behavior::FrameBehavior,
-    error::{Error, Result},
-    stack::Stack,
-    values::Value,
-};
+#[cfg(not(feature = "std"))]
+use core::cmp;
+
+use crate::behavior::FrameBehavior;
+use crate::error::{Error, Result};
+use crate::stack::Stack;
+use crate::values::Value;
+use crate::StacklessEngine;
 
 use super::common::{pop_v128, push_v128, V128};
 
@@ -39,10 +41,7 @@ fn set_f64_lane(v: &mut V128, lane: usize, value: f64) {
 }
 
 /// Replicate an f64 value to all lanes of a v128
-pub fn f64x2_splat(
-    stack: &mut (impl Stack + ?Sized),
-    _frame: &mut (impl FrameBehavior + ?Sized),
-) -> Result<()> {
+pub fn f64x2_splat(stack: &mut impl Stack, _frame: &mut impl FrameBehavior) -> Result<()> {
     // Pop the f64 value from the stack
     let value = match stack.pop()? {
         Value::F64(v) => v,
@@ -229,4 +228,62 @@ pub fn f64x2_neg(
 
     // Push the result v128 to the stack
     push_v128(stack, result)
+}
+
+// Add stubs for missing functions
+
+pub fn f64x2_min(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement f64x2_min")
+}
+
+pub fn f64x2_max(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement f64x2_max")
+}
+
+pub fn f64x2_pmin(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement f64x2_pmin")
+}
+
+pub fn f64x2_pmax(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement f64x2_pmax")
+}
+
+pub fn f64x2_convert_low_i32x4_s(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement f64x2_convert_low_i32x4_s")
+}
+
+pub fn f64x2_convert_low_i32x4_u(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement f64x2_convert_low_i32x4_u")
+}
+
+pub fn f64x2_promote_low_f32x4(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement f64x2_promote_low_f32x4")
 }

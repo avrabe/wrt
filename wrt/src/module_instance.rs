@@ -2,7 +2,7 @@ use crate::{
     error::{Error, Result},
     global::Global,
     instructions::Instruction,
-    memory::Memory,
+    memory::DefaultMemory as Memory,
     module::{Module, OtherExport},
     table::Table,
     types::FuncType,

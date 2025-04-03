@@ -162,9 +162,12 @@ impl LogOperation {
 /// Log handler type for processing WebAssembly log operations
 pub type LogHandler = Box<dyn Fn(LogOperation) + Send + Sync>;
 
-// Create a custom trait to use as a trait object
+/// A trait for functions that can be cloned and operate on `Vec<Value>`.
+/// This is used for storing host functions that can be called by the Wasm engine.
 pub trait FnWithVecValue: Send + Sync {
+    /// Calls the function with the given target and arguments.
     fn call(&self, target: &mut dyn Any, args: Vec<Value>) -> crate::error::Result<Vec<Value>>;
+    /// Clones the function into a `Box`.
     fn clone_box(&self) -> Box<dyn FnWithVecValue>;
 }
 
@@ -186,10 +189,14 @@ where
     }
 }
 
-// Create a cloneable wrapper for the trait object
+/// A wrapper struct that makes a closure implementing `Fn` cloneable
+/// by boxing it and handling the cloning via the `FnWithVecValue` trait.
 pub struct CloneableFn(Box<dyn FnWithVecValue>);
 
 impl CloneableFn {
+    /// Creates a new `CloneableFn` from a closure.
+    ///
+    /// The closure must be `Send`, `Sync`, `Clone`, and `'static`.
     pub fn new<F>(f: F) -> Self
     where
         F: Fn(&mut dyn Any, Vec<Value>) -> crate::error::Result<Vec<Value>>
@@ -201,6 +208,7 @@ impl CloneableFn {
         Self(Box::new(f))
     }
 
+    /// Calls the wrapped function.
     pub fn call(&self, target: &mut dyn Any, args: Vec<Value>) -> crate::error::Result<Vec<Value>> {
         self.0.call(target, args)
     }

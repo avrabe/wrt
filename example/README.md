@@ -13,10 +13,13 @@ This example showcases:
 ## Building
 
 ```bash
-# Install prerequisites
+# Install prerequisites (if not done via `just setup`)
 rustup target add wasm32-wasip2
 
-# Build the component
+# Build the component (using Justfile is recommended)
+just build-example
+
+# Alternatively, build directly with cargo:
 cargo build -p example --target wasm32-wasip2
 ```
 

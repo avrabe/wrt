@@ -6,14 +6,15 @@
 // Only include the imports actually needed in this file
 
 pub mod arithmetic;
-mod comparison;
+mod bit_counting;
+pub mod comparison;
 mod control;
-mod executor;
+pub mod executor;
 mod instruction_type;
 mod memory;
 pub mod numeric;
 mod parametric;
-mod simd;
+pub mod simd;
 mod table;
 mod variable;
 

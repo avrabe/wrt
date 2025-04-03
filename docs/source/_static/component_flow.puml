@@ -1,13 +1,12 @@
 @startuml
 
-title WRT Execution Flow
+title WRT Stackless Execution Flow (with Fuel)
 
 participant "WRTD CLI" as CLI
-participant "Engine" as Engine
+participant "StacklessEngine" as Engine
 participant "Module" as Module
 participant "Validation" as Validation
-participant "Execution" as Execution
-participant "Stack" as Stack
+participant "Stackless Execution" as Execution /' Internal to StacklessEngine '/
 participant "Memory" as Memory
 
 CLI -> Module: load_from_binary(bytes)
@@ -17,27 +16,29 @@ CLI -> Engine: instantiate(module)
 Engine -> Module: instantiate()
 Engine --> CLI: instance ID
 
+CLI -> Engine: set_fuel(amount)
 CLI -> Engine: execute(instance_id, func_idx, args)
 activate Engine
 
-Engine -> Stack: push_args(args)
-Engine -> Execution: execute()
+Engine -> Execution: initialize_state(args)
 activate Execution
 
 loop until completion or out of fuel
-  Execution -> Stack: push/pop values
+  Execution -> Execution: process_instruction()
   Execution -> Memory: read/write data
   
   alt out of fuel condition
     Execution --> Engine: FuelExhausted error
     Engine --> CLI: FuelExhausted error
+    deactivate Execution
+    deactivate Engine
+    stop
   end
 end
 
 Execution --> Engine: execution results
 deactivate Execution
 
-Engine -> Stack: get_results()
 Engine --> CLI: function results
 deactivate Engine
 

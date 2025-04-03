@@ -2,14 +2,25 @@ use crate::error::{Error, Result};
 use crate::types::TableType;
 use crate::values::Value;
 use crate::Vec;
+use std::sync::RwLock;
 
 /// Represents a WebAssembly table instance
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Table {
     /// Table type
     pub type_: TableType,
-    /// Table elements
-    elements: Vec<Option<Value>>,
+    /// Table elements, protected by RwLock
+    elements: RwLock<Vec<Option<Value>>>,
+}
+
+impl Clone for Table {
+    fn clone(&self) -> Self {
+        let elements_lock = self.elements.read().unwrap();
+        Self {
+            type_: self.type_.clone(),
+            elements: RwLock::new(elements_lock.clone()),
+        }
+    }
 }
 
 impl Table {
@@ -19,11 +30,11 @@ impl Table {
         let initial_size = table_type.min;
         Self {
             type_: table_type,
-            elements: {
+            elements: RwLock::new({
                 let mut v = Vec::with_capacity(initial_size as usize);
                 v.resize(initial_size as usize, None);
                 v
-            },
+            }),
         }
     }
 
@@ -35,93 +46,155 @@ impl Table {
 
     /// Returns the current size
     #[must_use]
-    pub fn size(&self) -> u32 {
-        self.elements.len() as u32
+    pub fn size(&self) -> usize {
+        self.elements.read().unwrap().len()
     }
 
     /// Grows the table by the specified number of elements
-    pub fn grow(&mut self, delta: u32) -> Result<u32> {
-        let old_size = self.size();
-        let new_size = old_size
-            .checked_add(delta)
+    pub fn grow(&self, delta: u32) -> Result<u32> {
+        let old_size_usize = self.elements.read().unwrap().len(); // Get current size as usize
+        let delta_usize: usize = delta
+            .try_into()
+            .map_err(|_| Error::Execution("Delta too large for usize".into()))?;
+        let new_size_usize = old_size_usize
+            .checked_add(delta_usize)
             .ok_or_else(|| Error::Execution("Table size overflow".into()))?;
 
-        if new_size > self.type_.max.unwrap_or(u32::MAX) {
+        let max_usize = self
+            .type_
+            .max
+            .map_or(usize::MAX, |m| m.try_into().unwrap_or(usize::MAX));
+
+        if new_size_usize > max_usize {
             return Err(Error::Execution("Table size exceeds maximum".into()));
         }
 
-        self.elements.resize(new_size as usize, None);
-        Ok(old_size)
+        let mut elements_guard = self.elements.write().unwrap();
+        elements_guard.resize(new_size_usize, None);
+        Ok(old_size_usize.try_into().unwrap_or(u32::MAX)) // Return old size as u32
     }
 
     /// Gets an element from the table
     pub fn get(&self, idx: u32) -> Result<Option<Value>> {
-        self.check_bounds(idx)?;
-        Ok(self.elements[idx as usize].clone())
+        let elements_guard = self.elements.read().unwrap();
+        let idx_usize = idx as usize;
+        if idx_usize >= elements_guard.len() {
+            // Wasm spec dictates trap on out-of-bounds access
+            return Err(Error::OutOfBounds);
+        }
+        Ok(elements_guard[idx_usize].clone())
     }
 
     /// Sets an element in the table
-    pub fn set(&mut self, idx: u32, value: Option<Value>) -> Result<()> {
-        self.check_bounds(idx)?;
-        self.elements[idx as usize] = value;
+    pub fn set(&self, idx: u32, value: Option<Value>) -> Result<()> {
+        let mut elements_guard = self.elements.write().unwrap();
+        let idx_usize = idx as usize;
+        if idx_usize >= elements_guard.len() {
+            return Err(Error::OutOfBounds); // Trap on out-of-bounds write
+        }
+        // Type check if value is Some
+        if let Some(ref val) = value {
+            if !val.matches_type(&self.type_.element_type) {
+                return Err(Error::TypeMismatch(format!(
+                    "Invalid value type {:?} for table type {:?}",
+                    val.get_type(),
+                    self.type_.element_type
+                )));
+            }
+        }
+        elements_guard[idx_usize] = value;
         Ok(())
     }
 
     /// Initializes a range of elements from a vector
-    pub fn init(&mut self, offset: u32, init: &[Option<Value>]) -> Result<()> {
+    pub fn init(&self, offset: u32, init: &[Option<Value>]) -> Result<()> {
+        let len = init.len() as u32;
         let end = offset
-            .checked_add(init.len() as u32)
+            .checked_add(len)
             .ok_or_else(|| Error::Execution("Table initialization overflow".into()))?;
-        self.check_bounds(end - 1)?;
+
+        let mut elements_guard = self.elements.write().unwrap();
+        self.check_bounds_internal(end.saturating_sub(1), &elements_guard)?;
 
         // Clone each element individually since Option<Value> doesn't implement Copy
         for (i, value) in init.iter().enumerate() {
-            self.elements[offset as usize + i] = value.clone();
+            elements_guard[offset as usize + i] = value.clone();
         }
 
         Ok(())
     }
 
     /// Copies elements from one range to another
-    pub fn copy(&mut self, dst: u32, src: u32, len: u32) -> Result<()> {
+    pub fn copy(&self, dst: u32, src: u32, len: u32) -> Result<()> {
+        if len == 0 {
+            return Ok(());
+        }
         let dst_end = dst
             .checked_add(len)
             .ok_or_else(|| Error::Execution("Table copy destination overflow".into()))?;
         let src_end = src
             .checked_add(len)
             .ok_or_else(|| Error::Execution("Table copy source overflow".into()))?;
-        self.check_bounds(dst_end - 1)?;
-        self.check_bounds(src_end - 1)?;
 
+        let mut elements_guard = self.elements.write().unwrap();
+        self.check_bounds_internal(dst_end.saturating_sub(1), &elements_guard)?;
+        self.check_bounds_internal(src_end.saturating_sub(1), &elements_guard)?;
+
+        // Perform copy within the locked guard
+        // Need to handle overlap carefully - copy_within might be simpler if elements were Copy
         if dst <= src {
             // Forward copy
             for i in 0..len {
-                self.elements[(dst + i) as usize] = self.elements[(src + i) as usize].clone();
+                elements_guard[(dst + i) as usize] = elements_guard[(src + i) as usize].clone();
             }
         } else {
             // Backward copy
             for i in (0..len).rev() {
-                self.elements[(dst + i) as usize] = self.elements[(src + i) as usize].clone();
+                elements_guard[(dst + i) as usize] = elements_guard[(src + i) as usize].clone();
             }
         }
         Ok(())
     }
 
     /// Fills a range of elements with a value
-    pub fn fill(&mut self, offset: u32, len: u32, value: Option<Value>) -> Result<()> {
-        let end = offset
-            .checked_add(len)
+    pub fn fill(&self, offset: u32, len: u32, value: Option<Value>) -> Result<()> {
+        if len == 0 {
+            return Ok(());
+        }
+        let offset_usize = offset as usize;
+        let len_usize = len as usize;
+        let end_usize = offset_usize
+            .checked_add(len_usize)
             .ok_or_else(|| Error::Execution("Table fill overflow".into()))?;
-        self.check_bounds(end - 1)?;
-        for i in offset..end {
-            self.elements[i as usize] = value.clone();
+
+        let mut elements_guard = self.elements.write().unwrap();
+        // Check bounds *after* getting lock
+        if end_usize > elements_guard.len() {
+            return Err(Error::OutOfBounds); // Trap if fill goes out of bounds
+        }
+        // Type check if value is Some
+        if let Some(ref val) = value {
+            if !val.matches_type(&self.type_.element_type) {
+                return Err(Error::TypeMismatch(format!(
+                    "Invalid value type {:?} for table type {:?}",
+                    val.get_type(),
+                    self.type_.element_type
+                )));
+            }
+        }
+
+        for i in offset_usize..end_usize {
+            elements_guard[i] = value.clone();
         }
         Ok(())
     }
 
-    /// Checks if a table access is within bounds
-    fn check_bounds(&self, idx: u32) -> Result<()> {
-        if idx >= self.elements.len() as u32 {
+    /// Internal bounds check using a lock guard
+    fn check_bounds_internal<G>(&self, idx: u32, guard: &G) -> Result<()>
+    where
+        G: std::ops::Deref<Target = Vec<Option<Value>>>,
+    {
+        if idx >= guard.len() as u32 {
             return Err(Error::Execution("Table access out of bounds".into()));
         }
         Ok(())
@@ -159,7 +232,7 @@ mod tests {
     #[test]
     fn test_table_growth() -> Result<()> {
         let table_type = create_test_table_type(1, Some(10));
-        let mut table = Table::new(table_type);
+        let table = Table::new(table_type);
 
         // Test successful growth
         let old_size = table.grow(2)?;
@@ -174,7 +247,7 @@ mod tests {
         assert!(table.grow(1).is_err());
 
         // Test growth with no max
-        let mut table = Table::new(create_test_table_type(1, None));
+        let table = Table::new(create_test_table_type(1, None));
         assert!(table.grow(1000).is_ok());
         assert_eq!(table.size(), 1001);
 
@@ -183,7 +256,7 @@ mod tests {
 
     #[test]
     fn test_table_access() -> Result<()> {
-        let mut table = Table::new(create_test_table_type(5, None));
+        let table = Table::new(create_test_table_type(5, None));
 
         // Test initial state
         for i in 0..5 {
@@ -204,7 +277,7 @@ mod tests {
 
     #[test]
     fn test_table_initialization() -> Result<()> {
-        let mut table = Table::new(create_test_table_type(5, None));
+        let table = Table::new(create_test_table_type(5, None));
         let values = vec![
             Some(Value::FuncRef(Some(1))),
             Some(Value::FuncRef(Some(2))),
@@ -225,7 +298,7 @@ mod tests {
 
     #[test]
     fn test_table_copy() -> Result<()> {
-        let mut table = Table::new(create_test_table_type(10, None));
+        let table = Table::new(create_test_table_type(10, None));
 
         // Set up some initial values
         table.set(0, Some(Value::FuncRef(Some(1))))?;
@@ -252,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_table_fill() -> Result<()> {
-        let mut table = Table::new(create_test_table_type(5, None));
+        let table = Table::new(create_test_table_type(5, None));
         let value = Some(Value::FuncRef(Some(42)));
 
         // Test successful fill

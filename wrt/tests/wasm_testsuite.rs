@@ -1,5 +1,6 @@
+use std::fs;
 use std::path::Path;
-use wrt::{Engine, Error as WrtError, Module, Result, Value};
+use wrt::{Error as WrtError, Module, Result, StacklessEngine, Value};
 
 /// Utility function to get the test suite path from environment variables
 fn get_testsuite_path() -> Option<String> {
@@ -88,10 +89,10 @@ fn test_basic_simd_operations() -> Result<()> {
 
     // Load the module from binary
     let mut empty_module = Module::new();
-    let module = empty_module.load_from_binary(&wasm_binary)?;
+    let module = empty_module?.load_from_binary(&wasm_binary)?;
 
     // Create an engine with the loaded module
-    let mut engine = Engine::new(module.clone());
+    let mut engine = StacklessEngine::new(module.clone());
 
     // Instantiate the module
     engine.instantiate(module)?;
@@ -151,11 +152,15 @@ fn test_basic_simd_operations() -> Result<()> {
         test_idx
     );
 
-    let result = engine.execute(0usize, test_idx, vec![])?;
+    let result = engine.invoke_export("f32x4_splat_test", &[])?;
     println!("DEBUG: f32x4_splat_test result: {:?}", result);
 
-    if let Some(Value::V128(_)) = result.first() {
+    if let Some(Value::V128(v)) = result.first() {
         println!("✅ f32x4_splat_test passed: {:?}", result[0]);
+        // Check the raw bytes directly
+        let expected_val = 3.14f32;
+        let expected_bytes: [u8; 16] = unsafe { std::mem::transmute([expected_val; 4]) };
+        assert_eq!(v, &expected_bytes, "f32x4 V128 value mismatch");
     } else {
         println!(
             "❌ f32x4_splat_test failed: expected V128, got {:?}",
@@ -165,9 +170,13 @@ fn test_basic_simd_operations() -> Result<()> {
     }
 
     // Test f64x2.splat
-    let result = engine.execute(0usize, f64x2_splat_test_idx, vec![])?;
-    if let Some(Value::V128(_)) = result.first() {
+    let result = engine.invoke_export("f64x2_splat_test", &[])?;
+    if let Some(Value::V128(v)) = result.first() {
         println!("✅ f64x2_splat_test passed: {:?}", result[0]);
+        // Check the raw bytes directly
+        let expected_val = 6.28f64;
+        let expected_bytes: [u8; 16] = unsafe { std::mem::transmute([expected_val; 2]) };
+        assert_eq!(v, &expected_bytes, "f64x2 V128 value mismatch");
     } else {
         println!(
             "❌ f64x2_splat_test failed: expected V128, got {:?}",
@@ -177,9 +186,13 @@ fn test_basic_simd_operations() -> Result<()> {
     }
 
     // Test i32x4.splat
-    let result = engine.execute(0usize, i32x4_splat_test_idx, vec![])?;
-    if let Some(Value::V128(_v)) = result.first() {
+    let result = engine.invoke_export("i32x4_splat_test", &[])?;
+    if let Some(Value::V128(v)) = result.first() {
         println!("✅ i32x4_splat_test passed: {:?}", result[0]);
+        // Check the raw bytes directly
+        let expected_val = 42i32;
+        let expected_bytes: [u8; 16] = unsafe { std::mem::transmute([expected_val; 4]) };
+        assert_eq!(v, &expected_bytes, "i32x4 V128 value mismatch");
     } else {
         println!(
             "❌ i32x4_splat_test failed: expected V128, got {:?}",
@@ -212,21 +225,21 @@ fn test_simd_dot_product() -> Result<()> {
 
     // Load the module from binary
     let mut empty_module = Module::new();
-    let module = empty_module.load_from_binary(&wasm_binary)?;
+    let module = empty_module?.load_from_binary(&wasm_binary)?;
 
     // Create an engine with the loaded module
-    let mut engine = Engine::new(module.clone());
+    let mut engine = StacklessEngine::new(module.clone());
 
     // Instantiate the module
     engine.instantiate(module)?;
 
     // Execute the function
-    let result = engine.execute(0usize, 0, vec![])?;
+    let result = engine.invoke_export("simple_simd_test", &[])?;
     if let Some(Value::V128(v)) = result.first() {
         println!("✅ simple_simd_test passed: {:?}", result[0]);
 
-        // Convert to bytes to inspect the values
-        let bytes = v.to_le_bytes();
+        // Use the V128 byte array directly
+        let bytes = v; // Corrected: v is already [u8; 16]
 
         // Read 4 i32 values out of the bytes
         let mut i32_values = [0i32; 4];

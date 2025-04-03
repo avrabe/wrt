@@ -1,0 +1,28 @@
+[package]
+name = "logging-adapter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "WASI logging to stdout adapter component"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = { workspace = true, features = ["realloc"] }
+
+[package.metadata.component]
+# world = "adapter" # Moved under target
+
+# Use a separate table for target dependencies and specify versions
+[package.metadata.component.target]
+path = "../wit/deps" # Base path for adapter's own WIT files (if any)
+world = "adapter" # Specify world here
+
+[package.metadata.component.target.dependencies]
+"wasi:logging" = { version = "0.2.0-preview2" }
+"wasi:cli" = { version = "0.2.0-preview2" }
+"wasi:io" = { version = "0.2.0-preview2" }
+
+[lints]
+workspace = true

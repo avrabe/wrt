@@ -1,20 +1,23 @@
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use wat;
 /// Test file to demonstrate memory persistence fix
-use wrt::memory::Memory;
+use wrt::memory::DefaultMemory;
 use wrt::module::{ExportKind, Module};
+use wrt::types::MemoryType;
 use wrt::{Error, Result, Value};
 
 // Helper struct to simulate the memory fix
 struct MemoryFixSimulator {
     module: Module,
     instance: Option<Instance>,
-    memories: Vec<Memory>,
+    memories: Vec<DefaultMemory>,
 }
 
 // Simple instance struct for our simulation
 #[derive(Clone)]
 struct Instance {
     module: Module,
-    memories: Vec<Memory>,
+    memories: Vec<DefaultMemory>,
 }
 
 impl Instance {
@@ -32,16 +35,20 @@ impl MemoryFixSimulator {
         let wasm = wat::parse_str(wat).map_err(|e| Error::Parse(e.to_string()))?;
         let module = Module::from_bytes(&wasm).map_err(|e| Error::Parse(e.to_string()))?;
 
-        println!("Module has {} memory definitions", module.memories.len());
+        println!(
+            "Module has {} memory definitions",
+            module.memories.read().unwrap().len()
+        );
 
         // Create memory instances based on module memory definitions
         let mut memories = Vec::new();
-        for mem_type in &module.memories {
+        for mem_arc in module.memories.read().unwrap().iter() {
+            let mem_type = (**mem_arc).type_(); // Explicitly dereference Arc and then call type_()
             println!(
                 "Creating memory with type: min={}, max={:?}",
                 mem_type.min, mem_type.max
             );
-            let memory = Memory::new(mem_type.clone());
+            let memory = DefaultMemory::new(mem_type.clone());
             memories.push(memory);
         }
 
@@ -107,20 +114,20 @@ impl MemoryFixSimulator {
             let memory = &instance_clone.memories[0];
             let addr = 100u32;
             let start = addr.saturating_sub(4);
-            let end = std::cmp::min(addr + 8, memory.data.len() as u32);
+            let end = std::cmp::min(addr + 8, memory.data.read().unwrap().len() as u32);
 
             println!("Memory data around address {}:", addr);
             for i in start..end {
-                println!("  [{:>3}]: {}", i, memory.data[i as usize]);
+                println!("  [{:>3}]: {}", i, memory.data.read().unwrap()[i as usize]);
             }
         }
 
         // Get the function details
         let function = &instance_clone.module.functions[func_idx as usize];
-        println!("Function has {} instructions", function.body.len());
+        println!("Function has {} instructions", function.code.len());
 
         // Print function instructions for debugging
-        for (i, instr) in function.body.iter().enumerate() {
+        for (i, instr) in function.code.iter().enumerate() {
             println!("Instruction {}: {:?}", i, instr);
         }
 
@@ -135,13 +142,13 @@ impl MemoryFixSimulator {
         let mut results = Vec::new();
         let mut stack = Vec::new();
 
-        for (idx, instruction) in function.body.iter().enumerate() {
+        for (idx, instruction) in function.code.iter().enumerate() {
             println!("Executing instruction {}: {:?}", idx, instruction);
 
             // Basic instruction handling
             match instruction {
                 wrt::instructions::Instruction::I32Const(value) => {
-                    stack.push(Value::I32(*value));
+                    stack.push(Value::I32(*value)); // Dereference value
                 }
                 wrt::instructions::Instruction::I32Store(_align, offset) => {
                     println!("I32STORE: Beginning execution of I32Store instruction");
@@ -169,7 +176,10 @@ impl MemoryFixSimulator {
                     );
 
                     let memory = &mut instance_clone.memories[0];
-                    println!("I32STORE: Memory size is {} bytes", memory.data.len());
+                    println!(
+                        "I32STORE: Memory size is {} bytes",
+                        memory.data.read().unwrap().len()
+                    );
 
                     let addr = match address {
                         Value::I32(addr) => addr as usize,
@@ -197,12 +207,12 @@ impl MemoryFixSimulator {
                         effective_addr + 8
                     );
                     for i in effective_addr.saturating_sub(4)
-                        ..std::cmp::min(effective_addr + 8, memory.data.len())
+                        ..std::cmp::min(effective_addr + 8, memory.data.read().unwrap().len())
                     {
-                        println!("  [{}]: {}", i, memory.data[i]);
+                        println!("  [{}]: {}", i, memory.data.read().unwrap()[i]);
                     }
 
-                    if effective_addr + 4 > memory.data.len() {
+                    if effective_addr + 4 > memory.data.read().unwrap().len() {
                         return Err(Error::Execution("Memory access out of bounds".to_string()));
                     }
 
@@ -214,10 +224,11 @@ impl MemoryFixSimulator {
                                 "I32STORE: Writing bytes {:?} to memory at address {}",
                                 bytes, effective_addr
                             );
-                            memory.data[effective_addr] = bytes[0];
-                            memory.data[effective_addr + 1] = bytes[1];
-                            memory.data[effective_addr + 2] = bytes[2];
-                            memory.data[effective_addr + 3] = bytes[3];
+                            let mut data = memory.data.write().unwrap();
+                            data[effective_addr] = bytes[0];
+                            data[effective_addr + 1] = bytes[1];
+                            data[effective_addr + 2] = bytes[2];
+                            data[effective_addr + 3] = bytes[3];
                         }
                         _ => {
                             return Err(Error::Execution(
@@ -233,9 +244,9 @@ impl MemoryFixSimulator {
                         effective_addr + 8
                     );
                     for i in effective_addr.saturating_sub(4)
-                        ..std::cmp::min(effective_addr + 8, memory.data.len())
+                        ..std::cmp::min(effective_addr + 8, memory.data.read().unwrap().len())
                     {
-                        println!("  [{}]: {}", i, memory.data[i]);
+                        println!("  [{}]: {}", i, memory.data.read().unwrap()[i]);
                     }
 
                     println!(
@@ -268,7 +279,10 @@ impl MemoryFixSimulator {
                     );
 
                     let memory = &instance_clone.memories[0];
-                    println!("I32LOAD: Memory size is {} bytes", memory.data.len());
+                    println!(
+                        "I32LOAD: Memory size is {} bytes",
+                        memory.data.read().unwrap().len()
+                    );
 
                     let addr = match address {
                         Value::I32(addr) => addr as usize,
@@ -290,21 +304,22 @@ impl MemoryFixSimulator {
                         effective_addr + 8
                     );
                     for i in effective_addr.saturating_sub(4)
-                        ..std::cmp::min(effective_addr + 8, memory.data.len())
+                        ..std::cmp::min(effective_addr + 8, memory.data.read().unwrap().len())
                     {
-                        println!("  [{}]: {}", i, memory.data[i]);
+                        println!("  [{}]: {}", i, memory.data.read().unwrap()[i]);
                     }
 
-                    if effective_addr + 4 > memory.data.len() {
+                    if effective_addr + 4 > memory.data.read().unwrap().len() {
                         return Err(Error::Execution("Memory access out of bounds".to_string()));
                     }
 
                     // Load the i32 value (little endian)
+                    let data = memory.data.read().unwrap();
                     let mut bytes = [0u8; 4];
-                    bytes[0] = memory.data[effective_addr];
-                    bytes[1] = memory.data[effective_addr + 1];
-                    bytes[2] = memory.data[effective_addr + 2];
-                    bytes[3] = memory.data[effective_addr + 3];
+                    bytes[0] = data[effective_addr];
+                    bytes[1] = data[effective_addr + 1];
+                    bytes[2] = data[effective_addr + 2];
+                    bytes[3] = data[effective_addr + 3];
 
                     let value = i32::from_le_bytes(bytes);
                     println!(
@@ -350,16 +365,20 @@ impl MemoryFixSimulator {
             if i < self.memories.len() {
                 // Very important: copy back the modified memory to our persistent store
                 println!("Copying back memory changes to our persistent store...");
-                self.memories[i].data.copy_from_slice(&memory.data);
+                self.memories[i]
+                    .data
+                    .write()
+                    .unwrap()
+                    .copy_from_slice(&memory.data.read().unwrap());
 
                 // Debug: verify memory was actually copied
                 if i == 0 {
                     let addr = 100usize;
                     let value_bytes = [
-                        self.memories[i].data[addr],
-                        self.memories[i].data[addr + 1],
-                        self.memories[i].data[addr + 2],
-                        self.memories[i].data[addr + 3],
+                        self.memories[i].data.read().unwrap()[addr],
+                        self.memories[i].data.read().unwrap()[addr + 1],
+                        self.memories[i].data.read().unwrap()[addr + 2],
+                        self.memories[i].data.read().unwrap()[addr + 3],
                     ];
                     let value = i32::from_le_bytes(value_bytes);
                     println!(

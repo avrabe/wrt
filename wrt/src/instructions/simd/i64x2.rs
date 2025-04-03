@@ -3,12 +3,14 @@
 //! This module contains implementations for WebAssembly SIMD instructions
 //! that operate on 128-bit vectors as two 64-bit integer lanes.
 
-use crate::{
-    behavior::FrameBehavior,
-    error::{Error, Result},
-    stack::Stack,
-    values::Value,
-};
+#[cfg(not(feature = "std"))]
+use core::cmp;
+
+use crate::behavior::FrameBehavior;
+use crate::error::{Error, Result};
+use crate::stack::Stack;
+use crate::values::Value;
+use crate::StacklessEngine;
 
 use super::common::{pop_v128, push_v128, V128};
 
@@ -39,10 +41,7 @@ fn set_i64_lane(v: &mut V128, lane: usize, value: i64) {
 }
 
 /// Replicate an i64 value to all lanes of a v128
-pub fn i64x2_splat(
-    stack: &mut (impl Stack + ?Sized),
-    _frame: &mut (impl FrameBehavior + ?Sized),
-) -> Result<()> {
+pub fn i64x2_splat(stack: &mut impl Stack, _frame: &mut impl FrameBehavior) -> Result<()> {
     // Pop the i64 value from the stack
     let value = match stack.pop()? {
         Value::I64(v) => v,
@@ -206,4 +205,102 @@ pub fn i64x2_neg(
 
     // Push the result v128 to the stack
     push_v128(stack, result)
+}
+
+// Add stubs for missing functions
+
+pub fn i64x2_abs(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_abs")
+}
+
+pub fn i64x2_shl(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_shl")
+}
+
+pub fn i64x2_shr_s(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_shr_s")
+}
+
+pub fn i64x2_shr_u(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_shr_u")
+}
+
+pub fn i64x2_extmul_low_i32x4_s(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_extmul_low_i32x4_s")
+}
+
+pub fn i64x2_extmul_high_i32x4_s(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_extmul_high_i32x4_s")
+}
+
+pub fn i64x2_extmul_low_i32x4_u(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_extmul_low_i32x4_u")
+}
+
+pub fn i64x2_extmul_high_i32x4_u(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_extmul_high_i32x4_u")
+}
+
+pub fn i64x2_extend_low_i32x4_s(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_extend_low_i32x4_s")
+}
+
+pub fn i64x2_extend_high_i32x4_s(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_extend_high_i32x4_s")
+}
+
+pub fn i64x2_extend_low_i32x4_u(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_extend_low_i32x4_u")
+}
+
+pub fn i64x2_extend_high_i32x4_u(
+    _stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+) -> Result<()> {
+    todo!("Implement i64x2_extend_high_i32x4_u")
 }

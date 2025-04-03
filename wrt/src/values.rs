@@ -4,99 +4,46 @@ use crate::{Box, String, Vec};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Represents a WebAssembly value that can be used in the runtime.
-///
-/// This enum encompasses both core WebAssembly value types (i32, i64, f32, f64,
-/// funcref, externref) and component model value types (record, tuple, list, etc.)
-/// for use with the WebAssembly Component Model.
-///
-/// # Examples
-///
-/// ```
-/// use wrt::{Value, ValueType};
-///
-/// // Create a simple i32 value
-/// let value = Value::I32(42);
-/// assert_eq!(value.type_(), ValueType::I32);
-///
-/// // Create a more complex component model value
-/// let list_value = Value::List(vec![Box::new(Value::I32(1)), Box::new(Value::I32(2))]);
-/// ```
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serialization", derive(Serialize, Deserialize))]
+/// Represents a WebAssembly runtime value
+#[derive(Debug, Clone)]
 pub enum Value {
-    /// 32-bit signed integer value
+    /// 32-bit integer
     I32(i32),
-
-    /// 64-bit signed integer value
+    /// 64-bit integer
     I64(i64),
-
-    /// 32-bit floating point value
+    /// 32-bit float
     F32(f32),
-
-    /// 64-bit floating point value
+    /// 64-bit float
     F64(f64),
-
-    /// 128-bit SIMD vector value
+    /// 128-bit vector
     V128([u8; 16]),
-
-    /// Function reference value, containing an optional function index
-    FuncRef(Option<u32>),
-
-    /// External reference value, containing an optional reference index
-    ExternRef(Option<u32>),
-
-    /// Any reference value, containing an optional reference index
-    AnyRef(Option<u32>),
-
-    /// Record value from the component model, containing named fields
-    /// with their corresponding values
-    Record(Vec<(String, Box<Value>)>),
-
-    /// Tuple value from the component model, containing a sequence of
-    /// unnamed values
-    Tuple(Vec<Box<Value>>),
-
-    /// List value from the component model, containing a sequence of
-    /// values of the same type
-    List(Vec<Box<Value>>),
-
-    /// Flags value from the component model, representing a set of
-    /// boolean flags as their names when true
-    Flags(Vec<String>),
-
-    /// Variant value from the component model, containing a discriminant
-    /// and an optional payload value
-    Variant(String, Option<Box<Value>>),
-
-    /// Enum value from the component model, containing just the discriminant
-    Enum(String),
-
-    /// Union value from the component model, representing a value that
-    /// can be one of multiple possible types
-    Union(Box<Value>),
-
-    /// Option value from the component model, representing an optional value
-    Option(Option<Box<Value>>),
-
-    /// Result value from the component model, representing either a success
-    /// value or an error value
-    Result(std::result::Result<Box<Value>, Box<Value>>),
-
-    /// Future value from the component model, representing a value that
-    /// will be available asynchronously
-    Future(Box<Value>),
-
-    /// Stream value from the component model, representing a sequence of
-    /// values that will be available asynchronously
-    Stream {
-        /// The element type of the stream
-        element: Box<Value>,
-
-        /// An optional end value that may be present when the stream completes
-        end: Option<Box<Value>>,
-    },
+    /// Function reference
+    FuncRef(Option<u32>), // Store function index
+    /// External reference
+    ExternRef(Option<u32>), // Store external reference index
+    /// Any reference
+    AnyRef(Option<u32>), // Store any reference index
 }
+
+// Manual PartialEq implementation for Value
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::I32(a), Value::I32(b)) => a == b,
+            (Value::I64(a), Value::I64(b)) => a == b,
+            // Handle NaN comparison for floats: NaN != NaN
+            (Value::F32(a), Value::F32(b)) => (a.is_nan() && b.is_nan()) || (a == b),
+            (Value::F64(a), Value::F64(b)) => (a.is_nan() && b.is_nan()) || (a == b),
+            (Value::V128(a), Value::V128(b)) => a == b,
+            (Value::FuncRef(a), Value::FuncRef(b)) => a == b,
+            (Value::ExternRef(a), Value::ExternRef(b)) => a == b,
+            (Value::AnyRef(a), Value::AnyRef(b)) => a == b,
+            _ => false, // Different types are not equal
+        }
+    }
+}
+
+impl Eq for Value {}
 
 impl Value {
     /// Creates a default value for the given WebAssembly value type.
@@ -125,14 +72,14 @@ impl Value {
     #[must_use]
     pub const fn default_for_type(ty: &ValueType) -> Self {
         match ty {
-            ValueType::I32 => Self::I32(0),
-            ValueType::I64 => Self::I64(0),
-            ValueType::F32 => Self::F32(0.0),
-            ValueType::F64 => Self::F64(0.0),
-            ValueType::FuncRef => Self::FuncRef(None),
-            ValueType::ExternRef => Self::ExternRef(None),
-            ValueType::V128 => Self::V128([0; 16]),
-            ValueType::AnyRef => Self::AnyRef(None),
+            ValueType::I32 => Value::I32(0),
+            ValueType::I64 => Value::I64(0),
+            ValueType::F32 => Value::F32(0.0),
+            ValueType::F64 => Value::F64(0.0),
+            ValueType::V128 => Value::V128([0; 16]),
+            ValueType::FuncRef => Value::FuncRef(None), // Default for FuncRef is null
+            ValueType::ExternRef => Value::ExternRef(None), // Default for ExternRef is null
+            ValueType::AnyRef => Value::AnyRef(None),   // Default for AnyRef is null
         }
     }
 
@@ -157,18 +104,6 @@ impl Value {
             Self::ExternRef(_) => ValueType::ExternRef,
             Self::V128(_) => ValueType::V128,
             Self::AnyRef(_) => ValueType::AnyRef,
-            // All component model types are represented as I32 internally
-            Self::Record(_)
-            | Self::Tuple(_)
-            | Self::List(_)
-            | Self::Flags(_)
-            | Self::Variant(_, _)
-            | Self::Enum(_)
-            | Self::Union(_)
-            | Self::Option(_)
-            | Self::Result(_)
-            | Self::Future(_)
-            | Self::Stream { .. } => ValueType::I32,
         }
     }
 
@@ -188,21 +123,7 @@ impl Value {
                 | (Self::FuncRef(_), ValueType::FuncRef)
                 | (Self::ExternRef(_), ValueType::ExternRef)
                 | (Self::V128(_), ValueType::V128)
-                | (
-                    Self::AnyRef(_)
-                        | Self::Record(_)
-                        | Self::Tuple(_)
-                        | Self::List(_)
-                        | Self::Flags(_)
-                        | Self::Variant(_, _)
-                        | Self::Enum(_)
-                        | Self::Union(_)
-                        | Self::Option(_)
-                        | Self::Result(_)
-                        | Self::Future(_)
-                        | Self::Stream { .. },
-                    ValueType::AnyRef
-                )
+                | (Self::AnyRef(_), ValueType::AnyRef)
         )
     }
 
@@ -362,325 +283,6 @@ impl Value {
         }
     }
 
-    /// Attempts to extract a record value if this Value is a Record.
-    ///
-    /// # Returns
-    ///
-    /// Some reference to the record fields if this is a Record value, None otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wrt::{Value, String, Box};
-    ///
-    /// let record = Value::Record(vec![
-    ///     (String::from("field1"), Box::new(Value::I32(42)))
-    /// ]);
-    /// assert!(record.as_record().is_some());
-    ///
-    /// let value = Value::I32(42);
-    /// assert!(value.as_record().is_none());
-    /// ```
-    #[must_use]
-    pub const fn as_record(&self) -> Option<&Vec<(String, Box<Self>)>> {
-        match self {
-            Self::Record(x) => Some(x),
-            _ => None,
-        }
-    }
-
-    /// Attempts to extract a tuple value if this Value is a Tuple.
-    ///
-    /// # Returns
-    ///
-    /// Some reference to the tuple elements if this is a Tuple value, None otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wrt::{Value, Box};
-    ///
-    /// let tuple = Value::Tuple(vec![Box::new(Value::I32(1)), Box::new(Value::I32(2))]);
-    /// assert!(tuple.as_tuple().is_some());
-    ///
-    /// let value = Value::I32(42);
-    /// assert!(value.as_tuple().is_none());
-    /// ```
-    #[must_use]
-    pub const fn as_tuple(&self) -> Option<&Vec<Box<Self>>> {
-        match self {
-            Self::Tuple(x) => Some(x),
-            _ => None,
-        }
-    }
-
-    /// Attempts to extract a list value if this Value is a List.
-    ///
-    /// # Returns
-    ///
-    /// Some reference to the list elements if this is a List value, None otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wrt::Value;
-    ///
-    /// let list = Value::List(vec![]);
-    /// assert!(list.as_list().is_some());
-    ///
-    /// let value = Value::I32(42);
-    /// assert!(value.as_list().is_none());
-    /// ```
-    #[must_use]
-    pub const fn as_list(&self) -> Option<&Vec<Box<Self>>> {
-        match self {
-            Self::List(x) => Some(x),
-            _ => None,
-        }
-    }
-
-    /// Attempts to extract a flags value if this Value is a Flags.
-    ///
-    /// # Returns
-    ///
-    /// Some reference to the flag names if this is a Flags value, None otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wrt::{Value, String};
-    ///
-    /// let flags = Value::Flags(vec![String::from("enabled"), String::from("visible")]);
-    /// assert!(flags.as_flags().is_some());
-    ///
-    /// let value = Value::I32(42);
-    /// assert!(value.as_flags().is_none());
-    /// ```
-    #[must_use]
-    pub const fn as_flags(&self) -> Option<&Vec<String>> {
-        match self {
-            Self::Flags(x) => Some(x),
-            _ => None,
-        }
-    }
-
-    /// Attempts to extract a variant value if this Value is a Variant.
-    ///
-    /// # Returns
-    ///
-    /// Some tuple with the discriminant and optional payload if this is a Variant value,
-    /// None otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wrt::Value;
-    ///
-    /// let variant = Value::Variant(String::from("success"), Some(Box::new(Value::I32(42))));
-    /// assert!(variant.as_variant().is_some());
-    ///
-    /// let value = Value::I32(42);
-    /// assert!(value.as_variant().is_none());
-    /// ```
-    #[must_use]
-    pub const fn as_variant(&self) -> Option<(&String, &Option<Box<Self>>)> {
-        match self {
-            Self::Variant(x, y) => Some((x, y)),
-            _ => None,
-        }
-    }
-
-    /// Attempts to extract an enum value if this Value is an Enum.
-    ///
-    /// # Returns
-    ///
-    /// Some reference to the enum discriminant if this is an Enum value, None otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wrt::Value;
-    ///
-    /// let enum_val = Value::Enum(String::from("Red"));
-    /// assert!(enum_val.as_enum().is_some());
-    ///
-    /// let value = Value::I32(42);
-    /// assert!(value.as_enum().is_none());
-    /// ```
-    #[must_use]
-    pub const fn as_enum(&self) -> Option<&String> {
-        match self {
-            Self::Enum(x) => Some(x),
-            _ => None,
-        }
-    }
-
-    /// Attempts to extract a union value if this Value is a Union.
-    ///
-    /// # Returns
-    ///
-    /// Some reference to the contained value if this is a Union value, None otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wrt::Value;
-    ///
-    /// let union = Value::Union(Box::new(Value::I32(42)));
-    /// assert!(union.as_union().is_some());
-    ///
-    /// let value = Value::I32(42);
-    /// assert!(union.as_union().is_some());
-    /// ```
-    #[must_use]
-    pub const fn as_union(&self) -> Option<&Self> {
-        match self {
-            Self::Union(x) => Some(x),
-            _ => None,
-        }
-    }
-
-    /// Attempts to extract an option value if this Value is an Option.
-    ///
-    /// # Returns
-    ///
-    /// Some reference to the option if this is an Option value, None otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wrt::{Value, Box};
-    ///
-    /// let some_val = Value::Option(Some(Box::new(Value::I32(42))));
-    /// assert!(some_val.as_option().is_some());
-    ///
-    /// let none_val = Value::Option(None);
-    /// assert!(none_val.as_option().is_some());
-    ///
-    /// let value = Value::I32(42);
-    /// assert!(value.as_option().is_none());
-    /// ```
-    #[must_use]
-    pub const fn as_option(&self) -> Option<&Option<Box<Self>>> {
-        match self {
-            Self::Option(x) => Some(x),
-            _ => None,
-        }
-    }
-
-    /// Attempts to extract a result value if this Value is a Result.
-    ///
-    /// # Returns
-    ///
-    /// Some reference to the result if this is a Result value, None otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wrt::{Value, Box};
-    /// use std::result::Result as StdResult;
-    ///
-    /// let ok_val = Value::Result(Ok(Box::new(Value::I32(42))));
-    /// assert!(ok_val.as_result().is_some());
-    ///
-    /// let err_val = Value::Result(Err(Box::new(Value::I32(404))));
-    /// assert!(err_val.as_result().is_some());
-    ///
-    /// let value = Value::I32(42);
-    /// assert!(value.as_result().is_none());
-    /// ```
-    #[must_use]
-    pub const fn as_result(&self) -> Option<&std::result::Result<Box<Self>, Box<Self>>> {
-        match self {
-            Self::Result(x) => Some(x),
-            _ => None,
-        }
-    }
-
-    /// Attempts to extract a future value if this Value is a Future.
-    ///
-    /// # Returns
-    ///
-    /// Some reference to the future's value if this is a Future value, None otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wrt::{Value, Box};
-    ///
-    /// let future_val = Value::Future(Box::new(Value::I32(42)));
-    /// assert!(future_val.as_future().is_some());
-    ///
-    /// let value = Value::I32(42);
-    /// assert!(value.as_future().is_none());
-    /// ```
-    #[must_use]
-    pub const fn as_future(&self) -> Option<&Self> {
-        match self {
-            Self::Future(x) => Some(x),
-            _ => None,
-        }
-    }
-
-    /// Attempts to extract a stream value if this Value is a Stream.
-    ///
-    /// # Returns
-    ///
-    /// Some tuple with references to the element type and end value if this is a Stream value,
-    /// None otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wrt::{Value, Box};
-    ///
-    /// let stream_val = Value::Stream {
-    ///     element: Box::new(Value::I32(42)),
-    ///     end: Some(Box::new(Value::I32(0))),
-    /// };
-    /// assert!(stream_val.as_stream().is_some());
-    ///
-    /// let value = Value::I32(42);
-    /// assert!(value.as_stream().is_none());
-    /// ```
-    #[must_use]
-    pub const fn as_stream(&self) -> Option<(&Self, &Option<Box<Self>>)> {
-        match self {
-            Self::Stream { element, end } => Some((element, end)),
-            _ => None,
-        }
-    }
-
-    /// Get the SIMD v128 value, if this is a V128 value
-    #[must_use]
-    pub const fn as_v128(&self) -> Option<&[u8; 16]> {
-        match self {
-            Self::V128(v) => Some(v),
-            _ => None,
-        }
-    }
-
-    /// Get the SIMD v128 value, if this is a V128 value
-    pub fn as_v128_mut(&mut self) -> Option<&mut [u8; 16]> {
-        match self {
-            Self::V128(v) => Some(v),
-            _ => None,
-        }
-    }
-
-    /// Get the SIMD v128 value, if this is a V128 value
-    #[must_use]
-    pub fn as_u128(&self) -> Option<u128> {
-        match self {
-            Self::V128(v) => {
-                let mut bytes = [0u8; 16];
-                bytes.copy_from_slice(v);
-                Some(u128::from_le_bytes(bytes))
-            }
-            _ => None,
-        }
-    }
-
     /// Attempts to extract an anyref value if this Value is an `AnyRef`.
     ///
     /// # Returns
@@ -708,18 +310,7 @@ impl Value {
             Self::V128(_) => ValueType::V128,
             Self::FuncRef(_) => ValueType::FuncRef,
             Self::ExternRef(_) => ValueType::ExternRef,
-            Self::AnyRef(_)
-            | Self::Record(_)
-            | Self::Tuple(_)
-            | Self::List(_)
-            | Self::Flags(_)
-            | Self::Variant(_, _)
-            | Self::Enum(_)
-            | Self::Union(_)
-            | Self::Option(_)
-            | Self::Result(_)
-            | Self::Future(_)
-            | Self::Stream { .. } => ValueType::AnyRef,
+            Self::AnyRef(_) => ValueType::AnyRef,
         }
     }
 
@@ -770,74 +361,15 @@ impl fmt::Display for Value {
             Self::F32(v) => write!(f, "f32: {v}"),
             Self::F64(v) => write!(f, "f64: {v}"),
             Self::V128(v) => write!(f, "v128: {v:02x?}"),
-            Self::FuncRef(v) => write!(f, "funcref: {v:?}"),
-            Self::ExternRef(v) => write!(f, "externref: {v:?}"),
+            Self::FuncRef(v) => match v {
+                Some(idx) => write!(f, "funcref: {idx}"),
+                None => write!(f, "funcref: null"),
+            },
+            Self::ExternRef(v) => match v {
+                Some(idx) => write!(f, "externref: {idx}"),
+                None => write!(f, "externref: null"),
+            },
             Self::AnyRef(v) => write!(f, "anyref: {v:?}"),
-            Self::Record(fields) => {
-                write!(f, "record: {{")?;
-                for (i, (name, value)) in fields.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{name}: {value}")?;
-                }
-                write!(f, "}}")
-            }
-            Self::Tuple(values) => {
-                write!(f, "tuple: (")?;
-                for (i, value) in values.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{value}")?;
-                }
-                write!(f, ")")
-            }
-            Self::List(values) => {
-                write!(f, "list: [")?;
-                for (i, value) in values.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{value}")?;
-                }
-                write!(f, "]")
-            }
-            Self::Flags(flags) => {
-                write!(f, "flags: {{")?;
-                for (i, flag) in flags.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{flag}")?;
-                }
-                write!(f, "}}")
-            }
-            Self::Variant(name, value) => {
-                write!(f, "variant: {name}")?;
-                if let Some(value) = value {
-                    write!(f, "({value})")?;
-                }
-                Ok(())
-            }
-            Self::Enum(name) => write!(f, "enum: {name}"),
-            Self::Union(value) => write!(f, "union: {value}"),
-            Self::Option(value) => match value {
-                Some(v) => write!(f, "option: Some({v})"),
-                None => write!(f, "option: None"),
-            },
-            Self::Result(result) => match result {
-                Ok(v) => write!(f, "result: Ok({v})"),
-                Err(e) => write!(f, "result: Err({e})"),
-            },
-            Self::Future(value) => write!(f, "future: {value}"),
-            Self::Stream { element, end } => {
-                write!(f, "stream: ({element}")?;
-                if let Some(end) = end {
-                    write!(f, ", {end}")?;
-                }
-                write!(f, ")")
-            }
         }
     }
 }
@@ -948,75 +480,6 @@ mod tests {
     }
 
     #[test]
-    fn test_component_model_values() {
-        // Test Record
-        let record = Value::Record(vec![
-            ("field1".to_string(), Box::new(Value::I32(1))),
-            ("field2".to_string(), Box::new(Value::I64(2))),
-        ]);
-        assert!(record.as_record().is_some());
-        assert_eq!(record.as_record().unwrap().len(), 2);
-
-        // Test Tuple
-        let tuple = Value::Tuple(vec![Box::new(Value::I32(1)), Box::new(Value::I64(2))]);
-        assert!(tuple.as_tuple().is_some());
-        assert_eq!(tuple.as_tuple().unwrap().len(), 2);
-
-        // Test List
-        let list = Value::List(vec![Box::new(Value::I32(1)), Box::new(Value::I32(2))]);
-        assert!(list.as_list().is_some());
-        assert_eq!(list.as_list().unwrap().len(), 2);
-
-        // Test Flags
-        let flags = Value::Flags(vec!["flag1".to_string(), "flag2".to_string()]);
-        assert!(flags.as_flags().is_some());
-        assert_eq!(flags.as_flags().unwrap().len(), 2);
-
-        // Test Variant
-        let variant = Value::Variant("some".to_string(), Some(Box::new(Value::I32(42))));
-        assert!(variant.as_variant().is_some());
-        assert_eq!(variant.as_variant().unwrap().0, "some");
-
-        // Test Enum
-        let enum_val = Value::Enum("RED".to_string());
-        assert!(enum_val.as_enum().is_some());
-        assert_eq!(enum_val.as_enum().unwrap(), "RED");
-
-        // Test Union
-        let union = Value::Union(Box::new(Value::I32(42)));
-        assert!(union.as_union().is_some());
-        assert_eq!(union.as_union().unwrap().as_i32(), Some(42));
-
-        // Test Option
-        let some_val = Value::Option(Some(Box::new(Value::I32(42))));
-        assert!(some_val.as_option().is_some());
-        let none_val = Value::Option(None);
-        assert!(none_val.as_option().is_some());
-        assert!(none_val.as_option().unwrap().is_none());
-
-        // Test Result
-        let ok_val = Value::Result(Ok(Box::new(Value::I32(42))));
-        assert!(ok_val.as_result().is_some());
-        let err_val = Value::Result(Err(Box::new(Value::I32(404))));
-        assert!(err_val.as_result().is_some());
-
-        // Test Future
-        let future = Value::Future(Box::new(Value::I32(42)));
-        assert!(future.as_future().is_some());
-        assert_eq!(future.as_future().unwrap().as_i32(), Some(42));
-
-        // Test Stream
-        let stream = Value::Stream {
-            element: Box::new(Value::I32(42)),
-            end: Some(Box::new(Value::I32(0))),
-        };
-        assert!(stream.as_stream().is_some());
-        let (element, end) = stream.as_stream().unwrap();
-        assert_eq!(element.as_i32(), Some(42));
-        assert!(end.is_some());
-    }
-
-    #[test]
     fn test_value_display() {
         // Test numeric display
         assert_eq!(Value::I32(42).to_string(), "i32: 42");
@@ -1027,12 +490,5 @@ mod tests {
         // Test reference display
         assert_eq!(Value::FuncRef(Some(1)).to_string(), "funcref: 1");
         assert_eq!(Value::ExternRef(None).to_string(), "externref: null");
-
-        // Test component model value display
-        let record = Value::Record(vec![("field1".to_string(), Box::new(Value::I32(1)))]);
-        assert!(record.to_string().starts_with("record:"));
-
-        let enum_val = Value::Enum("RED".to_string());
-        assert_eq!(enum_val.to_string(), "enum: RED");
     }
 }

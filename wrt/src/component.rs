@@ -1,12 +1,15 @@
 use crate::error::{Error, Result};
+use crate::memory::{DefaultMemory, MemoryBehavior};
 use crate::types::{ExternType, FuncType, GlobalType, MemoryType, TableType};
 use crate::values::Value;
 use crate::{format, String, Vec};
-use crate::{Global, Memory, Table};
+use crate::{Global, Table};
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
 #[cfg(not(feature = "std"))]
 use alloc::vec;
+use std::collections::HashMap;
+use std::sync::Arc;
 #[cfg(feature = "std")]
 use std::vec;
 
@@ -96,7 +99,7 @@ pub struct MemoryValue {
     /// Memory type
     pub ty: MemoryType,
     /// Memory instance
-    pub memory: Memory,
+    pub memory: DefaultMemory,
 }
 
 /// Represents a global value
@@ -256,7 +259,7 @@ impl Component {
                     // Create a memory export with default initialization
                     ExternValue::Memory(MemoryValue {
                         ty: memory_type.clone(),
-                        memory: Memory::new(memory_type.clone()),
+                        memory: DefaultMemory::new(memory_type.clone()),
                     })
                 }
                 ExternType::Global(global_type) => {
@@ -330,7 +333,7 @@ impl Component {
                 }),
                 ExternType::Memory(memory_type) => ExternValue::Memory(MemoryValue {
                     ty: memory_type.clone(),
-                    memory: Memory::new(memory_type.clone()),
+                    memory: DefaultMemory::new(memory_type.clone()),
                 }),
                 ExternType::Global(global_type) => ExternValue::Global(GlobalValue {
                     ty: global_type.clone(),
@@ -988,7 +991,7 @@ mod tests {
             ty: ExternType::Memory(MemoryType { min: 1, max: None }),
             value: ExternValue::Memory(MemoryValue {
                 ty: MemoryType { min: 1, max: None },
-                memory: Memory::new(MemoryType { min: 1, max: None }),
+                memory: DefaultMemory::new(MemoryType { min: 1, max: None }),
             }),
         };
         assert!(component.instantiate(vec![wrong_import]).is_err());

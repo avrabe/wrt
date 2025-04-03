@@ -19,6 +19,8 @@ WRT is a WebAssembly runtime implementation with a focus on bounded execution, b
    The WRT system is comprised of the following main components:
    
    1. Core Runtime - The foundational WebAssembly execution engine
+      - Traditional Engine - Stack-based execution engine
+      - Stackless Engine - State machine-based execution engine for bounded execution
    2. Component Model - The implementation of WebAssembly Component Model Preview 2
    3. WASI Interfaces - Platform-specific implementations of WASI APIs
    4. CLI (WRTD) - Command-line interface for running WebAssembly modules
@@ -43,12 +45,14 @@ The core runtime is responsible for executing WebAssembly instructions and manag
    :id: SPEC_002
    :links: REQ_001, REQ_003, REQ_005, REQ_006, REQ_007
    
-   The core runtime follows a stackless interpreter design that enables:
+   The core runtime provides two main interpreter implementations:
    
-   - Bounded execution through fuel metering
-   - Resumability after execution pauses
-   - No-std compatibility for bare-metal environments
-   - State serialization for migration between systems
+   1. Traditional Execution Engine - Suitable for most environments
+   2. Stackless Execution Engine - Designed specifically for:
+      - Bounded execution through fuel metering
+      - Resumability after execution pauses
+      - No-std compatibility for bare-metal environments
+      - State serialization for migration between systems
 
 .. impl:: Engine Implementation
    :id: IMPL_001
@@ -129,6 +133,8 @@ The Component Model subsystem implements the WebAssembly Component Model Preview
    2. Interface type conversion
    3. Resource type management
    4. Host function binding
+   5. Binary format parsing and validation
+   6. Component instance management
 
 .. impl:: Component Implementation
    :id: IMPL_005
@@ -158,7 +164,24 @@ The Component Model subsystem implements the WebAssembly Component Model Preview
    2. Conversion between host and component types
    3. Validation of type compatibility
    
-   The implementation handles all standard interface types including records, variants, enums, flags, and resources.
+   The implementation handles interface types including records, variants, enums, flags, and resources.
+
+.. impl:: Resource Type Handling
+   :id: IMPL_010
+   :status: partial
+   :links: SPEC_003, REQ_014, REQ_019
+   
+   Resource types are implemented through:
+   
+   1. Reference counting for resource instances
+   2. Resource tables for tracking live resources
+   3. Host callbacks for resource lifecycle events
+   4. Resource dropping semantics
+   
+   Key components:
+   - ``Resource`` struct - Represents a component model resource
+   - ``ResourceType`` - Type information for resources
+   - Resource lifetime management functions
 
 Logging Subsystem
 -----------------
@@ -215,6 +238,8 @@ The logging subsystem implements the WASI logging API and provides platform-spec
    - ``register_log_handler(handler)`` - Registers a custom log handler
    - ``handle_log(operation)`` - Internal method to process log messages
    - ``LogOperation::with_component(level, message, component_id)`` - Creates a log operation with component context
+   
+   Note: Platform-specific backends (syslog for Linux, os_log for macOS) are currently planned but not yet implemented.
 
 CLI (WRTD) Architecture
 -----------------------
@@ -232,6 +257,7 @@ The WRTD command-line interface provides a user-friendly way to execute WebAssem
    3. Execution control with fuel limits
    4. Statistics reporting
    5. Logging configuration
+   6. Component interface analysis capabilities
 
 .. impl:: CLI Implementation
    :id: IMPL_008
@@ -245,11 +271,32 @@ The WRTD command-line interface provides a user-friendly way to execute WebAssem
    3. Fuel-bounded execution
    4. Execution statistics reporting
    5. Logging configuration and output
+   6. Component interface parsing and introspection
    
    Command-line options include:
    - ``--call <function>`` - Function to call
-   - ``--fuel <amount>`` - Fuel limit for bounded execution
+   - ``--fuel <amount>`` - Set fuel limit for bounded execution
    - ``--stats`` - Show execution statistics
+   - ``--analyze-component-interfaces`` - Analyze component interfaces without execution
+
+Testing Tools
+------------
+
+WRT includes specialized tools for testing and validation of the WebAssembly implementation.
+
+.. impl:: WAST Test Runner
+   :id: IMPL_009
+   :status: implemented
+   :links: REQ_022
+   
+   The WAST test runner tool is a specialized binary for executing WebAssembly specification tests:
+   
+   1. Parses and executes WAST test files
+   2. Validates interpreter behavior against the WebAssembly specification
+   3. Tracks test results for conformance reporting
+   4. Supports blacklisting of tests that are known to fail
+   
+   This tool is crucial for ensuring that the WRT implementation correctly follows the WebAssembly specification.
 
 Development Status
 ------------------
@@ -266,4 +313,4 @@ Architecture-Requirement Mapping
 The following diagram shows how the architectural components map to requirements:
 
 .. needflow::
-   :filter: id in ['SPEC_001', 'SPEC_002', 'SPEC_003', 'SPEC_004', 'SPEC_005', 'SPEC_006', 'IMPL_001', 'IMPL_002', 'IMPL_003', 'IMPL_004', 'IMPL_005', 'IMPL_006', 'IMPL_007', 'IMPL_008', 'REQ_001', 'REQ_003', 'REQ_005', 'REQ_006', 'REQ_007', 'REQ_014', 'REQ_015', 'REQ_016', 'REQ_018', 'REQ_019', 'REQ_020']
+   :filter: id in ['SPEC_001', 'SPEC_002', 'SPEC_003', 'SPEC_004', 'SPEC_005', 'SPEC_006', 'IMPL_001', 'IMPL_002', 'IMPL_003', 'IMPL_004', 'IMPL_005', 'IMPL_006', 'IMPL_007', 'IMPL_008', 'IMPL_009', 'IMPL_010', 'REQ_001', 'REQ_003', 'REQ_005', 'REQ_006', 'REQ_007', 'REQ_014', 'REQ_015', 'REQ_016', 'REQ_018', 'REQ_019', 'REQ_020', 'REQ_022']

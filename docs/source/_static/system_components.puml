@@ -5,20 +5,30 @@ package "WRT System" {
 
   package "WRT Core Library" {
     package "Core Runtime" {
-      [Engine] as Engine
+      /' Traditional Engine using host stack '/
+      [Traditional Engine] as TradEngine
+      /' Stackless Engine using state machine '/
+      [Stackless Engine] as StacklessEngine
+      
       [Module] as Module 
       [Memory] as Memory
-      [Stack] as Stack
+      [Stack] as Stack /' Used by Traditional Engine '/
       [Instructions] as Instructions
       [Validation] as Validation
-      [Execution] as Execution
+      [Execution] as Execution /' Logic shared or specific to engines '/
       
-      Engine --> Module
-      Engine --> Memory
-      Engine --> Stack
-      Engine --> Execution
-      Module --> Validation
+      TradEngine --> Module
+      TradEngine --> Memory
+      TradEngine --> Stack
+      TradEngine --> Execution
+      
+      StacklessEngine --> Module
+      StacklessEngine --> Memory
+      /' StacklessEngine manages state internally '/
+      StacklessEngine --> Execution
+
       Execution --> Instructions
+      Module --> Validation
     }
     
     package "Component Model" {
@@ -32,13 +42,13 @@ package "WRT System" {
     
     package "WASI Implementation" {
       [Logging] as Logging
-      [Platform Backends] as Backends
+      [Platform Backends] as Backends #LightGray /' Planned '/
       
-      Logging --> Backends
+      Logging --> Backends <<..>> /' Planned '/ : platform-specific output
     }
   }
   
-  CLI --> Engine
+  CLI --> StacklessEngine : Primarily uses
   CLI --> Component
   CLI --> Logging
 }

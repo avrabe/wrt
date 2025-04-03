@@ -1,23 +1,28 @@
 // Example using WASI logging imports
 
-// Generate bindings from the WIT file
+// Restore wit_bindgen::generate! macro
 wit_bindgen::generate!({
-    path: "wit",
-    world: "hello",
-    exports: {
-        "example:hello/example": HelloComponent,
-    },
+    path: "../wit",
+    world: "hello-world",
+    // Explicitly generate bindings for imported WASI interfaces
+    with: {
+        "wasi:logging/logging@0.2.0": generate,
+        "wasi:cli/environment@0.2.0": generate,
+        "wasi:io/streams@0.2.4": generate,
+    }
 });
 
-use example::hello::logging;
-use exports::example::hello::example::Guest;
+// Import paths expected from the generate! macro
+use crate::exports::example::hello::greeter::Guest;
+use crate::wasi::logging::logging::{log, Level};
 
-struct HelloComponent;
+pub struct HelloComponent;
 
+// Implement the required Guest trait
 impl Guest for HelloComponent {
     fn hello() -> i32 {
-        logging::log(
-            logging::Level::Info,
+        log(
+            Level::Info,
             "example",
             "SIMPLE_TEST: Minimal example with I32 operations",
         );
@@ -27,44 +32,39 @@ impl Guest for HelloComponent {
 
         // Test addition
         let sum = a + b;
-        logging::log(
-            logging::Level::Info,
+        log(
+            Level::Info,
             "example",
             &format!("I32 Add: 10 + 20 = {}", sum),
         );
 
         // Test subtraction
         let diff = b - a;
-        logging::log(
-            logging::Level::Info,
+        log(
+            Level::Info,
             "example",
             &format!("I32 Sub: 20 - 10 = {}", diff),
         );
 
         // Test multiplication
         let product = a * b;
-        logging::log(
-            logging::Level::Info,
+        log(
+            Level::Info,
             "example",
             &format!("I32 Mul: 10 * 20 = {}", product),
         );
 
         // Test comparison
         if a < b {
-            logging::log(
-                logging::Level::Info,
-                "example",
-                "I32 comparison: 10 < 20 (correct)",
-            );
+            log(Level::Info, "example", "I32 comparison: 10 < 20 (correct)");
         } else {
-            logging::log(
-                logging::Level::Info,
-                "example",
-                "I32 comparison: 10 >= 20 (wrong)",
-            );
+            log(Level::Info, "example", "I32 comparison: 10 >= 20 (wrong)");
             return 1;
         }
 
         sum
     }
 }
+
+// Re-add export macro for wit_bindgen::generate!
+bindings::export!(HelloComponent with_types_in bindings);

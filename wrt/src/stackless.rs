@@ -15,18 +15,21 @@ use crate::{
     execution::ExecutionStats,
     global::Global,
     instructions::Instruction,
-    logging::{HostFunctionHandler, LogOperation},
-    memory::Memory,
-    module::{Function, Module},
+    logging::LogOperation,
+    memory::{DefaultMemory, MemoryBehavior},
+    module::{ExportKind, Function, Module},
     module_instance::ModuleInstance,
-    stack::{self, Stack},
+    stack::{self, Stack, StacklessStack},
+    stackless_frame::StacklessFrame,
     table::Table,
-    types::{BlockType, FuncType},
+    types::{BlockType, FuncType, ValueType},
     values::Value,
+    HostFunctionHandler,
 };
+use log::trace;
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 /// Represents the execution state in a stackless implementation
@@ -76,320 +79,6 @@ pub enum StacklessExecutionState {
     Error(Error),
 }
 
-/// Represents a function activation frame
-#[derive(Debug, Clone)]
-pub struct StacklessFrame {
-    pub module: Arc<Module>,
-    pub func_idx: u32,
-    pub pc: usize,
-    pub locals: Vec<Value>,
-    pub instance_idx: u32,
-    pub arity: usize,
-    pub label_arity: usize,
-    pub label_stack: Vec<Label>,
-    pub return_pc: usize,
-}
-
-impl StacklessFrame {
-    /// Creates a new stackless frame
-    pub fn new(
-        module: Arc<Module>,
-        instance_idx: u32,
-        func_idx: u32,
-        args: Vec<Value>,
-    ) -> Result<Self> {
-        // Clone the module for getting the function and function type
-        let module_clone = module.clone();
-
-        let _func = module_clone
-            .get_function(func_idx)
-            .ok_or_else(|| Error::InvalidFunctionType(format!("Function not found: {func_idx}")))?;
-
-        let func_type = module_clone.get_function_type(func_idx).ok_or_else(|| {
-            Error::InvalidFunctionType(format!("Function type not found: {func_idx}"))
-        })?;
-
-        if args.len() != func_type.params.len() {
-            return Err(Error::InvalidFunctionType(format!(
-                "Expected {} arguments, got {}",
-                func_type.params.len(),
-                args.len()
-            )));
-        }
-
-        for (arg, param) in args.iter().zip(func_type.params.iter()) {
-            if !arg.matches_type(param) {
-                return Err(Error::InvalidType(format!(
-                    "Expected type {param:?}, got {arg:?}"
-                )));
-            }
-        }
-
-        // Now use the original module for the struct creation
-        Ok(Self {
-            module,
-            func_idx,
-            pc: 0,
-            locals: args,
-            instance_idx,
-            arity: func_type.params.len(),
-            label_arity: 0,
-            label_stack: Vec::new(),
-            return_pc: 0,
-        })
-    }
-
-    /// Creates a new stackless frame from a function
-    pub fn from_function(
-        module: Arc<Module>,
-        func_idx: u32,
-        args: &[Value],
-        instance_idx: u32,
-    ) -> Result<Self> {
-        // Get the function and its type from the module
-        let func = module
-            .get_function(func_idx)
-            .ok_or(Error::FunctionNotFound(func_idx))?;
-
-        let func_type = module.get_function_type(func.type_idx).ok_or_else(|| {
-            Error::InvalidFunctionType(format!(
-                "Function type not found for index {}",
-                func.type_idx
-            ))
-        })?;
-
-        // Prepare the locals
-        let mut locals = Vec::with_capacity(func_type.params.len() + func.locals.len());
-        locals.extend(args.iter().cloned());
-
-        // Initialize local variables with their default values
-        for local_type in &func.locals {
-            locals.push(Value::default_for_type(local_type));
-        }
-
-        Ok(Self {
-            module: module.clone(),
-            func_idx,
-            pc: 0,
-            locals,
-            label_stack: Vec::new(),
-            label_arity: func_type.results.len(),
-            instance_idx,
-            arity: func_type.params.len(),
-            return_pc: 0,
-        })
-    }
-
-    /// Gets a function by index
-    pub fn get_function(&self, func_idx: u32) -> Result<&Function> {
-        self.module
-            .get_function(func_idx)
-            .ok_or_else(|| Error::InvalidFunctionType(format!("Function not found: {func_idx}")))
-    }
-
-    /// Gets a function type by index
-    pub fn get_function_type(&self, func_idx: u32) -> Result<&FuncType> {
-        self.module.get_function_type(func_idx).ok_or_else(|| {
-            Error::InvalidFunctionType(format!("Function type not found: {func_idx}"))
-        })
-    }
-
-    /// Gets a global by index
-    pub fn get_global(&self, idx: u32) -> Result<Arc<Global>> {
-        self.module.get_global(idx as usize)
-    }
-
-    /// Gets a mutable global by index
-    pub fn get_global_mut(&mut self, idx: u32) -> Result<Arc<Global>> {
-        let global = self.module.get_global(idx as usize)?;
-
-        // Check if the global is mutable
-        if !global.global_type.mutable {
-            return Err(Error::GlobalNotMutable(idx as usize));
-        }
-
-        Ok(global)
-    }
-
-    /// Gets a memory by index
-    pub fn get_memory(&self, idx: usize) -> Result<&Memory> {
-        let memory_arc = self.module.get_memory(idx)?;
-        // This is unsafe because we're returning a reference to the Arc's contents
-        // which isn't guaranteed to live long enough. In practice, the Arc keeps
-        // the memory alive for the lifetime of the module, but this is not ideal.
-        Ok(unsafe {
-            let memory_ptr = Arc::as_ptr(&memory_arc);
-            &*memory_ptr
-        })
-    }
-
-    /// Gets a mutable memory by index
-    pub fn get_memory_mut(&mut self, idx: usize) -> Result<&mut Memory> {
-        // Since module is Arc, we can't get a mutable reference directly
-        Err(Error::Unimplemented(
-            "get_memory_mut in stackless frame".to_string(),
-        ))
-    }
-
-    /// Gets a table by index
-    pub fn get_table(&self, idx: usize) -> Result<&Table> {
-        let table_arc = self.module.get_table(idx)?;
-        // This is unsafe for the same reason as get_memory
-        Ok(unsafe {
-            let table_ptr = Arc::as_ptr(&table_arc);
-            &*table_ptr
-        })
-    }
-
-    /// Gets a mutable table by index
-    pub fn get_table_mut(&mut self, idx: usize) -> Result<Arc<Table>> {
-        // Since Module is wrapped in Arc, we can't borrow it mutably
-        self.module.get_table(idx)
-    }
-
-    /// Execute a frame with a stack
-    pub fn execute(&mut self, stack: &mut impl Stack) -> Result<()> {
-        // Execute each instruction in the function body
-        let func_idx = self.func_idx;
-        let func = self
-            .module
-            .get_function(func_idx)
-            .ok_or(Error::InvalidFunctionIndex(func_idx as usize))?;
-        // Clone the instructions to avoid borrowing issues
-        let instructions = func.code.clone();
-
-        // Push arguments to the stack
-        for arg in &self.locals {
-            stack.push(arg.clone())?;
-        }
-
-        // Execute instructions
-        let mut pc = 0;
-        while pc < instructions.len() {
-            let instruction = &instructions[pc];
-            instruction.execute(stack, self)?;
-            pc += 1;
-        }
-
-        Ok(())
-    }
-
-    /// Get the function body for execution
-    pub fn get_function_body(&self, func_idx: u32) -> Result<&[Instruction]> {
-        let func = self
-            .module
-            .get_function(func_idx)
-            .ok_or(Error::InvalidFunctionIndex(func_idx as usize))?;
-        Ok(&func.code)
-    }
-}
-
-// Implement the Stack trait for StacklessFrame
-impl Stack for StacklessFrame {
-    fn push_label(&mut self, label: stack::Label) -> Result<()> {
-        // Convert stack::Label to behavior::Label
-        self.label_stack.push(behavior::Label {
-            arity: label.arity,
-            pc: label.pc,
-            continuation: label.continuation,
-        });
-        Ok(())
-    }
-
-    fn pop_label(&mut self) -> Result<stack::Label> {
-        if self.label_stack.is_empty() {
-            return Err(Error::Execution("Label stack is empty".to_string()));
-        }
-
-        let label = self.label_stack.pop().unwrap();
-        // Convert behavior::Label to stack::Label
-        Ok(stack::Label {
-            arity: label.arity,
-            pc: label.pc,
-            continuation: label.continuation,
-        })
-    }
-
-    fn get_label(&self, idx: usize) -> Result<&stack::Label> {
-        // We can't directly convert from &behavior::Label to &stack::Label
-        // This is a limitation of the current design
-        Err(Error::Unimplemented(
-            "get_label in StacklessFrame".to_string(),
-        ))
-    }
-
-    fn get_label_mut(&mut self, idx: usize) -> Result<&mut stack::Label> {
-        // Same limitation as above
-        Err(Error::Unimplemented(
-            "get_label_mut in StacklessFrame".to_string(),
-        ))
-    }
-
-    fn labels_len(&self) -> usize {
-        self.label_stack.len()
-    }
-}
-
-impl StackBehavior for StacklessFrame {
-    fn push(&mut self, value: Value) -> Result<()> {
-        // In this implementation, we're using locals as our stack
-        self.locals.push(value);
-        Ok(())
-    }
-
-    fn pop(&mut self) -> Result<Value> {
-        self.locals.pop().ok_or(Error::StackUnderflow)
-    }
-
-    fn peek(&self) -> Result<&Value> {
-        self.locals.last().ok_or(Error::StackUnderflow)
-    }
-
-    fn peek_mut(&mut self) -> Result<&mut Value> {
-        self.locals.last_mut().ok_or(Error::StackUnderflow)
-    }
-
-    fn values(&self) -> &[Value] {
-        &self.locals
-    }
-
-    fn values_mut(&mut self) -> &mut [Value] {
-        &mut self.locals
-    }
-
-    fn len(&self) -> usize {
-        self.locals.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.locals.is_empty()
-    }
-
-    fn push_label(&mut self, arity: usize, pc: usize) {
-        self.label_stack.push(Label {
-            arity,
-            pc,
-            continuation: 0,
-        });
-    }
-
-    fn pop_label(&mut self) -> Result<Label> {
-        if self.label_stack.is_empty() {
-            return Err(Error::Execution("Label stack is empty".to_string()));
-        }
-
-        Ok(self.label_stack.pop().unwrap())
-    }
-
-    fn get_label(&self, index: usize) -> Option<&Label> {
-        if index < self.label_stack.len() {
-            Some(&self.label_stack[index])
-        } else {
-            None
-        }
-    }
-}
-
 /// Represents the execution stack in a stackless implementation
 #[derive(Debug)]
 pub struct StacklessStack {
@@ -407,8 +96,6 @@ pub struct StacklessStack {
     pub instance_idx: usize,
     /// Function index
     pub func_idx: u32,
-    /// Reference to the engine
-    pub engine: Option<Arc<StacklessEngine>>,
     /// Reference to the module
     pub module: Arc<Module>,
 }
@@ -459,7 +146,6 @@ impl StacklessStack {
             pc: 0,
             instance_idx,
             func_idx: 0,
-            engine: None,
             module,
         }
     }
@@ -497,445 +183,43 @@ impl StacklessStack {
             .ok_or(Error::InvalidCode(format!("Invalid label index: {idx}")))
     }
 
-    /// Pushes a frame onto the call stack
-    pub fn push_frame(
-        &mut self,
-        instance_idx: usize,
-        func_idx: u32,
-        locals: Vec<Value>,
-    ) -> Result<()> {
-        let empty_module = Module::new().expect("Failed to create empty module");
-        self.frames.push(StacklessFrame {
-            module: Arc::new(empty_module),
-            func_idx,
-            locals: locals.clone(),
-            pc: 0,
-            instance_idx: instance_idx as u32,
-            arity: locals.len(),
-            label_arity: 0,
-            label_stack: Vec::new(),
-            return_pc: 0,
-        });
-        Ok(())
+    /// Returns the number of labels currently on the control stack.
+    pub fn labels_len(&self) -> usize {
+        self.labels.len()
     }
 
-    /// Pops a frame from the call stack
-    pub fn pop_frame(&mut self) -> Result<StacklessFrame> {
-        self.frames.pop().ok_or(Error::StackUnderflow)
+    /// Checks if the value stack is empty.
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
     }
 
-    /// Gets the current frame
-    pub fn current_frame(&self) -> Result<&StacklessFrame> {
-        self.frames.last().ok_or(Error::StackUnderflow)
+    /// Returns the number of values on the value stack.
+    pub fn len(&self) -> usize {
+        self.values.len()
     }
 
-    /// Gets a mutable reference to the current frame
-    pub fn current_frame_mut(&mut self) -> Result<&mut StacklessFrame> {
-        self.frames.last_mut().ok_or(Error::StackUnderflow)
+    /// Returns a slice containing all values on the stack.
+    pub fn values(&self) -> &[Value] {
+        &self.values
     }
 
-    pub fn get_function_instruction(&self, func_idx: u32, pc: usize) -> Result<&Instruction> {
-        self.module
-            .get_function(func_idx)
-            .ok_or(Error::InvalidFunctionIndex(func_idx as usize))?
-            .code
-            .get(pc)
-            .ok_or(Error::InvalidProgramCounter(pc))
+    /// Returns a mutable slice containing all values on the stack.
+    pub fn values_mut(&mut self) -> &mut [Value] {
+        &mut self.values
     }
 
-    pub fn get_instance(&self, instance_idx: usize) -> Result<&ModuleInstance> {
-        if let Some(engine) = &self.engine {
-            engine.get_instance(instance_idx)
-        } else {
-            Err(Error::NoInstances)
-        }
+    /// Returns a reference to the top value on the stack without removing it.
+    pub fn peek(&self) -> Result<&Value> {
+        self.values.last().ok_or(Error::StackUnderflow)
     }
 
-    pub fn execute_instruction(
-        &mut self,
-        instruction: &Instruction,
-        frame: &mut StacklessFrame,
-    ) -> Result<()> {
-        match instruction {
-            Instruction::Call(func_idx) => {
-                let instance = self.get_instance(frame.instance_idx as usize)?;
-                let empty_module = Module::new().expect("Failed to create empty module");
-                let mut temp_stack = Self::new(Arc::new(empty_module), self.instance_idx);
-                temp_stack.instance_idx = self.instance_idx;
-                temp_stack.func_idx = self.func_idx;
-                temp_stack.engine = self.engine.clone();
-
-                // Execute the function
-                temp_stack.execute_instruction(instruction, frame)?;
-
-                // Update our state with results from the temporary stack
-                self.values.extend(temp_stack.values);
-                Ok(())
-            }
-            // For all other instructions, forward to the InstructionExecutor trait implementation
-            _ => instruction.execute(self, frame),
-        }
+    /// Returns a mutable reference to the top value on the stack without removing it.
+    pub fn peek_mut(&mut self) -> Result<&mut Value> {
+        self.values.last_mut().ok_or(Error::StackUnderflow)
     }
 
-    pub fn execute_block(
-        &mut self,
-        instructions: &[Instruction],
-        frame: &mut StacklessFrame,
-    ) -> Result<()> {
-        let mut pc = 0;
-        while pc < instructions.len() {
-            let instruction = &instructions[pc];
-            let empty_module = Module::new().expect("Failed to create empty module");
-            let mut temp_stack = Self::new(Arc::new(empty_module), self.instance_idx);
-            temp_stack.instance_idx = self.instance_idx;
-            temp_stack.func_idx = self.func_idx;
-            temp_stack.engine = self.engine.clone();
-            temp_stack.execute_instruction(instruction, frame)?;
-            pc += 1;
-        }
-        Ok(())
-    }
-
-    /// Executes a function in a module instance
-    pub fn execute_function(
-        &mut self,
-        instance_idx: usize,
-        func_idx: u32,
-        args: Vec<Value>,
-    ) -> Result<Vec<Value>> {
-        println!("DEBUG: execute called for function index: {func_idx}");
-        println!("DEBUG: Arguments: {args:?}");
-
-        // Get the instance
-        let instance = self.get_instance(instance_idx)?;
-        println!("DEBUG: Got instance at index: {instance_idx}");
-
-        // Get the function code from instance
-        let func = instance
-            .module
-            .get_function(func_idx)
-            .ok_or(Error::InvalidFunctionIndex(func_idx as usize))?;
-
-        // Get the function type from instance
-        let func_type = instance.get_function_type(func_idx)?.clone();
-
-        println!(
-            "DEBUG: Function type: params={:?}, results={:?}",
-            func_type.params, func_type.results
-        );
-
-        // Check that the arguments match the function parameters
-        let params_len = func_type.params.len();
-        if args.len() != params_len {
-            return Err(Error::InvalidArgumentCount {
-                expected: params_len,
-                actual: args.len(),
-            });
-        }
-
-        // Get the number of results this function returns
-        let results_len = func_type.results.len();
-        println!("DEBUG: Results length: {results_len}");
-
-        // Create a new frame with arguments
-        let module_arc = Arc::new(instance.module.clone());
-        let frame =
-            StacklessFrame::from_function(module_arc, func_idx, &args, instance_idx as u32)?;
-        println!("DEBUG: Created frame with locals: {:?}", frame.locals);
-
-        // Create a stack for execution
-        let mut stack = Vec::new();
-
-        // Push arguments to the stack (needed for operations)
-        for arg in args {
-            stack.push(arg);
-        }
-        println!("DEBUG: Initial stack with arguments: {stack:?}");
-
-        // Execute each instruction in the function
-        let instructions = &func.code;
-        println!("DEBUG: Executing {} instructions", instructions.len());
-
-        let mut pc = 0;
-        while pc < instructions.len() {
-            let instruction = &instructions[pc];
-            println!(
-                "DEBUG: Executing instruction [{}/{}]: {:?}",
-                pc + 1,
-                instructions.len(),
-                instruction
-            );
-
-            match instruction {
-                Instruction::LocalGet(idx) => {
-                    println!("DEBUG: LocalGet - Index: {idx}");
-
-                    if *idx as usize >= frame.locals.len() {
-                        return Err(Error::InvalidLocalIndex(*idx as usize));
-                    }
-
-                    let value = frame.locals[*idx as usize].clone();
-                    println!("DEBUG: LocalGet - Value at idx {idx}: {value:?}");
-
-                    stack.push(value);
-                    println!("DEBUG: Stack after LocalGet: {stack:?}");
-                }
-                Instruction::I32Add => {
-                    println!("DEBUG: I32Add instruction");
-
-                    if stack.len() < 2 {
-                        return Err(Error::StackUnderflow);
-                    }
-
-                    // Get the operands, but keep clones for debugging
-                    let b = stack.pop().unwrap();
-                    let a = stack.pop().unwrap();
-
-                    println!("DEBUG: I32Add - Popped values: a={a:?}, b={b:?}");
-
-                    match (a, b) {
-                        (Value::I32(a_val), Value::I32(b_val)) => {
-                            let result = a_val.wrapping_add(b_val);
-                            println!("DEBUG: I32Add - Result: {a_val} + {b_val} = {result}");
-                            stack.push(Value::I32(result));
-                        }
-                        (a, b) => {
-                            return Err(Error::InvalidType(format!(
-                                "Type mismatch in I32Add: {a:?} and {b:?}"
-                            )));
-                        }
-                    }
-
-                    println!("DEBUG: Stack after I32Add: {stack:?}");
-                }
-                Instruction::I32Const(value) => {
-                    println!("DEBUG: I32Const - Value: {value}");
-                    stack.push(Value::I32(*value));
-                    println!("DEBUG: Stack after I32Const: {stack:?}");
-                }
-                Instruction::I64Const(value) => {
-                    println!("DEBUG: I64Const - Value: {value}");
-                    stack.push(Value::I64(*value));
-                    println!("DEBUG: Stack after I64Const: {stack:?}");
-                }
-                Instruction::F32Const(value) => {
-                    println!("DEBUG: F32Const - Value: {value}");
-                    stack.push(Value::F32(*value));
-                    println!("DEBUG: Stack after F32Const: {stack:?}");
-                }
-                Instruction::F64Const(value) => {
-                    println!("DEBUG: F64Const - Value: {value}");
-                    stack.push(Value::F64(*value));
-                    println!("DEBUG: Stack after F64Const: {stack:?}");
-                }
-                // Handle directly without using the Stack trait
-                _ => {
-                    println!("DEBUG: Unhandled instruction: {instruction:?}, treating as no-op");
-                    // For the basic i32.add test, we can treat other instructions as no-ops
-                    // since they're not needed for this test
-                }
-            }
-
-            pc += 1;
-        }
-
-        println!("DEBUG: Final stack after execution: {stack:?}");
-
-        // Critical fix: If we have results to return, extract them from the stack
-        if results_len > 0 {
-            // Make sure we have enough values on the stack
-            if stack.len() < results_len {
-                println!(
-                    "DEBUG: Error - Not enough values on stack. Expected {}, got {}",
-                    results_len,
-                    stack.len()
-                );
-                return Err(Error::Execution(format!(
-                    "Function did not produce enough results. Expected {}, got {}",
-                    results_len,
-                    stack.len()
-                )));
-            }
-
-            // Extract the results from the end of the stack
-            let start_idx = stack.len() - results_len;
-            println!(
-                "DEBUG: Extracting results from stack index {} (stack length: {})",
-                start_idx,
-                stack.len()
-            );
-            let mut results = Vec::with_capacity(results_len);
-
-            for i in 0..results_len {
-                let val = stack[start_idx + i].clone();
-                println!("DEBUG: Adding result[{i}]: {val:?}");
-                results.push(val);
-            }
-
-            println!("DEBUG: Final results being returned: {results:?}");
-            return Ok(results);
-        }
-
-        // If no results expected, return an empty vector
-        println!("DEBUG: No results expected, returning empty vector");
-        Ok(Vec::new())
-    }
-
-    pub fn execute_function_call_direct(
-        &mut self,
-        table_idx: u32,
-        func_idx: u32,
-        args: Vec<Value>,
-    ) -> Result<Vec<Value>> {
-        // First, get all the data we need before any mutable borrows
-        let instance = self.get_instance(self.instance_idx)?;
-        let func_type = instance.get_function_type(func_idx)?.clone();
-        let params_len = func_type.params.len();
-        let results_len = func_type.results.len();
-
-        // Validate arguments match function type
-        if args.len() != params_len {
-            return Err(Error::InvalidArgumentCount {
-                expected: params_len,
-                actual: args.len(),
-            });
-        }
-
-        // Create a frame for the called function
-        let mut frame = StacklessFrame::from_function(
-            Arc::new(instance.module.clone()),
-            func_idx,
-            &args,
-            self.instance_idx as u32,
-        )?;
-
-        // Get the function code
-        let func = instance
-            .module
-            .get_function(func_idx)
-            .ok_or(Error::InvalidFunctionIndex(func_idx as usize))?;
-        let instructions = &func.code;
-
-        // Create a temporary stack for execution
-        let empty_module = Module::new().expect("Failed to create empty module");
-        let mut temp_stack = Self::new(Arc::new(empty_module), self.instance_idx);
-        temp_stack.instance_idx = self.instance_idx;
-        temp_stack.func_idx = self.func_idx;
-        temp_stack.engine = self.engine.clone();
-
-        // Push arguments to the stack
-        for arg in args {
-            temp_stack.values.push(arg);
-        }
-
-        // Execute instructions
-        let mut pc = 0;
-        while pc < instructions.len() {
-            let instruction = &instructions[pc];
-            instruction.execute(&mut temp_stack, &mut frame)?;
-            pc += 1;
-        }
-
-        // Collect results
-        let result_start = temp_stack.values.len().saturating_sub(results_len);
-        let results = temp_stack.values.drain(result_start..).collect();
-
-        Ok(results)
-    }
-
-    pub fn execute_host_function(
-        &mut self,
-        func_name: &str,
-        args: Vec<Value>,
-    ) -> Result<Vec<Value>> {
-        // First, get all the data we need before any mutable borrows
-        let handler_option = if let Some(engine) = &self.engine {
-            // Clone within the narrower scope
-            let handler_clone = {
-                let callbacks = engine.callbacks.lock().unwrap();
-                callbacks.callbacks.get(func_name).cloned()
-            };
-            handler_clone
-        } else {
-            None
-        };
-
-        if let Some(handler) = handler_option {
-            // Create a temporary stack for execution
-            let empty_module = Module::new().expect("Failed to create empty module");
-            let mut temp_stack = Self::new(Arc::new(empty_module), self.instance_idx);
-            temp_stack.instance_idx = self.instance_idx;
-            temp_stack.func_idx = self.func_idx;
-            temp_stack.engine = self.engine.clone();
-
-            // Call the handler function with correct parameter order
-            handler.call(&mut temp_stack, args)
-        } else {
-            Err(Error::FunctionNotFound(
-                func_name.to_string().as_str().parse::<u32>().unwrap_or(0),
-            ))
-        }
-    }
-
-    /// Execute a function in the module with the given instance index and function index
-    ///
-    /// # Arguments
-    ///
-    /// * `instance_idx` - The index of the module instance
-    /// * `func_idx` - The index of the function in the module
-    /// * `args` - The arguments to pass to the function
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(())` - If the function executed successfully
-    /// * `Err(Error)` - If an error occurred
-    pub fn execute(&mut self, instance_idx: usize, func_idx: u32, args: Vec<Value>) -> Result<()> {
-        // Execute the function with the provided arguments
-        self.execute_function(instance_idx, func_idx, args)?;
-        Ok(())
-    }
-}
-
-impl Default for StacklessCallbackRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl StacklessCallbackRegistry {
-    /// Creates a new callback registry
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            export_names: HashMap::new(),
-            callbacks: HashMap::new(),
-        }
-    }
-
-    /// Registers a callback for a specific export
-    pub fn register_callback(&mut self, export_name: String, callback: HostFunctionHandler) {
-        self.callbacks.insert(export_name, callback);
-    }
-
-    /// Registers a log operation for a specific export
-    pub fn register_log_operation(&mut self, export_name: String, operation: LogOperation) {
-        self.export_names
-            .entry(export_name)
-            .or_default()
-            .insert(operation.message.clone(), operation);
-    }
-
-    /// Gets a callback for a specific export
-    #[must_use]
-    pub fn get_callback(&self, export_name: &str) -> Option<&HostFunctionHandler> {
-        self.callbacks.get(export_name)
-    }
-
-    /// Gets log operations for a specific export
-    #[must_use]
-    pub fn get_log_operations(&self, export_name: &str) -> Option<&HashMap<String, LogOperation>> {
-        self.export_names.get(export_name)
-    }
+    // Note: Implementations of the `Stack` and `StackBehavior` traits for StacklessStack
+    // are added below to maintain compatibility where the engine expects these traits.
 }
 
 impl Default for StacklessEngine {
@@ -1024,50 +308,396 @@ impl StacklessEngine {
         Ok(self.add_instance(instance))
     }
 
-    #[must_use]
+    /// Checks if the engine currently has any module instances loaded.
+    ///
+    /// # Returns
+    ///
+    /// `true` if there are no instances, `false` otherwise.
     pub fn has_no_instances(&self) -> bool {
         self.instances.is_empty()
     }
-}
 
-impl Stack for StacklessStack {
-    fn push_label(&mut self, label: stack::Label) -> Result<()> {
-        self.labels.push(behavior::Label {
-            arity: label.arity,
-            pc: label.pc,
-            continuation: label.continuation,
-        });
+    /// Registers a callback function for a specific export name.
+    ///
+    /// This allows host functions to be called from WebAssembly.
+    pub fn register_callback(
+        &mut self,
+        export_name: &str,
+        callback: HostFunctionHandler,
+    ) -> Result<()> {
+        let mut registry = self.callbacks.lock().map_err(|_| Error::PoisonedLock)?;
+        if registry.callbacks.contains_key(export_name) {
+            return Err(Error::Execution(format!(
+                "Callback already registered for export: {export_name}"
+            )));
+        }
+        registry.callbacks.insert(export_name.to_string(), callback);
         Ok(())
     }
 
-    fn pop_label(&mut self) -> Result<stack::Label> {
-        self.labels
-            .pop()
-            .map(|label| stack::Label {
+    /// Registers known exports that should trigger logging or other callbacks.
+    ///
+    /// # Arguments
+    ///
+    /// * `export_names`: A map where the key is the export name (e.g., "wasi:logging/logging.log")
+    ///   and the value is another map specifying the log operation (e.g., {"log": LogOperation::Log}).
+    pub fn register_known_exports(
+        &mut self,
+        export_names: HashMap<String, HashMap<String, LogOperation>>,
+    ) -> Result<()> {
+        let mut registry = self.callbacks.lock().map_err(|_| Error::PoisonedLock)?;
+        registry.export_names.extend(export_names);
+        Ok(())
+    }
+
+    /// Attempts to get a lock on the callback registry.
+    ///
+    /// Returns an `Error::PoisonedLock` if the mutex is poisoned.
+    fn get_callback_registry_lock(&self) -> Result<MutexGuard<'_, StacklessCallbackRegistry>> {
+        self.callbacks.lock().map_err(|_| Error::PoisonedLock)
+    }
+
+    /// Finds a callback function by export name.
+    ///
+    /// Requires a lock on the callback registry.
+    fn find_callback_locked(
+        registry: &StacklessCallbackRegistry,
+        export_name: &str,
+    ) -> Option<HostFunctionHandler> {
+        registry.callbacks.get(export_name).cloned()
+    }
+
+    /// Calls an exported function by name
+    pub fn call_export(&mut self, export_name: &str, args: &[Value]) -> Result<Vec<Value>> {
+        // Find the export in the *last added* instance (convention?)
+        // TODO: Allow specifying instance index or handle multiple instances better
+        let instance_idx = if self.instances.is_empty() {
+            return Err(Error::Execution("No instances loaded".into()));
+        } else {
+            self.instances.len() - 1
+        };
+        let instance = &self.instances[instance_idx];
+
+        let export = instance
+            .module
+            .exports
+            .get(export_name)
+            .ok_or_else(|| Error::ExportNotFound(export_name.to_string()))?;
+
+        match export.external {
+            crate::module::ExportKind::Function => {
+                // Found the start function export
+                let func_idx = if let crate::module::ExportValue::Function(idx, _) = export.value {
+                    idx
+                } else {
+                    return Err(Error::ExportNotFound(format!(
+                        "Export '{export_name}' is not a function"
+                    )));
+                };
+                self.call_function(0, func_idx, args) // Assuming instance_idx 0 if not specified
+            }
+            _ => {
+                return Err(Error::ExportNotFound(format!(
+                    "Export '{export_name}' is not a function"
+                )))
+            }
+        }
+    }
+
+    /// Calls a function by index within a specific instance
+    pub fn call_function(
+        &mut self,
+        instance_idx: u32,
+        func_idx: u32,
+        args: &[Value],
+    ) -> Result<Vec<Value>> {
+        let module = self
+            .instances
+            .last()
+            .ok_or(Error::InvalidInstanceIndex(self.instances.len()))?
+            .module
+            .clone();
+
+        // Check if this is a host function callback
+        // Find the export name associated with this function index
+        let export_name = module.exports.iter().find_map(|export| {
+            // Use export.kind and match the enum variant directly
+            if let crate::module::ExportKind::Function = export.kind {
+                // Also check the index associated with the Function kind
+                if export.index == func_idx {
+                    Some(export.name.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+
+        if let Some(name) = export_name {
+            let registry_lock = self.get_callback_registry_lock()?;
+            if let Some(callback) = Self::find_callback_locked(&registry_lock, &name) {
+                println!("DEBUG: Calling host callback: {}", name);
+                // Drop the lock before calling the callback to avoid deadlocks if the callback tries to use the engine
+                drop(registry_lock);
+                // Call the host function
+                return callback(args);
+            }
+        }
+
+        // Not a host callback, proceed with normal execution
+        // Clone the Arc<Module> obtained from the map and pass it
+        let initial_frame =
+            StacklessFrame::new(module.clone().into(), func_idx, args, instance_idx)?;
+        self.stack.frames.push(initial_frame);
+        self.stack.state = StacklessExecutionState::Running;
+
+        let result = self.run_loop();
+
+        // Handle result
+        match result {
+            Ok(StacklessExecutionState::Completed) => {
+                // Pop return values from the value stack
+                let current_frame = self.stack.frames.last().ok_or(Error::Execution(
+                    "Frame stack empty after function completion".into(),
+                ))?;
+                let func_type = current_frame.get_function_type()?;
+                let arity = func_type.results.len();
+
+                if self.stack.values.len() < arity {
+                    return Err(Error::StackUnderflow);
+                }
+                let results = self.stack.values.split_off(self.stack.values.len() - arity);
+                Ok(results)
+            }
+            Ok(state) => Err(Error::Execution(format!(
+                "Execution finished in unexpected state: {state:?}"
+            ))),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// The main execution loop
+    /// Continues execution until paused, completed, or an error occurs.
+    pub fn run(&mut self) -> Result<StacklessExecutionState> {
+        while self.stack.state == StacklessExecutionState::Running {
+            self.step()?;
+        }
+        Ok(self.stack.state.clone()) // Return the final state
+    }
+
+    /// Executes a single step (instruction) of the engine.
+    /// This is the core of the interpreter loop.
+    pub fn step(&mut self) -> Result<()> {
+        // Check fuel before executing anything
+        if let Some(ref mut fuel) = self.fuel {
+            if *fuel == 0 {
+                // TODO: Save state for pause
+                self.stack.state = StacklessExecutionState::Paused {
+                    pc: 0,               // Placeholder
+                    instance_idx: 0,     // Placeholder
+                    func_idx: 0,         // Placeholder
+                    expected_results: 0, // Placeholder
+                };
+                return Ok(());
+            }
+            *fuel -= 1; // Consume fuel
+            self.stats.fuel_consumed += 1;
+        }
+
+        // Get current frame (must exist if state is Running)
+        let current_frame = self
+            .stack
+            .frames
+            .last_mut()
+            .ok_or(Error::Execution("Execution frame stack empty".into()))?;
+
+        let func = current_frame.get_function()?;
+        let code = &func.code;
+        let pc = current_frame.pc;
+
+        if pc >= code.len() {
+            // Reached end of function code naturally
+            println!(
+                "DEBUG: Reached end of function {} at PC {}",
+                func.func_idx, pc
+            );
+            // Perform implicit return
+            current_frame.return_(&mut self.stack)?;
+
+            // Pop the completed frame
+            let completed_frame = self.stack.frames.pop().unwrap(); // Safe due to check above
+            let return_values = self
+                .stack
+                .values
+                .split_off(self.stack.values.len() - completed_frame.arity);
+            println!(
+                "DEBUG: Popped frame for func {}, return values: {:?}",
+                completed_frame.func_idx, return_values
+            );
+
+            if self.stack.frames.is_empty() {
+                // Last frame completed, execution finished
+                self.stack.state = StacklessExecutionState::Completed;
+                // Push return values back for the caller
+                self.stack.values.extend(return_values);
+                println!(
+                    "DEBUG: Final frame completed. State: Completed. Stack: {:?}",
+                    self.stack.values
+                );
+            } else {
+                // Return to caller frame
+                let caller_frame = self.stack.frames.last_mut().unwrap(); // Safe: checked !is_empty()
+                caller_frame.set_pc(completed_frame.return_pc);
+                // Push return values onto caller's effective stack
+                self.stack.values.extend(return_values);
+                self.stack.state = StacklessExecutionState::Running;
+                println!(
+                    "DEBUG: Returning to caller frame func {}, PC set to {}, Stack: {:?}",
+                    caller_frame.func_idx, caller_frame.pc, self.stack.values
+                );
+            }
+            return Ok(());
+        }
+
+        let instruction = &code[pc];
+        println!(
+            "DEBUG: Executing PC={}, Func={}, Inst: {:?}, Stack: {:?}, Labels: {:?}",
+            pc, current_frame.func_idx, instruction, self.stack.values, current_frame.label_stack
+        );
+        self.stats.instructions_executed += 1;
+
+        // Execute instruction
+        // Need to clone Arc<Module> for instruction execution context if needed
+        // let frame_module = current_frame.module.clone();
+
+        // Execute requires mutable frame and stack
+        // Temporarily take mutable references
+        let mut frame_ref = current_frame;
+        let mut stack_ref = &mut self.stack;
+
+        // The instruction execution might change the PC or state
+        match instruction.execute(stack_ref, &mut frame_ref, self) {
+            Ok(_) => {
+                // If execution didn't change PC (e.g., branch, return), increment PC
+                // Check if PC was already modified by the instruction execution (branch/return)
+                if frame_ref.pc == pc {
+                    frame_ref.pc += 1;
+                }
+                // State might have been changed (e.g., to Error by instruction)
+                // No need to set Running explicitly unless changed
+            }
+            Err(e) => {
+                // Instruction execution failed
+                self.stack.state = StacklessExecutionState::Error(e);
+            }
+        }
+
+        Ok(())
+    }
+
+    // Internal run loop helper
+    fn run_loop(&mut self) -> Result<StacklessExecutionState> {
+        loop {
+            match self.stack.state {
+                StacklessExecutionState::Running => {
+                    self.step()?;
+                }
+                StacklessExecutionState::Paused { .. } => {
+                    // Return paused state
+                    return Ok(self.stack.state.clone());
+                }
+                StacklessExecutionState::Calling { .. } => {
+                    // Handle call setup (push new frame)
+                    // This state should ideally be handled within step() or call_function()
+                    return Err(Error::Execution(
+                        "Unexpected Calling state in run_loop".into(),
+                    ));
+                }
+                StacklessExecutionState::Returning { .. } => {
+                    // Handle return (pop frame, push results)
+                    // This state should ideally be handled within step() or return instruction
+                    return Err(Error::Execution(
+                        "Unexpected Returning state in run_loop".into(),
+                    ));
+                }
+                StacklessExecutionState::Branching { .. } => {
+                    // This state should ideally be handled within step() or branch instruction
+                    return Err(Error::Execution(
+                        "Unexpected Branching state in run_loop".into(),
+                    ));
+                }
+                StacklessExecutionState::Completed => {
+                    // Execution finished successfully
+                    return Ok(StacklessExecutionState::Completed);
+                }
+                StacklessExecutionState::Finished => {
+                    // A potentially different terminal state?
+                    return Ok(StacklessExecutionState::Finished);
+                }
+                StacklessExecutionState::Error(ref e) => {
+                    // Propagate error
+                    return Err(e.clone());
+                }
+            }
+        }
+    }
+}
+
+// Implement Stack trait for StacklessStack for compatibility
+impl Stack for StacklessStack {
+    // Delegate label operations to the current frame if possible, otherwise error
+    // This might be problematic as the Stack trait is usually for operand stack + labels
+
+    fn push_label(&mut self, label: stack::Label) -> Result<()> {
+        if let Some(frame) = self.frames.last_mut() {
+            frame.label_stack.push(behavior::Label {
                 arity: label.arity,
                 pc: label.pc,
                 continuation: label.continuation,
-            })
-            .ok_or(Error::StackUnderflow)
+            });
+            Ok(())
+        } else {
+            Err(Error::Execution(
+                "No active frame to push label onto".into(),
+            ))
+        }
+    }
+
+    fn pop_label(&mut self) -> Result<stack::Label> {
+        if let Some(frame) = self.frames.last_mut() {
+            frame
+                .label_stack
+                .pop()
+                .map(|l| stack::Label {
+                    arity: l.arity,
+                    pc: l.pc,
+                    continuation: l.continuation,
+                })
+                .ok_or(Error::Execution("Label stack empty in frame".into()))
+        } else {
+            Err(Error::Execution("No active frame to pop label from".into()))
+        }
     }
 
     fn get_label(&self, idx: usize) -> Result<&stack::Label> {
-        Err(Error::Execution(
-            "Cannot return reference to stack::Label from StacklessStack".to_string(),
-        ))
+        // Cannot provide a stable reference easily due to conversion
+        Err(Error::Unimplemented("get_label for StacklessStack".into()))
     }
 
     fn get_label_mut(&mut self, idx: usize) -> Result<&mut stack::Label> {
-        Err(Error::Execution(
-            "Cannot return mutable reference to stack::Label from StacklessStack".to_string(),
+        // Cannot provide a stable reference easily due to conversion
+        Err(Error::Unimplemented(
+            "get_label_mut for StacklessStack".into(),
         ))
     }
 
     fn labels_len(&self) -> usize {
-        self.labels.len()
+        self.frames.last().map_or(0, |f| f.label_stack.len())
     }
 }
 
+// Implement StackBehavior for StacklessStack
 impl StackBehavior for StacklessStack {
     fn push(&mut self, value: Value) -> Result<()> {
         self.values.push(value);
@@ -1102,669 +732,25 @@ impl StackBehavior for StacklessStack {
         self.values.is_empty()
     }
 
+    // Delegate label operations to the current frame
     fn push_label(&mut self, arity: usize, pc: usize) {
-        self.labels.push(Label {
-            arity,
-            pc,
-            continuation: pc + 1, // Default continuation is the next instruction
-        });
+        if let Some(frame) = self.frames.last_mut() {
+            frame.push_label(arity, pc);
+        } else {
+            // Log error or handle? Pushing label without frame is likely an issue.
+            eprintln!("Warning: push_label called on StacklessStack without an active frame.");
+        }
     }
 
     fn pop_label(&mut self) -> Result<Label> {
-        self.labels.pop().ok_or(Error::StackUnderflow)
-    }
-
-    fn get_label(&self, _index: usize) -> Option<&Label> {
-        None
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ReturnFrame {
-    pub pc: u32,
-    pub arity: u32,
-}
-
-// This is a free function, not a method
-pub fn execute_instruction(
-    instruction: &Instruction,
-    stack: &mut impl Stack,
-    frame: &mut StacklessFrame,
-    func_type: &FuncType,
-) -> Result<()> {
-    // Execute the instruction directly now that we have proper cloning in the caller
-    instruction.execute(stack, frame)
-}
-
-impl StacklessFrame {
-    pub fn get_global_by_idx(&self, idx: usize) -> Result<Value> {
-        let global = self.module.get_global(idx)?;
-        Ok(global.value.clone())
-    }
-
-    pub fn get_memory_by_idx(&self, idx: usize) -> Result<Arc<Memory>> {
-        self.module.get_memory(idx)
-    }
-
-    pub fn get_memory_mut_by_idx(&mut self, idx: usize) -> Result<Arc<Memory>> {
-        // Since Module is wrapped in Arc, we can't borrow it mutably
-        self.module.get_memory(idx)
-    }
-
-    pub fn get_table_by_idx(&self, idx: usize) -> Result<Arc<Table>> {
-        self.module.get_table(idx)
-    }
-
-    pub fn get_table_mut_by_idx(&mut self, idx: usize) -> Result<Arc<Table>> {
-        // Since Module is wrapped in Arc, we can't borrow it mutably
-        self.module.get_table(idx)
-    }
-
-    pub fn get_global_mut_by_idx(&mut self, idx: usize) -> Result<Arc<Global>> {
-        // Since Arc doesn't allow direct mutable access, we return the Arc itself
-        self.module.get_global(idx)
-    }
-
-    pub fn find_matching_else(&mut self) -> Result<usize> {
-        let func = self
-            .module
-            .get_function(self.func_idx)
-            .ok_or(Error::InvalidFunctionIndex(self.func_idx as usize))?;
-
-        let code = &func.code;
-        let mut depth = 1;
-        let mut i = self.pc + 1;
-
-        while i < code.len() && depth > 0 {
-            match &code[i] {
-                Instruction::If(..) => depth += 1,
-                Instruction::Else if depth == 1 => {
-                    // Found matching else
-                    return Ok(i);
-                }
-                Instruction::End => {
-                    depth -= 1;
-                    if depth == 0 {
-                        // Found matching end without an else
-                        return Ok(i);
-                    }
-                }
-                _ => {}
-            }
-            i += 1;
-        }
-
-        Err(Error::Execution(
-            "Could not find matching else or end".to_string(),
-        ))
-    }
-
-    pub fn find_matching_end(&mut self) -> Result<usize> {
-        let func_idx = self.func_idx as usize;
-        let func = self
-            .module
-            .get_function(func_idx as u32)
-            .ok_or(Error::InvalidFunctionIndex(func_idx))?;
-
-        let instructions = &func.code;
-        let mut i = self.pc + 1;
-        let mut depth = 1;
-
-        while i < instructions.len() {
-            match &instructions[i] {
-                Instruction::Block(..) | Instruction::Loop(..) | Instruction::If(..) => depth += 1,
-                Instruction::End => {
-                    depth -= 1;
-                    if depth == 0 {
-                        // Found matching end, jump to it
-                        self.pc = i;
-                        return Ok(i);
-                    }
-                }
-                _ => {}
-            }
-            i += 1;
-        }
-
-        Err(Error::Execution("Could not find matching end".to_string()))
-    }
-}
-
-// Implement ControlFlowBehavior trait for StacklessFrame
-impl ControlFlowBehavior for StacklessFrame {
-    fn enter_block(&mut self, ty: BlockType, stack_len: usize) -> Result<()> {
-        // Store current PC to return to on block exit
-        let continuation = self.pc + 1;
-
-        // Calculate arity based on block type
-        let arity = match &ty {
-            BlockType::Empty => 0,
-            BlockType::Type(value_type) => 1,
-            BlockType::TypeIndex(type_idx) => {
-                if let Some(func_type) = self.module.get_function_type(*type_idx) {
-                    func_type.results.len()
-                } else {
-                    return Err(Error::InvalidType(format!(
-                        "Type index not found: {type_idx}"
-                    )));
-                }
-            }
-            BlockType::FuncType(func_type) => func_type.results.len(),
-            BlockType::Value(value_type) => 1,
-        };
-
-        // Push a new label
-        self.label_stack.push(Label {
-            arity,
-            pc: self.pc,
-            continuation,
-        });
-
-        Ok(())
-    }
-
-    fn enter_loop(&mut self, ty: BlockType, stack_len: usize) -> Result<()> {
-        // For loops, the continuation is the loop start (current PC)
-        let continuation = self.pc;
-
-        // Calculate arity based on block type (same as for blocks)
-        let arity = match &ty {
-            BlockType::Empty => 0,
-            BlockType::Type(value_type) => 1,
-            BlockType::TypeIndex(type_idx) => {
-                if let Some(func_type) = self.module.get_function_type(*type_idx) {
-                    func_type.results.len()
-                } else {
-                    return Err(Error::InvalidType(format!(
-                        "Type index not found: {type_idx}"
-                    )));
-                }
-            }
-            BlockType::FuncType(func_type) => func_type.results.len(),
-            BlockType::Value(value_type) => 1,
-        };
-
-        // Push a new label
-        self.label_stack.push(Label {
-            arity,
-            pc: self.pc,
-            continuation,
-        });
-
-        Ok(())
-    }
-
-    fn enter_if(&mut self, ty: BlockType, stack_len: usize, condition: bool) -> Result<()> {
-        // Get the arity for the label
-        let arity = match ty {
-            BlockType::Empty => 0,
-            BlockType::Value(_) => 1,
-            BlockType::Type(_) => 1,
-            BlockType::FuncType(func_type) => func_type.results.len(),
-            BlockType::TypeIndex(type_idx) => {
-                let func_type = self.module.get_function_type(type_idx).ok_or_else(|| {
-                    Error::InvalidFunctionType(format!("Invalid type index: {type_idx}"))
-                })?;
-                func_type.results.len()
-            }
-        };
-
-        if condition {
-            // Enter the block and continue
-            self.label_stack.push(Label {
-                arity,
-                pc: self.pc,
-                continuation: 0, // We will update this when we find the matching end
-            });
-
-            Ok(())
+        if let Some(frame) = self.frames.last_mut() {
+            frame.pop_label()
         } else {
-            // Find the matching else or end
-            let else_idx = self.find_matching_else()?;
-
-            self.pc = else_idx;
-
-            // If this is an else branch, enter it
-            let func = self
-                .module
-                .get_function(self.func_idx)
-                .ok_or(Error::InvalidFunctionIndex(self.func_idx as usize))?;
-            let code = &func.code;
-            if self.pc < code.len() && matches!(code[self.pc], Instruction::Else) {
-                self.label_stack.push(Label {
-                    arity,
-                    pc: self.pc,
-                    continuation: 0, // We will update this when we find the matching end
-                });
-                self.pc += 1; // Move past the else
-            }
-
-            Ok(())
+            Err(Error::Execution("No active frame to pop label from".into()))
         }
     }
 
-    fn enter_else(&mut self, stack_len: usize) -> Result<()> {
-        // Skip to the end of the if-else block
-        let func = self
-            .module
-            .get_function(self.func_idx)
-            .ok_or(Error::InvalidFunctionIndex(self.func_idx as usize))?;
-
-        let code = &func.code;
-        let mut depth = 1;
-        let mut i = self.pc + 1;
-
-        while i < code.len() && depth > 0 {
-            match &code[i] {
-                Instruction::If(..) => depth += 1,
-                Instruction::End => {
-                    depth -= 1;
-                    if depth == 0 {
-                        // Found matching end, jump to it
-                        self.pc = i;
-                        return Ok(());
-                    }
-                }
-                _ => {}
-            }
-            i += 1;
-        }
-
-        Err(Error::Execution("Could not find matching end".to_string()))
-    }
-
-    fn exit_block(&mut self, _stack: &mut dyn Stack) -> Result<()> {
-        if self.label_stack.is_empty() {
-            return Err(Error::Execution("Label stack underflow".to_string()));
-        }
-
-        // Pop label on exit
-        let label = self.label_stack.pop().unwrap();
-        self.pc = label.pc;
-        self.arity = label.arity;
-
-        Ok(())
-    }
-
-    fn branch(&mut self, label_idx: u32, _stack: &mut dyn Stack) -> Result<()> {
-        let stack_len = self.label_stack.len();
-        if label_idx as usize >= stack_len {
-            return Err(Error::Execution(format!(
-                "Branch index {label_idx} out of bounds (label stack len = {stack_len})"
-            )));
-        }
-
-        // Set pc to the target label
-        self.pc = self.label_stack[stack_len - 1 - (label_idx as usize)].pc;
-        Ok(())
-    }
-
-    fn return_(&mut self, _stack: &mut dyn Stack) -> Result<()> {
-        self.pc = self.return_pc;
-        Ok(())
-    }
-
-    fn call(&mut self, _func_idx: u32, _stack: &mut dyn Stack) -> Result<()> {
-        Err(Error::Unimplemented("call in stackless frame".to_string()))
-    }
-
-    fn call_indirect(
-        &mut self,
-        type_idx: u32,
-        table_idx: u32,
-        entry: u32,
-        stack: &mut dyn Stack,
-    ) -> Result<()> {
-        // Get the table
-        let table_arc = self.module.get_table(table_idx as usize)?;
-        let table = unsafe {
-            let table_ptr = Arc::as_ptr(&table_arc);
-            &*table_ptr
-        };
-
-        // Check bounds
-        if entry as usize >= table.size() as usize {
-            return Err(Error::InvalidTableIndex(entry as usize));
-        }
-
-        // Get the function index from the table
-        let func_entry = table.get(entry)?;
-
-        match func_entry {
-            Some(Value::FuncRef(Some(func_idx))) => {
-                // Check if the function type matches the expected type
-                let expected_type = self.module.types.get(type_idx as usize).ok_or_else(|| {
-                    Error::InvalidType(format!("Type index out of bounds: {type_idx}"))
-                })?;
-
-                let func = self.get_function(func_idx)?;
-                let func_type = self
-                    .module
-                    .types
-                    .get(func.type_idx as usize)
-                    .ok_or_else(|| {
-                        Error::InvalidType(format!("Type index out of bounds: {}", func.type_idx))
-                    })?;
-
-                // Check that the types match
-                if expected_type != func_type {
-                    return Err(Error::TypeMismatch(format!(
-                        "Function type mismatch in call_indirect: expected {expected_type:?}, got {func_type:?}"
-                    )));
-                }
-
-                // Save current state
-                let return_pc = self.pc;
-
-                // Extract arguments
-                let param_count = func_type.params.len();
-                let mut args = Vec::with_capacity(param_count);
-                for _ in 0..param_count {
-                    args.push(stack.pop()?);
-                }
-                args.reverse(); // Arguments were popped in reverse order
-
-                // Create a new execution context
-                let state = StacklessExecutionState::Calling {
-                    instance_idx: self.instance_idx,
-                    func_idx,
-                    args,
-                    return_pc,
-                };
-
-                // Return a special error to signal state change
-                Err(Error::StateChange(Box::new(state)))
-            }
-            Some(Value::FuncRef(None)) => Err(Error::NullFunctionReference),
-            None => Err(Error::InvalidTableIndex(entry as usize)),
-            Some(other) => Err(Error::TypeMismatch(format!(
-                "Expected function reference, got {other:?}"
-            ))),
-        }
-    }
-
-    fn set_label_arity(&mut self, arity: usize) {
-        self.label_arity = arity;
-    }
-}
-
-// Implement FrameBehavior trait for StacklessFrame
-impl FrameBehavior for StacklessFrame {
-    fn locals(&mut self) -> &mut Vec<Value> {
-        &mut self.locals
-    }
-
-    fn get_local(&self, idx: usize) -> Result<Value> {
-        self.locals
-            .get(idx)
-            .cloned()
-            .ok_or_else(|| Error::InvalidLocal(format!("Local index out of bounds: {idx}")))
-    }
-
-    fn set_local(&mut self, idx: usize, value: Value) -> Result<()> {
-        if idx < self.locals.len() {
-            self.locals[idx] = value;
-            Ok(())
-        } else {
-            Err(Error::InvalidLocal(format!(
-                "Local index out of bounds: {idx}"
-            )))
-        }
-    }
-
-    fn get_global(&self, idx: usize) -> Result<Value> {
-        let global = self.module.get_global(idx)?;
-        Ok(global.get())
-    }
-
-    fn set_global(&mut self, idx: usize, value: Value) -> Result<()> {
-        let global = self.module.get_global(idx)?;
-        // Cannot modify through Arc directly
-        Err(Error::Execution(
-            "Cannot modify global through Arc in stackless frame".to_string(),
-        ))
-    }
-
-    fn get_memory(&self, idx: usize) -> Result<&Memory> {
-        let memory_arc = self.module.get_memory(idx)?;
-        // This is unsafe because we're returning a reference to the Arc's contents
-        // which isn't guaranteed to live long enough. In practice, the Arc keeps
-        // the memory alive for the lifetime of the module, but this is not ideal.
-        Ok(unsafe {
-            let memory_ptr = Arc::as_ptr(&memory_arc);
-            &*memory_ptr
-        })
-    }
-
-    fn get_memory_mut(&mut self, idx: usize) -> Result<&mut Memory> {
-        // Since module is Arc, we can't get a mutable reference directly
-        Err(Error::Unimplemented(
-            "get_memory_mut in stackless frame".to_string(),
-        ))
-    }
-
-    fn get_table(&self, idx: usize) -> Result<&Table> {
-        let table_arc = self.module.get_table(idx)?;
-        // This is unsafe for the same reason as get_memory
-        Ok(unsafe {
-            let table_ptr = Arc::as_ptr(&table_arc);
-            &*table_ptr
-        })
-    }
-
-    fn get_table_mut(&mut self, idx: usize) -> Result<&mut Table> {
-        // Since module is Arc, we can't get a mutable reference directly
-        Err(Error::Unimplemented(
-            "get_table_mut in stackless frame".to_string(),
-        ))
-    }
-
-    fn get_global_mut(&mut self, idx: usize) -> Option<&mut Global> {
-        None // Since module is Arc, we can't get a mutable reference directly
-    }
-
-    fn pc(&self) -> usize {
-        self.pc
-    }
-
-    fn set_pc(&mut self, pc: usize) {
-        self.pc = pc;
-    }
-
-    fn func_idx(&self) -> u32 {
-        self.func_idx
-    }
-
-    fn instance_idx(&self) -> usize {
-        self.instance_idx as usize
-    }
-
-    fn locals_len(&self) -> usize {
-        self.locals.len()
-    }
-
-    fn label_stack(&mut self) -> &mut Vec<Label> {
-        &mut self.label_stack
-    }
-
-    fn arity(&self) -> usize {
-        self.arity
-    }
-
-    fn set_arity(&mut self, arity: usize) {
-        self.arity = arity;
-    }
-
-    fn label_arity(&self) -> usize {
-        self.label_arity
-    }
-
-    fn return_pc(&self) -> usize {
-        self.return_pc
-    }
-
-    fn set_return_pc(&mut self, pc: usize) {
-        self.return_pc = pc;
-    }
-
-    fn as_any(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-
-    // Implement the remaining methods from FrameBehavior trait
-    fn load_i32(&mut self, addr: usize, align: u32) -> Result<i32> {
-        let memory = self.get_memory(0)?;
-        Ok(memory.read_u32(addr as u32)? as i32)
-    }
-
-    fn load_i64(&mut self, addr: usize, align: u32) -> Result<i64> {
-        let memory = self.get_memory(0)?;
-        Ok(memory.read_u64(addr as u32)? as i64)
-    }
-
-    fn load_f32(&mut self, addr: usize, align: u32) -> Result<f32> {
-        let memory = self.get_memory(0)?;
-        memory.read_f32(addr as u32)
-    }
-
-    fn load_f64(&mut self, addr: usize, align: u32) -> Result<f64> {
-        let memory = self.get_memory(0)?;
-        memory.read_f64(addr as u32)
-    }
-
-    fn load_i8(&mut self, addr: usize, align: u32) -> Result<i8> {
-        let memory = self.get_memory(0)?;
-        Ok(memory.read_byte(addr as u32)? as i8)
-    }
-
-    fn load_u8(&mut self, addr: usize, align: u32) -> Result<u8> {
-        let memory = self.get_memory(0)?;
-        memory.read_byte(addr as u32)
-    }
-
-    fn load_i16(&mut self, addr: usize, align: u32) -> Result<i16> {
-        let memory = self.get_memory(0)?;
-        Ok(memory.read_u16(addr as u32)? as i16)
-    }
-
-    fn load_u16(&mut self, addr: usize, align: u32) -> Result<u16> {
-        let memory = self.get_memory(0)?;
-        memory.read_u16(addr as u32)
-    }
-
-    fn store_i32(&mut self, addr: usize, align: u32, value: i32) -> Result<()> {
-        let memory_arc = self.module.get_memory(0)?;
-        // This is unsafe because we're writing through a shared reference
-        unsafe {
-            let memory_ptr = Arc::as_ptr(&memory_arc).cast_mut();
-            (*memory_ptr).write_u32(addr as u32, value as u32)
-        }
-    }
-
-    fn store_i64(&mut self, addr: usize, align: u32, value: i64) -> Result<()> {
-        let memory_arc = self.module.get_memory(0)?;
-        // This is unsafe because we're writing through a shared reference
-        unsafe {
-            let memory_ptr = Arc::as_ptr(&memory_arc).cast_mut();
-            (*memory_ptr).write_u64(addr as u32, value as u64)
-        }
-    }
-
-    fn memory_size(&mut self) -> Result<u32> {
-        let memory = self.get_memory(0)?;
-        Ok(memory.size())
-    }
-
-    fn memory_grow(&mut self, pages: u32) -> Result<u32> {
-        let memory_arc = self.module.get_memory(0)?;
-        // This is unsafe because we're modifying through a shared reference
-        unsafe {
-            let memory_ptr = Arc::as_ptr(&memory_arc).cast_mut();
-            (*memory_ptr).grow(pages)
-        }
-    }
-
-    fn table_get(&mut self, table_idx: u32, idx: u32) -> Result<Value> {
-        let table = self.get_table(table_idx as usize)?;
-        let value_opt = table.get(idx)?;
-        value_opt.ok_or(Error::InvalidTableIndex(idx as usize))
-    }
-
-    fn table_set(&mut self, table_idx: u32, idx: u32, value: Value) -> Result<()> {
-        let table_arc = self.module.get_table(table_idx as usize)?;
-        // This is unsafe because we're modifying through a shared reference
-        unsafe {
-            let table_ptr = Arc::as_ptr(&table_arc).cast_mut();
-            (*table_ptr).set(idx, Some(value))
-        }
-    }
-
-    fn table_size(&mut self, table_idx: u32) -> Result<u32> {
-        let table = self.get_table(table_idx as usize)?;
-        Ok(table.size())
-    }
-
-    fn table_grow(&mut self, table_idx: u32, delta: u32, value: Value) -> Result<u32> {
-        let table_arc = self.module.get_table(table_idx as usize)?;
-        // This is unsafe because we're modifying through a shared reference
-        unsafe {
-            let table_ptr = Arc::as_ptr(&table_arc).cast_mut();
-            (*table_ptr).grow(delta)
-        }
-    }
-
-    fn table_init(
-        &mut self,
-        table_idx: u32,
-        elem_idx: u32,
-        dst: u32,
-        src: u32,
-        n: u32,
-    ) -> Result<()> {
-        Err(Error::Unimplemented(
-            "table_init in stackless frame".to_string(),
-        ))
-    }
-
-    fn table_copy(
-        &mut self,
-        dst_table: u32,
-        src_table: u32,
-        dst: u32,
-        src: u32,
-        n: u32,
-    ) -> Result<()> {
-        Err(Error::Unimplemented(
-            "table_copy in stackless frame".to_string(),
-        ))
-    }
-
-    fn elem_drop(&mut self, elem_idx: u32) -> Result<()> {
-        Err(Error::Unimplemented(
-            "elem_drop in stackless frame".to_string(),
-        ))
-    }
-
-    fn table_fill(&mut self, table_idx: u32, dst: u32, val: Value, n: u32) -> Result<()> {
-        Err(Error::Unimplemented(
-            "table_fill in stackless frame".to_string(),
-        ))
-    }
-
-    fn pop_bool(&mut self, stack: &mut dyn Stack) -> Result<bool> {
-        match stack.pop()? {
-            Value::I32(0) => Ok(false),
-            Value::I32(_) => Ok(true),
-            _ => Err(Error::TypeMismatch(
-                "Expected i32 boolean value".to_string(),
-            )),
-        }
-    }
-
-    fn pop_i32(&mut self, stack: &mut dyn Stack) -> Result<i32> {
-        match stack.pop()? {
-            Value::I32(v) => Ok(v),
-            _ => Err(Error::TypeMismatch("Expected i32 value".to_string())),
-        }
+    fn get_label(&self, index: usize) -> Option<&Label> {
+        self.frames.last().and_then(|f| f.get_label(index))
     }
 }

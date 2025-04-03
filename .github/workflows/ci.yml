@@ -125,9 +125,7 @@ jobs:
         with:
           python-version: '3.x'
       - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r docs/requirements.txt
+        run: just setup-python-deps
       - name: Setup Rust targets
         run: just setup-ci-minimal
       - name: Run tests
@@ -311,9 +309,7 @@ jobs:
         with:
           python-version: '3.x'
       - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r docs/requirements.txt
+        run: just setup-python-deps
       # Install Java for PlantUML
       - name: Set up JDK
         uses: actions/setup-java@v3
@@ -383,8 +379,6 @@ jobs:
       - name: Install just
         if: env.JUST_INSTALLED != 'true'
         run: cargo install just --locked
-      - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --locked
       - name: Setup Rust targets
         run: just setup-ci-minimal
       - name: Run coverage tests

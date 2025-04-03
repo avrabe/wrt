@@ -1,0 +1,14 @@
+// logging-adapter/wit/adapter.wit
+package example:logging-adapter@0.1.0;
+
+// Import the standard interfaces we need
+use wasi:logging/logging@0.2.0;
+use wasi:cli/stderr@0.2.0;
+use wasi:io/streams@0.2.0;
+
+world adapter {
+    export logging; // Implement the logging interface
+
+    import stderr;  // Need stderr to write to
+    import streams; // Need streams for stderr's types
+} 

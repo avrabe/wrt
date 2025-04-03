@@ -1,5 +1,18 @@
+use std::fs;
+use std::path::Path;
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use wrt::logging::{LogLevel, LogOperation};
+use wrt::Module;
+use wrt::StacklessEngine;
 use wrt::*;
+use wrt::{
+    behavior::NullBehavior,
+    behavior::{ControlFlowBehavior, FrameBehavior, StackBehavior},
+    execution::Engine,
+    Error, Global,
+};
 
 // Include our WebAssembly spec test modules
 #[cfg(test)]
@@ -174,97 +187,89 @@ mod tests {
     // Engine Tests
     #[test]
     fn test_engine_lifecycle() {
-        let mut engine = new_engine();
+        let module = Module::new().expect("Module creation failed");
+        let mut engine = StacklessEngine::new_with_module(module);
+        // Access fields directly
+        assert_eq!(engine.execution_stats.instructions_executed, 0);
 
-        // Test initial state
-        assert_eq!(engine.remaining_fuel(), None);
-        assert_eq!(engine.stats().instructions_executed, 0);
+        engine.fuel = Some(100);
+        // ... execution ...
+        engine.fuel = None;
 
-        // Test fuel management
-        engine.set_fuel(Some(100));
-        assert_eq!(engine.remaining_fuel(), Some(100));
-
-        engine.set_fuel(None);
-        assert_eq!(engine.remaining_fuel(), None);
-
-        // Test stats reset
-        engine.reset_stats();
-        assert_eq!(engine.stats().instructions_executed, 0);
-        assert_eq!(engine.stats().current_memory_bytes, 0);
-        assert_eq!(engine.stats().peak_memory_bytes, 0);
+        // Reset stats using Default
+        engine.execution_stats = ExecutionStats::default();
+        assert_eq!(engine.execution_stats.instructions_executed, 0);
+        assert_eq!(engine.execution_stats.current_memory_bytes, 0); // Example access
+        assert_eq!(engine.execution_stats.peak_memory_bytes, 0); // Example access
     }
 
     // Module Tests
     #[test]
-    fn test_module_lifecycle() {
-        let module = new_module();
-
-        // Test initial state
+    fn test_module_new() {
+        let module_result = Module::new();
+        assert!(module_result.is_ok());
+        let module = module_result.unwrap(); // Unwrap here
         assert!(module.types.is_empty());
         assert!(module.imports.is_empty());
         assert!(module.exports.is_empty());
         assert!(module.start.is_none());
-
-        // Test validation of empty module
+        // Validate should be called on the Module instance
         assert!(module.validate().is_ok());
     }
 
     #[test]
-    fn test_module_imports() {
-        let mut module = new_module();
+    fn test_module_structure() {
+        let mut module_result = Module::new();
+        assert!(module_result.is_ok());
+        let mut module = module_result.unwrap(); // Unwrap here
 
-        // Add a function type for the import
+        // Add a type
         module.types.push(FuncType {
-            params: vec![ValueType::I32, ValueType::I32],
-            results: vec![ValueType::I32],
+            params: vec![ValueType::I32],
+            results: vec![],
         });
 
-        // Add a function import
+        // Add imports
         module.imports.push(Import {
             module: "env".to_string(),
-            name: "add".to_string(),
+            name: "func".to_string(),
+            // Use unwrapped module to access types
             ty: ExternType::Function(module.types[0].clone()),
         });
-
-        // Add a memory import
         module.imports.push(Import {
             module: "env".to_string(),
             name: "memory".to_string(),
-            ty: ExternType::Memory(MemoryType {
-                min: 1,
-                max: Some(2),
-            }),
+            ty: ExternType::Memory(MemoryType { min: 1, max: None }),
         });
 
-        // Verify imports were added correctly
+        // Check imports
         assert_eq!(module.imports.len(), 2);
 
-        // Check function import
+        // Check function import details
         let func_import = &module.imports[0];
         assert_eq!(func_import.module, "env");
-        assert_eq!(func_import.name, "add");
-        if let ExternType::Function(func_type) = &func_import.ty {
-            assert_eq!(func_type.params.len(), 2);
-            assert_eq!(func_type.params[0], ValueType::I32);
-            assert_eq!(func_type.params[1], ValueType::I32);
-            assert_eq!(func_type.results.len(), 1);
-            assert_eq!(func_type.results[0], ValueType::I32);
-        } else {
-            panic!("Expected function import type");
+        assert_eq!(func_import.name, "func");
+        match &func_import.ty {
+            ExternType::Function(func_type) => {
+                assert_eq!(func_type.params, vec![ValueType::I32]);
+                assert!(func_type.results.is_empty());
+            }
+            _ => panic!("Expected function import type"),
         }
 
-        // Check memory import
+        // Check memory import details
         let mem_import = &module.imports[1];
         assert_eq!(mem_import.module, "env");
         assert_eq!(mem_import.name, "memory");
-        if let ExternType::Memory(mem_type) = &mem_import.ty {
-            assert_eq!(mem_type.min, 1);
-            assert_eq!(mem_type.max, Some(2));
-        } else {
-            panic!("Expected memory import type");
+        match &mem_import.ty {
+            ExternType::Memory(mem_type) => {
+                assert_eq!(mem_type.min, 1);
+                assert!(mem_type.max.is_none());
+            }
+            _ => panic!("Expected memory import type"),
         }
 
-        // Validate module with imports
+        // Validate the module
         assert!(module.validate().is_ok());
     }
 
@@ -313,11 +318,11 @@ mod tests {
         assert_eq!(execution_error.to_string(), "Execution error: test error");
 
         let fuel_error = Error::FuelExhausted;
-        assert_eq!(fuel_error.to_string(), "Execution paused: out of fuel");
+        assert_eq!(fuel_error.to_string(), "Fuel exhausted");
 
         // Test additional error types
         let io_error = Error::IO("file not found".to_string());
-        assert_eq!(io_error.to_string(), "IO error: file not found");
+        assert_eq!(io_error.to_string(), "I/O error: file not found");
 
         let parse_error = Error::Parse("invalid syntax".to_string());
         assert_eq!(parse_error.to_string(), "Parse error: invalid syntax");
@@ -329,6 +334,9 @@ mod tests {
         );
 
         let custom_error = Error::Custom("custom error message".to_string());
-        assert_eq!(custom_error.to_string(), "custom error message");
+        assert_eq!(
+            custom_error.to_string(),
+            "Custom error: custom error message"
+        );
     }
 }

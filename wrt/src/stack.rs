@@ -2,10 +2,14 @@ use crate::behavior;
 use crate::error::{Error, Result};
 use crate::values::Value as ValuesValue;
 
-#[derive(Debug, Clone)]
+/// Represents a control flow label on the stack (e.g., for blocks, loops, ifs).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Label {
+    /// The number of values the instruction sequence associated with the label is expected to produce.
     pub arity: usize,
+    /// The program counter (instruction index) where execution should resume after the block.
     pub pc: usize,
+    /// The program counter for the continuation (e.g., the `else` branch of an `if`).
     pub continuation: usize,
 }
 
@@ -19,12 +23,17 @@ impl From<behavior::Label> for Label {
     }
 }
 
-/// Trait for stack operations
+/// Trait defining operations for managing the execution stack, including value and label manipulation.
 pub trait Stack: behavior::StackBehavior + std::fmt::Debug {
+    /// Pushes a control flow label onto the label stack.
     fn push_label(&mut self, label: Label) -> Result<()>;
+    /// Pops a control flow label from the label stack.
     fn pop_label(&mut self) -> Result<Label>;
+    /// Gets a reference to a label on the stack by its relative index (0 is the top).
     fn get_label(&self, idx: usize) -> Result<&Label>;
+    /// Gets a mutable reference to a label on the stack by its relative index.
     fn get_label_mut(&mut self, idx: usize) -> Result<&mut Label>;
+    /// Returns the current number of labels on the stack.
     fn labels_len(&self) -> usize;
 }
 

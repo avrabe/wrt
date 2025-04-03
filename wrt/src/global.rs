@@ -2,14 +2,25 @@ use crate::error::{Error, Result};
 use crate::types::GlobalType;
 use crate::values::Value;
 use crate::{format, Vec};
+use std::sync::RwLock;
 
 /// Represents a WebAssembly global instance
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Global {
     /// Global type
     pub global_type: GlobalType,
-    /// Global value
-    pub value: Value,
+    /// Global value, protected by RwLock
+    value: RwLock<Value>,
+}
+
+impl Clone for Global {
+    fn clone(&self) -> Self {
+        let value_lock = self.value.read().unwrap();
+        Self {
+            global_type: self.global_type.clone(),
+            value: RwLock::new(value_lock.clone()),
+        }
+    }
 }
 
 impl Global {
@@ -24,7 +35,10 @@ impl Global {
             )));
         }
 
-        Ok(Self { global_type, value })
+        Ok(Self {
+            global_type,
+            value: RwLock::new(value),
+        })
     }
 
     /// Returns the global type
@@ -36,11 +50,16 @@ impl Global {
     /// Gets the global value
     #[must_use]
     pub fn get(&self) -> Value {
-        self.value.clone()
+        self.value.read().unwrap().clone()
+    }
+
+    /// Internal helper to get value, used by Module const eval
+    pub(crate) fn get_value(&self) -> Result<Value> {
+        Ok(self.value.read().map_err(|_| Error::PoisonedLock)?.clone())
     }
 
     /// Sets the global value
-    pub fn set(&mut self, value: Value) -> Result<()> {
+    pub fn set(&self, value: Value) -> Result<()> {
         // Check mutability
         if !self.global_type.mutable {
             return Err(Error::Execution("Cannot set immutable global".into()));
@@ -55,7 +74,8 @@ impl Global {
             )));
         }
 
-        self.value = value;
+        let mut value_guard = self.value.write().unwrap();
+        *value_guard = value;
         Ok(())
     }
 }
@@ -150,7 +170,7 @@ mod tests {
     fn test_global_mutability() -> Result<()> {
         // Test mutable global
         let global_type = create_test_global_type(ValueType::I32, true);
-        let mut global = Global::new(global_type, Value::I32(42))?;
+        let global = Global::new(global_type, Value::I32(42))?;
 
         // Valid set operation
         assert!(global.set(Value::I32(100)).is_ok());
@@ -161,7 +181,7 @@ mod tests {
 
         // Test immutable global
         let global_type = create_test_global_type(ValueType::I32, false);
-        let mut global = Global::new(global_type, Value::I32(42))?;
+        let global = Global::new(global_type, Value::I32(42))?;
 
         // Attempt to modify immutable global
         let result = global.set(Value::I32(100));

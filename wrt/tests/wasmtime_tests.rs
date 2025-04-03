@@ -46,10 +46,10 @@ fn test_memory_persistence() -> Result<()> {
         .ok_or(Error::ExportNotFound("load_int".to_string()))?;
 
     // Store value first
-    engine.execute(instance_idx, store_fn_idx as usize, vec![])?;
+    engine.execute(instance_idx, store_fn_idx.try_into().unwrap(), vec![])?;
 
     // Now load the value (should be 42)
-    let results = engine.execute(instance_idx, load_fn_idx as usize, vec![])?;
+    let results = engine.execute(instance_idx, load_fn_idx.try_into().unwrap(), vec![])?;
     println!("Load results: {:?}", results);
 
     assert_eq!(results[0].as_i32().unwrap_or(-1), 42);
@@ -103,11 +103,11 @@ fn test_memory_in_single_function() -> Result<()> {
         .ok_or(Error::ExportNotFound("load_int".to_string()))?;
 
     // Store 42 at address 100
-    let store_results = engine.execute(instance_idx, store_fn_idx as usize, vec![])?;
+    let store_results = engine.execute(instance_idx, store_fn_idx.try_into().unwrap(), vec![])?;
     println!("Store results: {:?}", store_results);
 
     // Load value from address 100 (should be 42)
-    let load_results = engine.execute(instance_idx, load_fn_idx as usize, vec![])?;
+    let load_results = engine.execute(instance_idx, load_fn_idx.try_into().unwrap(), vec![])?;
     println!("Load results: {:?}", load_results);
 
     assert_eq!(load_results[0].as_i32().unwrap_or(-1), 42);
@@ -152,7 +152,7 @@ fn test_memory_single_function_combined() -> Result<()> {
         .ok_or(Error::ExportNotFound("store_and_load".to_string()))?;
 
     // Call the combined function
-    let results = engine.execute(instance_idx, func_idx as usize, vec![])?;
+    let results = engine.execute(instance_idx, func_idx.try_into().unwrap(), vec![])?;
     println!("Store and load results: {:?}", results);
 
     // This should work since it's within a single function

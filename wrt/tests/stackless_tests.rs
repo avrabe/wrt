@@ -1,12 +1,16 @@
-use wrt::{execute_test_with_stackless, Result};
+#[cfg(feature = "wat-parsing")]
+use wrt::execute_test_with_stackless;
+use wrt::{Error as WrtError, Result};
 
 #[test]
+#[cfg(feature = "wat-parsing")]
 fn test_stackless_memory_operations() -> Result<()> {
     // Run the memory test using StacklessVM directly
     execute_test_with_stackless("tests/test_memory.wat")
 }
 
 #[test]
+#[cfg(feature = "wat-parsing")]
 fn test_memory_persistence() -> Result<()> {
     // Run the memory persistence test using StacklessVM directly
     execute_test_with_stackless("tests/memory_persistence_test.wat")
@@ -43,11 +47,11 @@ fn test_direct_memory_operations() -> Result<()> {
     println!("Successfully parsed WAT string to WASM binary");
 
     // Create a new module
-    let module = wrt::Module::new().load_from_binary(&wasm)?;
+    let module = wrt::Module::new()?.load_from_binary(&wasm)?;
 
     println!(
         "Successfully loaded module with {} memory definitions",
-        module.memories.len()
+        module.memories.read().unwrap().len()
     );
     println!("Memory types: {:?}", module.memories);
     println!(
@@ -65,7 +69,10 @@ fn test_direct_memory_operations() -> Result<()> {
     let instance_idx = engine.instantiate(module.clone())?;
 
     // Check memory instance details before any operations
-    println!("Module has {} memory definitions", module.memories.len());
+    println!(
+        "Module has {} memory definitions",
+        module.memories.read().unwrap().len()
+    );
 
     // Get the memory export
     let mem_export = module.get_export("memory").unwrap();
@@ -84,7 +91,11 @@ fn test_direct_memory_operations() -> Result<()> {
             println!("Memory data around address 100 before any operations:");
             let start = if 100 >= 4 { 96 } else { 0 };
             for i in start..start + 12 {
-                println!("  [{:3}]: {}", i, instance.memories[0].data[i as usize]);
+                println!(
+                    "  [{:3}]: {}",
+                    i,
+                    instance.memories[0].data.read().unwrap()[i as usize]
+                );
             }
         }
     }
@@ -96,19 +107,31 @@ fn test_direct_memory_operations() -> Result<()> {
             // Set the value directly in memory
             let value: i32 = 42;
             let bytes = value.to_le_bytes();
-            instance.memories[0].data[100] = bytes[0];
-            instance.memories[0].data[101] = bytes[1];
-            instance.memories[0].data[102] = bytes[2];
-            instance.memories[0].data[103] = bytes[3];
+            println!("Storing bytes: {:?}", bytes);
+            // Add write lock
+            let mut data = instance.memories[0].data.write().unwrap();
+            data[100] = bytes[0];
+            data[101] = bytes[1];
+            data[102] = bytes[2];
+            data[103] = bytes[3];
+            drop(data); // Release write lock
 
             println!("Manually set memory at address 100 to value 42");
 
             // Verify the value was set
-            println!("Memory after direct manipulation:");
-            let start = if 100 >= 4 { 96 } else { 0 };
-            for i in start..start + 12 {
-                println!("  [{:3}]: {}", i, instance.memories[0].data[i as usize]);
+            println!("Memory after:");
+            for i in 96..108 {
+                // Add read lock
+                println!(
+                    "  [{:3}]: {}",
+                    i,
+                    instance.memories[0].data.read().unwrap()[i as usize]
+                );
             }
+            // Comment out stack assertion - Stackless model manages stack differently
+            // assert_eq!(instance.stack.len(), 0);
+            // assert!(result.is_ok());
+            // assert_eq!(result.unwrap(), vec![wrt::Value::I32(42)]);
         }
     }
 

@@ -14,7 +14,7 @@ Functional Requirements
 
 .. req:: Baremetal Support
    :id: REQ_002
-   :status: planned
+   :status: partial
    
    The interpreter shall be executable on bare-metal environments with no reliance on any specific functionality from the provided execution environment, as it shall be ready for embedding to any environment that Rust can compile for.
 
@@ -32,7 +32,7 @@ Functional Requirements
 
 .. req:: WebAssembly Component Model Support
    :id: REQ_014
-   :status: planned
+   :status: partial
    
    The interpreter shall implement the WebAssembly Component Model Preview 2 specification, including:
    - Component model validation
@@ -83,6 +83,12 @@ Functional Requirements
    - macOS: Unified Logging System (os_log) integration
    - Generic fallback implementation for other platforms
 
+.. req:: WAST Test Suite Compatibility
+   :id: REQ_022
+   :status: partial
+   
+   The interpreter shall be testable against the official WebAssembly specification (WAST) test suite to ensure conformance and correctness.
+
 Low-Level Functional Requirements
 ---------------------------------
 
@@ -120,6 +126,7 @@ Low-Level Functional Requirements
    :links: REQ_014
    
    The interpreter shall implement the WebAssembly Core specification, including:
+   - Module validation
    - Value types and reference types
    - Instructions and control flow
    - Function calls and tables
@@ -142,6 +149,34 @@ Low-Level Functional Requirements
    - Component instantiation
    - Component linking
    - Resource lifetime management
+
+.. req:: Optimized Instruction Dispatch
+   :id: REQ_023
+   :status: planned
+   :links: REQ_005
+
+   The core instruction dispatch loop within the stackless engine shall be specifically optimized for execution speed. Techniques such as efficient instruction decoding, minimizing branching overhead, or platform-specific optimizations (where compatible with certifiability) should be considered.
+
+.. req:: Efficient Operand Stack Implementation
+   :id: REQ_024
+   :status: planned
+   :links: REQ_005
+
+   The stackless operand stack implementation (`StacklessStack` or equivalent) shall be designed and optimized for efficient push/pop operations, minimal memory overhead, and robust handling of potential overflow conditions suitable for the target `no_std` environments.
+
+.. req:: Efficient Branch Pre-calculation
+   :id: REQ_025
+   :status: planned
+   :links: REQ_005, REQ_018
+
+   The pre-calculation of branch targets (e.g., `label.continuation` values) shall be performed efficiently, ideally integrated with the module validation or loading process, to minimize runtime startup costs.
+
+.. req:: Minimize Code Complexity for Certification
+   :id: REQ_026
+   :status: planned
+   :links: REQ_012, REQ_013
+
+   To enhance certifiability and maintainability, the WRT interpreter codebase shall strive for simplicity, minimize the use of complex language features (e.g., procedural macros), and restrict external dependencies to those strictly necessary for core functionality or explicitly required features (like logging or `no_std` math).
 
 Dependency Requirements
 -----------------------
@@ -171,7 +206,7 @@ Dependency Requirements
    
    The interpreter shall use the following tools for Component Model development:
    - wit-parser >= 0.12.0 for WIT file parsing and validation
-   - wit-bindgen >= 0.12.0 for interface generation
+   - wit-bindgen >= 0.41.0 for interface generation
    - wit-component >= 0.12.0 for component model binary format handling
 
 Observability Requirements
@@ -205,4 +240,4 @@ Requirement Relationships
 -------------------------
 
 .. needflow::
-   :filter: id in ['REQ_001', 'REQ_002', 'REQ_003', 'REQ_004', 'REQ_005', 'REQ_006', 'REQ_007', 'REQ_008', 'REQ_009', 'REQ_010', 'REQ_011', 'REQ_012', 'REQ_013', 'REQ_014', 'REQ_015', 'REQ_016', 'REQ_017', 'REQ_018', 'REQ_019', 'REQ_020']
+   :filter: id in ['REQ_001', 'REQ_002', 'REQ_003', 'REQ_004', 'REQ_005', 'REQ_006', 'REQ_007', 'REQ_008', 'REQ_009', 'REQ_010', 'REQ_011', 'REQ_012', 'REQ_013', 'REQ_014', 'REQ_015', 'REQ_016', 'REQ_017', 'REQ_018', 'REQ_019', 'REQ_020', 'REQ_021', 'REQ_022', 'REQ_023', 'REQ_024', 'REQ_025', 'REQ_026']

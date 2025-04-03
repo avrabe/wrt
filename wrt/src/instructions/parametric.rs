@@ -4,21 +4,24 @@
 //! including operations for stack manipulation and control flow.
 
 use crate::{
-    behavior::FrameBehavior,
+    behavior::{FrameBehavior, StackBehavior},
     error::{Error, Result},
+    instructions::InstructionExecutor,
     stack::Stack,
     types::ValueType,
     values::Value,
+    StacklessEngine,
 };
 
 /// Execute a drop instruction
 ///
 /// Removes the top value from the stack.
 pub fn drop(
-    stack: &mut (impl Stack + ?Sized),
-    frame: &mut (impl FrameBehavior + ?Sized),
+    stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
 ) -> Result<()> {
-    stack.pop()?;
+    let _ = stack.pop()?;
     Ok(())
 }
 
@@ -26,50 +29,48 @@ pub fn drop(
 ///
 /// Selects one of two values based on a condition.
 pub fn select(
-    stack: &mut (impl Stack + ?Sized),
-    frame: &mut (impl FrameBehavior + ?Sized),
+    stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
 ) -> Result<()> {
-    let c = stack.pop()?;
+    let c = stack.pop()?.as_i32()?;
     let val2 = stack.pop()?;
     let val1 = stack.pop()?;
-    match c {
-        Value::I32(c) => {
-            if c != 0 {
-                stack.push(val1)?;
-            } else {
-                stack.push(val2)?;
-            }
-            Ok(())
-        }
-        _ => Err(Error::InvalidType("Expected i32".to_string())),
+
+    if c != 0 {
+        stack.push(val1)?;
+    } else {
+        stack.push(val2)?;
     }
+    Ok(())
 }
 
 /// Execute a `select_typed` instruction
 ///
 /// Selects one of two values based on a condition, with type checking.
 pub fn select_typed(
-    stack: &mut (impl Stack + ?Sized),
-    frame: &mut (impl FrameBehavior + ?Sized),
-    ty: ValueType,
+    stack: &mut dyn Stack,
+    _frame: &mut dyn FrameBehavior,
+    _engine: &StacklessEngine,
+    ty: &[ValueType],
 ) -> Result<()> {
-    let c = stack.pop()?;
+    let c = stack.pop()?.as_i32()?;
     let val2 = stack.pop()?;
     let val1 = stack.pop()?;
-    match c {
-        Value::I32(c) => {
-            if !val1.matches_type(&ty) || !val2.matches_type(&ty) {
-                return Err(Error::InvalidType(format!("Expected {ty}")));
-            }
-            if c != 0 {
-                stack.push(val1)?;
-            } else {
-                stack.push(val2)?;
-            }
-            Ok(())
+
+    if !ty.is_empty() {
+        let expected_type = ty[0];
+        if !val1.value_type().matches(expected_type) || !val2.value_type().matches(expected_type) {
+            return Err(Error::TypeMismatch);
         }
-        _ => Err(Error::InvalidType("Expected i32".to_string())),
     }
+
+    if c != 0 {
+        stack.push(val1)?;
+    } else {
+        stack.push(val2)?;
+    }
+    Ok(())
 }
 
 /// Execute a block instruction
@@ -122,7 +123,6 @@ pub fn end(
 pub fn br(
     stack: &mut (impl Stack + ?Sized),
     frame: &mut (impl FrameBehavior + ?Sized),
-    label_idx: u32,
 ) -> Result<()> {
     Ok(())
 }
@@ -133,7 +133,6 @@ pub fn br(
 pub fn br_if(
     stack: &mut (impl Stack + ?Sized),
     frame: &mut (impl FrameBehavior + ?Sized),
-    label_idx: u32,
 ) -> Result<()> {
     let condition = stack.pop()?;
     match condition {
@@ -148,8 +147,6 @@ pub fn br_if(
 pub fn br_table(
     stack: &mut (impl Stack + ?Sized),
     frame: &mut (impl FrameBehavior + ?Sized),
-    label_indices: &[u32],
-    default_label: u32,
 ) -> Result<()> {
     let index = stack.pop()?;
     match index {

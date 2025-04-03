@@ -8,6 +8,7 @@ use crate::{
     error::{Error, Result},
     stack::Stack,
     values::Value,
+    StacklessEngine,
 };
 
 /// Execute an i32 equality with zero instruction
@@ -17,6 +18,7 @@ use crate::{
 pub fn i32_eqz(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let a = stack.pop()?;
     match a {
@@ -35,6 +37,7 @@ pub fn i32_eqz(
 pub fn i32_eq(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -54,6 +57,7 @@ pub fn i32_eq(
 pub fn i32_ne(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -73,6 +77,7 @@ pub fn i32_ne(
 pub fn i32_lt_s(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -92,6 +97,7 @@ pub fn i32_lt_s(
 pub fn i32_lt_u(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -113,6 +119,7 @@ pub fn i32_lt_u(
 pub fn i32_gt_s(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -132,6 +139,7 @@ pub fn i32_gt_s(
 pub fn i32_gt_u(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -153,6 +161,7 @@ pub fn i32_gt_u(
 pub fn i32_le_s(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -172,6 +181,7 @@ pub fn i32_le_s(
 pub fn i32_le_u(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -193,6 +203,7 @@ pub fn i32_le_u(
 pub fn i32_ge_s(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -212,6 +223,7 @@ pub fn i32_ge_s(
 pub fn i32_ge_u(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -233,6 +245,7 @@ pub fn i32_ge_u(
 pub fn i64_eqz(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let a = stack.pop()?;
     match a {
@@ -251,6 +264,7 @@ pub fn i64_eqz(
 pub fn i64_eq(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -270,6 +284,7 @@ pub fn i64_eq(
 pub fn i64_ne(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -289,6 +304,7 @@ pub fn i64_ne(
 pub fn i64_lt_s(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -308,6 +324,7 @@ pub fn i64_lt_s(
 pub fn i64_lt_u(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -329,6 +346,7 @@ pub fn i64_lt_u(
 pub fn i64_gt_s(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -348,6 +366,7 @@ pub fn i64_gt_s(
 pub fn i64_gt_u(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -369,6 +388,7 @@ pub fn i64_gt_u(
 pub fn i64_le_s(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -388,6 +408,7 @@ pub fn i64_le_s(
 pub fn i64_le_u(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -409,6 +430,7 @@ pub fn i64_le_u(
 pub fn i64_ge_s(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -428,6 +450,7 @@ pub fn i64_ge_s(
 pub fn i64_ge_u(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -450,6 +473,7 @@ pub fn i64_ge_u(
 pub fn f32_eq(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -470,6 +494,7 @@ pub fn f32_eq(
 pub fn f32_ne(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -490,6 +515,7 @@ pub fn f32_ne(
 pub fn f32_lt(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -510,6 +536,7 @@ pub fn f32_lt(
 pub fn f32_gt(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -530,6 +557,7 @@ pub fn f32_gt(
 pub fn f32_le(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -550,6 +578,7 @@ pub fn f32_le(
 pub fn f32_ge(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -570,6 +599,7 @@ pub fn f32_ge(
 pub fn f64_eq(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -590,6 +620,7 @@ pub fn f64_eq(
 pub fn f64_ne(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -610,6 +641,7 @@ pub fn f64_ne(
 pub fn f64_lt(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -630,6 +662,7 @@ pub fn f64_lt(
 pub fn f64_gt(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -650,6 +683,7 @@ pub fn f64_gt(
 pub fn f64_le(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;
@@ -670,6 +704,7 @@ pub fn f64_le(
 pub fn f64_ge(
     stack: &mut (impl Stack + ?Sized),
     _frame: &mut (impl FrameBehavior + ?Sized),
+    _engine: &StacklessEngine,
 ) -> Result<()> {
     let b = stack.pop()?;
     let a = stack.pop()?;

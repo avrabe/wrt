@@ -51,12 +51,10 @@ impl StacklessEngine {
 
         // Convert the arguments to a Vec for the call
         let args_vec = args.to_vec();
-        println!("DEBUG: Calling execute_function with instance_idx: {instance_idx}, func_idx: {func_idx}, args: {args_vec:?}");
+        println!("DEBUG: Calling execute with instance_idx: {instance_idx}, func_idx: {func_idx}, args: {args_vec:?}");
 
-        // Execute the function using the stack's execute_function
-        let result = self
-            .stack
-            .execute_function(instance_idx, func_idx, args_vec);
+        // Execute the function
+        let result = self.execute(instance_idx, func_idx, args_vec);
 
         // Log the result
         match &result {

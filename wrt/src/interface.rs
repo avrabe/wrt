@@ -5,9 +5,12 @@
 //! core and component types.
 
 use crate::{
+    behavior::{FrameBehavior, StackBehavior},
     error::{Error, Result},
-    memory::Memory,
-    module::Module,
+    global::Global,
+    memory::{DefaultMemory, MemoryBehavior},
+    module::{ExportKind, ExportValue, Function, Import, Module},
+    module_instance::ModuleInstance,
     resource::{ResourceId, ResourceTable},
     types::{ComponentType, InstanceType, ValueType},
     values::Value,
@@ -97,7 +100,7 @@ impl CanonicalABI {
     pub fn lift(
         value: Value,
         ty: &ComponentType,
-        memory: Option<&Memory>,
+        memory: Option<&dyn MemoryBehavior>,
         resources: Option<&ResourceTable>,
     ) -> Result<InterfaceValue> {
         let value_clone = value.clone(); // Clone value so we can reference it later
@@ -166,7 +169,7 @@ impl CanonicalABI {
     /// Lower an interface value to a core WebAssembly value
     pub fn lower(
         value: InterfaceValue,
-        memory: Option<&mut Memory>,
+        memory: Option<&mut dyn MemoryBehavior>,
         resources: Option<&mut ResourceTable>,
     ) -> Result<Value> {
         match value {
@@ -203,7 +206,7 @@ impl CanonicalABI {
     }
 
     /// Lift a string from memory
-    fn lift_string(ptr: i32, memory: &Memory) -> Result<InterfaceValue> {
+    fn lift_string(ptr: i32, memory: &dyn MemoryBehavior) -> Result<InterfaceValue> {
         if ptr < 0 {
             return Err(Error::Execution(format!("Invalid string pointer: {ptr}")));
         }
@@ -236,7 +239,7 @@ impl CanonicalABI {
     }
 
     /// Lower a string to memory
-    fn lower_string(s: String, memory: &mut Memory) -> Result<Value> {
+    fn lower_string(s: String, memory: &mut dyn MemoryBehavior) -> Result<Value> {
         // Get the string as UTF-8 bytes
         let bytes = s.as_bytes();
         let length = bytes.len();
@@ -271,7 +274,7 @@ impl CanonicalABI {
         &self,
         value: InterfaceValue,
         ty: &ComponentType,
-        memory: Option<&mut Memory>,
+        memory: Option<&mut dyn MemoryBehavior>,
         _resources: Option<&mut ResourceTable>,
     ) -> Result<Value> {
         match value {
@@ -306,7 +309,7 @@ impl CanonicalABI {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::memory::Memory;
+    use crate::memory::DefaultMemory;
     use crate::resource::{
         ResourceRepresentation, ResourceTable, ResourceType, SimpleResourceData,
     };
@@ -384,7 +387,7 @@ mod tests {
             min: 1,
             max: Some(2),
         };
-        let mut memory = Memory::new(mem_type);
+        let mut memory = DefaultMemory::new(mem_type);
 
         // Test string lowering
         let string_val = InterfaceValue::String("Hello, WebAssembly!".to_string());
@@ -453,6 +456,20 @@ mod tests {
     }
 }
 
+/// Instantiates a WebAssembly component based on the provided module.
+///
+/// This function takes a module and an optional resource table, and attempts
+/// to create an instance according to the WebAssembly Component Model interface.
+/// It currently returns a placeholder instance type.
+///
+/// # Arguments
+///
+/// * `module`: A reference to the parsed `Module` representing the component.
+/// * `_resources`: An optional mutable reference to a `ResourceTable` (currently unused).
+///
+/// # Returns
+///
+/// A `Result` containing the `InstanceType` on success, or an `Error` on failure.
 pub fn instantiate(
     module: &Module,
     _resources: Option<&mut ResourceTable>,

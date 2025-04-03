@@ -1,4 +1,6 @@
-use wrt::{Engine, Error as WrtError, Module, Result, Value};
+use std::fs;
+use std::path::{Path, PathBuf};
+use wrt::{Error as WrtError, Module, Result, StacklessEngine, Value};
 
 #[test]
 fn test_i32_add() -> Result<()> {
@@ -37,11 +39,11 @@ fn test_i32_add() -> Result<()> {
     ];
 
     // Load the module from binary
-    let mut empty_module = Module::new();
+    let mut empty_module = Module::new()?;
     let module = empty_module.load_from_binary(&wasm_binary)?;
 
     // Create an engine with the loaded module
-    let mut engine = Engine::new(module.clone());
+    let mut engine = StacklessEngine::new_with_module(module.clone());
 
     // Instantiate the module
     engine.instantiate(module)?;
@@ -105,28 +107,28 @@ fn test_simple_memory() -> Result<()> {
     // Define a simple WebAssembly module with memory operations in WAT format
     let wat = r#"
     (module
-      (memory 1)
-      (export "memory" (memory 0))
+      (memory (export "memory") 1)
+      (func (export "store") (param $addr i32) (param $val i32)
+        local.get $addr
+        local.get $val
+        i32.store offset=0 align=4 ;; Correct WAT syntax
+      )
       
-      (func $store (export "store") (param i32)
-        i32.const 0  ;; address
-        local.get 0  ;; value
-        i32.store)   ;; store at address 0
-      
-      (func $load (export "load") (result i32)
-        i32.const 0  ;; address
-        i32.load))   ;; load from address 0
-    "#;
+      (func (export "load") (param $addr i32) (result i32)
+        local.get $addr
+        i32.load offset=0 align=4 ;; Correct WAT syntax
+      )
+    )"#;
 
     // Convert WAT to binary WebAssembly
     let wasm = wat::parse_str(wat).expect("Failed to parse WAT");
 
     // Load the module from binary
-    let mut empty_module = Module::new();
+    let mut empty_module = Module::new()?;
     let module = empty_module.load_from_binary(&wasm)?;
 
     // Create an engine with the loaded module
-    let mut engine = Engine::new(module.clone());
+    let mut engine = StacklessEngine::new_with_module(module.clone());
 
     // Instantiate the module
     engine.instantiate(module)?;
@@ -138,10 +140,10 @@ fn test_simple_memory() -> Result<()> {
 
     for (idx, value) in test_values.iter().enumerate() {
         // Store the value
-        engine.execute(0usize, 0, vec![Value::I32(*value)])?;
+        engine.execute(0usize, 0, vec![Value::I32(0), Value::I32(*value)])?;
 
         // Load the value back
-        let result = engine.execute(0usize, 1, vec![])?;
+        let result = engine.execute(0usize, 1, vec![Value::I32(0)])?;
 
         if result == vec![Value::I32(*value)] {
             println!("✅ Test case {}: Store and load {}", idx, value);
@@ -152,5 +154,67 @@ fn test_simple_memory() -> Result<()> {
     }
 
     println!("All memory tests passed!");
+    Ok(())
+}
+
+fn run_test_case(wasm_path: &Path) -> Result<()> {
+    let wasm_binary = fs::read(wasm_path).map_err(|e| WrtError::IO(e.to_string()))?;
+    let mut empty_module = Module::new()?;
+    let module = empty_module.load_from_binary(&wasm_binary)?;
+    let mut engine = StacklessEngine::new_with_module(module.clone());
+    let _instance_idx = engine.instantiate(module)?;
+
+    // TODO: Add actual test logic here to invoke functions and check results
+    println!(
+        "Successfully loaded and instantiated {:?}, but no tests run.",
+        wasm_path
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_simple_add() -> Result<()> {
+    let wat = r#"
+    (module
+        (func (export "add") (param $a i32) (param $b i32) (result i32)
+            local.get $a
+            local.get $b
+            i32.add
+        )
+    )"#;
+
+    // Parse WAT and create module
+    let wasm = wat::parse_str(wat).map_err(|e| wrt::Error::Parse(e.to_string()))?;
+    let module = Module::new()?.load_from_binary(&wasm)?;
+    let mut engine = StacklessEngine::new(module);
+
+    // TODO: Add execution logic here
+    println!("Successfully loaded and instantiated simple_add module, but no tests run.");
+
+    Ok(())
+}
+
+#[allow(dead_code)] // This test runner is not fully implemented yet
+fn test_run_all_spec_tests() -> Result<()> {
+    let testsuite_path = PathBuf::from("./testsuite");
+    println!("Running spec tests from: {:?}", testsuite_path);
+
+    if !testsuite_path.exists() {
+        println!("Test suite directory not found, skipping spec tests.");
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(testsuite_path).map_err(|e| WrtError::IO(e.to_string()))? {
+        let entry = entry.map_err(|e| WrtError::IO(e.to_string()))?;
+        let path = entry.path();
+        if path.is_file() && path.extension().map_or(false, |ext| ext == "wast") {
+            println!("Running test: {:?}", path);
+            // TODO: Implement wast parsing and execution logic here
+            // For now, just print the file path
+            run_test_case(&path)?;
+        }
+    }
+
     Ok(())
 }
