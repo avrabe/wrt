@@ -32,6 +32,6 @@ tiny_http = "0.12"
 
 # Check for the latest compatible version
 toml = "0.7.6"
-syn = { version = "2.0.34", features = ["parsing", "full", "extra-traits"] }
+syn = { version = "2.0.101", features = ["parsing", "full", "extra-traits"] }
 regex = "1.9.5"
 chrono = "0.4.24" 
