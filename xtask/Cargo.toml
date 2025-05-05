@@ -23,7 +23,7 @@ colored = "2.0.4"
 
 walkdir = "2"
 fs_extra = "1.3" # For cross-platform rm -rf and mkdir -p equivalent
-wasm-tools = { version = "1.228.0" }
+wasm-tools = { version = "1.229.0" }
 wat = "1.229.0"
 wrt = { path = "../wrt", optional = true }
 
