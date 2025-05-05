@@ -27,7 +27,7 @@ futures = { version = "0.3", optional = true }
 [dev-dependencies]
 ratatui = "0.29.0"
 crossterm = "0.27.0"
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.27", features = ["derive"] }
 tui-nodes = "0.8.0"
 
 [features]
