@@ -12,10 +12,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         ("Evaluation Plan", "docs/source/evaluation_plan.rst"),
         ("Evaluation Report", "docs/source/evaluation_report.rst"),
         ("Qualification Plan", "docs/source/qualification_plan.rst"),
-        (
-            "Qualification Report",
-            "docs/source/qualification_report.rst",
-        ),
+        ("Qualification Report", "docs/source/qualification_report.rst"),
         ("Traceability Matrix", "docs/source/traceability_matrix.rst"),
         ("Document List", "docs/source/document_list.rst"),
         ("Internal Procedures", "docs/source/internal_procedures.rst"),
@@ -89,10 +86,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         "GREEN"
     };
 
-    println!(
-        "Overall Progress: {}",
-        colorize(&format!("{:.1}%", percentage), progress_color)
-    );
+    println!("Overall Progress: {}", colorize(&format!("{:.1}%", percentage), progress_color));
 
     // Print sphinx-needs related information
     println!("\n{}", colorize("Sphinx-Needs Integration", "BOLD"));
@@ -140,10 +134,7 @@ fn count_objects_in_file(file_path: &str, object_prefix: &str) -> Result<String,
     }
 
     let content = fs::read_to_string(file_path)?;
-    let count = content
-        .lines()
-        .filter(|line| line.trim().starts_with(object_prefix))
-        .count();
+    let count = content.lines().filter(|line| line.trim().starts_with(object_prefix)).count();
 
     if count == 0 {
         Ok(colorize(&count.to_string(), "RED"))

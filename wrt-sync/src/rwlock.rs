@@ -1,4 +1,10 @@
-use crate::prelude::*;
+// #![allow(unsafe_code)] // Allow unsafe for UnsafeCell, atomics, and Send/Sync impls
+
+use core::cell::UnsafeCell;
+use core::fmt;
+use core::hint::spin_loop;
+use core::ops::{Deref, DerefMut};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 /// A simple, `no_std` compatible Read-Write Lock using atomics.
 ///
@@ -7,10 +13,10 @@ use crate::prelude::*;
 /// or priority inversion. Use with caution.
 const WRITE_LOCK_STATE: usize = usize::MAX;
 
-/// A non-blocking, atomic read-write lock for no_std environments.
+/// A non-blocking, atomic read-write lock for `no_std` environments.
 ///
-/// This read-write lock provides reader-preference locking with minimal overhead,
-/// making it suitable for use in embedded systems and other no_std contexts.
+/// This `RwLock` is designed to be efficient and suitable for environments where
+/// `std` is not available, making it suitable for use in embedded systems and other `no_std` contexts.
 ///
 /// # Examples
 ///
@@ -42,8 +48,8 @@ pub struct WrtRwLock<T: ?Sized> {
     /// Atomically tracks the lock state.
     /// Encoding:
     /// - 0: Unlocked
-    /// - usize::MAX: Write-locked
-    /// - n (1..usize::MAX-1): Read-locked by n readers
+    /// - `usize::MAX`: Write-locked
+    /// - n (`1..usize::MAX - 1`): Read-locked by n readers
     state: AtomicUsize,
     data: UnsafeCell<T>,
 }
@@ -125,29 +131,35 @@ impl<T: ?Sized> WrtRwLock<T> {
         }
     }
 
-    // Optional: Implement try_read, try_write (left as exercise)
-    /*
+    /// Attempts to acquire a read lock without blocking.
     #[inline]
     pub fn try_read(&self) -> Option<WrtRwLockReadGuard<'_, T>> {
         let current_state = self.state.load(Ordering::Relaxed);
-        if current_state != WRITE_LOCK_STATE {
-            match self.state.compare_exchange( // Use strong exchange for try_ versions
-                current_state,
-                current_state + 1,
+
+        if current_state == WRITE_LOCK_STATE {
+            None // Write locked
+        } else {
+            // Attempt to increment reader count if not write-locked.
+            // The `writer_waiting` flag is not strictly necessary to check here for `try_read`,
+            // as `try_read` should succeed even if a writer is waiting, as per typical RwLock semantics.
+            // A writer trying to acquire the lock will wait for readers to release.
+            match self.state.compare_exchange(
+                current_state,     // Expected: not WRITE_LOCK_STATE
+                current_state + 1, // Increment reader count
                 Ordering::Acquire,
                 Ordering::Relaxed,
             ) {
                 Ok(_) => Some(WrtRwLockReadGuard { lock: self }),
-                Err(_) => None, // Failed to acquire (state changed)
+                Err(_) => None, // State changed, CAS failed
             }
-        } else {
-            None // Write locked
         }
     }
 
+    /// Attempts to acquire a write lock without blocking.
     #[inline]
     pub fn try_write(&self) -> Option<WrtRwLockWriteGuard<'_, T>> {
-        match self.state.compare_exchange( // Use strong exchange for try_ versions
+        match self.state.compare_exchange(
+            // Use strong exchange for try_ versions
             0,
             WRITE_LOCK_STATE,
             Ordering::Acquire,
@@ -157,7 +169,6 @@ impl<T: ?Sized> WrtRwLock<T> {
             Err(_) => None, // Failed (already locked or state changed)
         }
     }
-    */
 }
 
 // Read Guard Implementation
@@ -212,618 +223,348 @@ impl<T: ?Sized + fmt::Debug> fmt::Debug for WrtRwLock<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Attempt a non-blocking read for Debug representation if possible,
         // otherwise indicate locked status. Avoids deadlocking Debug.
-        let current_state = self.state.load(Ordering::Relaxed);
-        if current_state == 0 {
-            // Briefly try to show unlocked state data. Imperfect.
-            // A try_read would be safer if available and implemented.
-            f.debug_struct("WrtRwLock")
-                .field("state", &"Unlocked")
-                .field("data", unsafe { &&*self.data.get() }) // Unsafe access for debug only
-                .finish()
-        } else if current_state == WRITE_LOCK_STATE {
-            f.debug_struct("WrtRwLock")
-                .field("state", &"WriteLocked")
-                .field("data", &"<locked>")
-                .finish()
+        if let Some(guard) = self.try_read() {
+            f.debug_struct("WrtRwLock").field("data", &&*guard).finish()
         } else {
-            f.debug_struct("WrtRwLock")
-                .field("state", &format_args!("ReadLocked({})", current_state))
-                .field("data", &"<locked>") // Avoid showing data during read lock in Debug
-                .finish()
+            // Could be write-locked or contended.
+            let state = self.state.load(Ordering::Relaxed);
+            let mut ds = f.debug_struct("WrtRwLock");
+            if state == WRITE_LOCK_STATE {
+                ds.field("state", &"WriteLocked");
+            } else if state == 0 {
+                ds.field("state", &"Unlocked(contended)");
+            } else {
+                ds.field("state", &format_args!("ReadLocked({state}) (contended)"));
+            }
+            ds.field("data", &"<locked>");
+            ds.finish()
         }
     }
 }
 
 // ======= Parking-based Implementation (for std environments) =======
 #[cfg(feature = "std")]
-/// A thread-parking read-write lock for std environments.
-///
-/// This implementation extends the basic RwLock by adding thread-parking capabilities,
-/// making it more efficient in std environments where threads need to wait on locks.
-/// This version is only available when the `std` feature is enabled.
-///
-/// # Examples
-///
-/// ```
-/// # #[cfg(feature = "std")]
-/// # {
-/// use wrt_sync::WrtParkingRwLock;
-///
-/// let lock = WrtParkingRwLock::new(42);
-/// let reader = lock.read();
-/// assert_eq!(*reader, 42);
-/// # }
-/// ```
-pub struct WrtParkingRwLock<T: ?Sized> {
-    /// Atomically tracks the lock state.
-    /// Encoding:
-    /// - 0: Unlocked
-    /// - usize::MAX: Write-locked
-    /// - n (1..usize::MAX-1): Read-locked by n readers
-    state: AtomicUsize,
-    /// Flag to indicate a waiting writer
-    writer_waiting: AtomicBool,
-    /// Queue of waiting readers/writers to be woken up
-    waiters: Arc<WaitQueue>,
-    /// Protected data
-    data: UnsafeCell<T>,
-}
+pub mod parking_impl {
+    use crate::prelude::{
+        fmt as CoreFmt, Arc, AtomicBool, AtomicUsize, Deref as CoreDeref, DerefMut as CoreDerefMut,
+        Ordering, UnsafeCell as CoreUnsafeCell, Vec,
+    };
+    use core::hint::spin_loop;
+    use std::sync::RwLock as StdRwLock;
+    use std::thread;
 
-#[cfg(feature = "std")]
-struct WaitQueue {
-    // Track reader threads in a vector behind RwLock for interior mutability
-    readers: std::sync::RwLock<Vec<thread::Thread>>,
-    // Writer thread (only one can wait at a time)
-    writer: std::sync::RwLock<Option<thread::Thread>>,
-    readers_count: AtomicUsize,
-    writer_waiting: AtomicBool,
-}
+    const WRITE_LOCK_STATE: usize = usize::MAX;
 
-#[cfg(feature = "std")]
-impl WaitQueue {
-    fn new() -> Self {
-        Self {
-            readers: std::sync::RwLock::new(Vec::new()),
-            writer: std::sync::RwLock::new(None),
-            readers_count: AtomicUsize::new(0),
-            writer_waiting: AtomicBool::new(false),
+    #[derive(Debug)]
+    pub struct PoisonError(String);
+
+    impl<Guard> From<std::sync::PoisonError<Guard>> for PoisonError {
+        fn from(err: std::sync::PoisonError<Guard>) -> Self {
+            PoisonError(err.to_string())
         }
     }
 
-    fn register_reader(&self) {
-        let current = thread::current();
-        // Add to reader queue
-        if let Ok(mut readers) = self.readers.write() {
-            readers.push(current);
-        }
-        self.readers_count.fetch_add(1, Ordering::Relaxed);
-    }
-
-    fn unregister_reader(&self) {
-        // This is simple bookkeeping, the reader already acquired the lock
-        self.readers_count.fetch_sub(1, Ordering::Relaxed);
-    }
-
-    fn register_writer(&self) -> bool {
-        let current = thread::current();
-        // Only one writer can wait at a time
-        if self.writer_waiting.swap(true, Ordering::Relaxed) {
-            // Another writer is already waiting
-            return false;
-        }
-
-        // Set the writer thread
-        if let Ok(mut writer) = self.writer.write() {
-            *writer = Some(current);
-        }
-        true
-    }
-
-    fn unregister_writer(&self) {
-        self.writer_waiting.store(false, Ordering::Relaxed);
-        // Clear the writer thread
-        if let Ok(mut writer) = self.writer.write() {
-            *writer = None;
+    impl CoreFmt::Display for PoisonError {
+        fn fmt(&self, f: &mut CoreFmt::Formatter<'_>) -> CoreFmt::Result {
+            write!(f, "lock poisoned: {}", self.0)
         }
     }
 
-    // Wake one writer if there's any waiting
-    fn wake_writer(&self) -> bool {
-        if let Ok(writer) = self.writer.read() {
-            if let Some(thread) = writer.as_ref() {
-                thread.unpark();
-                return true;
-            }
-        }
-        false
+    pub struct WrtParkingRwLock<T: ?Sized> {
+        state: AtomicUsize,
+        writer_waiting: AtomicBool,
+        waiters: Arc<WaitQueue>,
+        data: CoreUnsafeCell<T>,
     }
 
-    // Wake all waiting readers
-    fn wake_readers(&self) {
-        if let Ok(readers) = self.readers.read() {
-            for thread in readers.iter() {
-                thread.unpark();
+    struct WaitQueue {
+        readers: StdRwLock<Vec<thread::Thread>>,
+        writer: StdRwLock<Option<thread::Thread>>,
+    }
+
+    impl WaitQueue {
+        fn new() -> Self {
+            WaitQueue { readers: StdRwLock::new(Vec::new()), writer: StdRwLock::new(None) }
+        }
+
+        fn register_reader(&self) -> Result<(), PoisonError> {
+            self.readers.write()?.push(thread::current());
+            Ok(())
+        }
+
+        fn register_writer(&self) -> Result<bool, PoisonError> {
+            let mut writer_guard = self.writer.write()?;
+            if writer_guard.is_none() {
+                *writer_guard = Some(thread::current());
+                Ok(true)
+            } else {
+                Ok(false)
             }
         }
 
-        // Clear readers list after unparking
-        if let Ok(mut readers) = self.readers.write() {
-            readers.clear();
+        fn unregister_writer(&self) -> Result<(), PoisonError> {
+            let mut writer_guard = self.writer.write()?;
+            if let Some(writer_thread) = writer_guard.take() {
+                if writer_thread.id() == thread::current().id() {
+                    // Successfully unregistered
+                } else {
+                    *writer_guard = Some(writer_thread);
+                }
+            }
+            Ok(())
+        }
+
+        fn wake_writer(&self) -> Result<(), PoisonError> {
+            if let Some(writer_thread) = self.writer.write()?.take() {
+                writer_thread.unpark();
+            }
+            Ok(())
+        }
+
+        fn wake_readers(&self) -> Result<(), PoisonError> {
+            let readers_guard = self.readers.read()?;
+            for reader_thread in readers_guard.iter() {
+                reader_thread.unpark();
+            }
+            Ok(())
         }
     }
-}
 
-#[cfg(feature = "std")]
-unsafe impl<T: ?Sized + Send + Sync> Send for WrtParkingRwLock<T> {}
+    unsafe impl<T: ?Sized + Send + Sync> Send for WrtParkingRwLock<T> {}
+    unsafe impl<T: ?Sized + Send + Sync> Sync for WrtParkingRwLock<T> {}
 
-#[cfg(feature = "std")]
-unsafe impl<T: ?Sized + Send + Sync> Sync for WrtParkingRwLock<T> {}
+    pub struct WrtParkingRwLockReadGuard<'a, T: ?Sized + 'a> {
+        lock: &'a WrtParkingRwLock<T>,
+    }
 
-#[cfg(feature = "std")]
-#[clippy::has_significant_drop]
-/// A read guard for `WrtParkingRwLock` that provides shared read access.
-///
-/// When this guard is dropped, the lock is automatically released.
-pub struct WrtParkingRwLockReadGuard<'a, T: ?Sized + 'a> {
-    lock: &'a WrtParkingRwLock<T>,
-}
+    pub struct WrtParkingRwLockWriteGuard<'a, T: ?Sized + 'a> {
+        lock: &'a WrtParkingRwLock<T>,
+    }
 
-#[cfg(feature = "std")]
-#[clippy::has_significant_drop]
-/// A write guard for `WrtParkingRwLock` that provides exclusive write access.
-///
-/// When this guard is dropped, the lock is automatically released.
-pub struct WrtParkingRwLockWriteGuard<'a, T: ?Sized + 'a> {
-    lock: &'a WrtParkingRwLock<T>,
-}
-
-#[cfg(feature = "std")]
-impl<T> WrtParkingRwLock<T> {
-    /// Creates a new `WrtParkingRwLock` protecting the given data.
-    #[inline]
-    pub fn new(data: T) -> Self {
-        WrtParkingRwLock {
-            state: AtomicUsize::new(0), // Start unlocked
-            writer_waiting: AtomicBool::new(false),
-            waiters: Arc::new(WaitQueue::new()),
-            data: UnsafeCell::new(data),
+    impl<T> WrtParkingRwLock<T> {
+        pub fn new(data: T) -> Self {
+            Self {
+                state: AtomicUsize::new(0),
+                writer_waiting: AtomicBool::new(false),
+                waiters: Arc::new(WaitQueue::new()),
+                data: CoreUnsafeCell::new(data),
+            }
         }
     }
-}
 
-#[cfg(feature = "std")]
-impl<T: ?Sized> WrtParkingRwLock<T> {
-    /// Acquires a read lock, parking the thread if not immediately available.
-    #[inline]
-    pub fn read(&self) -> WrtParkingRwLockReadGuard<'_, T> {
-        let waiters = Arc::clone(&self.waiters);
-        let mut registered = false;
+    impl<T: ?Sized> WrtParkingRwLock<T> {
+        pub fn read(&self) -> Result<WrtParkingRwLockReadGuard<'_, T>, PoisonError> {
+            loop {
+                if self.writer_waiting.load(Ordering::Acquire) {
+                    self.waiters.register_reader()?;
+                    thread::park();
+                    continue;
+                }
 
-        loop {
+                let current_state = self.state.load(Ordering::Relaxed);
+                if current_state != WRITE_LOCK_STATE {
+                    match self.state.compare_exchange(
+                        current_state,
+                        current_state + 1,
+                        Ordering::Acquire,
+                        Ordering::Relaxed,
+                    ) {
+                        Ok(_) => return Ok(WrtParkingRwLockReadGuard { lock: self }),
+                        Err(_) => {}
+                    }
+                }
+                self.waiters.register_reader()?;
+                thread::park();
+            }
+        }
+
+        pub fn write(&self) -> Result<WrtParkingRwLockWriteGuard<'_, T>, PoisonError> {
+            loop {
+                if !self.writer_waiting.swap(true, Ordering::Acquire) {
+                    loop {
+                        match self.state.compare_exchange(
+                            0,
+                            WRITE_LOCK_STATE,
+                            Ordering::Acquire,
+                            Ordering::Relaxed,
+                        ) {
+                            Ok(_) => {
+                                return Ok(WrtParkingRwLockWriteGuard { lock: self });
+                            }
+                            Err(s) => {
+                                if s != 0 {
+                                    spin_loop();
+                                }
+                            }
+                        }
+                    }
+                } else if self.waiters.register_writer()? {
+                    loop {
+                        match self.state.compare_exchange(
+                            0,
+                            WRITE_LOCK_STATE,
+                            Ordering::Acquire,
+                            Ordering::Relaxed,
+                        ) {
+                            Ok(_) => {
+                                self.waiters.unregister_writer()?;
+                                return Ok(WrtParkingRwLockWriteGuard { lock: self });
+                            }
+                            Err(s) => {
+                                if s != 0 {
+                                    thread::park();
+                                } else {
+                                    spin_loop();
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    thread::park();
+                }
+                spin_loop();
+            }
+        }
+
+        pub fn try_read(&self) -> Option<WrtParkingRwLockReadGuard<'_, T>> {
             let current_state = self.state.load(Ordering::Relaxed);
 
-            // Check if write-locked
-            if current_state != WRITE_LOCK_STATE && !self.writer_waiting.load(Ordering::Relaxed) {
-                // Attempt to increment reader count
-                match self.state.compare_exchange_weak(
+            if current_state == WRITE_LOCK_STATE {
+                None
+            } else {
+                match self.state.compare_exchange(
                     current_state,
                     current_state + 1,
                     Ordering::Acquire,
                     Ordering::Relaxed,
                 ) {
-                    Ok(_) => {
-                        // Successfully acquired read lock
-                        if registered {
-                            waiters.unregister_reader();
-                        }
-                        return WrtParkingRwLockReadGuard { lock: self };
-                    }
-                    Err(_) => {
-                        // Failed to acquire lock, continue to register and park
-                    }
+                    Ok(_) => Some(WrtParkingRwLockReadGuard { lock: self }),
+                    Err(_) => None,
                 }
             }
+        }
 
-            // Register as waiting if not already registered
-            if !registered {
-                waiters.register_reader();
-                registered = true;
+        pub fn try_write(&self) -> Option<WrtParkingRwLockWriteGuard<'_, T>> {
+            if self
+                .writer_waiting
+                .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+                .is_err()
+            {
+                return None;
             }
 
-            // Park the thread
-            thread::park();
-        }
-    }
-
-    /// Acquires a write lock, parking the thread if not immediately available.
-    #[inline]
-    pub fn write(&self) -> WrtParkingRwLockWriteGuard<'_, T> {
-        let waiters = Arc::clone(&self.waiters);
-        let mut registered = false;
-
-        // Signal that a writer is waiting
-        self.writer_waiting.store(true, Ordering::Relaxed);
-
-        loop {
-            // Try to acquire the write lock if unlocked
-            match self.state.compare_exchange_weak(
+            match self.state.compare_exchange(
                 0,
                 WRITE_LOCK_STATE,
                 Ordering::Acquire,
                 Ordering::Relaxed,
             ) {
-                Ok(_) => {
-                    // Successfully acquired write lock
-                    self.writer_waiting.store(false, Ordering::Relaxed);
-                    if registered {
-                        waiters.unregister_writer();
-                    }
-                    return WrtParkingRwLockWriteGuard { lock: self };
-                }
+                Ok(_) => Some(WrtParkingRwLockWriteGuard { lock: self }),
                 Err(_) => {
-                    // Failed to acquire lock, register and park
-                    if !registered && waiters.register_writer() {
-                        registered = true;
-                    }
-
-                    // Park the thread
-                    thread::park();
+                    self.writer_waiting.store(false, Ordering::Release);
+                    None
                 }
             }
         }
     }
 
-    /// Try to acquire a read lock without blocking.
-    #[inline]
-    pub fn try_read(&self) -> Option<WrtParkingRwLockReadGuard<'_, T>> {
-        let current_state = self.state.load(Ordering::Relaxed);
-
-        // Can't acquire if write locked or writer waiting
-        if current_state == WRITE_LOCK_STATE || self.writer_waiting.load(Ordering::Relaxed) {
-            return None;
-        }
-
-        // Try to increment reader count
-        match self.state.compare_exchange(
-            current_state,
-            current_state + 1,
-            Ordering::Acquire,
-            Ordering::Relaxed,
-        ) {
-            Ok(_) => Some(WrtParkingRwLockReadGuard { lock: self }),
-            Err(_) => None,
+    impl<T: ?Sized> CoreDeref for WrtParkingRwLockReadGuard<'_, T> {
+        type Target = T;
+        #[inline]
+        fn deref(&self) -> &Self::Target {
+            unsafe { &*self.lock.data.get() }
         }
     }
 
-    /// Try to acquire a write lock without blocking.
-    #[inline]
-    pub fn try_write(&self) -> Option<WrtParkingRwLockWriteGuard<'_, T>> {
-        // Try to acquire the write lock if unlocked
-        match self
-            .state
-            .compare_exchange(0, WRITE_LOCK_STATE, Ordering::Acquire, Ordering::Relaxed)
-        {
-            Ok(_) => Some(WrtParkingRwLockWriteGuard { lock: self }),
-            Err(_) => None,
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl<T: ?Sized> Drop for WrtParkingRwLockReadGuard<'_, T> {
-    #[inline]
-    fn drop(&mut self) {
-        // Decrement reader count
-        let old_state = self.lock.state.fetch_sub(1, Ordering::Release);
-
-        // If this was the last reader and a writer is waiting, wake up a writer
-        if old_state == 1 && self.lock.writer_waiting.load(Ordering::Relaxed) {
-            // Unpark a waiting writer thread
-            let waiters = Arc::clone(&self.lock.waiters);
-            if waiters.writer_waiting.load(Ordering::Relaxed) {
-                // Wake the writer
-                waiters.wake_writer();
+    impl<T: ?Sized> Drop for WrtParkingRwLockReadGuard<'_, T> {
+        #[inline]
+        fn drop(&mut self) {
+            let prev_state = self.lock.state.fetch_sub(1, Ordering::Release);
+            if prev_state == 1 && self.lock.writer_waiting.load(Ordering::Acquire) {
+                let _ = self.lock.waiters.wake_writer();
             }
         }
     }
-}
 
-#[cfg(feature = "std")]
-impl<T: ?Sized> Drop for WrtParkingRwLockWriteGuard<'_, T> {
-    #[inline]
-    fn drop(&mut self) {
-        // Set state back to unlocked
-        self.lock.state.store(0, Ordering::Release);
-
-        // Wake up waiting readers or writers
-        let waiters = Arc::clone(&self.lock.waiters);
-        let readers_count = waiters.readers_count.load(Ordering::Relaxed);
-        let writer_waiting = waiters.writer_waiting.load(Ordering::Relaxed);
-
-        // To maintain writer fairness, prefer waking a writer if one is waiting
-        if writer_waiting {
-            waiters.wake_writer();
-        } else if readers_count > 0 {
-            // If no writers, wake all readers
-            waiters.wake_readers();
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl<T: ?Sized + fmt::Debug> fmt::Debug for WrtParkingRwLock<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let current_state = self.state.load(Ordering::Relaxed);
-        if current_state == 0 {
-            f.debug_struct("WrtParkingRwLock")
-                .field("state", &"Unlocked")
-                .field("data", unsafe { &&*self.data.get() })
-                .finish()
-        } else if current_state == WRITE_LOCK_STATE {
-            f.debug_struct("WrtParkingRwLock")
-                .field("state", &"WriteLocked")
-                .field("data", &"<locked>")
-                .finish()
-        } else {
-            f.debug_struct("WrtParkingRwLock")
-                .field("state", &format_args!("ReadLocked({})", current_state))
-                .field("data", &"<locked>")
-                .finish()
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl<T: ?Sized> Deref for WrtParkingRwLockReadGuard<'_, T> {
-    type Target = T;
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        // Safety: Guard ensures read lock is held.
-        unsafe { &*self.lock.data.get() }
-    }
-}
-
-#[cfg(feature = "std")]
-impl<T: ?Sized> Deref for WrtParkingRwLockWriteGuard<'_, T> {
-    type Target = T;
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        // Safety: Guard ensures write lock is held.
-        unsafe { &*self.lock.data.get() }
-    }
-}
-
-#[cfg(feature = "std")]
-impl<T: ?Sized> DerefMut for WrtParkingRwLockWriteGuard<'_, T> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        // Safety: Guard ensures write lock is held.
-        unsafe { &mut *self.lock.data.get() }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::prelude::*;
-
-    #[test]
-    fn test_rwlock_new_read() {
-        let lock = WrtRwLock::new(42);
-        let data = lock.read();
-        assert_eq!(*data, 42);
-    }
-
-    #[test]
-    fn test_rwlock_new_write_read() {
-        let lock = WrtRwLock::new(42);
-        {
-            let mut writer = lock.write();
-            *writer = 100;
-        }
-        let data = lock.read();
-        assert_eq!(*data, 100);
-    }
-
-    #[test]
-    fn test_rwlock_multiple_readers() {
-        let lock = WrtRwLock::new(String::from("hello"));
-        let r1 = lock.read();
-        let r2 = lock.read();
-        assert_eq!(*r1, "hello");
-        assert_eq!(*r2, "hello");
-        // Drop guards explicitly to show order (though not strictly necessary)
-        drop(r1);
-        drop(r2);
-    }
-
-    #[test]
-    fn test_rwlock_write_blocks_write() {
-        // This test logic requires threads to actually test blocking.
-        // We simulate the state change.
-        let lock = WrtRwLock::new(0);
-        let _w1 = lock.write(); // Acquire write lock
-                                // Try to acquire another write lock (conceptually) - it should block.
-                                // In a single thread, lock.write() would just spin infinitely here.
-                                // We can check the state:
-        assert_eq!(lock.state.load(Ordering::Relaxed), WRITE_LOCK_STATE);
-    }
-
-    #[test]
-    fn test_rwlock_read_blocks_write() {
-        let lock = WrtRwLock::new(0);
-        let _r1 = lock.read(); // Acquire read lock
-                               // Try to acquire write lock (conceptually) - it should block.
-                               // In a single thread, lock.write() would spin infinitely.
-                               // Check the state:
-        assert_eq!(lock.state.load(Ordering::Relaxed), 1);
-    }
-
-    #[test]
-    fn test_rwlock_write_blocks_read() {
-        let lock = WrtRwLock::new(0);
-        let _w1 = lock.write(); // Acquire write lock
-                                // Try to acquire read lock (conceptually) - it should block.
-                                // In a single thread, lock.read() would spin infinitely.
-                                // Check the state:
-        assert_eq!(lock.state.load(Ordering::Relaxed), WRITE_LOCK_STATE);
-    }
-
-    // Basic concurrency tests (require std for threading)
-    #[cfg(feature = "std")]
-    mod concurrency {
-        use super::*; // Access WrtRwLock etc.
-        use std::println;
-        use std::sync::{Arc, Barrier};
-        use std::thread; // Import println for the tests
-
-        #[test]
-        fn test_rwlock_concurrent_reads() {
-            let lock = Arc::new(WrtRwLock::new(123));
-            let num_threads = 10;
-            let barrier = Arc::new(Barrier::new(num_threads));
-            let mut handles = vec![];
-
-            for _ in 0..num_threads {
-                let lock_clone = Arc::clone(&lock);
-                let barrier_clone = Arc::clone(&barrier);
-                handles.push(thread::spawn(move || {
-                    barrier_clone.wait(); // Sync threads
-                    let reader = lock_clone.read();
-                    assert_eq!(*reader, 123);
-                    // Keep lock for a bit
-                    thread::sleep(std::time::Duration::from_millis(10));
-                }));
-            }
-            for handle in handles {
-                handle.join().unwrap();
-            }
-            assert_eq!(lock.state.load(Ordering::Relaxed), 0); // Should be unlocked now
-        }
-
-        #[test]
-        fn test_rwlock_concurrent_write_then_reads() {
-            let lock = Arc::new(WrtRwLock::new(0));
-            let num_readers = 5;
-            let barrier = Arc::new(Barrier::new(num_readers + 1)); // +1 for writer
-            let reader_start = Arc::new(Barrier::new(num_readers + 1)); // Wait for writer to finish
-            let mut handles = vec![];
-
-            // Writer thread
-            let lock_clone_w = Arc::clone(&lock);
-            let barrier_clone_w = Arc::clone(&barrier);
-            let reader_start_clone = Arc::clone(&reader_start);
-            handles.push(thread::spawn(move || {
-                barrier_clone_w.wait();
-                let mut writer = lock_clone_w.write();
-                *writer = 999;
-                println!("Writer finished setting value to 999");
-                // Hold lock for a while
-                thread::sleep(std::time::Duration::from_millis(50));
-                // Explicitly drop to ensure release before readers start
-                drop(writer);
-                // Signal readers to start
-                reader_start_clone.wait();
-            }));
-
-            // Reader threads
-            for i in 0..num_readers {
-                let lock_clone_r = Arc::clone(&lock);
-                let barrier_clone_r = Arc::clone(&barrier);
-                let reader_start_clone = Arc::clone(&reader_start);
-                handles.push(thread::spawn(move || {
-                    barrier_clone_r.wait(); // Meet with writer
-                                            // Wait for writer to finish
-                    reader_start_clone.wait();
-                    println!("Reader {} starting", i);
-                    // Readers should see writer's change
-                    let reader = lock_clone_r.read();
-                    println!("Reader {} got value: {}", i, *reader);
-                    assert_eq!(*reader, 999);
-                }));
-            }
-
-            for handle in handles {
-                handle.join().unwrap();
-            }
-            assert_eq!(lock.state.load(Ordering::Relaxed), 0);
-        }
-
-        #[test]
-        fn test_rwlock_concurrent_reads_then_write() {
-            let lock = Arc::new(WrtRwLock::new(String::from("initial")));
-            let num_readers = 5;
-            let reader_barrier = Arc::new(Barrier::new(num_readers));
-            let main_barrier = Arc::new(Barrier::new(2)); // Sync reader group and writer
-            let mut reader_handles = vec![];
-
-            // Reader threads
-            for i in 0..num_readers {
-                let lock_clone_r = Arc::clone(&lock);
-                let reader_barrier_clone = Arc::clone(&reader_barrier);
-                let main_barrier_clone = Arc::clone(&main_barrier);
-                reader_handles.push(thread::spawn(move || {
-                    println!("Reader {} acquiring", i);
-                    let reader = lock_clone_r.read();
-                    assert_eq!(*reader, "initial");
-                    println!("Reader {} acquired, waiting at barrier", i);
-                    reader_barrier_clone.wait(); // Wait for all readers to acquire
-                    println!("Reader {} passed barrier, waiting for main barrier", i);
-                    if i == 0 {
-                        // Let one reader sync with main
-                        main_barrier_clone.wait();
-                    }
-                    println!("Reader {} releasing", i);
-                    // Keep lock until main barrier is passed
-                })); // Read locks released here
-            }
-
-            // Writer thread - should block until all readers release
-            let lock_clone_w = Arc::clone(&lock);
-            let main_barrier_clone_w = Arc::clone(&main_barrier);
-            let writer_handle = thread::spawn(move || {
-                println!("Writer waiting for main barrier");
-                main_barrier_clone_w.wait(); // Wait until readers are holding locks
-                println!("Writer trying to acquire");
-                let mut writer = lock_clone_w.write(); // This should block
-                println!("Writer acquired");
-                *writer = String::from("modified");
-            });
-
-            // Wait for readers first, then writer
-            for handle in reader_handles {
-                handle.join().unwrap();
-            }
-            writer_handle.join().unwrap();
-
-            // Verify final state
-            let final_reader = lock.read();
-            assert_eq!(*final_reader, "modified");
-            assert_eq!(lock.state.load(Ordering::Relaxed), 1); // Final reader holds lock
+    impl<T: ?Sized> CoreDeref for WrtParkingRwLockWriteGuard<'_, T> {
+        type Target = T;
+        #[inline]
+        fn deref(&self) -> &Self::Target {
+            unsafe { &*self.lock.data.get() }
         }
     }
 
-    // Tests for WrtParkingRwLock
-    #[cfg(feature = "std")]
-    mod parking_tests {
-        use super::*;
+    impl<T: ?Sized> CoreDerefMut for WrtParkingRwLockWriteGuard<'_, T> {
+        #[inline]
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            unsafe { &mut *self.lock.data.get() }
+        }
+    }
+
+    impl<T: ?Sized> Drop for WrtParkingRwLockWriteGuard<'_, T> {
+        #[inline]
+        fn drop(&mut self) {
+            self.lock.writer_waiting.store(false, Ordering::Release);
+            self.lock.state.store(0, Ordering::Release);
+
+            let _ = self.lock.waiters.wake_readers();
+            let _ = self.lock.waiters.wake_writer();
+        }
+    }
+
+    impl<T: ?Sized + CoreFmt::Debug> CoreFmt::Debug for WrtParkingRwLock<T> {
+        fn fmt(&self, f: &mut CoreFmt::Formatter<'_>) -> CoreFmt::Result {
+            let state_val = self.state.load(Ordering::Relaxed);
+            let is_writer_waiting = self.writer_waiting.load(Ordering::Relaxed);
+
+            let mut d = f.debug_struct("WrtParkingRwLock");
+
+            if state_val == WRITE_LOCK_STATE {
+                d.field("status", &"WriteLocked");
+            } else if state_val == 0 {
+                d.field("status", &"Unlocked");
+            } else {
+                d.field("status", &format_args!("ReadLocked({state_val})"));
+            }
+
+            d.field("writer_waiting", &is_writer_waiting);
+            d.field("waiters", &"<WaitQueue>");
+
+            if (state_val != WRITE_LOCK_STATE && state_val != 0)
+                || (state_val == 0 && !is_writer_waiting)
+            {
+                unsafe {
+                    d.field("data", &&*self.data.get());
+                }
+            } else {
+                d.field("data", &"<locked_or_writer_pending>");
+            }
+
+            d.finish()
+        }
+    }
+
+    #[cfg(test)]
+    mod internal_parking_tests {
+        use super::WrtParkingRwLock;
+        use crate::prelude::{AtomicBool, Ordering};
         use std::sync::Arc;
         use std::thread;
-        use std::time::Duration;
 
         #[test]
         fn test_parking_rwlock_basic() {
             let lock = WrtParkingRwLock::new(42);
-            let reader = lock.read();
-            assert_eq!(*reader, 42);
-            drop(reader);
 
-            let mut writer = lock.write();
-            *writer = 100;
-            drop(writer);
-
-            let reader = lock.read();
-            assert_eq!(*reader, 100);
+            {
+                let r = lock.read().unwrap();
+                assert_eq!(*r, 42);
+            }
+            {
+                let mut w = lock.write().unwrap();
+                *w = 100;
+            }
+            let r = lock.read().unwrap();
+            assert_eq!(*r, 100);
         }
 
         #[test]
@@ -834,9 +575,9 @@ mod tests {
             for _ in 0..5 {
                 let lock_clone = Arc::clone(&lock);
                 handles.push(thread::spawn(move || {
-                    let reader = lock_clone.read();
-                    thread::sleep(Duration::from_millis(10));
+                    let reader = lock_clone.read().unwrap();
                     assert_eq!(*reader, 123);
+                    thread::sleep(std::time::Duration::from_millis(10));
                 }));
             }
 
@@ -848,51 +589,131 @@ mod tests {
         #[test]
         fn test_parking_rwlock_writer_blocks_readers() {
             let lock = Arc::new(WrtParkingRwLock::new(0));
-            let lock_clone_w = Arc::clone(&lock);
+            let writer_ready = Arc::new(AtomicBool::new(false));
+            let reader_finished_first_attempt = Arc::new(AtomicBool::new(false));
 
-            // Start writer thread that holds lock for a while
+            let lock_clone_writer = Arc::clone(&lock);
+            let writer_ready_clone = Arc::clone(&writer_ready);
+
             let writer_handle = thread::spawn(move || {
-                let mut writer = lock_clone_w.write();
-                *writer = 999;
-                thread::sleep(Duration::from_millis(50));
-                drop(writer);
+                let mut w_guard = lock_clone_writer.write().unwrap();
+                *w_guard = 10;
+                writer_ready_clone.store(true, Ordering::SeqCst);
+                thread::sleep(std::time::Duration::from_millis(50));
             });
 
-            // Give writer time to acquire lock
-            thread::sleep(Duration::from_millis(10));
+            while !writer_ready.load(Ordering::SeqCst) {
+                thread::yield_now();
+            }
 
-            // Start reader thread, should block until writer releases
-            let lock_clone_r = Arc::clone(&lock);
+            let lock_clone_reader = Arc::clone(&lock);
+            let reader_finished_first_attempt_clone = Arc::clone(&reader_finished_first_attempt);
             let reader_handle = thread::spawn(move || {
-                let reader = lock_clone_r.read();
-                assert_eq!(*reader, 999); // Should see writer's change
+                let r_guard = lock_clone_reader.read().unwrap();
+                assert_eq!(*r_guard, 10);
+                reader_finished_first_attempt_clone.store(true, Ordering::SeqCst);
             });
+
+            thread::sleep(std::time::Duration::from_millis(10));
+            assert!(
+                !reader_finished_first_attempt.load(Ordering::SeqCst),
+                "Reader should be blocked by writer"
+            );
 
             writer_handle.join().unwrap();
             reader_handle.join().unwrap();
+            assert!(
+                reader_finished_first_attempt.load(Ordering::SeqCst),
+                "Reader should have finished after writer released"
+            );
         }
 
         #[test]
         fn test_parking_rwlock_try_operations() {
-            let lock = WrtParkingRwLock::new(42);
-
-            // Try operations when unlocked
-            assert!(lock.try_read().is_some());
-
-            // First make sure no readers are active
-            {
-                let reader = lock.try_read();
-                assert!(reader.is_some());
-                // Drop explicitly to ensure lock is released
-                drop(reader.unwrap());
-            }
-
-            // Now try write
-            let writer = lock.try_write();
-            assert!(writer.is_some());
-
-            // Can't read while write locked
+            let lock = WrtParkingRwLock::new(0);
+            let w_opt = lock.try_write();
+            assert!(w_opt.is_some());
+            let mut w_guard = w_opt.unwrap();
+            *w_guard = 20;
+            drop(w_guard);
+            let r_opt = lock.try_read();
+            assert!(r_opt.is_some());
+            assert_eq!(*r_opt.unwrap(), 20);
+            let r1 = lock.read().unwrap();
+            assert!(lock.try_write().is_none());
+            let r_opt_2 = lock.try_read();
+            assert!(r_opt_2.is_some());
+            assert_eq!(*r_opt_2.unwrap(), 20);
+            drop(r1);
+            let mut w = lock.write().unwrap();
+            *w = 2;
             assert!(lock.try_read().is_none());
+            assert!(lock.try_write().is_none());
+            drop(w);
+            assert_eq!(*lock.read().unwrap(), 2);
         }
+    }
+}
+
+#[cfg(all(test, feature = "std"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rwlock_new_read() {
+        let lock = WrtRwLock::new(10);
+        let val = lock.read();
+        assert_eq!(*val, 10);
+    }
+
+    #[test]
+    fn test_rwlock_new_write_read() {
+        let lock = WrtRwLock::new(0);
+        {
+            let mut w = lock.write();
+            *w = 20;
+        }
+        let val = lock.read();
+        assert_eq!(*val, 20);
+    }
+
+    #[test]
+    fn test_rwlock_multiple_readers() {
+        let lock = WrtRwLock::new(30);
+        let r1 = lock.read();
+        let r2 = lock.read();
+        assert_eq!(*r1, 30);
+        assert_eq!(*r2, 30);
+        drop(r1);
+        assert_eq!(*r2, 30);
+    }
+
+    #[test]
+    fn test_rwlock_try_read_write() {
+        let lock = WrtRwLock::new(5);
+
+        if let Some(r_guard) = lock.try_read() {
+            assert_eq!(*r_guard, 5);
+            assert!(lock.try_write().is_none());
+        } else {
+            panic!("try_read failed when it should succeed");
+        }
+
+        if let Some(mut w_guard) = lock.try_write() {
+            *w_guard = 10;
+            assert!(lock.try_read().is_none());
+            assert!(lock.try_write().is_none());
+        } else {
+            panic!("try_write failed when it should succeed");
+        }
+        assert_eq!(*lock.read(), 10);
+
+        let r_guard = lock.read();
+        assert!(lock.try_write().is_none(), "try_write should fail when read lock is held");
+        drop(r_guard);
+
+        let w_guard = lock.write();
+        assert!(lock.try_read().is_none(), "try_read should fail when write lock is held");
+        drop(w_guard);
     }
 }

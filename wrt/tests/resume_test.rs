@@ -16,19 +16,12 @@ mod resume_tests {
         let mut module = Module::new()?;
 
         // Create a function type
-        let func_type = FuncType {
-            params: vec![ValueType::I32],
-            results: vec![ValueType::I32],
-        };
+        let func_type = FuncType { params: vec![ValueType::I32], results: vec![ValueType::I32] };
         module.types.push(func_type);
 
         // Create a simple function
         let code = vec![Instruction::I32Const(42), Instruction::End];
-        let function = Function {
-            type_idx: 0,
-            locals: vec![],
-            code,
-        };
+        let function = Function { type_idx: 0, locals: vec![], code };
         module.functions.push(function);
 
         // Create an engine and instantiate
@@ -61,10 +54,7 @@ mod resume_tests {
         let mut module = Module::new()?;
 
         // Create a function type
-        let func_type = FuncType {
-            params: vec![ValueType::I32],
-            results: vec![ValueType::I32],
-        };
+        let func_type = FuncType { params: vec![ValueType::I32], results: vec![ValueType::I32] };
         module.types.push(func_type);
 
         // Create a function
@@ -74,11 +64,7 @@ mod resume_tests {
             Instruction::I32Add,
             Instruction::End,
         ];
-        let function = Function {
-            type_idx: 0,
-            locals: vec![],
-            code,
-        };
+        let function = Function { type_idx: 0, locals: vec![], code };
         module.functions.push(function);
 
         // Create an engine and instantiate

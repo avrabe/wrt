@@ -1,3 +1,12 @@
+// WRT - wrtd
+// SW-REQ-ID: [SW-REQ-ID-wrtd]
+//
+// Copyright (c) 2025 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+#![forbid(unsafe_code)] // Rule 2
+
 //! # WebAssembly Runtime Daemon (wrtd)
 //!
 //! A daemon process that coordinates WebAssembly module execution and provides system services.
@@ -144,29 +153,14 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     // Display runtime configuration
-    info!(
-        "Executing WebAssembly file: {} with runtime configuration:",
-        args.wasm_file
-    );
-    info!(
-        "  Function to call: {}",
-        args.call.as_deref().unwrap_or("None")
-    );
-    info!(
-        "  Fuel limit: {}",
-        args.fuel.map_or("None".to_string(), |f| f.to_string())
-    );
+    info!("Executing WebAssembly file: {} with runtime configuration:", args.wasm_file);
+    info!("  Function to call: {}", args.call.as_deref().unwrap_or("None"));
+    info!("  Fuel limit: {}", args.fuel.map_or("None".to_string(), |f| f.to_string()));
     info!("  Show execution statistics: {}", args.stats);
-    info!(
-        "  Analyze component interfaces: {}",
-        args.analyze_component_interfaces
-    );
+    info!("  Analyze component interfaces: {}", args.analyze_component_interfaces);
     info!("  Memory strategy: {}", args.memory_strategy);
     info!("  Buffer size: {} bytes", args.buffer_size);
-    info!(
-        "  Interceptors: {}",
-        args.interceptors.as_deref().unwrap_or("None")
-    );
+    info!("  Interceptors: {}", args.interceptors.as_deref().unwrap_or("None"));
 
     // Setup timings for performance measurement
     let mut timings = HashMap::new();
@@ -206,20 +200,11 @@ fn main() -> Result<()> {
     let mut engine = create_stackless_engine(args.fuel);
 
     // Load and execute using the stackless engine
-    if let Err(e) = load_component(
-        &mut engine,
-        &wasm_bytes,
-        args.call.as_deref(),
-        args.wasm_file.clone(),
-    ) {
-        error!(
-            "Failed to load WebAssembly Component with stackless engine: {}",
-            e
-        );
-        return Err(anyhow!(
-            "Failed to load WebAssembly Component with stackless engine: {}",
-            e
-        ));
+    if let Err(e) =
+        load_component(&mut engine, &wasm_bytes, args.call.as_deref(), args.wasm_file.clone())
+    {
+        error!("Failed to load WebAssembly Component with stackless engine: {}", e);
+        return Err(anyhow!("Failed to load WebAssembly Component with stackless engine: {}", e));
     }
 
     if args.stats {
@@ -272,22 +257,14 @@ fn load_wasm_file(file_path: &str) -> Result<(PathBuf, Vec<u8>, Duration)> {
     let wasm_bytes = fs::read(&wasm_path).context("Failed to read WebAssembly file")?;
     let load_time = load_start.elapsed();
 
-    info!(
-        "Loaded {} bytes of WebAssembly code in {:?}",
-        wasm_bytes.len(),
-        load_time
-    );
+    info!("Loaded {} bytes of WebAssembly code in {:?}", wasm_bytes.len(), load_time);
 
     Ok((wasm_path, wasm_bytes, load_time))
 }
 
 /// Format a list of value types as a string
 fn format_value_types(types: &[ValueType]) -> String {
-    types
-        .iter()
-        .map(|p| p.to_string())
-        .collect::<Vec<_>>()
-        .join(", ")
+    types.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(", ")
 }
 
 /// Parse a WebAssembly module from bytes
@@ -321,10 +298,7 @@ fn analyze_component_interfaces(module: &Module) {
                 info!("    Detected logging interface import - will provide implementation");
             }
 
-            info!(
-                "    Function signature: (params: [{}], results: [{}])",
-                params, results
-            );
+            info!("    Function signature: (params: [{}], results: [{}])", params, results);
 
             // Store the interface function type
             interfaces.imports.insert(
@@ -415,10 +389,7 @@ fn display_component_function_details(
         let params = format_value_types(&func_type.params);
         let results = format_value_types(&func_type.results);
 
-        info!(
-            "    Function signature: (params: [{}], results: [{}])",
-            params, results
-        );
+        info!("    Function signature: (params: [{}], results: [{}])", params, results);
     }
 }
 
@@ -428,10 +399,7 @@ fn execute_component_function(
     instance_idx: usize,
     func_name: &str,
 ) -> Result<()> {
-    info!(
-        "Executing component function with stackless engine: {}",
-        func_name
-    );
+    info!("Executing component function with stackless engine: {}", func_name);
 
     // Get the function and information before execution
     let func_info = {
@@ -442,22 +410,13 @@ fn execute_component_function(
         // Debug all available exports to help identify the correct function
         if instance_idx < engine.instances.len() {
             debug!("Available exports in instance {}:", instance_idx);
-            for (i, export) in engine.instances[instance_idx]
-                .module
-                .exports
-                .iter()
-                .enumerate()
-            {
+            for (i, export) in engine.instances[instance_idx].module.exports.iter().enumerate() {
                 if matches!(export.kind, ExportKind::Function) {
-                    if let Some(func) = engine.instances[instance_idx]
-                        .module
-                        .functions
-                        .get(export.index as usize)
+                    if let Some(func) =
+                        engine.instances[instance_idx].module.functions.get(export.index as usize)
                     {
-                        if let Some(func_type) = engine.instances[instance_idx]
-                            .module
-                            .types
-                            .get(func.type_idx as usize)
+                        if let Some(func_type) =
+                            engine.instances[instance_idx].module.types.get(func.type_idx as usize)
                         {
                             let params = format_value_types(&func_type.params);
                             let results = format_value_types(&func_type.results);
@@ -497,10 +456,7 @@ fn execute_component_function(
 
     if !found {
         warn!("Function '{}' not found in component", func_name);
-        return Err(anyhow::anyhow!(
-            "Function '{}' not found in component",
-            func_name
-        ));
+        return Err(anyhow::anyhow!("Function '{}' not found in component", func_name));
     }
 
     debug!("Function found, preparing to call it: {}", func_name);
@@ -525,9 +481,7 @@ fn execute_component_function(
     }
 
     // Execute the function
-    let execution_result = engine
-        .stack
-        .execute_function(instance_idx, func_idx, args.clone());
+    let execution_result = engine.stack.execute_function(instance_idx, func_idx, args.clone());
 
     // Get stats after execution
     let instructions_executed_after;
@@ -586,10 +540,7 @@ fn execute_component_function(
         }
         Err(e) => {
             let execution_time = Duration::from_millis(0); // Placeholder
-            error!(
-                "Function execution failed after {:?}: {}",
-                execution_time, e
-            );
+            error!("Function execution failed after {:?}: {}", execution_time, e);
 
             // Even though execution failed, we'll display a message to indicate how close we got
             info!("Component execution attempted but encountered errors.");
@@ -685,9 +636,7 @@ fn load_component(
         if let wrt_component::export::Export::Function(func) = func {
             // Execute the function
             info!("Executing function: {}", func_name);
-            let result = func
-                .call(&[])
-                .map_err(|e| anyhow!("Function execution failed: {}", e))?;
+            let result = func.call(&[]).map_err(|e| anyhow!("Function execution failed: {}", e))?;
 
             // Display the result
             info!("Function returned: {:?}", result);

@@ -9,10 +9,16 @@ documentation = "https://docs.rs/wrt-intercept"
 keywords = ["wasm", "webassembly", "runtime", "interception"]
 categories = ["wasm", "no-std"]
 
+[profile.release]
+panic = "abort"
+
+[profile.test]
+panic = "abort"
+
 [dependencies]
-wrt-error = { path = "../wrt-error", version = "0.2.0" }
-wrt-types = { path = "../wrt-types", version = "0.2.0" }
-wrt-format = { path = "../wrt-format", version = "0.2.0" }
+wrt-error = { path = "../wrt-error", version = "0.2.0", default-features = false }
+wrt-types = { path = "../wrt-types", version = "0.2.0", default-features = false }
+wrt-sync = { path = "../wrt-sync", version = "0.2.0", default-features = false }
 
 # Optional dependencies
 log = { version = "0.4", optional = true }
@@ -25,17 +31,41 @@ pretty_assertions = "1.4.0"
 
 [features]
 default = ["std"]
-std = ["wrt-error/std", "wrt-types/std", "wrt-format/std", "log"]
-no_std = ["wrt-error/no_std", "wrt-types/no_std", "wrt-format/no_std"]
-alloc = ["wrt-error/alloc", "wrt-types/alloc", "wrt-format/alloc"]
+std = ["wrt-error/std", "wrt-types/std", "wrt-sync/std", "log"]
+no_std = ["alloc", "wrt-error/no_std", "wrt-types/no_std", "wrt-sync/no_std"]
+alloc = ["wrt-error/alloc", "wrt-types/alloc", "wrt-sync/alloc"]
+optimize = ["wrt-error/optimize", "wrt-types/optimize", "wrt-sync/optimize"]
+safety = ["wrt-error/safety", "wrt-types/safety", "wrt-sync/safety", "alloc"]
 kani = ["dep:kani-verifier"]
 
-[lints.rust]
-unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)', 'cfg(kani)', 'cfg(coverage)', 'cfg(doc)'] }
-unused_imports = "allow"
-unused_variables = "allow"
-unused_mut = "allow"
-unused_macros = "allow"
+[lints]
+rust.unexpected_cfgs = { level = "allow", check-cfg = ['cfg(kani)', 'cfg(coverage)', 'cfg(doc)'] }
+rust.unsafe_code = "forbid" # Rule 2: #![forbid(unsafe_code)]
+rust.pointer_cast = "deny" # Rule 1, ADDED
+rust.missing_docs = "deny" # Rule 9, ADDED/ENSURED
+
+clippy.pedantic = "warn"
+clippy.unwrap_used = "deny" # Rule 3
+clippy.expect_used = "deny" # Rule 3
+clippy.panic = "deny" # Rule 3 & 4
+clippy.todo = "deny" # Rule 3
+clippy.unimplemented = "deny" # Rule 3
+clippy.match_wildcard_for_single_variants = "warn" # Rule 4
+clippy.never_loop = "warn" # Rule 4
+clippy.unreachable = "deny" # Rule 4
+clippy.float_arithmetic = "warn" # Rule 1
+clippy.inline_asm_x86_att_syntax = "deny" # Rule 1
+clippy.transmute_ptr_to_ref = "deny" # Rule 1
+clippy.type_id = "deny" # Rule 1
+clippy.dyn_trait = "warn" # Rule 1
+clippy.ptr_offset_with_cast = "warn" # Rule 2
+clippy.result_unit_err = "warn" # Rule 3
+clippy.let_underscore_drop = "warn" # Rule 3
+clippy.must_use = { level = "warn", options = { "ignore- मुख्य-functions" = true } } # Rule 3
+clippy.static_mut_reference = "deny" # Rule 5
+clippy.arc_mutate = "deny" # Rule 5
+clippy.missing_docs_in_private_items = "allow" # To be reviewed if too noisy
+clippy.debug_assert_with_mut_call = "warn" # Rule 9, ADDED
 
 # Configuration for Kani verification
 # This will only be used when running `cargo kani`

@@ -13,7 +13,7 @@ release = '0.1.0'
 # Version configuration
 # Read current version from environment or default to 'main'
 current_version = os.environ.get('DOCS_VERSION', 'main')
-version_path_prefix = os.environ.get('DOCS_VERSION_PATH_PREFIX', '/')
+version_path_prefix = os.environ.get('DOCS_VERSION_PATH_PREFIX', '/wrt')
 
 # Function to get available versions
 def get_versions():
@@ -85,7 +85,7 @@ extensions = [
     'sphinx_needs',  # Temporarily disabled to focus on diagrams
     'myst_parser',
     'sphinxcontrib.plantuml',
-    # "sphinxcontrib_rust",  # Disabled temporarily to focus on diagrams
+    "sphinxcontrib_rust",
 ]
 
 templates_path = ['_templates']
@@ -219,22 +219,22 @@ myst_enable_extensions = {
     "strikethrough",
     "tasklist",
 }
-# Rust documentation configuration - temporarily disabled
+# Rust documentation configuration
 rust_crates = {
-"wrt": os.path.abspath("../../wrt"),
-"wrt-error": os.path.abspath("../../wrt-error"),
-"wrt-sync": os.path.abspath("../../wrt-sync"),
-"wrt-format": os.path.abspath("../../wrt-format"),
-"wrt-decoder": os.path.abspath("../../wrt-decoder"),
-"wrt-common": os.path.abspath("../../wrt-common"),
-"wrt-component": os.path.abspath("../../wrt-component"),
-"wrt-host": os.path.abspath("../../wrt-host"),
-"wrt-instructions": os.path.abspath("../../wrt-instructions"),
-"wrt-intercept": os.path.abspath("../../wrt-intercept"),
-"wrt-logging": os.path.abspath("../../wrt-logging"),
-"wrt-runtime": os.path.abspath("../../wrt-runtime"),
-"wrt-types": os.path.abspath("../../wrt-types"),
-"wrtd": os.path.abspath("../../wrtd"),
+    "wrt-error": os.path.abspath("../../wrt-error"),
+    "wrt": os.path.abspath("../../wrt"),
+    "wrt-sync": os.path.abspath("../../wrt-sync"),
+    "wrt-format": os.path.abspath("../../wrt-format"),
+    "wrt-decoder": os.path.abspath("../../wrt-decoder"),
+    "wrt-common": os.path.abspath("../../wrt-common"),
+    "wrt-component": os.path.abspath("../../wrt-component"),
+    "wrt-host": os.path.abspath("../../wrt-host"),
+    "wrt-instructions": os.path.abspath("../../wrt-instructions"),
+    "wrt-intercept": os.path.abspath("../../wrt-intercept"),
+    "wrt-logging": os.path.abspath("../../wrt-logging"),
+    "wrt-runtime": os.path.abspath("../../wrt-runtime"),
+    "wrt-types": os.path.abspath("../../wrt-types"),
+    "wrtd": os.path.abspath("../../wrtd"),
 }
 rust_doc_dir = "docs/source/"
 rust_rustdoc_fmt = "md"

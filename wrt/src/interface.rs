@@ -14,9 +14,9 @@ use crate::{
     module_instance::ModuleInstance,
     prelude::{
         TypesComponentType as ComponentType, TypesInstanceType as InstanceType, TypesValue as Value,
+        ValueType,
     },
     resource::{ResourceId, ResourceTable},
-    types::ValueType,
 };
 
 // Import std when available

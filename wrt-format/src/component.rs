@@ -137,9 +137,7 @@ impl Validatable for CoreInstance {
                 // Validate exports
                 for export in exports {
                     if export.name.is_empty() {
-                        return Err(Error::validation_error(
-                            "Inline export name cannot be empty",
-                        ));
+                        return Err(Error::validation_error("Inline export name cannot be empty"));
                     }
                     // Reasonable index limit
                     if export.idx > 100000 {
@@ -743,22 +741,12 @@ pub struct ExportName {
 impl ImportName {
     /// Create a new import name with just namespace and name
     pub fn new(namespace: String, name: String) -> Self {
-        Self {
-            namespace,
-            name,
-            nested: Vec::new(),
-            package: None,
-        }
+        Self { namespace, name, nested: Vec::new(), package: None }
     }
 
     /// Create a new import name with nested namespaces
     pub fn with_nested(namespace: String, name: String, nested: Vec<String>) -> Self {
-        Self {
-            namespace,
-            name,
-            nested,
-            package: None,
-        }
+        Self { namespace, name, nested, package: None }
     }
 
     /// Add package reference to an import name
@@ -780,24 +768,12 @@ impl ImportName {
 impl ExportName {
     /// Create a new export name
     pub fn new(name: String) -> Self {
-        Self {
-            name,
-            is_resource: false,
-            semver: None,
-            integrity: None,
-            nested: Vec::new(),
-        }
+        Self { name, is_resource: false, semver: None, integrity: None, nested: Vec::new() }
     }
 
     /// Create a new export name with nested namespaces
     pub fn with_nested(name: String, nested: Vec<String>) -> Self {
-        Self {
-            name,
-            is_resource: false,
-            semver: None,
-            integrity: None,
-            nested,
-        }
+        Self { name, is_resource: false, semver: None, integrity: None, nested }
     }
 
     /// Mark as a resource export
@@ -903,10 +879,7 @@ pub enum ConstValue {
 impl Validatable for Instance {
     fn validate(&self) -> Result<()> {
         match &self.instance_expr {
-            InstanceExpr::Instantiate {
-                component_idx,
-                args,
-            } => {
+            InstanceExpr::Instantiate { component_idx, args } => {
                 // Basic validation: component_idx should be reasonable
                 if *component_idx > 10000 {
                     // Arbitrary reasonable limit
@@ -931,9 +904,7 @@ impl Validatable for Instance {
                 // Validate exports
                 for export in exports {
                     if export.name.is_empty() {
-                        return Err(Error::validation_error(
-                            "Inline export name cannot be empty",
-                        ));
+                        return Err(Error::validation_error("Inline export name cannot be empty"));
                     }
                 }
 
@@ -946,9 +917,7 @@ impl Validatable for Instance {
 impl Validatable for Alias {
     fn validate(&self) -> Result<()> {
         match &self.target {
-            AliasTarget::CoreInstanceExport {
-                instance_idx, name, ..
-            } => {
+            AliasTarget::CoreInstanceExport { instance_idx, name, .. } => {
                 if *instance_idx > 10000 {
                     return Err(Error::validation_error(format!(
                         "Instance index {} seems unreasonably large",
@@ -962,9 +931,7 @@ impl Validatable for Alias {
 
                 Ok(())
             }
-            AliasTarget::InstanceExport {
-                instance_idx, name, ..
-            } => {
+            AliasTarget::InstanceExport { instance_idx, name, .. } => {
                 if *instance_idx > 10000 {
                     return Err(Error::validation_error(format!(
                         "Instance index {} seems unreasonably large",
@@ -1072,9 +1039,7 @@ impl Validatable for ComponentType {
 impl Validatable for Canon {
     fn validate(&self) -> Result<()> {
         match &self.operation {
-            CanonOperation::Lift {
-                func_idx, type_idx, ..
-            } => {
+            CanonOperation::Lift { func_idx, type_idx, .. } => {
                 if *func_idx > 10000 {
                     return Err(Error::validation_error(format!(
                         "Function index {} seems unreasonably large",

@@ -33,23 +33,51 @@ Core Safety Implementations
 .. impl:: Test Infrastructure
    :id: IMPL_TEST_001
    :status: implemented
-   :links: REQ_INSTALL_002
+   :links: REQ_INSTALL_002, REQ_QA_001
    
-   The test infrastructure includes installation validation tests that can be executed with `just test-validation`.
+   The test infrastructure includes unit, integration, and validation tests. Standard tests are executed via ``just test`` and comprehensive test suites including Miri and Kani are run via ``just ci-full``. See :ref:`dev-testing` for more details.
 
-.. impl:: CI Pipeline
+.. impl:: CI Pipeline Enhancement
    :id: IMPL_CI_001
    :status: implemented
-   :links: REQ_BUILD_001
+   :links: REQ_BUILD_001, REQ_CODE_QUALITY_001, REQ_CODE_QUALITY_003, REQ_QA_003
    
-   Continuous Integration pipeline ensures clean build environment for each test run.
+   The Continuous Integration (CI) pipeline, defined in `.github/workflows/ci.yml`, automates a comprehensive suite of checks on every push and pull request to the main branch. It ensures a clean build environment and executes formatting, linting, static analysis, security audits, tests, and documentation builds. Key checks are grouped into the ``just ci-main`` recipe, which is executed by the CI's "Compliance Checks" job. More extensive checks like Miri and Kani are part of ``just ci-full``.
 
-.. impl:: Compiler Warning Detection
-   :id: IMPL_CI_002
+.. impl:: Automated Code Linting and Formatting
+   :id: IMPL_CI_LINTING_001
    :status: implemented
-   :links: REQ_CODE_QUALITY_001
+   :links: REQ_CODE_QUALITY_001, REQ_CODE_STYLE_001
    
-   The CI pipeline is configured to treat all warnings as errors using the RUSTFLAGS="-D warnings" setting.
+   Automated code style enforcement and linting are integrated into the CI pipeline:
+   
+   * **Code Formatting (`rustfmt`)**: Consistent code formatting is enforced using `rustfmt` with rules defined in `rustfmt.toml`. Checked via ``just fmt-check`` (part of ``just ci-main``).
+   * **Clippy Lints**: Extensive static analysis is performed by `clippy` with a strict, pedantic configuration (e.g., denying `unwrap_used`, `float_arithmetic`, `pedantic` group) defined in each crate's `Cargo.toml` (`[lints.clippy]`). All `clippy` warnings are treated as errors in CI (via ``-D warnings`` in ``just ci-clippy``, part of ``just ci-main``).
+   * **Compiler Warnings**: All standard Rust compiler warnings are treated as errors (`-D warnings`).
+
+.. impl:: Automated Static Analysis and Dependency Checks
+   :id: IMPL_CI_STATIC_ANALYSIS_001
+   :status: implemented
+   :links: REQ_CODE_QUALITY_002, REQ_DEPENDENCY_001, REQ_SECURITY_001
+   
+   The CI pipeline includes several static analysis tools to detect potential issues:
+   
+   * **Unsafe Code Detection (`cargo geiger`)**: Scans for usage of `unsafe` Rust code and reports statistics. Run via ``just ci-geiger`` (part of ``just ci-main``).
+   * **Dependency Policy (`cargo deny`)**: Checks dependencies against configurable policies (licenses, duplicate versions, security advisories, source origins) defined in `deny.toml`. Run via ``just ci-deny`` (part of ``just ci-main``).
+   * **Unused Dependency Check (`cargo udeps`)**: Identifies unused dependencies in `Cargo.toml` files. Run via ``just udeps``.
+   * **Security Audit (`cargo audit`)**: Checks for known security vulnerabilities in dependencies using the RustSec advisory database. Run via ``just audit``.
+
+.. impl:: Automated Project Integrity Checks
+   :id: IMPL_CI_PROJECT_CHECKS_001
+   :status: implemented
+   :links: REQ_DOC_001, REQ_CODE_STYLE_001
+   
+   Additional automated checks ensure project consistency and documentation quality:
+   
+   * **File Presence Check**: Verifies the existence of essential project files (e.g., `README.md`, `LICENSE`, `CONTRIBUTING.md`) via ``cargo xtask ci-checks file-presence`` (run by ``just ci-check-file-presence``, part of ``just ci-main``).
+   * **File Header Check**: Ensures all Rust source files (`*.rs`) have the standard copyright and license header, and that library/binary crates include `#![forbid(unsafe_code)]`. Checked by ``cargo xtask ci-checks headers`` (run by ``just ci-check-headers``, part of ``just ci-main``).
+   * **Spell Checking (`cspell`)**: Source code comments, documentation, and markdown files are spell-checked using `cspell` with a custom dictionary defined in `cspell.json`. Run via ``just spell-check``.
+   * **Documentation Build Check**: Ensures all Rust documentation (cargo doc) and Sphinx project documentation build successfully without warnings. Run via ``just ci-doc-check`` (part of ``just ci-main``).
 
 Memory Safety Implementations
 -----------------------------

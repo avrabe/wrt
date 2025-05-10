@@ -192,12 +192,10 @@ fn test_import_section_parsing() {
     let parser = Parser::new(&module);
 
     // Find the import section
-    let import_section = parser
-        .into_iter()
-        .find_map(|payload_result| match payload_result {
-            Ok(Payload::Section { id: 2, data, size }) => Some((data, size)),
-            _ => None,
-        });
+    let import_section = parser.into_iter().find_map(|payload_result| match payload_result {
+        Ok(Payload::Section { id: 2, data, size }) => Some((data, size)),
+        _ => None,
+    });
 
     assert!(import_section.is_some());
     let (data, size) = import_section.unwrap();
@@ -222,12 +220,10 @@ fn test_multi_import_parsing() {
 
     // Parse the module and find the import section
     let parser = Parser::new(&module);
-    let import_section = parser
-        .into_iter()
-        .find_map(|payload_result| match payload_result {
-            Ok(Payload::Section { id: 2, data, size }) => Some((data, size)),
-            _ => None,
-        });
+    let import_section = parser.into_iter().find_map(|payload_result| match payload_result {
+        Ok(Payload::Section { id: 2, data, size }) => Some((data, size)),
+        _ => None,
+    });
 
     assert!(import_section.is_some());
     let (data, size) = import_section.unwrap();
@@ -350,12 +346,10 @@ fn test_empty_import_section() {
 
     // Parse the module and find the import section
     let parser = Parser::new(&module);
-    let import_section = parser
-        .into_iter()
-        .find_map(|payload_result| match payload_result {
-            Ok(Payload::Section { id: 2, data, size }) => Some((data, size)),
-            _ => None,
-        });
+    let import_section = parser.into_iter().find_map(|payload_result| match payload_result {
+        Ok(Payload::Section { id: 2, data, size }) => Some((data, size)),
+        _ => None,
+    });
 
     assert!(import_section.is_some());
     let (data, size) = import_section.unwrap();

@@ -163,10 +163,7 @@ fn test_import_section_iteration() {
         }
     }
 
-    assert!(
-        found_import_section,
-        "Import section not found in the module"
-    );
+    assert!(found_import_section, "Import section not found in the module");
 }
 
 #[test]
@@ -214,10 +211,7 @@ fn test_custom_section_handling() {
         }
     }
 
-    assert!(
-        found_custom_section,
-        "Custom section not found in the module"
-    );
+    assert!(found_custom_section, "Custom section not found in the module");
 }
 
 #[test]
@@ -303,11 +297,7 @@ fn test_performance() {
     // Just verify that parsing completes without timing out
     // This is a very simple performance test, but it ensures
     // the operation doesn't take an unreasonable amount of time
-    assert!(
-        duration.as_millis() < 500,
-        "Parsing took too long: {:?}",
-        duration
-    );
+    assert!(duration.as_millis() < 500, "Parsing took too long: {:?}", duration);
 }
 
 // Helper function to create a minimal valid WebAssembly module with imports
@@ -329,9 +319,8 @@ fn create_test_module() -> Vec<u8> {
     module.extend_from_slice(&import_section);
 
     // Custom section (id = 0)
-    let custom_section = vec![
-        0x00, 0x0A, 0x04, 0x74, 0x65, 0x73, 0x74, 0x01, 0x02, 0x03, 0x04, 0x05,
-    ];
+    let custom_section =
+        vec![0x00, 0x0A, 0x04, 0x74, 0x65, 0x73, 0x74, 0x01, 0x02, 0x03, 0x04, 0x05];
     module.extend_from_slice(&custom_section);
 
     module
@@ -463,10 +452,7 @@ fn test_parser_performance() {
     let duration = start.elapsed();
 
     // Print performance info
-    println!(
-        "Parser performance test: Scanned 1000 modules in {:?}",
-        duration
-    );
+    println!("Parser performance test: Scanned 1000 modules in {:?}", duration);
     // Ensure the test doesn't take too long (adjust based on hardware)
     assert!(duration.as_millis() < 1000, "Parser is too slow");
 }

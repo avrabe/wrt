@@ -40,11 +40,7 @@ fn test_simple_add() -> Result<(), Error> {
     println!("DEBUG: Result from add function: {:?}", result);
 
     // Verify the result
-    assert_eq!(
-        result,
-        vec![Value::I32(2)],
-        "Add function should return [I32(2)]"
-    );
+    assert_eq!(result, vec![Value::I32(2)], "Add function should return [I32(2)]");
 
     println!("DEBUG: Test passed!");
     Ok(())

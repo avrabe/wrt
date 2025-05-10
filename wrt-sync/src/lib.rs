@@ -1,6 +1,12 @@
-#![no_std]
-#![cfg_attr(feature = "std", allow(unused_imports))]
+// WRT - wrt-sync
+// SW-REQ-ID: [SW-REQ-ID-wrt-sync]
+//
+// Copyright (c) 2025 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
 #![doc = include_str!("../README.md")]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![warn(clippy::missing_panics_doc)]
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -17,48 +23,84 @@ extern crate std;
 #[cfg(all(not(feature = "std"), not(feature = "alloc")))]
 compile_error!("The 'alloc' feature must be enabled when using no_std");
 
-/// Mutex implementation for both std and no_std environments.
+/// Synchronization primitives for Wasmtime, supporting both std and `no_std` environments.
 ///
-/// This module provides a synchronization primitive that enforces mutual exclusion,
-/// allowing only one thread at a time to access the protected data. The implementation
-/// transparently adapts to both standard library and no_std environments based on
+/// This module provides essential synchronization tools like `WrtMutex` and `WrtRwLock`,
+/// designed to work seamlessly in WebAssembly runtimes. They are optimized for
+/// performance and safety, offering robust solutions for managing concurrent access
+/// to shared resources.
+///
+/// ## Modules
+///
+/// - `mutex`: Provides `WrtMutex` and `WrtMutexGuard`.
+/// - `rwlock`: Provides `WrtRwLock` and `WrtParkingRwLock`.
+///
+/// Each module is designed with an emphasis on ergonomics, performance, and safety,
+/// offering robust solutions for managing concurrent access to shared resources.
+/// The `WrtMutex` provides a mutual exclusion primitive.
+/// It ensures that only one thread or task can access the protected data at any given time.
+/// This implementation is designed for WebAssembly runtimes and
+/// transparently adapts to both standard library and `no_std` environments based on
 /// feature flags.
 ///
-/// # Examples
-///
-/// ```
-/// use wrt_sync::prelude::*;
-///
-/// let mutex = Mutex::new(42);
-/// let mut guard = mutex.lock();
-/// *guard += 1;
-/// assert_eq!(*guard, 43);
-/// ```
+/// # Features
 pub mod mutex;
 
-/// Prelude module that provides unified imports for both std and no_std.
+/// OnceCell implementation for one-time initialization.
 ///
-/// This module re-exports the appropriate implementations of synchronization primitives
-/// based on the enabled feature flags, allowing downstream code to import from a single
-/// location regardless of the target environment.
-pub mod prelude;
-
-/// ReadWrite lock implementation for both std and no_std environments.
-///
-/// This module provides a synchronization primitive that allows multiple readers
-/// or a single writer to access the protected data at any given time. The implementation
-/// transparently adapts to both standard library and no_std environments based on
-/// feature flags.
+/// This module provides a synchronization primitive that allows for safe, one-time
+/// initialization of a value.
 ///
 /// # Examples
 ///
 /// ```
 /// use wrt_sync::prelude::*;
-///
-/// let rwlock = RwLock::new(42);
-/// let read_guard = rwlock.read();
-/// assert_eq!(*read_guard, 42);
+/// static SOME_STATIC: WrtOnce<Vec<i32>> = WrtOnce::new();
+/// fn main() {
+///     let data = SOME_STATIC.get_or_init(|| vec![1,2,3]);
+///     assert_eq!(data, &vec![1,2,3]);
+/// }
 /// ```
+pub mod once;
+
+/// Prelude module for `wrt_sync`.
+///
+/// This module re-exports commonly used items for convenience.
+pub mod prelude {
+    #[cfg(not(feature = "std"))]
+    pub use core::{
+        cell::UnsafeCell,
+        fmt,
+        ops::{Deref, DerefMut},
+        sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    };
+
+    #[cfg(all(not(feature = "std"), feature = "alloc"))]
+    pub use alloc::{sync::Arc, vec::Vec};
+
+    #[cfg(feature = "std")]
+    pub use std::{
+        cell::UnsafeCell,
+        fmt,
+        ops::{Deref, DerefMut},
+        sync::{
+            atomic::{AtomicBool, AtomicUsize, Ordering},
+            Arc,
+        },
+        thread::{self, park as park_thread, sleep, yield_now, JoinHandle},
+        time::Duration,
+        vec::Vec,
+    };
+}
+
+/// `ReadWrite` lock implementation for both std and `no_std` environments.
+///
+/// The `WrtRwLock` allows multiple readers or a single writer at any point in time.
+/// This is useful for data structures that are read frequently but modified infrequently.
+/// Like `WrtMutex`, this implementation is tailored for WebAssembly and adjusts its
+/// behavior for `std` and `no_std` contexts.
+///
+/// # Features
 pub mod rwlock;
 
 // Include verification module conditionally, but exclude during coverage builds
@@ -67,5 +109,16 @@ pub mod rwlock;
 pub mod verify;
 
 // Re-export types for convenience
-pub use mutex::*;
-pub use rwlock::*;
+pub use mutex::{WrtMutex, WrtMutexGuard};
+pub use once::WrtOnce;
+pub use rwlock::{WrtRwLock, WrtRwLockReadGuard, WrtRwLockWriteGuard};
+
+/// Publicly exported synchronization primitives when the `std` feature is enabled.
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+pub use rwlock::parking_impl::{
+    PoisonError, WrtParkingRwLock, WrtParkingRwLockReadGuard, WrtParkingRwLockWriteGuard,
+};
+
+// Conditional re-export for the basic (spin-lock) RwLock and its guards
+// These are always available as they don't depend on std for parking.

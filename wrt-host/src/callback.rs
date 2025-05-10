@@ -60,11 +60,7 @@ impl CallbackRegistry {
     /// Create a new callback registry
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            callbacks: HashMap::new(),
-            interceptor: None,
-            host_functions: HashMap::new(),
-        }
+        Self { callbacks: HashMap::new(), interceptor: None, host_functions: HashMap::new() }
     }
 
     /// Sets an interceptor for this registry
@@ -92,9 +88,7 @@ impl CallbackRegistry {
         &self,
         callback_type: &CallbackType,
     ) -> Option<&T> {
-        self.callbacks
-            .get(callback_type)
-            .and_then(|cb| cb.downcast_ref())
+        self.callbacks.get(callback_type).and_then(|cb| cb.downcast_ref())
     }
 
     /// Get a mutable callback
@@ -102,9 +96,7 @@ impl CallbackRegistry {
         &mut self,
         callback_type: &CallbackType,
     ) -> Option<&mut T> {
-        self.callbacks
-            .get_mut(callback_type)
-            .and_then(|cb| cb.downcast_mut())
+        self.callbacks.get_mut(callback_type).and_then(|cb| cb.downcast_mut())
     }
 
     /// Register a host function
@@ -124,10 +116,7 @@ impl CallbackRegistry {
     /// Check if a host function is registered
     #[must_use]
     pub fn has_host_function(&self, module_name: &str, function_name: &str) -> bool {
-        self.host_functions
-            .get(module_name)
-            .and_then(|funcs| funcs.get(function_name))
-            .is_some()
+        self.host_functions.get(module_name).and_then(|funcs| funcs.get(function_name)).is_some()
     }
 
     /// Call a host function

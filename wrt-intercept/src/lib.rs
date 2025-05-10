@@ -1,3 +1,12 @@
+// WRT - wrt-intercept
+// SW-REQ-ID: [SW-REQ-ID-wrt-intercept]
+//
+// Copyright (c) 2025 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+#![forbid(unsafe_code)] // Rule 2
+
 //! # Interception Layer for WebAssembly Component Linking
 //!
 //! This crate provides a flexible interception mechanism for WebAssembly
@@ -55,7 +64,7 @@
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![warn(clippy::missing_panics_doc)]
 
 //! # Interception Layer for WebAssembly Component Linking
@@ -167,7 +176,7 @@ pub trait LinkInterceptorStrategy: Send + Sync {
     /// * `Result<Option<Vec<u8>>>` - Serialized value if lifting was handled, None if it should proceed normally
     fn intercept_lift(
         &self,
-        _ty: &wrt_format::component::ValType,
+        _ty: &ValType,
         _addr: u32,
         _memory_bytes: &[u8],
     ) -> Result<Option<Vec<u8>>> {
@@ -188,7 +197,7 @@ pub trait LinkInterceptorStrategy: Send + Sync {
     /// * `Result<bool>` - True if the lowering was handled, false if it should proceed normally
     fn intercept_lower(
         &self,
-        _value_type: &wrt_format::component::ValType,
+        _value_type: &ValType,
         _value_data: &[u8],
         _addr: u32,
         _memory_bytes: &mut [u8],
@@ -219,7 +228,7 @@ pub trait LinkInterceptorStrategy: Send + Sync {
     fn intercept_function_call(
         &self,
         _function_name: &str,
-        _arg_types: &[wrt_format::component::ValType],
+        _arg_types: &[ValType],
         _arg_data: &[u8],
     ) -> Result<Option<Vec<u8>>> {
         Ok(None)
@@ -239,7 +248,7 @@ pub trait LinkInterceptorStrategy: Send + Sync {
     fn intercept_function_result(
         &self,
         _function_name: &str,
-        _result_types: &[wrt_format::component::ValType],
+        _result_types: &[ValType],
         _result_data: &[u8],
     ) -> Result<Option<Vec<u8>>> {
         Ok(None)
@@ -303,7 +312,7 @@ pub trait LinkInterceptorStrategy: Send + Sync {
     fn after_start(
         &self,
         _component_name: &str,
-        _result_types: &[wrt_format::component::ValType],
+        _result_types: &[ValType],
         _result_data: Option<&[u8]>,
     ) -> Result<Option<Vec<u8>>> {
         Ok(None)
@@ -360,10 +369,7 @@ impl LinkInterceptor {
     ///
     /// * `Self` - A new LinkInterceptor instance
     pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            strategies: Vec::new(),
-        }
+        Self { name: name.to_string(), strategies: Vec::new() }
     }
 
     /// Adds a strategy to this interceptor
@@ -466,10 +472,7 @@ impl LinkInterceptor {
         results: &[ComponentValue],
     ) -> Result<InterceptionResult> {
         // Create default result (no modifications)
-        let mut result = InterceptionResult {
-            modified: false,
-            modifications: Vec::new(),
-        };
+        let mut result = InterceptionResult { modified: false, modifications: Vec::new() };
 
         // Process with each strategy
         for strategy in &self.strategies {
@@ -673,7 +676,7 @@ mod tests {
 
         fn intercept_lift(
             &self,
-            _ty: &wrt_format::component::ValType,
+            _ty: &ValType,
             _addr: u32,
             _memory_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>> {
@@ -682,7 +685,7 @@ mod tests {
 
         fn intercept_lower(
             &self,
-            _value_type: &wrt_format::component::ValType,
+            _value_type: &ValType,
             _value_data: &[u8],
             _addr: u32,
             _memory_bytes: &mut [u8],
@@ -697,7 +700,7 @@ mod tests {
         fn intercept_function_call(
             &self,
             _function_name: &str,
-            _arg_types: &[wrt_format::component::ValType],
+            _arg_types: &[ValType],
             _arg_data: &[u8],
         ) -> Result<Option<Vec<u8>>> {
             Ok(None)
@@ -706,7 +709,7 @@ mod tests {
         fn intercept_function_result(
             &self,
             _function_name: &str,
-            _result_types: &[wrt_format::component::ValType],
+            _result_types: &[ValType],
             _result_data: &[u8],
         ) -> Result<Option<Vec<u8>>> {
             Ok(None)
@@ -731,7 +734,7 @@ mod tests {
         fn after_start(
             &self,
             _component_name: &str,
-            _result_types: &[wrt_format::component::ValType],
+            _result_types: &[ValType],
             _result_data: Option<&[u8]>,
         ) -> Result<Option<Vec<u8>>> {
             Ok(None)
@@ -753,10 +756,7 @@ mod tests {
             _results: &[ComponentValue],
         ) -> Result<Option<Vec<Modification>>> {
             if self.modify_result {
-                Ok(Some(vec![Modification::Replace {
-                    offset: 0,
-                    data: vec![42],
-                }]))
+                Ok(Some(vec![Modification::Replace { offset: 0, data: vec![42] }]))
             } else {
                 Ok(None)
             }
@@ -765,11 +765,8 @@ mod tests {
 
     #[test]
     fn test_interceptor_passthrough() {
-        let strategy = Arc::new(TestStrategy {
-            bypass: false,
-            modify_args: false,
-            modify_result: false,
-        });
+        let strategy =
+            Arc::new(TestStrategy { bypass: false, modify_args: false, modify_result: false });
 
         let mut interceptor = LinkInterceptor::new("test");
         interceptor.add_strategy(strategy);
@@ -784,11 +781,8 @@ mod tests {
 
     #[test]
     fn test_interceptor_modify_args() {
-        let strategy = Arc::new(TestStrategy {
-            bypass: false,
-            modify_args: true,
-            modify_result: false,
-        });
+        let strategy =
+            Arc::new(TestStrategy { bypass: false, modify_args: true, modify_result: false });
 
         let mut interceptor = LinkInterceptor::new("test");
         interceptor.add_strategy(strategy);
@@ -803,11 +797,8 @@ mod tests {
 
     #[test]
     fn test_interceptor_modify_result() {
-        let strategy = Arc::new(TestStrategy {
-            bypass: false,
-            modify_args: false,
-            modify_result: true,
-        });
+        let strategy =
+            Arc::new(TestStrategy { bypass: false, modify_args: false, modify_result: true });
 
         let mut interceptor = LinkInterceptor::new("test");
         interceptor.add_strategy(strategy);
@@ -822,11 +813,8 @@ mod tests {
 
     #[test]
     fn test_interceptor_bypass() {
-        let strategy = Arc::new(TestStrategy {
-            bypass: true,
-            modify_args: true,
-            modify_result: false,
-        });
+        let strategy =
+            Arc::new(TestStrategy { bypass: true, modify_args: true, modify_result: false });
 
         let mut interceptor = LinkInterceptor::new("test");
         interceptor.add_strategy(strategy);
@@ -840,17 +828,11 @@ mod tests {
 
     #[test]
     fn test_multiple_strategies() {
-        let strategy1 = Arc::new(TestStrategy {
-            bypass: false,
-            modify_args: true,
-            modify_result: false,
-        });
+        let strategy1 =
+            Arc::new(TestStrategy { bypass: false, modify_args: true, modify_result: false });
 
-        let strategy2 = Arc::new(TestStrategy {
-            bypass: false,
-            modify_args: false,
-            modify_result: true,
-        });
+        let strategy2 =
+            Arc::new(TestStrategy { bypass: false, modify_args: false, modify_result: true });
 
         let mut interceptor = LinkInterceptor::new("test");
         interceptor.add_strategy(strategy1);

@@ -69,9 +69,7 @@ mod tests {
         let strategy = MemoryStrategy::Copy;
         let data = vec![1, 2, 3, 4, 5];
 
-        let result = strategy
-            .process_memory(&data, ResourceOperation::Read)
-            .unwrap();
+        let result = strategy.process_memory(&data, ResourceOperation::Read).unwrap();
         assert_eq!(result, data);
 
         // Modifying the copy shouldn't affect the original
@@ -85,9 +83,7 @@ mod tests {
         let strategy = MemoryStrategy::Reference;
         let data = vec![1, 2, 3, 4, 5];
 
-        let result = strategy
-            .process_memory(&data, ResourceOperation::Read)
-            .unwrap();
+        let result = strategy.process_memory(&data, ResourceOperation::Read).unwrap();
         assert_eq!(result, data);
     }
 }

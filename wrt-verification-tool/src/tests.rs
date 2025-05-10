@@ -257,14 +257,8 @@ pub fn register_decoder_tests() {
             }
         }
 
-        assert_test!(
-            count >= 2,
-            format!("Expected at least 2 payloads, found {}", count)
-        );
-        assert_test!(
-            found_import_section,
-            "Failed to find import section payload"
-        );
+        assert_test!(count >= 2, format!("Expected at least 2 payloads, found {}", count));
+        assert_test!(found_import_section, "Failed to find import section payload");
 
         Ok(())
     });
@@ -288,11 +282,7 @@ pub fn register_decoder_tests() {
                     import_section_found = true;
                     section_count += 1;
                 }
-                Payload::CustomSection {
-                    name: _,
-                    data: _,
-                    size: _,
-                } => {
+                Payload::CustomSection { name: _, data: _, size: _ } => {
                     custom_count += 1;
                 }
                 Payload::Version(_) => {}
@@ -302,10 +292,7 @@ pub fn register_decoder_tests() {
             }
         }
 
-        assert_test!(
-            import_section_found,
-            "Import section not found in larger module"
-        );
+        assert_test!(import_section_found, "Import section not found in larger module");
         assert_test!(
             section_count >= 5,
             format!("Expected at least 5 sections, found {}", section_count)

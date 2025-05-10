@@ -41,9 +41,7 @@ mod tests {
 
     impl MockExecutionEnvironment {
         fn new() -> Self {
-            Self {
-                stack: SafeStack::new(),
-            }
+            Self { stack: SafeStack::new() }
         }
     }
 

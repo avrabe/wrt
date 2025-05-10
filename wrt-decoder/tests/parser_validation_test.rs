@@ -1,6 +1,6 @@
 use wrt_decoder::parser::{Parser, Payload};
+use wrt_decoder::prelude::*;
 use wrt_format::module::ImportDesc;
-use wrt_format::types::ValueType;
 
 // Create a minimal valid WebAssembly module with an import section
 fn create_test_module() -> Vec<u8> {

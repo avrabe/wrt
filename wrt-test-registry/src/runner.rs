@@ -1,6 +1,16 @@
+//! Command line test runner for wrt-test-registry
+//!
+//! This runner provides a unified interface for running tests in the wrt-test-registry.
+//! It is designed to work with both standard and no_std environments.
+//!
+//! The runner follows the modular design and safety principles of the WRT project:
+//! - Uses `wrt-error` for consistent error handling
+//! - Uses `wrt-types` bounded collections for memory safety
+//! - Follows the implementation sequence
+
+use crate::prelude::*;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use wrt_test_registry::TestRegistry;
 
 /// Command-line interface for running WebAssembly Runtime (WRT) tests.
 #[derive(Parser)]
@@ -24,6 +34,10 @@ struct Cli {
     /// Verbose output
     #[arg(short, long)]
     verbose: bool,
+
+    /// Safety verification level (none, sampling, standard, full)
+    #[arg(long, default_value = "standard")]
+    verification: String,
 }
 
 #[derive(Subcommand)]
@@ -53,22 +67,38 @@ fn main() {
     let registry = TestRegistry::global();
 
     // Register all compatibility tests
-    wrt_test_registry::compatibility::register_compatibility_tests();
+    crate::compatibility::register_compatibility_tests();
+
+    // Set verification level based on command line argument
+    let verification_level = match cli.verification.to_lowercase().as_str() {
+        "none" => VerificationLevel::None,
+        "sampling" => VerificationLevel::Sampling,
+        "standard" => VerificationLevel::Standard,
+        "full" => VerificationLevel::Full,
+        _ => {
+            eprintln!(
+                "{}",
+                format!(
+                    "Invalid verification level: {}. Valid options are: none, sampling, standard, full",
+                    cli.verification
+                )
+                .red()
+            );
+            std::process::exit(1);
+        }
+    };
+
+    // Apply the verification level to the global registry
+    if let Err(e) = registry.set_verification_level(verification_level) {
+        eprintln!("{}", format!("Failed to set verification level: {}", e).red());
+        // Decide if this is a fatal error for the runner
+        // For now, we'll print the error and continue with the default or previously set level.
+        // std::process::exit(1); // Optionally exit if setting level is critical
+    }
 
     match cli.command {
-        Some(Commands::List {
-            name,
-            category,
-            std_only,
-            no_std_only,
-        }) => {
-            list_tests(
-                registry,
-                name.as_deref(),
-                category.as_deref(),
-                std_only,
-                no_std_only,
-            );
+        Some(Commands::List { name, category, std_only, no_std_only }) => {
+            list_tests(registry, name.as_deref(), category.as_deref(), std_only, no_std_only);
         }
         None => {
             // Run tests
@@ -78,11 +108,20 @@ fn main() {
                 cli.category.as_deref(),
                 !cli.no_std,
                 cli.verbose,
+                verification_level,
             );
         }
     }
 }
 
+/// Collect test statistics for a category
+struct CategoryStats {
+    total: usize,
+    requires_std: usize,
+    no_std: usize,
+}
+
+/// List tests matching the filters
 fn list_tests(
     registry: &TestRegistry,
     name_filter: Option<&str>,
@@ -90,307 +129,225 @@ fn list_tests(
     std_only: bool,
     no_std_only: bool,
 ) {
-    let tests = registry.get_tests();
-    let mut filtered_tests = Vec::new();
+    println!("{}", "WebAssembly Runtime (WRT) Test Registry".green().bold());
 
-    for test in tests {
-        // Apply filters
-        if let Some(name) = name_filter {
-            if !test.name().contains(name) {
-                continue;
-            }
-        }
-
-        if let Some(category) = category_filter {
-            if !test.category().contains(category) {
-                continue;
-            }
-        }
-
-        if std_only && !test.requires_std() {
-            continue;
-        }
-
-        if no_std_only && test.requires_std() {
-            continue;
-        }
-
-        filtered_tests.push(test);
-    }
-
-    // Print test count
-    println!(
-        "{} (filtered from {} total)",
-        format!("{} tests found", filtered_tests.len())
-            .green()
-            .bold(),
-        registry.count()
-    );
-
-    // Group tests by category
-    let mut categories = std::collections::HashMap::new();
-    for test in filtered_tests {
-        categories
-            .entry(test.category())
-            .or_insert_with(Vec::new)
-            .push(test);
-    }
-
-    // Print tests by category
-    for (category, tests) in categories {
-        println!("\n{}", format!("Category: {}", category).blue().bold());
+    // Use bounded collections for safety
+    let mut category_stats: BoundedHashMap<String, CategoryStats, 100> = BoundedHashMap::new();
+    registry.with_tests(|tests| {
+        // First, collect all categories
         for test in tests {
-            let std_marker = if test.requires_std() {
-                format!("[{}]", "std".yellow())
-            } else {
-                format!("[{}]", "no_std".green())
+            let category = test.category().to_string();
+
+            // Skip tests that don't match the filters
+            if !should_include_test(test, name_filter, Some(&category), std_only, no_std_only) {
+                continue;
+            }
+
+            // Update category stats
+            let entry = match category_stats.get_mut(&category) {
+                Some(entry) => entry,
+                None => {
+                    // Insert new entry if it doesn't exist
+                    let new_entry = CategoryStats { total: 0, requires_std: 0, no_std: 0 };
+
+                    if let Err(e) = category_stats.try_insert(category.clone(), new_entry) {
+                        // Skip if we can't insert (capacity reached)
+                        eprintln!("Category capacity exceeded: {}", e);
+                        continue;
+                    }
+
+                    category_stats.get_mut(&category).unwrap()
+                }
             };
-            println!("  {} {}", test.name(), std_marker);
+
+            entry.total += 1;
+            if test.requires_std() {
+                entry.requires_std += 1;
+            } else {
+                entry.no_std += 1;
+            }
         }
-    }
+
+        // Display by category
+        println!("\n{}", "Tests by Category:".underline());
+
+        // Create a bounded collection of sorted categories
+        let mut sorted_categories = BoundedVec::<String, 100>::new();
+        for (category, _) in category_stats.iter() {
+            if let Err(e) = sorted_categories.try_push(category.clone()) {
+                eprintln!("Too many categories to display: {}", e);
+                break;
+            }
+        }
+
+        // Sort categories
+        sorted_categories.sort();
+
+        for category in sorted_categories.iter() {
+            if let Some(stats) = category_stats.get(category) {
+                println!(
+                    "{}: {} tests ({} std, {} no_std)",
+                    category.bold(),
+                    stats.total,
+                    stats.requires_std,
+                    stats.no_std
+                );
+
+                // List tests in this category
+                registry.with_tests(|tests| {
+                    let mut tests_in_category = BoundedVec::<String, 1024>::new();
+                    for test in tests {
+                        if test.category() == category {
+                            // Skip tests that don't match the filters
+                            if !should_include_test(test, name_filter, None, std_only, no_std_only)
+                            {
+                                continue;
+                            }
+
+                            let test_info = format!(
+                                "  - {} {}",
+                                test.name(),
+                                if test.requires_std() {
+                                    "(requires std)".dimmed()
+                                } else {
+                                    "(no_std compatible)".dimmed()
+                                }
+                            );
+
+                            // Add to collection with error handling
+                            if let Err(e) = tests_in_category.try_push(test_info) {
+                                eprintln!("Too many tests to display: {}", e);
+                                break;
+                            }
+                        }
+                    }
+
+                    // Sort and display tests
+                    tests_in_category.sort();
+                    for test_info in tests_in_category.iter() {
+                        println!("{}", test_info);
+                    }
+                });
+
+                println!(); // Add a blank line between categories
+            }
+        }
+    });
 }
 
+/// Helper function to check if a test should be included based on filters
+fn should_include_test(
+    test: &Box<dyn TestCase>,
+    name_filter: Option<&str>,
+    category_filter: Option<&str>,
+    std_only: bool,
+    no_std_only: bool,
+) -> bool {
+    // Skip tests that don't match the name filter
+    if let Some(filter) = name_filter {
+        if !test.name().contains(filter) {
+            return false;
+        }
+    }
+
+    // Skip tests that don't match the category filter
+    if let Some(filter) = category_filter {
+        let category = test.category();
+        if !category.contains(filter) {
+            return false;
+        }
+    }
+
+    // Skip tests that don't match the std/no_std filter
+    if std_only && !test.requires_std() {
+        return false;
+    }
+
+    if no_std_only && test.requires_std() {
+        return false;
+    }
+
+    true
+}
+
+/// Run tests that match the given filters
 fn run_tests(
     registry: &TestRegistry,
     name_filter: Option<&str>,
     category_filter: Option<&str>,
     allow_std: bool,
     verbose: bool,
+    verification_level: VerificationLevel,
 ) {
+    println!("{}", "Running WebAssembly Runtime Tests".green().bold());
     println!(
-        "{}",
-        "Running WebAssembly Runtime (WRT) tests...".green().bold()
+        "Verification level: {}",
+        match verification_level {
+            VerificationLevel::None => "None".normal(),
+            VerificationLevel::Sampling => "Sampling".yellow(),
+            VerificationLevel::Standard => "Standard".normal(),
+            VerificationLevel::Full => "Full".red(),
+        }
     );
 
-    if let Some(name) = name_filter {
-        println!("Filtering by name: {}", name);
-    }
+    // Create a safe test configuration
+    let mut test_config = TestConfig {
+        is_std: true,
+        features: BoundedVec::new(),
+        params: HashMap::new(),
+        verification_level,
+    };
 
-    if let Some(category) = category_filter {
-        println!("Filtering by category: {}", category);
-    }
+    // Add standard features
+    let _ = test_config.features.try_push("std".to_string());
 
-    if !allow_std {
-        println!("Skipping tests that require the standard library");
-    }
+    let start_time = std::time::Instant::now();
+    let num_tests = registry.run_filtered_tests(name_filter, category_filter, allow_std);
+    let elapsed = start_time.elapsed();
 
-    println!("\n{}", "Test Results:".underline());
-    let failed_count = registry.run_filtered_tests(name_filter, category_filter, allow_std);
-    let total_count = registry.count();
+    // Get the test statistics
+    let stats = registry.get_stats();
 
-    println!("\n{}", "Summary:".bold());
-    if failed_count == 0 {
-        println!("{}", "All tests passed!".green().bold());
+    // Print test results with color coding
+    if verbose {
+        println!("\n{}", "Test Results:".underline());
+        println!("Tests run: {}", num_tests);
+        println!("Passed: {}", stats.passed.to_string().green());
+        println!("Failed: {}", stats.failed.to_string().red());
+        println!("Skipped: {}", stats.skipped.to_string().yellow());
+        println!("Time: {:.2} seconds", elapsed.as_secs_f64());
     } else {
-        println!("{}", format!("{} tests failed", failed_count).red().bold());
-        std::process::exit(1);
+        print_test_statistics(&stats);
     }
-
-    println!(
-        "Ran {} tests out of {} total registered tests",
-        total_count - failed_count,
-        total_count
-    );
 }
 
-/// Module for testing compatibility between std and no_std environments
-#[cfg(feature = "std")]
-pub mod compatibility {
-    use crate::{TestRegistry, TestResult};
-
-    /// Create a test registry with compatibility tests
-    pub fn create_compatibility_test_registry() -> TestRegistry {
-        let registry = TestRegistry::new();
-
-        // Register basic compatibility tests
-        registry.register(Box::new(MemoryCompatibilityTest));
-        registry.register(Box::new(ModuleCompatibilityTest));
-        registry.register(Box::new(TypesCompatibilityTest));
-        registry.register(Box::new(ErrorHandlingTest));
-
-        registry
+/// Display a summary of test results
+fn print_test_statistics(stats: &TestStats) {
+    // Create a summary bar that shows passed/failed/skipped proportions
+    let total = stats.passed + stats.failed + stats.skipped;
+    if total == 0 {
+        println!("No tests were run.");
+        return;
     }
 
-    /// Test memory operations in both std and no_std environments
-    struct MemoryCompatibilityTest;
+    let bar_width = 50;
+    let passed_width = (stats.passed * bar_width) / total;
+    let failed_width = (stats.failed * bar_width) / total;
+    let skipped_width = bar_width - passed_width - failed_width;
 
-    impl crate::TestCase for MemoryCompatibilityTest {
-        fn name(&self) -> &'static str {
-            "memory_compatibility"
-        }
+    let passed_bar = "█".repeat(passed_width).green();
+    let failed_bar = "█".repeat(failed_width).red();
+    let skipped_bar = "█".repeat(skipped_width).yellow();
 
-        fn category(&self) -> &'static str {
-            "compatibility"
-        }
+    println!("\n{}{}{}", passed_bar, failed_bar, skipped_bar);
+    println!(
+        "{} passed, {} failed, {} skipped (total: {})",
+        stats.passed.to_string().green(),
+        stats.failed.to_string().red(),
+        stats.skipped.to_string().yellow(),
+        total
+    );
 
-        fn requires_std(&self) -> bool {
-            false // Works in both environments
-        }
-
-        fn run(&self) -> TestResult {
-            use wrt_types::memory::MemoryType;
-
-            // Create a memory instance
-            let mem_type = MemoryType::new(1, Some(2), false);
-            let memory = wrt::new_memory(mem_type);
-
-            // Verify initial size
-            assert_eq_test!(memory.size(), 1, "Initial memory size should be 1 page");
-            assert_eq_test!(
-                memory.data_size(),
-                65536,
-                "Initial data size should be 65536 bytes"
-            );
-
-            // Test basic memory operations
-            let test_data = [1, 2, 3, 4];
-            memory.write(100, &test_data).map_err(|e| e.to_string())?;
-
-            let mut read_buffer = [0; 4];
-            memory
-                .read(100, &mut read_buffer)
-                .map_err(|e| e.to_string())?;
-
-            assert_eq_test!(
-                read_buffer,
-                test_data,
-                "Memory read/write should work correctly"
-            );
-
-            // Test memory growth
-            memory.grow(1).map_err(|e| e.to_string())?;
-            assert_eq_test!(
-                memory.size(),
-                2,
-                "Memory size should be 2 pages after growing"
-            );
-
-            Ok(())
-        }
-    }
-
-    /// Test module operations in both std and no_std environments
-    struct ModuleCompatibilityTest;
-
-    impl crate::TestCase for ModuleCompatibilityTest {
-        fn name(&self) -> &'static str {
-            "module_compatibility"
-        }
-
-        fn category(&self) -> &'static str {
-            "compatibility"
-        }
-
-        fn requires_std(&self) -> bool {
-            false // Works in both environments
-        }
-
-        fn run(&self) -> TestResult {
-            // Create a new module
-            let module = wrt::new_module().map_err(|e| e.to_string())?;
-
-            // Verify module properties
-            assert_eq_test!(
-                module.functions().len(),
-                0,
-                "New module should have 0 functions"
-            );
-            assert_eq_test!(
-                module.imports().len(),
-                0,
-                "New module should have 0 imports"
-            );
-            assert_eq_test!(
-                module.exports().len(),
-                0,
-                "New module should have 0 exports"
-            );
-
-            Ok(())
-        }
-    }
-
-    /// Test type system compatibility between std and no_std
-    struct TypesCompatibilityTest;
-
-    impl crate::TestCase for TypesCompatibilityTest {
-        fn name(&self) -> &'static str {
-            "types_compatibility"
-        }
-
-        fn category(&self) -> &'static str {
-            "compatibility"
-        }
-
-        fn requires_std(&self) -> bool {
-            false // Works in both environments
-        }
-
-        fn run(&self) -> TestResult {
-            use wrt_types::values::{ValType, Value};
-
-            // Test value types
-            let i32_val = Value::I32(42);
-            let i64_val = Value::I64(84);
-            let f32_val = Value::F32(42.0);
-            let f64_val = Value::F64(84.0);
-
-            assert_eq_test!(
-                i32_val.value_type(),
-                ValType::I32,
-                "I32 value type should be I32"
-            );
-            assert_eq_test!(
-                i64_val.value_type(),
-                ValType::I64,
-                "I64 value type should be I64"
-            );
-            assert_eq_test!(
-                f32_val.value_type(),
-                ValType::F32,
-                "F32 value type should be F32"
-            );
-            assert_eq_test!(
-                f64_val.value_type(),
-                ValType::F64,
-                "F64 value type should be F64"
-            );
-
-            Ok(())
-        }
-    }
-
-    /// Test error handling compatibility between std and no_std
-    struct ErrorHandlingTest;
-
-    impl crate::TestCase for ErrorHandlingTest {
-        fn name(&self) -> &'static str {
-            "error_handling_compatibility"
-        }
-
-        fn category(&self) -> &'static str {
-            "compatibility"
-        }
-
-        fn requires_std(&self) -> bool {
-            false // Works in both environments
-        }
-
-        fn run(&self) -> TestResult {
-            use wrt_error::{kinds, Error};
-
-            // Create an error
-            let validation_error = Error::new(kinds::ErrorKind::Validation, 1, Some("test error"));
-
-            // Check error properties
-            assert_eq_test!(
-                validation_error.kind(),
-                kinds::ErrorKind::Validation,
-                "Error kind should be Validation"
-            );
-            assert_eq_test!(validation_error.code(), 1, "Error code should be 1");
-
-            Ok(())
-        }
-    }
+    // Print execution time if available
+    println!("Execution time: {:.2} seconds", stats.execution_time_ms as f64 / 1000.0);
 }

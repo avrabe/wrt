@@ -158,17 +158,9 @@ impl ThreadManager {
         });
 
         // Store the thread handle
-        let thread_handle = ThreadHandle {
-            handle: Some(handle),
-            state,
-            result,
-            error,
-        };
+        let thread_handle = ThreadHandle { handle: Some(handle), state, result, error };
 
-        self.threads
-            .write()
-            .unwrap()
-            .insert(thread_id, thread_handle);
+        self.threads.write().unwrap().insert(thread_id, thread_handle);
 
         Ok(thread_id)
     }
@@ -215,9 +207,7 @@ impl ThreadManager {
                 }
                 ThreadState::Running => {
                     // This shouldn't happen if handle is None
-                    Err(Error::new(ThreadingError(
-                        "Thread is still running but handle is missing",
-                    )))
+                    Err(Error::new(ThreadingError("Thread is still running but handle is missing")))
                 }
             }
         } else {
@@ -234,9 +224,7 @@ impl ThreadManager {
                     // Thread panicked
                     *thread.state.write().unwrap() = ThreadState::Error;
                     *thread.error.write().unwrap() = Some("Thread panicked".to_string());
-                    Err(Error::new(ThreadingError(
-                        "Thread panicked during execution",
-                    )))
+                    Err(Error::new(ThreadingError("Thread panicked during execution")))
                 }
             }
         }
@@ -271,9 +259,7 @@ impl ThreadManager {
     pub fn create_mutex(&self) -> SyncId {
         let sync_id = self.next_sync_id.fetch_add(1, Ordering::SeqCst);
 
-        let mutex = SyncPrimitive::Mutex {
-            lock: Mutex::new(None),
-        };
+        let mutex = SyncPrimitive::Mutex { lock: Mutex::new(None) };
 
         self.sync_primitives.write().unwrap().insert(sync_id, mutex);
         sync_id
@@ -287,15 +273,9 @@ impl ThreadManager {
     pub fn create_condvar(&self) -> SyncId {
         let sync_id = self.next_sync_id.fetch_add(1, Ordering::SeqCst);
 
-        let condvar = SyncPrimitive::CondVar {
-            lock: Mutex::new(None),
-            cvar: Condvar::new(),
-        };
+        let condvar = SyncPrimitive::CondVar { lock: Mutex::new(None), cvar: Condvar::new() };
 
-        self.sync_primitives
-            .write()
-            .unwrap()
-            .insert(sync_id, condvar);
+        self.sync_primitives.write().unwrap().insert(sync_id, condvar);
         sync_id
     }
 
@@ -307,14 +287,9 @@ impl ThreadManager {
     pub fn create_rwlock(&self) -> SyncId {
         let sync_id = self.next_sync_id.fetch_add(1, Ordering::SeqCst);
 
-        let rwlock = SyncPrimitive::RwLock {
-            lock: RwLock::new(None),
-        };
+        let rwlock = SyncPrimitive::RwLock { lock: RwLock::new(None) };
 
-        self.sync_primitives
-            .write()
-            .unwrap()
-            .insert(sync_id, rwlock);
+        self.sync_primitives.write().unwrap().insert(sync_id, rwlock);
         sync_id
     }
 
@@ -347,14 +322,10 @@ impl ThreadManager {
 
                 Ok(previous)
             }
-            Some(_) => Err(Error::new(ThreadingError(format!(
-                "Sync ID {} is not a mutex",
-                sync_id
-            )))),
-            None => Err(Error::new(ThreadingError(format!(
-                "Invalid sync ID: {}",
-                sync_id
-            )))),
+            Some(_) => {
+                Err(Error::new(ThreadingError(format!("Sync ID {} is not a mutex", sync_id))))
+            }
+            None => Err(Error::new(ThreadingError(format!("Invalid sync ID: {}", sync_id)))),
         }
     }
 
@@ -393,10 +364,7 @@ impl ThreadManager {
                 "Sync ID {} is not a condition variable",
                 sync_id
             )))),
-            None => Err(Error::new(ThreadingError(format!(
-                "Invalid sync ID: {}",
-                sync_id
-            )))),
+            None => Err(Error::new(ThreadingError(format!("Invalid sync ID: {}", sync_id)))),
         }
     }
 
@@ -436,10 +404,7 @@ impl ThreadManager {
                 "Sync ID {} is not a condition variable",
                 sync_id
             )))),
-            None => Err(Error::new(ThreadingError(format!(
-                "Invalid sync ID: {}",
-                sync_id
-            )))),
+            None => Err(Error::new(ThreadingError(format!("Invalid sync ID: {}", sync_id)))),
         }
     }
 
@@ -468,10 +433,7 @@ impl ThreadManager {
                 "Sync ID {} is not a read-write lock",
                 sync_id
             )))),
-            None => Err(Error::new(ThreadingError(format!(
-                "Invalid sync ID: {}",
-                sync_id
-            )))),
+            None => Err(Error::new(ThreadingError(format!("Invalid sync ID: {}", sync_id)))),
         }
     }
 
@@ -508,10 +470,7 @@ impl ThreadManager {
                 "Sync ID {} is not a read-write lock",
                 sync_id
             )))),
-            None => Err(Error::new(ThreadingError(format!(
-                "Invalid sync ID: {}",
-                sync_id
-            )))),
+            None => Err(Error::new(ThreadingError(format!("Invalid sync ID: {}", sync_id)))),
         }
     }
 }
@@ -540,10 +499,7 @@ impl ThreadingSpawnHandler {
             dyn Fn(u32, Vec<ComponentValue>) -> Result<Vec<ComponentValue>> + Send + Sync,
         >,
     ) -> Self {
-        Self {
-            thread_manager,
-            executor,
-        }
+        Self { thread_manager, executor }
     }
 }
 
@@ -556,9 +512,7 @@ impl BuiltinHandler for ThreadingSpawnHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate arguments
         if args.len() < 1 {
-            return Err(Error::new(ThreadingError(
-                "threading.spawn requires at least 1 argument",
-            )));
+            return Err(Error::new(ThreadingError("threading.spawn requires at least 1 argument")));
         }
 
         // Extract function ID
@@ -580,9 +534,7 @@ impl BuiltinHandler for ThreadingSpawnHandler {
         // Spawn the thread
         let thread_id =
             self.thread_manager
-                .spawn(function_id, function_args, move |id, args| {
-                    executor(id, args)
-                })?;
+                .spawn(function_id, function_args, move |id, args| executor(id, args))?;
 
         // Return the thread ID
         Ok(vec![ComponentValue::U64(thread_id)])
@@ -622,9 +574,7 @@ impl BuiltinHandler for ThreadingJoinHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate arguments
         if args.len() != 1 {
-            return Err(Error::new(ThreadingError(
-                "threading.join requires exactly 1 argument",
-            )));
+            return Err(Error::new(ThreadingError("threading.join requires exactly 1 argument")));
         }
 
         // Extract thread ID
@@ -664,10 +614,7 @@ impl ThreadingSyncHandler {
     ///
     /// * `thread_manager` - Thread manager to use
     pub fn new(thread_manager: Arc<ThreadManager>) -> Self {
-        Self {
-            thread_manager,
-            no_std_mode: AtomicBool::new(false),
-        }
+        Self { thread_manager, no_std_mode: AtomicBool::new(false) }
     }
 }
 
@@ -680,16 +627,12 @@ impl BuiltinHandler for ThreadingSyncHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Check if we're in no_std mode (should never happen if properly feature-gated)
         if self.no_std_mode.load(Ordering::Relaxed) {
-            return Err(Error::new(ThreadingError(
-                "Threading is not supported in no_std mode",
-            )));
+            return Err(Error::new(ThreadingError("Threading is not supported in no_std mode")));
         }
 
         // Validate arguments
         if args.len() < 1 {
-            return Err(Error::new(ThreadingError(
-                "threading.sync requires at least 1 argument",
-            )));
+            return Err(Error::new(ThreadingError("threading.sync requires at least 1 argument")));
         }
 
         // Extract operation type
@@ -724,11 +667,7 @@ impl BuiltinHandler for ThreadingSyncHandler {
                 };
 
                 // Extract optional data
-                let data = if args.len() > 2 {
-                    Some(args[2..].to_vec())
-                } else {
-                    None
-                };
+                let data = if args.len() > 2 { Some(args[2..].to_vec()) } else { None };
 
                 // Lock the mutex
                 let previous = self.thread_manager.lock_mutex(mutex_id, data)?;
@@ -744,9 +683,7 @@ impl BuiltinHandler for ThreadingSyncHandler {
             "wait-condvar" => {
                 // Wait on a condition variable
                 if args.len() < 2 {
-                    return Err(Error::new(ThreadingError(
-                        "wait-condvar requires a condvar ID",
-                    )));
+                    return Err(Error::new(ThreadingError("wait-condvar requires a condvar ID")));
                 }
 
                 let condvar_id = match args[1] {
@@ -770,9 +707,7 @@ impl BuiltinHandler for ThreadingSyncHandler {
             "signal-condvar" => {
                 // Signal a condition variable
                 if args.len() < 2 {
-                    return Err(Error::new(ThreadingError(
-                        "signal-condvar requires a condvar ID",
-                    )));
+                    return Err(Error::new(ThreadingError("signal-condvar requires a condvar ID")));
                 }
 
                 let condvar_id = match args[1] {
@@ -785,11 +720,7 @@ impl BuiltinHandler for ThreadingSyncHandler {
                 };
 
                 // Extract optional data
-                let data = if args.len() > 2 {
-                    Some(args[2..].to_vec())
-                } else {
-                    None
-                };
+                let data = if args.len() > 2 { Some(args[2..].to_vec()) } else { None };
 
                 // Signal the condition variable
                 let previous = self.thread_manager.signal_condvar(condvar_id, data)?;
@@ -805,9 +736,7 @@ impl BuiltinHandler for ThreadingSyncHandler {
             "read-rwlock" => {
                 // Read from a read-write lock
                 if args.len() < 2 {
-                    return Err(Error::new(ThreadingError(
-                        "read-rwlock requires a rwlock ID",
-                    )));
+                    return Err(Error::new(ThreadingError("read-rwlock requires a rwlock ID")));
                 }
 
                 let rwlock_id = match args[1] {
@@ -828,9 +757,7 @@ impl BuiltinHandler for ThreadingSyncHandler {
             "write-rwlock" => {
                 // Write to a read-write lock
                 if args.len() < 2 {
-                    return Err(Error::new(ThreadingError(
-                        "write-rwlock requires a rwlock ID",
-                    )));
+                    return Err(Error::new(ThreadingError("write-rwlock requires a rwlock ID")));
                 }
 
                 let rwlock_id = match args[1] {
@@ -843,11 +770,7 @@ impl BuiltinHandler for ThreadingSyncHandler {
                 };
 
                 // Extract optional data
-                let data = if args.len() > 2 {
-                    Some(args[2..].to_vec())
-                } else {
-                    None
-                };
+                let data = if args.len() > 2 { Some(args[2..].to_vec()) } else { None };
 
                 // Write to the read-write lock
                 let previous = self.thread_manager.write_rwlock(rwlock_id, data)?;
@@ -919,20 +842,14 @@ mod tests {
                 sleep(Duration::from_millis(sleep_ms as u64));
 
                 // Return a simple result
-                Ok(vec![
-                    ComponentValue::String("Slept".to_string()),
-                    ComponentValue::U32(sleep_ms),
-                ])
+                Ok(vec![ComponentValue::String("Slept".to_string()), ComponentValue::U32(sleep_ms)])
             }
 
             // Function that returns an error
             3 => Err(Error::new("Test error")),
 
             // Unknown function
-            _ => Err(Error::new(ThreadingError(format!(
-                "Unknown function ID: {}",
-                function_id
-            )))),
+            _ => Err(Error::new(ThreadingError(format!("Unknown function ID: {}", function_id)))),
         }
     }
 
@@ -942,11 +859,7 @@ mod tests {
 
         // Spawn a thread
         let thread_id = manager
-            .spawn(
-                1,
-                vec![ComponentValue::String("Hello".to_string())],
-                test_executor,
-            )
+            .spawn(1, vec![ComponentValue::String("Hello".to_string())], test_executor)
             .unwrap();
 
         // Join it
@@ -961,9 +874,7 @@ mod tests {
         let manager = ThreadManager::new();
 
         // Spawn a thread that sleeps
-        let thread_id = manager
-            .spawn(2, vec![ComponentValue::U32(50)], test_executor)
-            .unwrap();
+        let thread_id = manager.spawn(2, vec![ComponentValue::U32(50)], test_executor).unwrap();
 
         // Check if it's completed (should be running)
         assert!(!manager.is_thread_completed(thread_id).unwrap());
@@ -980,10 +891,7 @@ mod tests {
         // Verify result
         assert_eq!(
             result,
-            vec![
-                ComponentValue::String("Slept".to_string()),
-                ComponentValue::U32(50)
-            ]
+            vec![ComponentValue::String("Slept".to_string()), ComponentValue::U32(50)]
         );
     }
 
@@ -1025,10 +933,7 @@ mod tests {
 
         // Join the thread
         let join_result = thread_manager.join(thread_id).unwrap();
-        assert_eq!(
-            join_result,
-            vec![ComponentValue::String("Test".to_string())]
-        );
+        assert_eq!(join_result, vec![ComponentValue::String("Test".to_string())]);
 
         // Test with invalid arguments
         let args = vec![ComponentValue::String("invalid".to_string())];
@@ -1046,11 +951,7 @@ mod tests {
 
         // Spawn a thread
         let thread_id = thread_manager
-            .spawn(
-                1,
-                vec![ComponentValue::String("Test".to_string())],
-                executor,
-            )
+            .spawn(1, vec![ComponentValue::String("Test".to_string())], executor)
             .unwrap();
 
         // Create a join handler
@@ -1075,9 +976,8 @@ mod tests {
         let handler = ThreadingSyncHandler::new(thread_manager);
 
         // Test creating a mutex
-        let result = handler
-            .execute(&[ComponentValue::String("create-mutex".to_string())])
-            .unwrap();
+        let result =
+            handler.execute(&[ComponentValue::String("create-mutex".to_string())]).unwrap();
         assert_eq!(result.len(), 1);
 
         let mutex_id = match result[0] {
@@ -1109,9 +1009,8 @@ mod tests {
         assert_eq!(result, vec![ComponentValue::String("data".to_string())]);
 
         // Test creating a condvar
-        let result = handler
-            .execute(&[ComponentValue::String("create-condvar".to_string())])
-            .unwrap();
+        let result =
+            handler.execute(&[ComponentValue::String("create-condvar".to_string())]).unwrap();
         let condvar_id = match result[0] {
             ComponentValue::U64(id) => id,
             _ => panic!("Expected U64 result"),
@@ -1127,9 +1026,8 @@ mod tests {
             .unwrap();
 
         // Test creating an rwlock
-        let result = handler
-            .execute(&[ComponentValue::String("create-rwlock".to_string())])
-            .unwrap();
+        let result =
+            handler.execute(&[ComponentValue::String("create-rwlock".to_string())]).unwrap();
         let rwlock_id = match result[0] {
             ComponentValue::U64(id) => id,
             _ => panic!("Expected U64 result"),
@@ -1152,10 +1050,7 @@ mod tests {
             ])
             .unwrap();
 
-        assert_eq!(
-            result,
-            vec![ComponentValue::String("rwlock-data".to_string())]
-        );
+        assert_eq!(result, vec![ComponentValue::String("rwlock-data".to_string())]);
 
         // Test with invalid operation
         let args = vec![ComponentValue::String("invalid-op".to_string())];

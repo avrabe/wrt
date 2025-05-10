@@ -146,19 +146,19 @@ impl ResourceTable {
     pub fn get(&self, id: ResourceId) -> Result<&Resource> {
         let index = id.0 as usize - 1;
         if index >= self.resources.len() {
-            return Err(Error::new(kinds::ExecutionError(format!(
+            return Err(kinds::ExecutionError(format!(
                 "Invalid resource ID: {:?}",
                 id
-            ))));
+            )).into());
         }
 
         if let Some(ref resource) = self.resources[index] {
             Ok(resource)
         } else {
-            Err(Error::new(kinds::ExecutionError(format!(
+            Err(kinds::ExecutionError(format!(
                 "Resource not found: {:?}",
                 id
-            ))))
+            )).into())
         }
     }
 
@@ -166,19 +166,19 @@ impl ResourceTable {
     pub fn get_mut(&mut self, id: ResourceId) -> Result<&mut Resource> {
         let index = id.0 as usize - 1;
         if index >= self.resources.len() {
-            return Err(Error::new(kinds::ExecutionError(format!(
+            return Err(kinds::ExecutionError(format!(
                 "Invalid resource ID: {:?}",
                 id
-            ))));
+            )).into());
         }
 
         if let Some(ref mut resource) = self.resources[index] {
             Ok(resource)
         } else {
-            Err(Error::new(kinds::ExecutionError(format!(
+            Err(kinds::ExecutionError(format!(
                 "Resource not found: {:?}",
                 id
-            ))))
+            )).into())
         }
     }
 
@@ -193,10 +193,10 @@ impl ResourceTable {
     pub fn drop_ref(&mut self, id: ResourceId) -> Result<()> {
         let index = id.0 as usize - 1;
         if index >= self.resources.len() {
-            return Err(Error::new(kinds::ExecutionError(format!(
+            return Err(kinds::ExecutionError(format!(
                 "Invalid resource ID: {:?}",
                 id
-            ))));
+            )).into());
         }
 
         let drop_resource = {

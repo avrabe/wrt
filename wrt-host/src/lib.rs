@@ -1,3 +1,12 @@
+// WRT - wrt-host
+// SW-REQ-ID: [SW-REQ-ID-wrt-host]
+//
+// Copyright (c) 2025 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+#![forbid(unsafe_code)] // Rule 2
+
 //! Host function infrastructure for the WebAssembly Runtime (WRT).
 //!
 //! This crate provides the core infrastructure for registering and managing host functions

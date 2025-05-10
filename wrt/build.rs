@@ -25,7 +25,7 @@ fn main() {
         if has_internet {
             println!("Cloning WebAssembly testsuite repository...");
             if let Err(e) = clone_testsuite(&testsuite_path) {
-                println!("cargo:warning=Failed to clone testsuite: {}", e);
+                println!("cargo:warning=Failed to clone testsuite: {e}");
                 return;
             }
         } else {
@@ -36,7 +36,7 @@ fn main() {
         // Update repository if we have internet
         println!("Updating WebAssembly testsuite repository...");
         if let Err(e) = update_testsuite(&testsuite_path) {
-            println!("cargo:warning=Failed to update testsuite: {}", e);
+            println!("cargo:warning=Failed to update testsuite: {e}");
             // Continue with existing version
         }
     } else {
@@ -47,23 +47,23 @@ fn main() {
     if testsuite_path.exists() {
         match get_commit_hash(&testsuite_path) {
             Ok(hash) => {
-                println!("Testsuite at commit: {}", hash);
+                println!("Testsuite at commit: {hash}");
                 if let Err(e) = fs::write(&commit_hash_path, &hash) {
-                    println!("cargo:warning=Failed to write commit hash: {}", e);
+                    println!("cargo:warning=Failed to write commit hash: {e}");
                 }
 
                 // Make the commit hash available to the test code
-                println!("cargo:rustc-env=WASM_TESTSUITE_COMMIT={}", hash);
+                println!("cargo:rustc-env=WASM_TESTSUITE_COMMIT={hash}");
             }
             Err(e) => {
-                println!("cargo:warning=Failed to get commit hash: {}", e);
+                println!("cargo:warning=Failed to get commit hash: {e}");
             }
         }
 
         // Make the testsuite path available to the test code
         let path_str = testsuite_path.to_string_lossy();
-        println!("cargo:rustc-env=WASM_TESTSUITE={}", path_str);
-        println!("cargo:warning=Setting WASM_TESTSUITE to {}", path_str);
+        println!("cargo:rustc-env=WASM_TESTSUITE={path_str}");
+        println!("cargo:warning=Setting WASM_TESTSUITE to {path_str}");
     }
 
     // Create a symbolic link in the current directory for easier access
@@ -76,7 +76,7 @@ fn main() {
         {
             use std::os::unix::fs as unix_fs;
             if let Err(e) = unix_fs::symlink(&testsuite_path, &workspace_testsuite) {
-                println!("cargo:warning=Failed to create symlink: {}", e);
+                println!("cargo:warning=Failed to create symlink: {e}");
             } else {
                 println!("cargo:warning=Created symlink to testsuite at ./testsuite");
             }
@@ -104,9 +104,8 @@ fn check_internet_connection() -> bool {
 }
 
 fn clone_testsuite(path: &Path) -> io::Result<()> {
-    let status = Command::new("git")
-        .args(["clone", TESTSUITE_REPO_URL, path.to_str().unwrap()])
-        .status()?;
+    let status =
+        Command::new("git").args(["clone", TESTSUITE_REPO_URL, path.to_str().unwrap()]).status()?;
 
     if !status.success() {
         return Err(io::Error::new(
@@ -119,18 +118,13 @@ fn clone_testsuite(path: &Path) -> io::Result<()> {
 }
 
 fn update_testsuite(path: &Path) -> io::Result<()> {
-    let status = Command::new("git")
-        .args(["pull", "origin", "master"])
-        .current_dir(path)
-        .status()?;
+    let status =
+        Command::new("git").args(["pull", "origin", "master"]).current_dir(path).status()?;
 
     if !status.success() {
         return Err(io::Error::new(
             io::ErrorKind::Other,
-            format!(
-                "Failed to update repository, exit code: {:?}",
-                status.code()
-            ),
+            format!("Failed to update repository, exit code: {:?}", status.code()),
         ));
     }
 
@@ -138,18 +132,12 @@ fn update_testsuite(path: &Path) -> io::Result<()> {
 }
 
 fn get_commit_hash(path: &Path) -> io::Result<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .current_dir(path)
-        .output()?;
+    let output = Command::new("git").args(["rev-parse", "HEAD"]).current_dir(path).output()?;
 
     if !output.status.success() {
         return Err(io::Error::new(
             io::ErrorKind::Other,
-            format!(
-                "Failed to get commit hash, exit code: {:?}",
-                output.status.code()
-            ),
+            format!("Failed to get commit hash, exit code: {:?}", output.status.code()),
         ));
     }
 

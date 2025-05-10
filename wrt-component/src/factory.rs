@@ -26,9 +26,7 @@ pub struct ComponentFactoryConfig {
 impl ComponentFactory {
     /// Create a new component factory with default configuration
     pub fn new() -> Self {
-        Self {
-            config: ComponentFactoryConfig::default(),
-        }
+        Self { config: ComponentFactoryConfig::default() }
     }
 
     /// Create a new component factory with custom configuration

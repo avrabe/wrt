@@ -11,11 +11,8 @@ use wrt_host::CallbackRegistry;
 #[kani::proof]
 fn verify_component_type() {
     // Create a component type
-    let component_type = ComponentType {
-        imports: Vec::new(),
-        exports: Vec::new(),
-        instances: Vec::new(),
-    };
+    let component_type =
+        ComponentType { imports: Vec::new(), exports: Vec::new(), instances: Vec::new() };
 
     // Verify that it can be used to create a component
     let component = Component::new(component_type);
@@ -62,10 +59,7 @@ fn verify_host() {
 
     // Add a function
     let func_value = FunctionValue {
-        ty: FuncType {
-            params: Vec::new(),
-            results: Vec::new(),
-        },
+        ty: FuncType { params: Vec::new(), results: Vec::new() },
         export_name: "test".to_string(),
     };
 

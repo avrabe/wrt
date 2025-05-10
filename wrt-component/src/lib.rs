@@ -1,3 +1,12 @@
+// WRT - wrt-component
+// SW-REQ-ID: [SW-REQ-ID-wrt-component]
+//
+// Copyright (c) 2025 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+#![forbid(unsafe_code)] // Rule 2
+
 //! Component Model implementation for the WebAssembly Runtime (WRT).
 //!
 //! This crate provides an implementation of the WebAssembly Component Model,
@@ -63,19 +72,23 @@ pub use strategies::memory::{
     BoundedCopyStrategy, FullIsolationStrategy, MemoryOptimizationStrategy, ZeroCopyStrategy,
 };
 pub use type_conversion::{
-    complete_format_to_types_extern_type, complete_types_to_format_extern_type,
-    format_to_runtime_extern_type as format_to_types_extern_type, format_to_types_valtype,
-    format_val_type_to_value_type, format_valtype_to_types_valtype,
-    runtime_to_format_extern_type as types_to_format_extern_type,
+    common_to_format_val_type, core_value_to_types_componentvalue, extern_type_to_func_type,
+    format_constvalue_to_types_componentvalue, format_to_common_val_type,
+    format_to_types_extern_type, format_val_type_to_value_type, format_valtype_to_types_valtype,
     types_componentvalue_to_core_value, types_componentvalue_to_format_constvalue,
-    types_valtype_to_format_valtype, types_valtype_to_valuetype, value_type_to_format_val_type,
+    types_to_format_extern_type, types_valtype_to_format_valtype, value_type_to_format_val_type,
     value_type_to_types_valtype, IntoFormatType, IntoRuntimeType,
+};
+pub use type_conversion::{
+    FormatComponentType, FormatInstanceType, IntoFormatComponentType, IntoFormatInstanceType,
+    IntoRuntimeComponentType, IntoRuntimeInstanceType, RuntimeComponentType, RuntimeInstanceType,
 };
 pub use types::ComponentInstance;
 pub use values::{
-    component_to_core_value, component_value_to_value, core_to_component_value,
-    deserialize_component_value, encode_component_value as serialize_component_value,
-    format_valtype_to_common_valtype, value_to_component_value,
+    component_to_core_value,
+    core_to_component_value,
+    deserialize_component_value,
+    // Use what's actually available in the values module
 };
 pub use wrt_error::{codes, Error, ErrorCategory, Result};
 pub use wrt_host::CallbackRegistry;

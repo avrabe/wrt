@@ -53,11 +53,7 @@ fn matches_pattern(filename: &str, pattern: &str) -> bool {
 // Helper function to filter WalkDir entries based on pattern
 fn filter_by_pattern(entry: &DirEntry, pattern: &str) -> bool {
     entry.file_type().is_file()
-        && entry
-            .file_name()
-            .to_str()
-            .map(|s| matches_pattern(s, pattern))
-            .unwrap_or(false)
+        && entry.file_name().to_str().map(|s| matches_pattern(s, pattern)).unwrap_or(false)
 }
 
 pub fn find_delete(directory: &Path, pattern: &str) -> Result<()> {
@@ -70,11 +66,7 @@ pub fn find_delete(directory: &Path, pattern: &str) -> Result<()> {
         } // else: Non-existent path is fine, nothing to delete.
         return Ok(());
     }
-    println!(
-        "Finding and deleting files matching '{}' in {}...",
-        pattern,
-        directory.display()
-    );
+    println!("Finding and deleting files matching '{}' in {}...", pattern, directory.display());
     let mut deleted_count = 0;
     for entry in WalkDir::new(directory)
         .into_iter()
@@ -114,37 +106,17 @@ pub fn count_files(directory: &Path, pattern: &str) -> Result<()> {
     Ok(())
 }
 
+/*
 pub fn file_size(path: &Path) -> Result<()> {
-    let size = if path.is_file() {
-        match fs::metadata(path) {
-            Ok(metadata) => metadata.len(),
-            Err(e) => {
-                println!(
-                    "Error: Failed to get metadata for file {}: {}",
-                    path.display(),
-                    e
-                );
-                0 // Output 0 on error
-            }
-        }
-    } else {
-        if path.exists() {
-            println!("Error: Path exists but is not a file: {}", path.display());
-        } else {
-            println!("Error: File does not exist: {}", path.display());
-        }
-        0 // Output 0 if not a file or doesn't exist
-    };
-    println!("{}", size); // Print only the size for scripting
+    let metadata = fs::metadata(path).with_context(|| format!("Failed to get metadata for {:?}", path))?;
+    let size = metadata.len();
+    info!("Size of {:?}: {} bytes", path, size);
     Ok(())
 }
+*/
 
 pub fn copy_file(source: &Path, destination: &Path) -> Result<()> {
-    println!(
-        "Copying file from {} to {}...",
-        source.display(),
-        destination.display()
-    );
+    println!("Copying file from {} to {}...", source.display(), destination.display());
 
     // Ensure the destination directory exists
     if let Some(parent) = destination.parent() {
@@ -159,11 +131,7 @@ pub fn copy_file(source: &Path, destination: &Path) -> Result<()> {
         destination.display()
     ))?;
 
-    println!(
-        "File copy successful: {} -> {}",
-        source.display(),
-        destination.display()
-    );
+    println!("File copy successful: {} -> {}", source.display(), destination.display());
     Ok(())
 }
 

@@ -52,4 +52,17 @@ pub use alloc::{
 pub use wrt_error::{codes, kinds, Error, ErrorCategory, Result};
 
 // Re-export from this crate
-pub use crate::{WrtMutex as Mutex, WrtRwLock as RwLock};
+pub use crate::mutex::{WrtMutex, WrtMutexGuard};
+pub use crate::rwlock::{WrtRwLock, WrtRwLockReadGuard, WrtRwLockWriteGuard};
+
+// Re-alias for convenience if not using std's versions
+#[cfg(not(feature = "std"))]
+pub use WrtMutex as Mutex;
+#[cfg(not(feature = "std"))]
+pub use WrtMutexGuard as MutexGuard;
+#[cfg(not(feature = "std"))]
+pub use WrtRwLock as RwLock;
+#[cfg(not(feature = "std"))]
+pub use WrtRwLockReadGuard as RwLockReadGuard;
+#[cfg(not(feature = "std"))]
+pub use WrtRwLockWriteGuard as RwLockWriteGuard;

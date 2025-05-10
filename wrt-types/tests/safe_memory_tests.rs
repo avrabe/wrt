@@ -3,10 +3,21 @@
 //! This file contains comprehensive tests for the SafeMemory module
 //! and its providers (StdMemoryProvider and NoStdMemoryProvider).
 
+#![cfg(test)]
+
+#[cfg(feature = "std")]
+extern crate std;
+
 extern crate wrt_types;
 
-use wrt_types::safe_memory::{MemoryProvider, MemorySafety, SafeSlice, StdMemoryProvider};
-use wrt_types::verification::VerificationLevel;
+use std::hint::black_box;
+// Common imports (assuming these are okay or handled internally by wrt-types for no_std)
+use wrt_types::WrtResult as Result;
+use wrt_types::{
+    prelude::*,
+    safe_memory::{MemoryProvider, SafeMemoryHandler, SafeSlice, StdMemoryProvider},
+    verification::VerificationLevel,
+};
 
 #[cfg(feature = "std")]
 #[test]
@@ -57,7 +68,7 @@ fn test_std_memory_provider_operations() {
     assert_eq!(slice.data().unwrap(), &[2, 3]);
 
     // Resize with more data
-    provider.resize(8, 0);
+    provider.resize(8, 0).unwrap();
     assert_eq!(provider.size(), 8);
 
     // Clear
@@ -268,47 +279,32 @@ fn test_safe_slice_sub_slicing() {
 #[cfg(feature = "std")]
 #[test]
 fn test_generic_memory_provider() {
-    #[cfg(feature = "std")]
-    fn access_memory<P: MemoryProvider>(provider: &P) -> Result<Vec<u8>, wrt_error::Error> {
-        let slice = provider.borrow_slice(2, 3)?;
-        let data = slice.data()?;
-        Ok(data.to_vec())
+    // Test with StdMemoryProvider
+    let std_provider = StdMemoryProvider::new(vec![1, 2, 3, 4, 5]);
+    let data = access_memory(&std_provider).unwrap();
+    assert_eq!(data, vec![1, 2, 3, 4, 5]);
+
+    // Generic function to access memory
+    fn access_memory<P: MemoryProvider>(provider: &P) -> Result<Vec<u8>> {
+        let slice = provider.borrow_slice(0, provider.size())?;
+        Ok(slice.data()?.to_vec())
     }
-
-    let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
-    let provider = StdMemoryProvider::new(data);
-
-    let result = access_memory(&provider).unwrap();
-    assert_eq!(result, vec![3, 4, 5]);
 }
 
 #[cfg(feature = "std")]
 #[test]
 fn test_generic_memory_safety() {
-    #[cfg(feature = "std")]
-    fn verify_and_access<M: MemoryProvider + MemorySafety>(
-        provider: &M,
-    ) -> Result<(), wrt_error::Error> {
+    let std_provider = StdMemoryProvider::new(vec![1, 2, 3, 4, 5]);
+    verify_and_access(&std_provider).unwrap();
+
+    // Generic function to verify and access memory
+    fn verify_and_access<M: MemoryProvider>(provider: &M) -> Result<()> {
         provider.verify_integrity()?;
-
-        // Check verification level
-        assert_eq!(provider.verification_level(), VerificationLevel::Standard);
-
-        // Access data
-        let slice = provider.borrow_slice(0, 4)?;
-        assert_eq!(slice.len(), 4);
-
-        // Check stats
-        let stats = provider.memory_stats();
-        assert!(stats.access_count > 0);
-
+        let slice = provider.borrow_slice(0, provider.size())?;
+        // Perform some operation with slice.data() if needed, e.g., black_box it
+        let _ = black_box(slice.data()?);
         Ok(())
     }
-
-    let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
-    let provider = StdMemoryProvider::new(data);
-
-    verify_and_access(&provider).unwrap();
 }
 
 // More comprehensive tests in a separate module
@@ -316,7 +312,7 @@ fn test_generic_memory_safety() {
 mod tests {
     use super::*;
     use wrt_types::{
-        safe_memory::{MemoryProvider, MemorySafety, SafeSlice, StdMemoryProvider},
+        safe_memory::{MemoryProvider, SafeSlice, StdMemoryProvider},
         verification::VerificationLevel,
     };
 

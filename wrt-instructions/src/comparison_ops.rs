@@ -91,7 +91,7 @@ pub trait ComparisonContext {
 }
 
 impl<T: ComparisonContext> PureInstruction<T, Error> for ComparisonOp {
-    fn execute(&self, context: &mut T) -> Result<(), Error> {
+    fn execute(&self, context: &mut T) -> Result<()> {
         match self {
             // i32 equality operations
             Self::I32Eq => {

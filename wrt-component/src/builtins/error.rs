@@ -36,11 +36,7 @@ pub struct ErrorContext {
 impl ErrorContext {
     /// Create a new error context with the given message
     pub fn new(message: &str) -> Self {
-        Self {
-            message: message.to_string(),
-            trace: Vec::new(),
-            metadata: HashMap::new(),
-        }
+        Self { message: message.to_string(), trace: Vec::new(), metadata: HashMap::new() }
     }
 
     /// Add a trace entry to the error context
@@ -81,10 +77,7 @@ pub struct ErrorContextStore {
 impl ErrorContextStore {
     /// Create a new error context store
     pub fn new() -> Self {
-        Self {
-            contexts: HashMap::new(),
-            next_id: 1,
-        }
+        Self { contexts: HashMap::new(), next_id: 1 }
     }
 
     /// Create a new error context and return its ID
@@ -142,11 +135,7 @@ impl BuiltinHandler for ErrorNewHandler {
         // Extract error message
         let message = match &args[0] {
             ComponentValue::String(s) => s.as_str(),
-            _ => {
-                return Err(Error::new(ValidationError(
-                    "error.new argument must be a string",
-                )))
-            }
+            _ => return Err(Error::new(ValidationError("error.new argument must be a string"))),
         };
 
         // Create a new error context
@@ -228,10 +217,7 @@ impl BuiltinHandler for ErrorTraceHandler {
 /// Create handlers for error built-ins
 pub fn create_error_handlers() -> Vec<Box<dyn BuiltinHandler>> {
     let store = Arc::new(Mutex::new(ErrorContextStore::new()));
-    vec![
-        Box::new(ErrorNewHandler::new(store.clone())),
-        Box::new(ErrorTraceHandler::new(store)),
-    ]
+    vec![Box::new(ErrorNewHandler::new(store.clone())), Box::new(ErrorTraceHandler::new(store))]
 }
 
 #[cfg(test)]
@@ -258,10 +244,7 @@ mod tests {
         assert_eq!(error.trace()[0], "Trace 1");
 
         // Add metadata
-        store
-            .get_error_mut(id)
-            .unwrap()
-            .add_metadata("key", "value");
+        store.get_error_mut(id).unwrap().add_metadata("key", "value");
         let error = store.get_error(id).unwrap();
         assert_eq!(error.get_metadata("key").unwrap(), "value");
 
@@ -285,11 +268,7 @@ mod tests {
         };
 
         // Verify the error was created
-        let error = store
-            .lock()
-            .unwrap()
-            .get_error(id)
-            .expect("Error context should exist");
+        let error = store.lock().unwrap().get_error(id).expect("Error context should exist");
         assert_eq!(error.message(), "Test error");
 
         // Test with invalid arguments
@@ -308,34 +287,22 @@ mod tests {
         let handler = ErrorTraceHandler::new(store.clone());
 
         // Test with valid arguments
-        let args = vec![
-            ComponentValue::U64(id),
-            ComponentValue::String("Trace entry".to_string()),
-        ];
+        let args = vec![ComponentValue::U64(id), ComponentValue::String("Trace entry".to_string())];
         let result = handler.execute(&args).expect("Handler should succeed");
         assert_eq!(result.len(), 0);
 
         // Verify the trace was added
-        let error = store
-            .lock()
-            .unwrap()
-            .get_error(id)
-            .expect("Error context should exist");
+        let error = store.lock().unwrap().get_error(id).expect("Error context should exist");
         assert_eq!(error.trace().len(), 1);
         assert_eq!(error.trace()[0], "Trace entry");
 
         // Test with invalid error ID
-        let args = vec![
-            ComponentValue::U64(9999),
-            ComponentValue::String("Trace entry".to_string()),
-        ];
+        let args =
+            vec![ComponentValue::U64(9999), ComponentValue::String("Trace entry".to_string())];
         assert!(handler.execute(&args).is_err());
 
         // Test with invalid arguments
-        let args = vec![
-            ComponentValue::I32(42),
-            ComponentValue::String("Trace entry".to_string()),
-        ];
+        let args = vec![ComponentValue::I32(42), ComponentValue::String("Trace entry".to_string())];
         assert!(handler.execute(&args).is_err());
 
         // Test with wrong number of arguments

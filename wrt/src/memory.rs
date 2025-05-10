@@ -46,7 +46,8 @@ use crate::{
 };
 
 use wrt_error::Result as WrtResult;
-use wrt_types::safe_memory::{MemoryProvider, MemorySafety, SafeSlice, VerificationLevel};
+use wrt_types::safe_memory::{MemoryProvider, MemorySafety, SafeSlice};
+use wrt_types::verification::VerificationLevel;
 
 // Re-export memory types from wrt-runtime
 pub use wrt_runtime::{Memory, MemoryType, PAGE_SIZE};

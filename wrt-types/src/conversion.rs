@@ -1,3 +1,11 @@
+// WRT - wrt-types
+// Module: Type Conversion Utilities
+// SW-REQ-ID: REQ_WASM_CORE_004 (Example: Relates to type system consistency)
+//
+// Copyright (c) 2024 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
 //! Type conversion utilities for WebAssembly types
 //!
 //! This module provides functions for converting between different
@@ -8,41 +16,6 @@ extern crate alloc;
 
 use crate::{BlockType, FuncType, RefType, ValueType};
 use wrt_error::{codes, Error, Result};
-
-/// Convert from a ValueType to its binary representation
-///
-/// This function standardizes the conversion between ValueType and
-/// the binary format representation used in WebAssembly modules.
-pub fn val_type_to_binary(val_type: ValueType) -> u8 {
-    match val_type {
-        ValueType::I32 => 0x7F,
-        ValueType::I64 => 0x7E,
-        ValueType::F32 => 0x7D,
-        ValueType::F64 => 0x7C,
-        ValueType::FuncRef => 0x70,
-        ValueType::ExternRef => 0x6F,
-    }
-}
-
-/// Convert from a binary representation to ValueType
-///
-/// This function standardizes the conversion between the binary format
-/// representation and the ValueType enum used throughout the crates.
-pub fn binary_to_val_type(byte: u8) -> Result<ValueType> {
-    match byte {
-        0x7F => Ok(ValueType::I32),
-        0x7E => Ok(ValueType::I64),
-        0x7D => Ok(ValueType::F32),
-        0x7C => Ok(ValueType::F64),
-        0x70 => Ok(ValueType::FuncRef),
-        0x6F => Ok(ValueType::ExternRef),
-        _ => Err(Error::new(
-            wrt_error::ErrorCategory::Validation,
-            codes::VALIDATION_ERROR,
-            "Invalid value type",
-        )),
-    }
-}
 
 /// Convert RefType to ValueType
 ///
@@ -105,15 +78,8 @@ pub mod func_type {
     ///
     /// This is a utility function that can be used by any crate that
     /// needs to validate a function type.
-    pub fn verify(_func_type: &FuncType) -> Result<()> {
-        // Since our ValueType enum only includes valid WebAssembly types,
-        // and we're working with a strongly typed system, there's no need
-        // to validate each value type individually anymore.
-
-        // This function is kept for potential future extensions
-        // or more complex validation logic.
-
-        Ok(())
+    pub fn verify(func_type: &FuncType) -> Result<()> {
+        func_type.verify()
     }
 
     /// Create a function type from parameters and results
@@ -121,8 +87,7 @@ pub mod func_type {
     /// This utility function ensures consistent creation of function types
     /// with proper validation.
     pub fn create(params: Vec<ValueType>, results: Vec<ValueType>) -> Result<FuncType> {
-        let func_type = FuncType::new(params, results);
-        // Still call verify in case future validation is added
+        let func_type = FuncType::new(params, results)?;
         verify(&func_type)?;
         Ok(func_type)
     }
@@ -137,42 +102,35 @@ mod tests {
 
     #[test]
     fn test_val_type_conversions() {
-        // Test binary conversions
-        assert_eq!(val_type_to_binary(ValueType::I32), 0x7F);
-        assert_eq!(val_type_to_binary(ValueType::I64), 0x7E);
-        assert_eq!(val_type_to_binary(ValueType::F32), 0x7D);
-        assert_eq!(val_type_to_binary(ValueType::F64), 0x7C);
-        assert_eq!(val_type_to_binary(ValueType::FuncRef), 0x70);
-        assert_eq!(val_type_to_binary(ValueType::ExternRef), 0x6F);
+        // Test binary conversions (now directly from ValueType)
+        assert_eq!(ValueType::I32.to_binary(), 0x7F);
+        assert_eq!(ValueType::I64.to_binary(), 0x7E);
+        assert_eq!(ValueType::F32.to_binary(), 0x7D);
+        assert_eq!(ValueType::F64.to_binary(), 0x7C);
+        assert_eq!(ValueType::V128.to_binary(), 0x7B); // Added for V128
+        assert_eq!(ValueType::FuncRef.to_binary(), 0x70);
+        assert_eq!(ValueType::ExternRef.to_binary(), 0x6F);
 
-        // Test binary to val type conversions
-        assert_eq!(binary_to_val_type(0x7F).unwrap(), ValueType::I32);
-        assert_eq!(binary_to_val_type(0x7E).unwrap(), ValueType::I64);
-        assert_eq!(binary_to_val_type(0x7D).unwrap(), ValueType::F32);
-        assert_eq!(binary_to_val_type(0x7C).unwrap(), ValueType::F64);
-        assert_eq!(binary_to_val_type(0x70).unwrap(), ValueType::FuncRef);
-        assert_eq!(binary_to_val_type(0x6F).unwrap(), ValueType::ExternRef);
-        assert!(binary_to_val_type(0x00).is_err());
+        // Test binary to val type conversions (now directly from ValueType)
+        assert_eq!(ValueType::from_binary(0x7F).unwrap(), ValueType::I32);
+        assert_eq!(ValueType::from_binary(0x7E).unwrap(), ValueType::I64);
+        assert_eq!(ValueType::from_binary(0x7D).unwrap(), ValueType::F32);
+        assert_eq!(ValueType::from_binary(0x7C).unwrap(), ValueType::F64);
+        assert_eq!(ValueType::from_binary(0x7B).unwrap(), ValueType::V128); // Added for V128
+        assert_eq!(ValueType::from_binary(0x70).unwrap(), ValueType::FuncRef);
+        assert_eq!(ValueType::from_binary(0x6F).unwrap(), ValueType::ExternRef);
+        assert!(ValueType::from_binary(0x00).is_err());
     }
 
     #[test]
     fn test_ref_type_conversions() {
         // Test RefType to ValueType conversions
         assert_eq!(ref_type_to_val_type(RefType::Funcref), ValueType::FuncRef);
-        assert_eq!(
-            ref_type_to_val_type(RefType::Externref),
-            ValueType::ExternRef
-        );
+        assert_eq!(ref_type_to_val_type(RefType::Externref), ValueType::ExternRef);
 
         // Test ValueType to RefType conversions
-        assert_eq!(
-            val_type_to_ref_type(ValueType::FuncRef).unwrap(),
-            RefType::Funcref
-        );
-        assert_eq!(
-            val_type_to_ref_type(ValueType::ExternRef).unwrap(),
-            RefType::Externref
-        );
+        assert_eq!(val_type_to_ref_type(ValueType::FuncRef).unwrap(), RefType::Funcref);
+        assert_eq!(val_type_to_ref_type(ValueType::ExternRef).unwrap(), RefType::Externref);
         assert!(val_type_to_ref_type(ValueType::I32).is_err());
         assert!(val_type_to_ref_type(ValueType::I64).is_err());
         assert!(val_type_to_ref_type(ValueType::F32).is_err());

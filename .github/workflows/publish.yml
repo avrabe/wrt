@@ -39,37 +39,19 @@ jobs:
           # We need history to get tags
           fetch-depth: 0
       
-      # Cache Rust dependencies to speed up builds
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
+      - name: Setup Dagger CLI
+        run: |
+          cd /usr/local/bin # Or another directory in PATH
+          curl -L https://dl.dagger.io/dagger/install.sh | sudo sh
+          dagger version
           
-      # Setup Java for PlantUML
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-                                   
-      - name: Setup Rust and build API docs
+      - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: nightly # Ensure this matches what xtask/Dagger pipeline might expect
           override: true
-          components: llvm-tools-preview
+          components: llvm-tools-preview # if needed by llvm-cov
 
       - name: Check if just is available
         id: check-just
@@ -85,123 +67,40 @@ jobs:
       - name: Install just
         if: env.JUST_INSTALLED != 'true'
         run: cargo install just --locked
-
-      - name: Install python dependencies
-        run: just setup-python-deps
         
-      - name: Install cargo-llvm-cov
-        run: cargo install cargo-llvm-cov
-
-      # Install grcov for combining coverage reports
-      - name: Install grcov
-        run: cargo install grcov
-
-      # Install PlantUML for diagram generation
-      - name: Install PlantUML
+      - name: Get versions to build
+        id: get-versions
         run: |
-          sudo apt-get update
-          sudo apt-get install -y plantuml
-          
-      # Run coverage separately to handle errors better
-      - name: Generate code coverage
-        run: |
-          # Generate coverage using the robust xtask command
-          cargo xtask robust-coverage --exclude wrt-host --html || {
-            echo "::warning::Failed to generate coverage data. Creating placeholder..."
-            mkdir -p target/coverage/html
-            echo "<h1>Coverage Report Not Available</h1>" > target/coverage/html/index.html
-            
-            cp docs/source/_generated_coverage_summary.rst.template docs/source/_generated_coverage_summary.rst || true
-          }
-          
-          # Create a minimum viable coverage report if it doesn't exist
-          if [ ! -d "target/coverage/html" ]; then
-            echo "::warning::Creating minimal coverage report directory..."
-            mkdir -p target/coverage/html
-            echo "<h1>Coverage Report Not Available</h1><p>The coverage report could not be generated due to build errors.</p>" > target/coverage/html/index.html
-          fi
-          
-          # Ensure coverage summary exists for documentation
-          if [ ! -f "docs/source/_generated_coverage_summary.rst" ]; then
-            echo "::warning::Creating coverage summary placeholder..."
-            mkdir -p docs/source
-            cp docs/source/_generated_coverage_summary.rst.template docs/source/_generated_coverage_summary.rst 2>/dev/null || {
-              echo ".. container:: coverage-summary" > docs/source/_generated_coverage_summary.rst
-              echo "" >> docs/source/_generated_coverage_summary.rst
-              echo "   **Code Coverage:** 0.00% (0/0 lines)" >> docs/source/_generated_coverage_summary.rst
-              echo "" >> docs/source/_generated_coverage_summary.rst
-              echo "   \`Full HTML Report <../_static/coverage/index.html>\`_" >> docs/source/_generated_coverage_summary.rst
-            }
-          fi
-
-      - name: Determine version
-        id: determine-version
-        run: |
-          # Initialize version variable
-          VERSION=""
-          
-          # Check if version was provided as input
+          VERSIONS_STRING=""
           if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-            echo "Using manually specified version: $VERSION"
-          # Check if this is a tag push
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION="${{ github.ref_name }}"
-            echo "Using tag version: $VERSION"
-          # Default to 'main' for branch pushes
-          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
-            VERSION="main"
-            echo "Using branch version: $VERSION"
+            VERSIONS_STRING="${{ github.event.inputs.version }}"
+            echo "::notice::Building specific version(s) from input: $VERSIONS_STRING"
           else
-            VERSION="main"
-            echo "Using default version: $VERSION"
+            echo "::notice::Building docs for 'main' and all Git tags."
+            TAGS=$(git tag --sort=-v:refname)
+            VERSIONS_STRING="main"
+            for TAG_NAME in $TAGS; do
+              VERSIONS_STRING="$VERSIONS_STRING $TAG_NAME"
+            done
           fi
-          
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          UNIQUE_VERSIONS=$(echo "$VERSIONS_STRING" | xargs -n1 | sort -u | xargs)
+          echo "VERSIONS_TO_BUILD=$UNIQUE_VERSIONS" >> $GITHUB_ENV
+          echo "Final list of versions to build: $UNIQUE_VERSIONS"
 
-      - name: Build Sphinx documentation for version
+      - name: Build documentation via Dagger and xtask
         run: |
-          # Set version for documentation build
-          export DOCS_VERSION="${{ env.VERSION }}"
-          export DOCS_VERSION_PATH_PREFIX="/"
-          
-          # Skip coverage generation since we already did it separately
-          export SKIP_COVERAGE=1
-          
-          # Build documentation (continue on error)
-          just docs-with-diagrams || {
-            echo "::warning::Documentation build encountered errors but will try to continue with versioning"
-            # Ensure build directory exists even if build failed
-            mkdir -p docs/_build/html
-          }
-          
-          # Create directory structure for versioned docs
-          mkdir -p docs/_build/versioned/${{ env.VERSION }}
-          
-          # Copy built HTML to versioned directory if it exists
-          if [ -d "docs/_build/html" ]; then
-            cp -r docs/_build/html/* docs/_build/versioned/${{ env.VERSION }}/ || {
-              echo "::warning::Failed to copy HTML documentation to versioned directory"
-              mkdir -p docs/_build/versioned/${{ env.VERSION }}
-              echo "<html><body><h1>Documentation Generation Failed</h1><p>The documentation for version ${{ env.VERSION }} could not be generated properly.</p></body></html>" > docs/_build/versioned/${{ env.VERSION }}/index.html
-            }
-          else
-            echo "::warning::HTML documentation directory not found"
-            mkdir -p docs/_build/versioned/${{ env.VERSION }}
-            echo "<html><body><h1>Documentation Generation Failed</h1><p>The documentation for version ${{ env.VERSION }} could not be generated properly.</p></body></html>" > docs/_build/versioned/${{ env.VERSION }}/index.html
-          fi
-          
-          # Generate index file for root
-          cp docs/source/root_index.html docs/_build/versioned/index.html || {
-            echo "::warning::Failed to copy root index file"
-            echo "<html><body><h1>WRT Documentation</h1><p>Please select a version: <a href='./main/'>main</a></p></body></html>" > docs/_build/versioned/index.html
-          }
-          
-          # Generate the switcher.json file specifically for GitHub Pages using the new xtask command
-          cargo xtask docs switcher-json
-          
-          echo "Documentation processing completed for version ${{ env.VERSION }}"
+          echo "Building documentation for versions: ${{ env.VERSIONS_TO_BUILD }}"
+          # Ensure xtask is compiled
+          cargo build --package xtask
+          # Run the Dagger pipeline via xtask
+          # The xtask command will handle connecting to Dagger and running the pipeline.
+          # Output will be in ./docs_artifact (default or as specified)
+          ./target/debug/xtask publish-docs-dagger --versions "${{ env.VERSIONS_TO_BUILD }}" --output-dir ./docs_artifact_final
+        env:
+          # DAGGER_LOG_FORMAT: plain # Optional: for cleaner logs in CI
+          RUST_LOG: info # Optional: set log level for xtask/dagger-rs logs
+          # If your Dagger pipeline needs access to GitHub token for private repos, etc.
+          # GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Dagger often picks this up via docker credentials
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -209,7 +108,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'docs/_build/versioned'
+          path: './docs_artifact_final' # Path where Dagger pipeline (via xtask) exports the final result
           
   # Deployment job
   deploy:

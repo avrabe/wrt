@@ -1,4 +1,7 @@
-use crate::prelude::*;
+// #![allow(unsafe_code)] // Allow unsafe for UnsafeCell and Send/Sync impls
+
+// use crate::prelude::*;
+use crate::prelude::{fmt, AtomicBool, Deref, DerefMut, Ordering, UnsafeCell};
 
 /// A simple, non-reentrant spinlock mutex suitable for `no_std` environments.
 ///
@@ -29,10 +32,7 @@ impl<T> WrtMutex<T> {
     /// Creates a new `WrtMutex` protecting the given data.
     #[inline]
     pub const fn new(data: T) -> Self {
-        WrtMutex {
-            locked: AtomicBool::new(false),
-            data: UnsafeCell::new(data),
-        }
+        WrtMutex { locked: AtomicBool::new(false), data: UnsafeCell::new(data) }
     }
 }
 
@@ -99,19 +99,15 @@ impl<T: ?Sized + fmt::Debug> fmt::Debug for WrtMutex<T> {
         // otherwise indicate locked status. Avoids deadlocking Debug.
         // Use load with relaxed ordering as we don't need synchronization guarantees here,
         // just a snapshot of the state for debugging.
-        if !self.locked.load(Ordering::Relaxed) {
+        if self.locked.load(Ordering::Relaxed) {
+            f.debug_struct("WrtMutex").field("data", &"<locked>").finish()
+        } else {
             // Temporarily try to acquire the lock for reading the value.
             // This is imperfect as it might briefly show unlocked even if locked immediately after.
             // A try_lock approach would be better if implemented.
             // Safety: We are only reading for debug purposes, and the lock check
             // makes data races less likely, though not impossible in edge cases.
-            f.debug_struct("WrtMutex")
-                .field("data", unsafe { &&*self.data.get() })
-                .finish()
-        } else {
-            f.debug_struct("WrtMutex")
-                .field("data", &"<locked>")
-                .finish()
+            f.debug_struct("WrtMutex").field("data", unsafe { &&*self.data.get() }).finish()
         }
     }
 }
@@ -151,7 +147,10 @@ impl<T: ?Sized> Drop for WrtMutexGuard<'_, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::*;
+    // use crate::prelude::*;
+    // For std-specific parts of tests, ensure std imports are scoped or handled by feature flags.
+    #[cfg(feature = "std")]
+    use std::{sync::Arc, thread};
 
     #[test]
     fn test_mutex_creation() {
@@ -209,9 +208,6 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn test_mutex_concurrency() {
-        use std::sync::Arc;
-        use std::thread;
-
         let mutex = Arc::new(WrtMutex::new(0));
         let mut handles = vec![];
 

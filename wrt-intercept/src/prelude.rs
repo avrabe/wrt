@@ -60,8 +60,8 @@ pub use wrt_types::{
     values::Value,
 };
 
-// Re-export from wrt-format
-pub use wrt_format::component::ValType;
+// Re-export from wrt-types (for component model)
+pub use wrt_types::component_value::ValType;
 
 // Re-export from this crate
 pub use crate::{

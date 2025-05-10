@@ -79,8 +79,7 @@ impl HostBuilder {
         function_name: &str,
         handler: HostFunctionHandler,
     ) -> Self {
-        self.registry
-            .register_host_function(module_name, function_name, handler);
+        self.registry.register_host_function(module_name, function_name, handler);
         self
     }
 
@@ -161,8 +160,7 @@ impl HostBuilder {
     #[must_use]
     pub fn is_builtin_implemented(&self, builtin_type: BuiltinType) -> bool {
         // For now we just check if the registry has a handler for the built-in
-        self.registry
-            .has_host_function("wasi_builtin", builtin_type.name())
+        self.registry.has_host_function("wasi_builtin", builtin_type.name())
     }
 
     /// Validate the configuration.
@@ -285,10 +283,7 @@ impl HostBuilder {
 
         for builtin_type in &builtin_types {
             let builtin_name = builtin_type.name();
-            if self
-                .registry
-                .has_host_function("wasi_builtin", builtin_name)
-            {
+            if self.registry.has_host_function("wasi_builtin", builtin_name) {
                 // We need a way to extract the handler function from the registry
                 // For now, we'll create a new function that calls through the registry
                 let registry_clone = self.registry.clone();
@@ -338,9 +333,7 @@ mod tests {
     #[test]
     fn test_builtin_registration() {
         let builder = HostBuilder::new()
-            .with_builtin_handler(BuiltinType::ResourceCreate, |_, _| {
-                Ok(vec![Value::I64(123)])
-            });
+            .with_builtin_handler(BuiltinType::ResourceCreate, |_, _| Ok(vec![Value::I64(123)]));
 
         let registry = builder.build().expect("Failed to build registry");
 
@@ -361,9 +354,7 @@ mod tests {
         let builder = HostBuilder::new()
             .require_builtin(BuiltinType::ResourceCreate)
             .with_strict_validation(true)
-            .with_builtin_handler(BuiltinType::ResourceCreate, |_, _| {
-                Ok(vec![Value::I64(123)])
-            });
+            .with_builtin_handler(BuiltinType::ResourceCreate, |_, _| Ok(vec![Value::I64(123)]));
 
         // Should succeed now
         let result = builder.build();

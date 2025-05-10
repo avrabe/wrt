@@ -102,15 +102,13 @@ fn generate_traceability_matrix(matches: &ArgMatches) -> Result<(), Box<dyn Erro
 
 // Command definition for running safety analysis
 fn run_safety_analysis_command() -> Command {
-    Command::new("safety")
-        .about("Run safety analysis on requirements and implementation")
-        .arg(
-            Arg::new("output")
-                .short('o')
-                .long("output")
-                .help("Output path for the safety analysis report")
-                .default_value("docs/source/safety_analysis.rst"),
-        )
+    Command::new("safety").about("Run safety analysis on requirements and implementation").arg(
+        Arg::new("output")
+            .short('o')
+            .long("output")
+            .help("Output path for the safety analysis report")
+            .default_value("docs/source/safety_analysis.rst"),
+    )
 }
 
 // Command implementation for running safety analysis
@@ -146,15 +144,13 @@ fn run_safety_analysis(matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
 // Command definition for qualification assessment
 fn assess_command() -> Command {
-    Command::new("assess")
-        .about("Assess qualification status against requirements")
-        .arg(
-            Arg::new("output")
-                .short('o')
-                .long("output")
-                .help("Output path for qualification assessment")
-                .default_value("docs/source/qualification_assessment.rst"),
-        )
+    Command::new("assess").about("Assess qualification status against requirements").arg(
+        Arg::new("output")
+            .short('o')
+            .long("output")
+            .help("Output path for qualification assessment")
+            .default_value("docs/source/qualification_assessment.rst"),
+    )
 }
 
 // Command implementation for qualification assessment
@@ -221,39 +217,15 @@ pub fn report_status(_matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
     // Check for qualification materials
     let qualification_materials = [
-        (
-            "Evaluation Plan",
-            "docs/source/qualification/evaluation_plan.rst",
-        ),
-        (
-            "Evaluation Report",
-            "docs/source/qualification/evaluation_report.rst",
-        ),
+        ("Evaluation Plan", "docs/source/qualification/evaluation_plan.rst"),
+        ("Evaluation Report", "docs/source/qualification/evaluation_report.rst"),
         ("Qualification Plan", "docs/source/qualification/plan.rst"),
-        (
-            "Qualification Report",
-            "docs/source/qualification/qualification_report.rst",
-        ),
-        (
-            "Traceability Matrix",
-            "docs/source/qualification/traceability_matrix.rst",
-        ),
-        (
-            "Document List",
-            "docs/source/qualification/document_list.rst",
-        ),
-        (
-            "Internal Procedures",
-            "docs/source/qualification/internal_procedures.rst",
-        ),
-        (
-            "Technical Report",
-            "docs/source/qualification/technical_report.rst",
-        ),
-        (
-            "Safety Analysis",
-            "docs/source/qualification/safety_analysis.rst",
-        ),
+        ("Qualification Report", "docs/source/qualification/qualification_report.rst"),
+        ("Traceability Matrix", "docs/source/qualification/traceability_matrix.rst"),
+        ("Document List", "docs/source/qualification/document_list.rst"),
+        ("Internal Procedures", "docs/source/qualification/internal_procedures.rst"),
+        ("Technical Report", "docs/source/qualification/technical_report.rst"),
+        ("Safety Analysis", "docs/source/qualification/safety_analysis.rst"),
     ];
 
     // Print status of each material with color coding
@@ -313,10 +285,7 @@ pub fn report_status(_matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
         "GREEN"
     };
 
-    println!(
-        "Overall Progress: {}",
-        colorize(&format!("{:.1}%", percentage), progress_color)
-    );
+    println!("Overall Progress: {}", colorize(&format!("{:.1}%", percentage), progress_color));
 
     // Print sphinx-needs related information
     println!("\n{}", colorize("Sphinx-Needs Integration", "BOLD"));
@@ -339,10 +308,7 @@ pub fn report_status(_matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
     );
     println!(
         "Safety objects:           {}",
-        count_objects_in_file(
-            "docs/source/qualification/safety_analysis.rst",
-            ".. safety::"
-        )?
+        count_objects_in_file("docs/source/qualification/safety_analysis.rst", ".. safety::")?
     );
 
     Ok(())
@@ -364,10 +330,7 @@ fn count_objects_in_file(file_path: &str, object_prefix: &str) -> Result<String,
     }
 
     let content = fs::read_to_string(file_path)?;
-    let count = content
-        .lines()
-        .filter(|line| line.trim().starts_with(object_prefix))
-        .count();
+    let count = content.lines().filter(|line| line.trim().starts_with(object_prefix)).count();
 
     if count == 0 {
         Ok(colorize(&count.to_string(), "RED"))
@@ -465,10 +428,7 @@ fn generate_assessment_report(results: &[(String, bool, String)]) -> String {
         } else {
             "Document does not exist yet"
         };
-        report.push_str(&format!(
-            "   * - {}\n     - {}\n     - {}\n",
-            material, status, notes
-        ));
+        report.push_str(&format!("   * - {}\n     - {}\n     - {}\n", material, status, notes));
     }
 
     report

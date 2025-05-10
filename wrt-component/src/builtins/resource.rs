@@ -70,9 +70,7 @@ impl BuiltinHandler for ResourceCreateHandler {
     }
 
     fn clone_handler(&self) -> Box<dyn BuiltinHandler> {
-        Box::new(Self {
-            resource_manager: self.resource_manager.clone(),
-        })
+        Box::new(Self { resource_manager: self.resource_manager.clone() })
     }
 }
 
@@ -116,10 +114,7 @@ impl BuiltinHandler for ResourceDropHandler {
         // Drop the resource
         let mut manager = self.resource_manager.lock().unwrap();
         if !manager.has_resource(id) {
-            return Err(Error::new(format!(
-                "resource.drop: Resource not found with ID: {:?}",
-                id
-            )));
+            return Err(Error::new(format!("resource.drop: Resource not found with ID: {:?}", id)));
         }
 
         manager.delete_resource(id);
@@ -129,9 +124,7 @@ impl BuiltinHandler for ResourceDropHandler {
     }
 
     fn clone_handler(&self) -> Box<dyn BuiltinHandler> {
-        Box::new(Self {
-            resource_manager: self.resource_manager.clone(),
-        })
+        Box::new(Self { resource_manager: self.resource_manager.clone() })
     }
 }
 
@@ -175,10 +168,7 @@ impl BuiltinHandler for ResourceRepHandler {
         // Get the resource representation
         let manager = self.resource_manager.lock().unwrap();
         if !manager.has_resource(id) {
-            return Err(Error::new(format!(
-                "resource.rep: Resource not found with ID: {:?}",
-                id
-            )));
+            return Err(Error::new(format!("resource.rep: Resource not found with ID: {:?}", id)));
         }
 
         // Get the resource as u32
@@ -190,9 +180,7 @@ impl BuiltinHandler for ResourceRepHandler {
     }
 
     fn clone_handler(&self) -> Box<dyn BuiltinHandler> {
-        Box::new(Self {
-            resource_manager: self.resource_manager.clone(),
-        })
+        Box::new(Self { resource_manager: self.resource_manager.clone() })
     }
 }
 
@@ -252,9 +240,7 @@ impl BuiltinHandler for ResourceGetHandler {
     }
 
     fn clone_handler(&self) -> Box<dyn BuiltinHandler> {
-        Box::new(Self {
-            resource_manager: self.resource_manager.clone(),
-        })
+        Box::new(Self { resource_manager: self.resource_manager.clone() })
     }
 }
 

@@ -1,5 +1,10 @@
-use crate::error::{Error, Result};
-use crate::prelude::TypesValue as Value;
+use crate::{
+    prelude::{
+        ComponentInterface, Value, HashMap, 
+    },
+};
+// Import directly from wrt_error
+use wrt_error::{Error, Result, kinds};
 use crate::{global::Global, table::Table};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -211,7 +216,7 @@ impl Component {
     pub fn instantiate(&mut self, imports: Vec<Import>) -> Result<()> {
         // Validate imports
         if imports.len() != self.component_type.imports.len() {
-            return Err(Error::new(crate::error::kinds::ValidationError(format!(
+            return Err(Error::new(kinds::ValidationError(format!(
                 "Expected {} imports, got {}",
                 self.component_type.imports.len(),
                 imports.len()
@@ -223,14 +228,14 @@ impl Component {
             self.component_type.imports.iter().zip(imports.iter())
         {
             if import.name != *import_name {
-                return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                return Err(Error::new(kinds::ValidationError(format!(
                     "Expected import {}, got {}",
                     import_name, import.name
                 ))));
             }
 
             if !wrt_types::component::types_are_compatible(import_type, &import.ty) {
-                return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                return Err(Error::new(kinds::ValidationError(format!(
                     "Import {import_name} has incompatible type"
                 ))));
             }
@@ -423,7 +428,7 @@ impl Component {
         let memory_value = match &memory_export.value {
             ExternValue::Memory(memory) => memory,
             _ => {
-                return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                return Err(Error::new(kinds::ValidationError(format!(
                     "Export {name} is not a memory"
                 ))));
             }
@@ -456,7 +461,7 @@ impl Component {
         let memory_value = match &memory_export.value {
             ExternValue::Memory(memory) => memory,
             _ => {
-                return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                return Err(Error::new(kinds::ValidationError(format!(
                     "Export {name} is not a memory"
                 ))));
             }
@@ -479,15 +484,15 @@ impl Component {
         let func_value = match &export.value {
             ExternValue::Function(func) => func,
             _ => {
-                return Err(Error::new(crate::error::kinds::ExecutionError(format!(
+                return Err(Error::new(kinds::ExecutionError(format!(
                     "Export {name} is not a function"
-                ))))
+                ))));
             }
         };
 
         // Check argument count
         if args.len() != func_value.ty.params.len() {
-            return Err(Error::new(crate::error::kinds::ExecutionError(format!(
+            return Err(Error::new(kinds::ExecutionError(format!(
                 "Expected {} arguments, got {}",
                 func_value.ty.params.len(),
                 args.len()
@@ -497,7 +502,7 @@ impl Component {
         // Validate argument types
         for (i, (arg, expected_type)) in args.iter().zip(func_value.ty.params.iter()).enumerate() {
             if !arg.matches_type(expected_type) {
-                return Err(Error::new(crate::error::kinds::ExecutionError(format!(
+                return Err(Error::new(kinds::ExecutionError(format!(
                     "Argument {i} has invalid type - expected {expected_type:?}, got {arg:?}"
                 ))));
             }
@@ -510,7 +515,7 @@ impl Component {
     /// Gets an export by name
     pub fn get_export(&self, name: &str) -> Result<&Export> {
         self.exports.iter().find(|e| e.name == name).ok_or_else(|| {
-            Error::new(crate::error::kinds::ValidationError(format!(
+            Error::new(kinds::ValidationError(format!(
                 "Export {name} not found"
             )))
         })
@@ -522,7 +527,7 @@ impl Component {
             .iter_mut()
             .find(|e| e.name == name)
             .ok_or_else(|| {
-                Error::new(crate::error::kinds::ValidationError(format!(
+                Error::new(kinds::ValidationError(format!(
                     "Export {name} not found"
                 )))
             })
@@ -538,15 +543,15 @@ impl Component {
         let func_value = match &export.value {
             ExternValue::Function(func) => func,
             _ => {
-                return Err(Error::new(crate::error::kinds::ExecutionError(format!(
+                return Err(Error::new(kinds::ExecutionError(format!(
                     "Export {name} is not a function"
-                ))))
+                ))));
             }
         };
 
         // Check argument count
         if args.len() != func_value.ty.params.len() {
-            return Err(Error::new(crate::error::kinds::ExecutionError(format!(
+            return Err(Error::new(kinds::ExecutionError(format!(
                 "Expected {} arguments, got {}",
                 func_value.ty.params.len(),
                 args.len()
@@ -574,7 +579,7 @@ impl Component {
     ) -> Result<()> {
         // Check if export already exists
         if self.exports.iter().any(|e| e.name == name) {
-            return Err(Error::new(crate::error::kinds::ValidationError(format!(
+            return Err(Error::new(kinds::ValidationError(format!(
                 "Export {name} already exists"
             ))));
         }
@@ -630,12 +635,12 @@ impl Component {
             ExternValue::Function(func) => {
                 if let ExternType::Function(export_func_type) = &ty {
                     if !wrt_types::component::func_types_compatible(&func.ty, export_func_type) {
-                        return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                        return Err(Error::new(kinds::ValidationError(format!(
                             "Function type mismatch for export {name}"
                         ))));
                     }
                 } else {
-                    return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                    return Err(Error::new(kinds::ValidationError(format!(
                         "Expected function type for export {name}"
                     ))));
                 }
@@ -646,12 +651,12 @@ impl Component {
                         || table.ty.limits.min != export_table_type.limits.min
                         || table.ty.limits.max != export_table_type.limits.max
                     {
-                        return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                        return Err(Error::new(kinds::ValidationError(format!(
                             "Table type mismatch for export {name}"
                         ))));
                     }
                 } else {
-                    return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                    return Err(Error::new(kinds::ValidationError(format!(
                         "Expected table type for export {name}"
                     ))));
                 }
@@ -661,12 +666,12 @@ impl Component {
                     if memory.ty.limits.min != export_memory_type.limits.min
                         || memory.ty.limits.max != export_memory_type.limits.max
                     {
-                        return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                        return Err(Error::new(kinds::ValidationError(format!(
                             "Memory type mismatch for export {name}"
                         ))));
                     }
                 } else {
-                    return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                    return Err(Error::new(kinds::ValidationError(format!(
                         "Expected memory type for export {name}"
                     ))));
                 }
@@ -676,18 +681,18 @@ impl Component {
                     if global.ty.value_type != export_global_type.value_type
                         || global.ty.mutable != export_global_type.mutable
                     {
-                        return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                        return Err(Error::new(kinds::ValidationError(format!(
                             "Global type mismatch for export {name}"
                         ))));
                     }
                 } else {
-                    return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                    return Err(Error::new(kinds::ValidationError(format!(
                         "Expected global type for export {name}"
                     ))));
                 }
             }
             ExternValue::Trap(_) => {
-                return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                return Err(Error::new(kinds::ValidationError(format!(
                     "Cannot export trap value for {name}"
                 ))));
             }
@@ -702,7 +707,7 @@ impl Component {
         // Check that all required imports are provided
         for (name, _namespace, _ty) in &self.component_type.imports {
             if !self.imports.iter().any(|import| import.name == *name) {
-                return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                return Err(Error::new(kinds::ValidationError(format!(
                     "Missing required import {name}"
                 ))));
             }
@@ -712,18 +717,30 @@ impl Component {
         for (name, ty) in &self.component_type.exports {
             if let Some(export) = self.exports.iter().find(|e| e.name == *name) {
                 if !wrt_types::component::types_are_compatible(ty, &export.ty) {
-                    return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                    return Err(Error::new(kinds::ValidationError(format!(
                         "Export {name} has incompatible type"
                     ))));
                 }
             } else {
-                return Err(Error::new(crate::error::kinds::ValidationError(format!(
+                return Err(Error::new(kinds::ValidationError(format!(
                     "Missing declared export {name}"
                 ))));
             }
         }
 
         Ok(())
+    }
+
+    pub fn get_export_instance_value(&self, name: &str) -> Result<InstanceValue> {
+        self.exports
+            .iter()
+            .find(|e| e.name == name)
+            .ok_or_else(|| {
+                Error::new(kinds::ValidationError(format!(
+                    "Export {name} not found"
+                )))
+            })
+            .map(|export| export.instance_value.clone())
     }
 }
 
@@ -766,14 +783,14 @@ impl Host {
     /// Calls a host function
     pub fn call_function(&self, name: &str, args: &[Value]) -> Result<Vec<Value>> {
         let func_value = self.get_function(name).ok_or_else(|| {
-            Error::new(crate::error::kinds::ExecutionError(format!(
+            Error::new(prelude::kinds::ExecutionError(format!(
                 "Host function {name} not found"
             )))
         })?;
 
         // Check argument count
         if args.len() != func_value.ty.params.len() {
-            return Err(Error::new(crate::error::kinds::ExecutionError(format!(
+            return Err(Error::new(prelude::kinds::ExecutionError(format!(
                 "Expected {} arguments, got {}",
                 func_value.ty.params.len(),
                 args.len()

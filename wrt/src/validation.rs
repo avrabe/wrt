@@ -1,10 +1,12 @@
+use crate::prelude::{
+    BlockType, FuncType, ValueType,
+};
 use crate::error::{kinds, Error, Result};
 use crate::instructions::Instruction;
 use crate::module::Module;
 use crate::prelude::{String, Vec};
 use crate::types::*;
 use wrt_error::{codes, ErrorCategory};
-use wrt_types::types::ValueType;
 
 /// Validates a WebAssembly module
 pub fn validate_module(module: &Module) -> Result<()> {

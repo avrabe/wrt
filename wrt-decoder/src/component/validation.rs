@@ -3,7 +3,7 @@
 //! This module provides validation for WebAssembly Component Model components.
 //! It verifies that components conform to the Component Model specification.
 
-use wrt_error::{codes, Error, ErrorCategory, Result};
+use wrt_error::{Result};
 
 // Import prelude for String and other types
 use crate::prelude::*;
@@ -67,12 +67,4 @@ pub fn validate_component_with_config(
 /// Validate a component with default configuration
 pub fn validate_component(component: &Component) -> Result<()> {
     validate_component_with_config(component, &ValidationConfig::default())
-}
-
-fn validation_error(message: impl Into<String>) -> Error {
-    Error::new(
-        ErrorCategory::Validation,
-        codes::VALIDATION_ERROR,
-        message.into(),
-    )
 }

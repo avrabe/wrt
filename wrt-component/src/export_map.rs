@@ -23,9 +23,7 @@ pub struct SafeExportMap {
 impl ExportMap {
     /// Create a new empty export map
     pub fn new() -> Self {
-        Self {
-            exports: HashMap::new(),
-        }
+        Self { exports: HashMap::new() }
     }
 
     /// Add an export to the map
@@ -56,10 +54,7 @@ impl ExportMap {
 
     /// Get all exports as a Vec of (name, export) pairs
     pub fn get_all(&self) -> Vec<(String, Arc<Export>)> {
-        self.exports
-            .iter()
-            .map(|(name, export)| (name.clone(), export.clone()))
-            .collect()
+        self.exports.iter().map(|(name, export)| (name.clone(), export.clone())).collect()
     }
 
     /// Convert this export map to one using SafeMemory containers
@@ -77,9 +72,7 @@ impl ExportMap {
 impl SafeExportMap {
     /// Create a new empty export map
     pub fn new() -> Self {
-        Self {
-            exports: wrt_types::safe_memory::SafeStack::new(),
-        }
+        Self { exports: wrt_types::safe_memory::SafeStack::new() }
     }
 
     /// Add an export to the map

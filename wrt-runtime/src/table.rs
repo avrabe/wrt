@@ -4,35 +4,30 @@
 //! which store function references or externref values.
 
 use crate::prelude::*;
-use crate::types::TableType;
+use wrt_types::types::{TableType as WrtTableType, ValueType as WrtValueType, Limits as WrtLimits};
+use wrt_types::values::Value as WrtValue;
 
-/// Represents a WebAssembly table instance
+/// A WebAssembly table is a vector of opaque values of a single type.
 #[derive(Debug)]
 pub struct Table {
-    /// The table type
-    pub ty: TableType,
-    /// The elements in the table - using SafeStack instead of Vec for memory safety
-    elements: SafeStack<Option<Value>>,
-    /// A debug name for diagnostics
-    debug_name: Option<String>,
+    /// The table type, using the canonical WrtTableType
+    pub ty: WrtTableType,
+    /// The table elements
+    elements: SafeStack<Option<WrtValue>>,
+    /// A debug name for the table (optional)
+    pub debug_name: Option<String>,
     /// Verification level for table operations
-    verification_level: VerificationLevel,
+    pub verification_level: VerificationLevel,
 }
 
 impl Clone for Table {
     fn clone(&self) -> Self {
-        // Get elements as a Vec
         let elements_vec = self.elements.to_vec().unwrap_or_default();
-
-        // Create a new SafeStack with the same elements
         let mut new_elements = SafeStack::with_capacity(elements_vec.len());
         new_elements.set_verification_level(self.verification_level);
-
         for elem in elements_vec {
             new_elements.push(elem).unwrap();
         }
-
-        // Create a new instance with the same properties
         Self {
             ty: self.ty.clone(),
             elements: new_elements,
@@ -42,40 +37,41 @@ impl Clone for Table {
     }
 }
 
-impl Table {
-    /// Creates a new table with the specified type and initial value
-    ///
-    /// # Arguments
-    ///
-    /// * `ty` - The type of the table
-    /// * `default_value` - The default value for table slots
-    ///
-    /// # Returns
-    ///
-    /// A new table instance
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the table cannot be created
-    pub fn new(ty: TableType, default_value: Value) -> Result<Self> {
-        // Verify the default value matches the element type
-        if !default_value.matches_type(&ty.element_type) {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                format!(
-                    "Default value type doesn't match table element type: {:?} vs {:?}",
-                    default_value, ty.element_type
-                ),
-            ));
+impl PartialEq for Table {
+    fn eq(&self, other: &Self) -> bool {
+        if self.ty != other.ty 
+            || self.debug_name != other.debug_name
+            || self.verification_level != other.verification_level {
+            return false;
         }
+        let self_elements = self.elements.to_vec().unwrap_or_default();
+        let other_elements = other.elements.to_vec().unwrap_or_default();
+        self_elements == other_elements
+    }
+}
+
+impl Table {
+    /// Creates a new table with the specified type.
+    /// Elements are initialized to a type-appropriate null value.
+    pub fn new(ty: WrtTableType) -> Result<Self> {
+        // Determine the type-appropriate null value for initialization
+        let init_val = match ty.element_type {
+            WrtValueType::FuncRef => Some(WrtValue::FuncRef(None)),
+            WrtValueType::ExternRef => Some(WrtValue::ExternRef(None)),
+            // Other types are not allowed in tables as per current Wasm spec for element_type
+            _ => return Err(Error::new(
+                ErrorCategory::Validation,
+                codes::INVALID_TYPE,
+                format!("Invalid element type for table: {:?}", ty.element_type),
+            )),
+        };
 
         let initial_size = ty.limits.min as usize;
         let mut elements = SafeStack::with_capacity(initial_size);
+        elements.set_verification_level(VerificationLevel::default());
 
-        // Initialize with None (null) elements
         for _ in 0..initial_size {
-            elements.push(None)?;
+            elements.push(init_val.clone())?;
         }
 
         Ok(Self {
@@ -100,16 +96,15 @@ impl Table {
     /// # Errors
     ///
     /// Returns an error if the table cannot be created
-    pub fn with_capacity(capacity: u32, element_type: &ValueType) -> Result<Self> {
-        let table_type = TableType {
+    pub fn with_capacity(capacity: u32, element_type: &WrtValueType) -> Result<Self> {
+        let table_type = WrtTableType {
             element_type: *element_type,
-            limits: Limits {
+            limits: WrtLimits {
                 min: capacity,
-                max: Some(capacity * 2), // Allow doubling as max
+                max: Some(capacity),
             },
         };
-
-        Self::new(table_type, Value::FuncRef(None))
+        Self::new(table_type)
     }
 
     /// Gets the size of the table
@@ -135,7 +130,7 @@ impl Table {
     /// # Errors
     ///
     /// Returns an error if the index is out of bounds
-    pub fn get(&self, idx: u32) -> Result<Option<Value>> {
+    pub fn get(&self, idx: u32) -> Result<Option<WrtValue>> {
         let idx = idx as usize;
         if idx >= self.elements.len() {
             return Err(Error::new(
@@ -183,7 +178,7 @@ impl Table {
     /// # Errors
     ///
     /// Returns an error if the index is out of bounds or if the value type doesn't match the table element type
-    pub fn set(&mut self, idx: u32, value: Option<Value>) -> Result<()> {
+    pub fn set(&mut self, idx: u32, value: Option<WrtValue>) -> Result<()> {
         let idx = idx as usize;
         if idx >= self.elements.len() {
             return Err(Error::new(
@@ -193,23 +188,19 @@ impl Table {
             ));
         }
 
-        // If value is Some, check that it matches the element type
         if let Some(ref val) = value {
             if !val.matches_type(&self.ty.element_type) {
                 return Err(Error::new(
                     ErrorCategory::Validation,
                     codes::VALIDATION_ERROR,
                     format!(
-                        "Element type doesn't match table element type: {:?} vs {:?}",
-                        val, self.ty.element_type
+                        "Element value type {:?} doesn't match table element type {:?}",
+                        val.value_type(), self.ty.element_type
                     ),
                 ));
             }
         }
-
-        // Use SafeStack's set method to update the element directly
         self.elements.set(idx, value)?;
-
         Ok(())
     }
 
@@ -227,76 +218,35 @@ impl Table {
     /// # Errors
     ///
     /// Returns an error if the table cannot be grown
-    pub fn grow(&mut self, delta: u32, init_value: Value) -> Result<u32> {
-        // Check that init_value has the correct type
-        if !init_value.matches_type(&self.ty.element_type) {
+    pub fn grow(&mut self, delta: u32, init_value_from_arg: WrtValue) -> Result<u32> {
+        if !init_value_from_arg.matches_type(&self.ty.element_type) {
             return Err(Error::new(
                 ErrorCategory::Validation,
                 codes::VALIDATION_ERROR,
                 format!(
-                    "Initial value type doesn't match table element type: {:?} vs {:?}",
-                    init_value, self.ty.element_type
+                    "Grow operation init value type {:?} doesn't match table element type {:?}",
+                    init_value_from_arg.value_type(), self.ty.element_type
                 ),
             ));
         }
 
-        // Get current size
         let old_size = self.size();
+        let new_size = old_size.checked_add(delta).ok_or_else(|| Error::new(ErrorCategory::Runtime, codes::TABLE_TOO_LARGE, "Table size overflow"))?;
 
-        // Calculate new size
-        let new_size = match old_size.checked_add(delta) {
-            Some(size) => size,
-            None => {
-                return Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_LIMIT_EXCEEDED,
-                    "Table size overflow",
-                ));
-            }
-        };
-
-        // Check against table max limit if defined
         if let Some(max) = self.ty.limits.max {
             if new_size > max {
-                return Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_LIMIT_EXCEEDED,
-                    format!("Table size exceeds maximum: {} > {}", new_size, max),
-                ));
+                // As per spec, grow should return -1 (or an error indicating failure)
+                // For now, let's return an error. The runtime execution might interpret this.
+                return Err(Error::new(ErrorCategory::Runtime, codes::TABLE_TOO_LARGE, "Table grow exceeds maximum limit"));
             }
         }
 
-        // Add new elements directly to the SafeStack
+        // Use SafeStack's grow method or manually push
         for _ in 0..delta {
-            self.elements.push(Some(init_value.clone()))?;
+            self.elements.push(Some(init_value_from_arg.clone()))?;
         }
-
-        // Verify integrity if needed based on verification level
-        if self.verification_level.should_verify(200) {
-            // Ensure the new size is correct
-            if self.elements.len() != new_size as usize {
-                return Err(Error::new(
-                    ErrorCategory::Validation,
-                    codes::VALIDATION_ERROR,
-                    format!(
-                        "Table integrity check failed: expected size {} but got {}",
-                        new_size,
-                        self.elements.len()
-                    ),
-                ));
-            }
-
-            // Verify the type of the last element added
-            if let Ok(Some(last)) = self.elements.get(self.elements.len() - 1) {
-                if !last.matches_type(&self.ty.element_type) {
-                    return Err(Error::new(
-                        ErrorCategory::Validation,
-                        codes::VALIDATION_ERROR,
-                        "Table integrity check failed: element type mismatch after grow",
-                    ));
-                }
-            }
-        }
+        // Update the min limit in the table type if it changes due to growth (spec is a bit unclear if ty should reflect current size)
+        // For now, ty.limits.min reflects the *initial* min. Current size is self.size().
 
         Ok(old_size)
     }
@@ -316,8 +266,10 @@ impl Table {
     ///
     /// Returns an error if the index is out of bounds or the table element type isn't a funcref
     pub fn set_func(&mut self, idx: u32, func_idx: u32) -> Result<()> {
-        // Set a function reference value
-        self.set(idx, Some(Value::func_ref(Some(func_idx))))
+        if self.ty.element_type != WrtValueType::FuncRef {
+            return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Table element type is not FuncRef"));
+        }
+        self.set(idx, Some(WrtValue::FuncRef(Some(func_idx))))
     }
 
     /// Initialize a range of elements in the table
@@ -334,74 +286,18 @@ impl Table {
     /// # Errors
     ///
     /// Returns an error if the operation fails
-    pub fn init(&mut self, offset: u32, init: &[Option<Value>]) -> Result<()> {
-        let offset = offset as usize;
-        if offset > self.elements.len() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_FUNCTION_INDEX,
-                "Table access out of bounds",
-            ));
+    pub fn init(&mut self, offset: u32, init_data: &[Option<WrtValue>]) -> Result<()> {
+        if offset as usize + init_data.len() > self.elements.len() {
+            return Err(Error::new(ErrorCategory::Runtime, codes::TABLE_ACCESS_OOB, "Table init out of bounds"));
         }
-
-        let end = offset + init.len();
-        if end > self.elements.len() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_FUNCTION_INDEX,
-                "Table initialization would go out of bounds",
-            ));
-        }
-
-        // Create a safe copy of the elements
-        let mut elements_vec = self.elements.to_vec()?;
-
-        // Type check all values
-        for (i, value) in init.iter().enumerate() {
-            if let Some(val) = value {
+        for (i, val_opt) in init_data.iter().enumerate() {
+            if let Some(val) = val_opt {
                 if !val.matches_type(&self.ty.element_type) {
-                    return Err(Error::new(
-                        ErrorCategory::Validation,
-                        codes::VALIDATION_ERROR,
-                        format!(
-                            "Element type doesn't match table element type: {:?} vs {:?}",
-                            val, self.ty.element_type
-                        ),
-                    ));
+                    return Err(Error::new(ErrorCategory::Validation, codes::VALIDATION_ERROR, "Table init value type mismatch"));
                 }
-
-                // Update the element at the appropriate position
-                elements_vec[offset + i] = Some(val.clone());
-            } else {
-                // Set to None (null reference)
-                elements_vec[offset + i] = None;
             }
+            self.elements.set((offset as usize) + i, val_opt.clone())?;
         }
-
-        // Create a new SafeStack with the updated elements
-        let mut new_stack = SafeStack::with_capacity(elements_vec.len());
-        new_stack.set_verification_level(self.verification_level);
-
-        // Push the elements to the new stack
-        for element in elements_vec.iter() {
-            new_stack.push(element.clone())?;
-        }
-
-        // Verify integrity if needed based on verification level
-        if self.verification_level.should_verify(200) {
-            // Ensure all elements are pushed correctly
-            if new_stack.len() != elements_vec.len() {
-                return Err(Error::new(
-                    ErrorCategory::Validation,
-                    codes::VALIDATION_ERROR,
-                    "Table integrity check failed: element count mismatch after initialization",
-                ));
-            }
-        }
-
-        // Replace the elements with the new stack
-        self.elements = new_stack;
-
         Ok(())
     }
 
@@ -455,7 +351,7 @@ impl Table {
     }
 
     /// Fill a range of elements with a given value
-    pub fn fill_elements(&mut self, offset: usize, value: Option<Value>, len: usize) -> Result<()> {
+    pub fn fill_elements(&mut self, offset: usize, value: Option<WrtValue>, len: usize) -> Result<()> {
         // Verify bounds
         if offset + len > self.elements.len() {
             return Err(Error::new(
@@ -513,7 +409,7 @@ impl Table {
     }
 
     /// Sets an element at the given index.
-    pub fn init_element(&mut self, idx: usize, value: Option<Value>) -> Result<()> {
+    pub fn init_element(&mut self, idx: usize, value: Option<WrtValue>) -> Result<()> {
         // Check bounds
         if idx >= self.elements.len() {
             return Err(Error::new(
@@ -572,25 +468,25 @@ pub trait ArcTableExt {
     fn size(&self) -> u32;
 
     /// Get an element from the table
-    fn get(&self, idx: u32) -> Result<Option<Value>>;
+    fn get(&self, idx: u32) -> Result<Option<WrtValue>>;
 
     /// Set an element in the table
-    fn set(&self, idx: u32, value: Option<Value>) -> Result<()>;
+    fn set(&self, idx: u32, value: Option<WrtValue>) -> Result<()>;
 
     /// Grow the table by a given number of elements
-    fn grow(&self, delta: u32, init_value: Value) -> Result<u32>;
+    fn grow(&self, delta: u32, init_value: WrtValue) -> Result<u32>;
 
     /// Set a function reference in the table
     fn set_func(&self, idx: u32, func_idx: u32) -> Result<()>;
 
     /// Initialize a range of elements from a vector
-    fn init(&self, offset: u32, init: &[Option<Value>]) -> Result<()>;
+    fn init(&self, offset: u32, init: &[Option<WrtValue>]) -> Result<()>;
 
     /// Copy elements from one range to another
     fn copy(&self, dst: u32, src: u32, len: u32) -> Result<()>;
 
     /// Fill a range of elements with a value
-    fn fill(&self, offset: u32, len: u32, value: Option<Value>) -> Result<()>;
+    fn fill(&self, offset: u32, len: u32, value: Option<WrtValue>) -> Result<()>;
 }
 
 #[cfg(feature = "std")]
@@ -599,11 +495,11 @@ impl ArcTableExt for Arc<Table> {
         self.as_ref().size()
     }
 
-    fn get(&self, idx: u32) -> Result<Option<Value>> {
+    fn get(&self, idx: u32) -> Result<Option<WrtValue>> {
         self.as_ref().get(idx)
     }
 
-    fn set(&self, idx: u32, value: Option<Value>) -> Result<()> {
+    fn set(&self, idx: u32, value: Option<WrtValue>) -> Result<()> {
         // Clone-and-mutate pattern for thread safety
         let mut table_clone = self.as_ref().clone();
 
@@ -611,7 +507,7 @@ impl ArcTableExt for Arc<Table> {
         table_clone.set(idx, value)
     }
 
-    fn grow(&self, delta: u32, init_value: Value) -> Result<u32> {
+    fn grow(&self, delta: u32, init_value: WrtValue) -> Result<u32> {
         // Clone-and-mutate pattern for thread safety
         let mut table_clone = self.as_ref().clone();
 
@@ -627,7 +523,7 @@ impl ArcTableExt for Arc<Table> {
         table_clone.set_func(idx, func_idx)
     }
 
-    fn init(&self, offset: u32, init: &[Option<Value>]) -> Result<()> {
+    fn init(&self, offset: u32, init: &[Option<WrtValue>]) -> Result<()> {
         // Clone-and-mutate pattern for thread safety
         let mut table_clone = self.as_ref().clone();
 
@@ -643,7 +539,7 @@ impl ArcTableExt for Arc<Table> {
         table_clone.copy_elements(dst as usize, src as usize, len as usize)
     }
 
-    fn fill(&self, offset: u32, len: u32, value: Option<Value>) -> Result<()> {
+    fn fill(&self, offset: u32, len: u32, value: Option<WrtValue>) -> Result<()> {
         // Clone-and-mutate pattern for thread safety
         let mut table_clone = self.as_ref().clone();
 
@@ -671,7 +567,7 @@ mod tests {
     fn test_table_creation() {
         let table_type = create_test_table_type(10, Some(20));
         let init_value = Value::func_ref(None);
-        let table = Table::new(table_type.clone(), init_value.clone()).unwrap();
+        let table = Table::new(table_type.clone()).unwrap();
 
         assert_eq!(table.ty, table_type);
         assert_eq!(table.size(), 10);
@@ -685,7 +581,7 @@ mod tests {
     #[test]
     fn test_table_get_set() {
         let table_type = create_test_table_type(5, Some(10));
-        let mut table = Table::new(table_type, Value::func_ref(None)).unwrap();
+        let mut table = Table::new(table_type).unwrap();
 
         let func_idx = 42;
         let new_value = Value::func_ref(Some(func_idx));
@@ -711,7 +607,7 @@ mod tests {
     #[test]
     fn test_table_grow() {
         let table_type = create_test_table_type(5, Some(10));
-        let mut table = Table::new(table_type, Value::func_ref(None)).unwrap();
+        let mut table = Table::new(table_type).unwrap();
 
         let old_size = table.grow(3, Value::func_ref(None)).unwrap();
         assert_eq!(old_size, 5);
@@ -725,7 +621,7 @@ mod tests {
     #[test]
     fn test_table_func_set() {
         let table_type = create_test_table_type(5, Some(10));
-        let mut table = Table::new(table_type, Value::func_ref(None)).unwrap();
+        let mut table = Table::new(table_type).unwrap();
 
         let func_idx = 42;
         table.set_func(3, func_idx).unwrap();
@@ -740,7 +636,7 @@ mod tests {
     #[test]
     fn test_table_init() {
         let table_type = create_test_table_type(5, Some(10));
-        let mut table = Table::new(table_type, Value::func_ref(None)).unwrap();
+        let mut table = Table::new(table_type).unwrap();
 
         let init_values = vec![Some(Value::func_ref(None)); 3];
         table.init(0, &init_values).unwrap();
@@ -757,7 +653,7 @@ mod tests {
     #[test]
     fn test_table_copy() {
         let table_type = create_test_table_type(5, Some(10));
-        let mut table = Table::new(table_type.clone(), Value::func_ref(None)).unwrap();
+        let mut table = Table::new(table_type.clone()).unwrap();
 
         // Initialize source values
         for i in 0..3 {
@@ -781,7 +677,7 @@ mod tests {
     #[test]
     fn test_table_fill() {
         let table_type = create_test_table_type(5, Some(10));
-        let mut table = Table::new(table_type, Value::func_ref(None)).unwrap();
+        let mut table = Table::new(table_type).unwrap();
 
         // Fill a range with a value
         let fill_value = Some(Value::func_ref(Some(42)));
@@ -802,7 +698,7 @@ mod tests {
     #[test]
     fn test_arc_table_extensions() -> Result<()> {
         let table_type = create_test_table_type(5, Some(10));
-        let table = Table::new(table_type, Value::func_ref(None))?;
+        let table = Table::new(table_type)?;
         let arc_table = Arc::new(table);
 
         // Test size
@@ -853,7 +749,7 @@ mod tests {
         };
 
         // Create a table
-        let mut table = Table::new(table_type, Value::func_ref(None))?;
+        let mut table = Table::new(table_type)?;
 
         // Set verification level
         table.set_verification_level(VerificationLevel::Full);

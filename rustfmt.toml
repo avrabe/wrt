@@ -1,0 +1,20 @@
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Unix"
+use_small_heuristics = "Max"
+reorder_imports = true
+reorder_modules = true
+remove_nested_parens = true
+short_array_element_width_threshold = 10
+format_strings = true
+wrap_comments = true
+comment_width = 80
+normalize_comments = true
+normalize_doc_attributes = true
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+# Enforce trailing commas where applicable
+trailing_comma = "Vertical"
+# Edition to use for formatting
+edition = "2021" 

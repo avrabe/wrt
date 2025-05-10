@@ -592,9 +592,7 @@ fn format_val_type_to_val_type(
             let mut new_cases = Vec::with_capacity(cases.len());
             for (name, case_type) in cases {
                 let new_name = name.clone();
-                let new_case_type = case_type
-                    .as_ref()
-                    .map(|val_type| format_val_type_to_val_type(val_type));
+                let new_case_type = case_type.as_ref().map(format_val_type_to_val_type);
                 new_cases.push((new_name, new_case_type));
             }
             wrt_format::component::ValType::Variant(new_cases)
@@ -648,7 +646,7 @@ mod tests {
     use super::*;
     use wrt_format::component::{
         Component, CoreInlineExport, CoreInstance, CoreInstanceExpr, CoreSort, Export, ExportName,
-        Import, ImportName, Sort, ValType,
+        Import, ImportName, Sort,
     };
 
     #[test]

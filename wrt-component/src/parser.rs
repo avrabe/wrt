@@ -5,6 +5,7 @@
 
 use crate::prelude::*;
 use wrt_decoder::{Parser, Payload};
+use wrt_error::kinds::DecodingError;
 
 /// Scan a WebAssembly module for built-in imports
 ///
@@ -30,7 +31,7 @@ pub fn scan_for_builtins(binary: &[u8]) -> Result<Vec<String>> {
                             return Err(Error::new(
                                 ErrorCategory::Parse,
                                 codes::DECODING_ERROR,
-                                kinds::DecodingError(format!(
+                                DecodingError(format!(
                                     "Failed to create import section reader: {}",
                                     err
                                 )),
@@ -49,7 +50,7 @@ pub fn scan_for_builtins(binary: &[u8]) -> Result<Vec<String>> {
                             return Err(Error::new(
                                 ErrorCategory::Parse,
                                 codes::DECODING_ERROR,
-                                kinds::DecodingError(format!(
+                                DecodingError(format!(
                                     "Failed to parse import during built-in scan: {}",
                                     err
                                 )),
@@ -65,10 +66,7 @@ pub fn scan_for_builtins(binary: &[u8]) -> Result<Vec<String>> {
                 return Err(Error::new(
                     ErrorCategory::Parse,
                     codes::DECODING_ERROR,
-                    kinds::DecodingError(format!(
-                        "Failed to parse module during built-in scan: {}",
-                        err
-                    )),
+                    DecodingError(format!("Failed to parse module during built-in scan: {}", err)),
                 ));
             }
             _ => {} // Skip other payload types
@@ -233,22 +231,10 @@ mod tests {
         let resource_get_module = create_test_module("wasi_builtin", "resource.get");
 
         // Verify all are correctly identified
-        assert_eq!(
-            scan_for_builtins(&resource_create_module).unwrap(),
-            vec!["resource.create"]
-        );
-        assert_eq!(
-            scan_for_builtins(&resource_drop_module).unwrap(),
-            vec!["resource.drop"]
-        );
-        assert_eq!(
-            scan_for_builtins(&resource_rep_module).unwrap(),
-            vec!["resource.rep"]
-        );
-        assert_eq!(
-            scan_for_builtins(&resource_get_module).unwrap(),
-            vec!["resource.get"]
-        );
+        assert_eq!(scan_for_builtins(&resource_create_module).unwrap(), vec!["resource.create"]);
+        assert_eq!(scan_for_builtins(&resource_drop_module).unwrap(), vec!["resource.drop"]);
+        assert_eq!(scan_for_builtins(&resource_rep_module).unwrap(), vec!["resource.rep"]);
+        assert_eq!(scan_for_builtins(&resource_get_module).unwrap(), vec!["resource.get"]);
 
         // Verify all map to correct builtin types
         assert!(get_required_builtins(&resource_create_module)

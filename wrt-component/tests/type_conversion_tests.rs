@@ -15,22 +15,10 @@ use wrt_types::{
 #[test]
 fn test_value_type_to_format_val_type() {
     // Test each core value type
-    assert_eq!(
-        value_type_to_format_val_type(&ValueType::I32).unwrap(),
-        FormatValType::S32
-    );
-    assert_eq!(
-        value_type_to_format_val_type(&ValueType::I64).unwrap(),
-        FormatValType::S64
-    );
-    assert_eq!(
-        value_type_to_format_val_type(&ValueType::F32).unwrap(),
-        FormatValType::F32
-    );
-    assert_eq!(
-        value_type_to_format_val_type(&ValueType::F64).unwrap(),
-        FormatValType::F64
-    );
+    assert_eq!(value_type_to_format_val_type(&ValueType::I32).unwrap(), FormatValType::S32);
+    assert_eq!(value_type_to_format_val_type(&ValueType::I64).unwrap(), FormatValType::S64);
+    assert_eq!(value_type_to_format_val_type(&ValueType::F32).unwrap(), FormatValType::F32);
+    assert_eq!(value_type_to_format_val_type(&ValueType::F64).unwrap(), FormatValType::F64);
 
     // Test reference types that should return errors
     assert!(value_type_to_format_val_type(&ValueType::FuncRef).is_err());
@@ -41,22 +29,10 @@ fn test_value_type_to_format_val_type() {
 #[test]
 fn test_format_val_type_to_value_type() {
     // Test primitive types
-    assert_eq!(
-        format_val_type_to_value_type(&FormatValType::S32).unwrap(),
-        ValueType::I32
-    );
-    assert_eq!(
-        format_val_type_to_value_type(&FormatValType::S64).unwrap(),
-        ValueType::I64
-    );
-    assert_eq!(
-        format_val_type_to_value_type(&FormatValType::F32).unwrap(),
-        ValueType::F32
-    );
-    assert_eq!(
-        format_val_type_to_value_type(&FormatValType::F64).unwrap(),
-        ValueType::F64
-    );
+    assert_eq!(format_val_type_to_value_type(&FormatValType::S32).unwrap(), ValueType::I32);
+    assert_eq!(format_val_type_to_value_type(&FormatValType::S64).unwrap(), ValueType::I64);
+    assert_eq!(format_val_type_to_value_type(&FormatValType::F32).unwrap(), ValueType::F32);
+    assert_eq!(format_val_type_to_value_type(&FormatValType::F64).unwrap(), ValueType::F64);
 
     // Test complex types that should return errors
     assert!(format_val_type_to_value_type(&FormatValType::String).is_err());
@@ -67,89 +43,38 @@ fn test_format_val_type_to_value_type() {
 /// Test conversion from core ValueType to TypesValType
 #[test]
 fn test_value_type_to_types_valtype() {
-    assert_eq!(
-        value_type_to_types_valtype(&ValueType::I32),
-        TypesValType::S32
-    );
-    assert_eq!(
-        value_type_to_types_valtype(&ValueType::I64),
-        TypesValType::S64
-    );
-    assert_eq!(
-        value_type_to_types_valtype(&ValueType::F32),
-        TypesValType::F32
-    );
-    assert_eq!(
-        value_type_to_types_valtype(&ValueType::F64),
-        TypesValType::F64
-    );
-    assert_eq!(
-        value_type_to_types_valtype(&ValueType::FuncRef),
-        TypesValType::Own(0)
-    );
-    assert_eq!(
-        value_type_to_types_valtype(&ValueType::ExternRef),
-        TypesValType::Ref(0)
-    );
+    assert_eq!(value_type_to_types_valtype(&ValueType::I32), TypesValType::S32);
+    assert_eq!(value_type_to_types_valtype(&ValueType::I64), TypesValType::S64);
+    assert_eq!(value_type_to_types_valtype(&ValueType::F32), TypesValType::F32);
+    assert_eq!(value_type_to_types_valtype(&ValueType::F64), TypesValType::F64);
+    assert_eq!(value_type_to_types_valtype(&ValueType::FuncRef), TypesValType::Own(0));
+    assert_eq!(value_type_to_types_valtype(&ValueType::ExternRef), TypesValType::Ref(0));
 }
 
 /// Test conversion from format ValType to TypesValType
 #[test]
 fn test_format_valtype_to_types_valtype() {
     // Test primitive types
-    assert_eq!(
-        format_valtype_to_types_valtype(&FormatValType::S32),
-        TypesValType::S32
-    );
-    assert_eq!(
-        format_valtype_to_types_valtype(&FormatValType::U32),
-        TypesValType::U32
-    );
-    assert_eq!(
-        format_valtype_to_types_valtype(&FormatValType::S64),
-        TypesValType::S64
-    );
-    assert_eq!(
-        format_valtype_to_types_valtype(&FormatValType::U64),
-        TypesValType::U64
-    );
-    assert_eq!(
-        format_valtype_to_types_valtype(&FormatValType::F32),
-        TypesValType::F32
-    );
-    assert_eq!(
-        format_valtype_to_types_valtype(&FormatValType::F64),
-        TypesValType::F64
-    );
+    assert_eq!(format_valtype_to_types_valtype(&FormatValType::S32), TypesValType::S32);
+    assert_eq!(format_valtype_to_types_valtype(&FormatValType::U32), TypesValType::U32);
+    assert_eq!(format_valtype_to_types_valtype(&FormatValType::S64), TypesValType::S64);
+    assert_eq!(format_valtype_to_types_valtype(&FormatValType::U64), TypesValType::U64);
+    assert_eq!(format_valtype_to_types_valtype(&FormatValType::F32), TypesValType::F32);
+    assert_eq!(format_valtype_to_types_valtype(&FormatValType::F64), TypesValType::F64);
 
     // Test more complex types
-    assert_eq!(
-        format_valtype_to_types_valtype(&FormatValType::Bool),
-        TypesValType::Bool
-    );
-    assert_eq!(
-        format_valtype_to_types_valtype(&FormatValType::String),
-        TypesValType::String
-    );
-    assert_eq!(
-        format_valtype_to_types_valtype(&FormatValType::Char),
-        TypesValType::Char
-    );
+    assert_eq!(format_valtype_to_types_valtype(&FormatValType::Bool), TypesValType::Bool);
+    assert_eq!(format_valtype_to_types_valtype(&FormatValType::String), TypesValType::String);
+    assert_eq!(format_valtype_to_types_valtype(&FormatValType::Char), TypesValType::Char);
 
     // Test compound types
     let list_type = FormatValType::List(Box::new(FormatValType::S32));
     let expected_list_type = TypesValType::List(Box::new(TypesValType::S32));
-    assert_eq!(
-        format_valtype_to_types_valtype(&list_type),
-        expected_list_type
-    );
+    assert_eq!(format_valtype_to_types_valtype(&list_type), expected_list_type);
 
     let option_type = FormatValType::Option(Box::new(FormatValType::S32));
     let expected_option_type = TypesValType::Option(Box::new(TypesValType::S32));
-    assert_eq!(
-        format_valtype_to_types_valtype(&option_type),
-        expected_option_type
-    );
+    assert_eq!(format_valtype_to_types_valtype(&option_type), expected_option_type);
 
     // Test record type
     let record_fields = vec![
@@ -182,14 +107,8 @@ fn test_format_valtype_to_types_valtype() {
     );
 
     // Test resource handles
-    assert_eq!(
-        format_valtype_to_types_valtype(&FormatValType::Own(5)),
-        TypesValType::Own(5)
-    );
-    assert_eq!(
-        format_valtype_to_types_valtype(&FormatValType::Borrow(5)),
-        TypesValType::Borrow(5)
-    );
+    assert_eq!(format_valtype_to_types_valtype(&FormatValType::Own(5)), TypesValType::Own(5));
+    assert_eq!(format_valtype_to_types_valtype(&FormatValType::Borrow(5)), TypesValType::Borrow(5));
 }
 
 /// Test round-trip conversion for format ValType to TypesValType and back
@@ -263,10 +182,7 @@ fn test_format_to_runtime_extern_type() {
     let format_instance = FormatExternType::Instance {
         exports: vec![(
             "func".to_string(),
-            FormatExternType::Function {
-                params: vec![],
-                results: vec![],
-            },
+            FormatExternType::Function { params: vec![], results: vec![] },
         )],
     };
 
@@ -280,10 +196,8 @@ fn test_format_to_runtime_extern_type() {
     }
 
     // Test resource type conversion
-    let resource_extern_type = FormatExternType::Resource {
-        rep: ResourceRepresentation::Handle32,
-        nullable: false,
-    };
+    let resource_extern_type =
+        FormatExternType::Resource { rep: ResourceRepresentation::Handle32, nullable: false };
 
     let runtime_resource = format_to_runtime_extern_type(&resource_extern_type).unwrap();
 
@@ -332,16 +246,10 @@ fn test_extern_type_roundtrip() {
 #[test]
 fn test_common_conversion_utilities() {
     // Test common_to_format_val_type
-    assert_eq!(
-        common_to_format_val_type(&ValueType::I32).unwrap(),
-        FormatValType::S32
-    );
+    assert_eq!(common_to_format_val_type(&ValueType::I32).unwrap(), FormatValType::S32);
 
     // Test format_to_common_val_type
-    assert_eq!(
-        format_to_common_val_type(&FormatValType::S32).unwrap(),
-        ValueType::I32
-    );
+    assert_eq!(format_to_common_val_type(&FormatValType::S32).unwrap(), ValueType::I32);
 
     // Test extern_type_to_func_type
     let func_type = TypesFuncType::new(vec![ValueType::I32, ValueType::I64], vec![ValueType::F32]);
@@ -377,10 +285,7 @@ fn test_conversion_traits() {
 fn test_conversion_error_handling() {
     // Test error when converting unsupported format value types
     let unsupported_types = vec![
-        FormatValType::ResultBoth(
-            Box::new(FormatValType::S32),
-            Box::new(FormatValType::String),
-        ),
+        FormatValType::ResultBoth(Box::new(FormatValType::S32), Box::new(FormatValType::String)),
         FormatValType::ErrorContext,
     ];
 

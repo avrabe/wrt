@@ -121,98 +121,47 @@ impl VersionInfo {
     /// Initialize features for version 1.0
     fn initialize_v1_0_features(&mut self) {
         // Standard features in V1.0
-        self.features.insert(
-            ComponentModelFeature::CoreModule,
-            FeatureStatus::FullySupported,
-        );
-        self.features.insert(
-            ComponentModelFeature::CoreInstance,
-            FeatureStatus::FullySupported,
-        );
-        self.features.insert(
-            ComponentModelFeature::CoreType,
-            FeatureStatus::FullySupported,
-        );
-        self.features.insert(
-            ComponentModelFeature::ComponentType,
-            FeatureStatus::FullySupported,
-        );
-        self.features.insert(
-            ComponentModelFeature::Instance,
-            FeatureStatus::FullySupported,
-        );
-        self.features
-            .insert(ComponentModelFeature::Alias, FeatureStatus::FullySupported);
-        self.features
-            .insert(ComponentModelFeature::Canon, FeatureStatus::FullySupported);
-        self.features
-            .insert(ComponentModelFeature::Start, FeatureStatus::FullySupported);
-        self.features
-            .insert(ComponentModelFeature::Import, FeatureStatus::FullySupported);
-        self.features
-            .insert(ComponentModelFeature::Export, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::CoreModule, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::CoreInstance, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::CoreType, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::ComponentType, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::Instance, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::Alias, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::Canon, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::Start, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::Import, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::Export, FeatureStatus::FullySupported);
 
         // Experimental features
         #[cfg(feature = "component-model-values")]
-        self.features.insert(
-            ComponentModelFeature::Value,
-            FeatureStatus::ExperimentalSupported,
-        );
+        self.features.insert(ComponentModelFeature::Value, FeatureStatus::ExperimentalSupported);
         #[cfg(not(feature = "component-model-values"))]
-        self.features
-            .insert(ComponentModelFeature::Value, FeatureStatus::Unavailable);
+        self.features.insert(ComponentModelFeature::Value, FeatureStatus::Unavailable);
 
         #[cfg(feature = "component-model-resources")]
-        self.features.insert(
-            ComponentModelFeature::ResourceTypes,
-            FeatureStatus::ExperimentalSupported,
-        );
+        self.features
+            .insert(ComponentModelFeature::ResourceTypes, FeatureStatus::ExperimentalSupported);
         #[cfg(not(feature = "component-model-resources"))]
-        self.features.insert(
-            ComponentModelFeature::ResourceTypes,
-            FeatureStatus::Unavailable,
-        );
+        self.features.insert(ComponentModelFeature::ResourceTypes, FeatureStatus::Unavailable);
     }
 
     /// Initialize minimal feature set (for unknown versions)
     fn initialize_minimal_features(&mut self) {
         // Only include core features
-        self.features.insert(
-            ComponentModelFeature::CoreModule,
-            FeatureStatus::FullySupported,
-        );
-        self.features.insert(
-            ComponentModelFeature::CoreInstance,
-            FeatureStatus::FullySupported,
-        );
-        self.features.insert(
-            ComponentModelFeature::CoreType,
-            FeatureStatus::FullySupported,
-        );
+        self.features.insert(ComponentModelFeature::CoreModule, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::CoreInstance, FeatureStatus::FullySupported);
+        self.features.insert(ComponentModelFeature::CoreType, FeatureStatus::FullySupported);
 
         // Other features are unavailable
-        self.features.insert(
-            ComponentModelFeature::ComponentType,
-            FeatureStatus::Unavailable,
-        );
-        self.features
-            .insert(ComponentModelFeature::Instance, FeatureStatus::Unavailable);
-        self.features
-            .insert(ComponentModelFeature::Alias, FeatureStatus::Unavailable);
-        self.features
-            .insert(ComponentModelFeature::Canon, FeatureStatus::Unavailable);
-        self.features
-            .insert(ComponentModelFeature::Start, FeatureStatus::Unavailable);
-        self.features
-            .insert(ComponentModelFeature::Import, FeatureStatus::Unavailable);
-        self.features
-            .insert(ComponentModelFeature::Export, FeatureStatus::Unavailable);
-        self.features
-            .insert(ComponentModelFeature::Value, FeatureStatus::Unavailable);
-        self.features.insert(
-            ComponentModelFeature::ResourceTypes,
-            FeatureStatus::Unavailable,
-        );
+        self.features.insert(ComponentModelFeature::ComponentType, FeatureStatus::Unavailable);
+        self.features.insert(ComponentModelFeature::Instance, FeatureStatus::Unavailable);
+        self.features.insert(ComponentModelFeature::Alias, FeatureStatus::Unavailable);
+        self.features.insert(ComponentModelFeature::Canon, FeatureStatus::Unavailable);
+        self.features.insert(ComponentModelFeature::Start, FeatureStatus::Unavailable);
+        self.features.insert(ComponentModelFeature::Import, FeatureStatus::Unavailable);
+        self.features.insert(ComponentModelFeature::Export, FeatureStatus::Unavailable);
+        self.features.insert(ComponentModelFeature::Value, FeatureStatus::Unavailable);
+        self.features.insert(ComponentModelFeature::ResourceTypes, FeatureStatus::Unavailable);
     }
 
     /// Check if a feature is available (either experimental or fully supported)
@@ -225,10 +174,7 @@ impl VersionInfo {
 
     /// Get the status of a feature
     pub fn get_feature_status(&self, feature: ComponentModelFeature) -> FeatureStatus {
-        *self
-            .features
-            .get(&feature)
-            .unwrap_or(&FeatureStatus::Unavailable)
+        *self.features.get(&feature).unwrap_or(&FeatureStatus::Unavailable)
     }
 
     /// Determine if the binary uses any experimental features
@@ -237,9 +183,8 @@ impl VersionInfo {
         // In a real implementation, this would scan the binary for sections
         // that correspond to experimental features
 
-        let value_section_present = binary
-            .windows(1)
-            .any(|window| window[0] == crate::binary::COMPONENT_VALUE_SECTION_ID);
+        let value_section_present =
+            binary.windows(1).any(|window| window[0] == crate::binary::COMPONENT_VALUE_SECTION_ID);
         if value_section_present
             && self.get_feature_status(ComponentModelFeature::Value)
                 == FeatureStatus::ExperimentalSupported

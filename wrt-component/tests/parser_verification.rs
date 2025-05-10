@@ -93,11 +93,7 @@ fn test_section_finding() {
 
     // Test finding the import section (ID 2)
     let section_result = find_section(&module, 2);
-    assert!(
-        section_result.is_ok(),
-        "Error finding section: {:?}",
-        section_result.err()
-    );
+    assert!(section_result.is_ok(), "Error finding section: {:?}", section_result.err());
     let section = section_result.unwrap();
 
     assert!(section.is_some(), "Failed to find import section");
@@ -116,17 +112,8 @@ fn test_scanning_for_builtins() {
     );
 
     let builtins = builtin_result.unwrap();
-    assert_eq!(
-        builtins.len(),
-        1,
-        "Expected 1 builtin, found: {}",
-        builtins.len()
-    );
-    assert_eq!(
-        builtins[0], "random",
-        "Expected 'random' builtin, found: {}",
-        builtins[0]
-    );
+    assert_eq!(builtins.len(), 1, "Expected 1 builtin, found: {}", builtins.len());
+    assert_eq!(builtins[0], "random", "Expected 'random' builtin, found: {}", builtins[0]);
 }
 
 #[test]
@@ -151,10 +138,7 @@ fn test_payloads() {
     }
 
     assert!(count >= 2, "Expected at least 2 payloads, found {}", count);
-    assert!(
-        found_import_section,
-        "Failed to find import section payload"
-    );
+    assert!(found_import_section, "Failed to find import section payload");
 }
 
 #[test]
@@ -167,11 +151,7 @@ fn test_section_reader() {
 
     // Use the section reader to parse the import section
     let import_data = &module[offset..offset + size];
-    assert_eq!(
-        import_data[0], 0x01,
-        "Expected 1 import, found {}",
-        import_data[0]
-    );
+    assert_eq!(import_data[0], 0x01, "Expected 1 import, found {}", import_data[0]);
 }
 
 #[test]
@@ -187,10 +167,6 @@ fn test_performance() {
     let duration = start.elapsed();
 
     // Check that scanning is reasonably fast
-    assert!(
-        duration.as_millis() < 1000,
-        "Scanning took too long: {:?}",
-        duration
-    );
+    assert!(duration.as_millis() < 1000, "Scanning took too long: {:?}", duration);
     println!("Scanning 1000 times took: {:?}", duration);
 }

@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{self, Error, Result};
 use crate::format_adapter;
 use crate::stackless::StacklessEngine;
 use wrt_format::{CompressionType, Module as FormatModule, StateSection};
@@ -73,8 +73,8 @@ pub fn serialize_to_module(engine: &StacklessEngine) -> Result<crate::module::Mo
 pub fn deserialize_from_module(module: &crate::module::Module) -> Result<StacklessEngine> {
     // Check if this is a serialized state module
     if !format_adapter::has_state_sections(module)? {
-        return Err(Error::execution_error(
-            "Module does not contain serialized state".to_string(),
+        return Err(error::execution_error(
+            "Module does not contain serialized state"
         ));
     }
 

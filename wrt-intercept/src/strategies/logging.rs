@@ -57,13 +57,7 @@ pub struct LoggingConfig {
 
 impl Default for LoggingConfig {
     fn default() -> Self {
-        Self {
-            log_args: true,
-            log_results: true,
-            log_timing: true,
-            max_args: 10,
-            max_results: 10,
-        }
+        Self { log_args: true, log_results: true, log_timing: true, max_args: 10, max_results: 10 }
     }
 }
 
@@ -256,14 +250,9 @@ pub struct FileLogSink {
 impl FileLogSink {
     /// Create a new file log sink
     fn new(path: &std::path::Path) -> std::io::Result<Self> {
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)?;
+        let file = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
 
-        Ok(Self {
-            file: Mutex::new(file),
-        })
+        Ok(Self { file: Mutex::new(file) })
     }
 }
 
@@ -319,9 +308,7 @@ mod tests {
 
     #[test]
     fn test_logging_strategy() {
-        let sink = Arc::new(TestSink {
-            logs: Mutex::new(Vec::new()),
-        });
+        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) });
         let strategy = LoggingStrategy::new(sink.clone());
 
         // Test before_call
@@ -340,9 +327,7 @@ mod tests {
 
     #[test]
     fn test_logging_strategy_after_call() {
-        let sink = Arc::new(TestSink {
-            logs: Mutex::new(Vec::new()),
-        });
+        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) });
         let strategy = LoggingStrategy::new(sink.clone());
 
         // Test after_call with success
@@ -361,9 +346,7 @@ mod tests {
 
     #[test]
     fn test_logging_strategy_config() {
-        let sink = Arc::new(TestSink {
-            logs: Mutex::new(Vec::new()),
-        });
+        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) });
         let config = LoggingConfig {
             log_args: false,
             log_results: true,

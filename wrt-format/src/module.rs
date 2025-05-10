@@ -9,9 +9,11 @@ use std::{string::String, vec::Vec};
 use alloc::{string::String, vec::Vec};
 
 use crate::section::CustomSection;
+use crate::types::CoreWasmVersion;
+use crate::types::FormatGlobalType;
 use crate::types::Limits;
 use wrt_error::{codes, Error, ErrorCategory, Result};
-use wrt_types::{types::GlobalType, ValueType};
+use wrt_types::{types::GlobalType, RefType, ValueType};
 
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
@@ -60,7 +62,7 @@ pub struct Table {
 #[derive(Debug, Clone)]
 pub struct Global {
     /// Global type
-    pub global_type: GlobalType,
+    pub global_type: FormatGlobalType,
     /// Initialization expression
     pub init: Vec<u8>,
 }
@@ -87,15 +89,42 @@ pub struct Data {
     pub init: Vec<u8>,
 }
 
-/// WebAssembly element segment
+/// Represents the initialization items for an element segment.
+#[derive(Debug, Clone)]
+pub enum ElementInit {
+    /// A vector of function indices (for funcref element type when expressions are not used).
+    FuncIndices(Vec<u32>),
+    /// A vector of initialization expressions (for externref, or funcref with expressions).
+    /// Each expression is a raw byte vector, representing a const expr.
+    Expressions(Vec<Vec<u8>>),
+}
+
+/// Mode for an element segment, determining how it's initialized.
+#[derive(Debug, Clone)]
+pub enum ElementMode {
+    /// Active segment: associated with a table and an offset.
+    Active {
+        /// Index of the table to initialize.
+        table_index: u32,
+        /// Offset expression (raw bytes of a const expr).
+        offset_expr: Vec<u8>,
+    },
+    /// Passive segment: elements are not actively placed in a table at instantiation.
+    Passive,
+    /// Declared segment: elements are declared but not available at runtime
+    /// until explicitly instantiated. Useful for some linking scenarios.
+    Declared,
+}
+
+/// WebAssembly element segment (Wasm 2.0 compatible)
 #[derive(Debug, Clone)]
 pub struct Element {
-    /// Table index
-    pub table_idx: u32,
-    /// Offset expression
-    pub offset: Vec<u8>,
-    /// Function indices
-    pub init: Vec<u32>,
+    /// The type of elements in this segment (funcref or externref).
+    pub element_type: RefType,
+    /// Initialization items for the segment.
+    pub init: ElementInit,
+    /// The mode of the element segment.
+    pub mode: ElementMode,
 }
 
 /// WebAssembly export
@@ -120,6 +149,8 @@ pub enum ExportKind {
     Memory,
     /// Global export
     Global,
+    /// Tag export
+    Tag,
 }
 
 /// WebAssembly import
@@ -143,11 +174,26 @@ pub enum ImportDesc {
     /// Memory import
     Memory(Memory),
     /// Global import
-    Global(Global),
+    Global(FormatGlobalType),
+    /// Tag import
+    Tag(u32),
 }
 
-/// WebAssembly module
-#[derive(Debug, Clone)]
+/// Hypothetical Finding F5: Represents an entry in the TypeInformation section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TypeInformationEntry {
+    pub type_index: u32, // Assuming TypeIdx is u32
+    pub name: String,
+}
+
+/// Hypothetical Finding F5: Represents the custom TypeInformation section.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TypeInformationSection {
+    pub entries: Vec<TypeInformationEntry>,
+}
+
+/// Represents a WebAssembly module.
+#[derive(Debug, Clone, Default)]
 pub struct Module {
     /// Function types
     pub types: Vec<ValueType>,
@@ -173,6 +219,8 @@ pub struct Module {
     pub custom_sections: Vec<CustomSection>,
     /// Original binary (if available)
     pub binary: Option<Vec<u8>>,
+    pub core_version: CoreWasmVersion, // Added for Wasm 3.0 support
+    pub type_info_section: Option<TypeInformationSection>,
 }
 
 impl Default for Module {
@@ -197,6 +245,8 @@ impl Module {
             start: None,
             custom_sections: Vec::new(),
             binary: None,
+            core_version: CoreWasmVersion::default(),
+            type_info_section: None,
         }
     }
 
@@ -222,9 +272,7 @@ impl Module {
 
     /// Find a custom section by name
     pub fn find_custom_section(&self, name: &str) -> Option<&CustomSection> {
-        self.custom_sections
-            .iter()
-            .find(|section| section.name == name)
+        self.custom_sections.iter().find(|section| section.name == name)
     }
 
     /// Add a custom section

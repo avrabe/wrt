@@ -121,9 +121,7 @@ pub fn calculate_layout(ty: &ValType) -> CanonicalLayout {
             size: 8, // ptr + len
             alignment: 4,
             offset: None,
-            details: CanonicalLayoutDetails::String {
-                encoding: StringEncoding::UTF8,
-            },
+            details: CanonicalLayoutDetails::String { encoding: StringEncoding::UTF8 },
         },
         ValType::Record(fields) => {
             let mut field_layouts = Vec::with_capacity(fields.len());
@@ -153,9 +151,7 @@ pub fn calculate_layout(ty: &ValType) -> CanonicalLayout {
                 size: total_size,
                 alignment: max_alignment,
                 offset: None,
-                details: CanonicalLayoutDetails::Record {
-                    fields: field_layouts,
-                },
+                details: CanonicalLayoutDetails::Record { fields: field_layouts },
             }
         }
         ValType::Variant(cases) => {
@@ -250,9 +246,7 @@ pub fn calculate_layout(ty: &ValType) -> CanonicalLayout {
                 size: total_size,
                 alignment: max_alignment,
                 offset: None,
-                details: CanonicalLayoutDetails::Record {
-                    fields: field_layouts,
-                },
+                details: CanonicalLayoutDetails::Record { fields: field_layouts },
             }
         }
         ValType::Flags(names) => {
@@ -310,10 +304,7 @@ pub fn calculate_layout(ty: &ValType) -> CanonicalLayout {
                 offset: None,
                 details: CanonicalLayoutDetails::Variant {
                     tag_size: tag_size as u8,
-                    cases: vec![
-                        ("Ok".to_string(), Some(ok_layout)),
-                        ("Err".to_string(), None),
-                    ],
+                    cases: vec![("Ok".to_string(), Some(ok_layout)), ("Err".to_string(), None)],
                 },
             }
         }
@@ -332,10 +323,7 @@ pub fn calculate_layout(ty: &ValType) -> CanonicalLayout {
                 offset: None,
                 details: CanonicalLayoutDetails::Variant {
                     tag_size: tag_size as u8,
-                    cases: vec![
-                        ("Ok".to_string(), None),
-                        ("Err".to_string(), Some(err_layout)),
-                    ],
+                    cases: vec![("Ok".to_string(), None), ("Err".to_string(), Some(err_layout))],
                 },
             }
         }
@@ -554,11 +542,7 @@ mod tests {
         assert_eq!(layout.size, 40);
         assert_eq!(layout.alignment, 4);
 
-        if let CanonicalLayoutDetails::List {
-            element,
-            fixed_length,
-        } = &layout.details
-        {
+        if let CanonicalLayoutDetails::List { element, fixed_length } = &layout.details {
             assert_eq!(element.size, 4);
             assert_eq!(element.alignment, 4);
             assert_eq!(fixed_length, &Some(10));

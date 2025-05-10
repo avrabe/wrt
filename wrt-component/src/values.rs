@@ -56,10 +56,8 @@ pub fn convert_common_to_format_valtype(common_type: &CanonicalValType) -> Forma
             FormatValType::List(Box::new(convert_common_to_format_valtype(elem_type)))
         }
         CanonicalValType::Tuple(types) => {
-            let converted_types = types
-                .iter()
-                .map(|val_type| convert_common_to_format_valtype(val_type))
-                .collect();
+            let converted_types =
+                types.iter().map(|val_type| convert_common_to_format_valtype(val_type)).collect();
             FormatValType::Tuple(converted_types)
         }
         CanonicalValType::Flags(names) => FormatValType::Flags(names.clone()),
@@ -132,10 +130,8 @@ pub fn convert_format_to_common_valtype(format_type: &FormatValType) -> Canonica
             CanonicalValType::List(Box::new(convert_format_to_common_valtype(elem_type)))
         }
         FormatValType::Tuple(types) => {
-            let converted_types = types
-                .iter()
-                .map(|val_type| convert_format_to_common_valtype(val_type))
-                .collect();
+            let converted_types =
+                types.iter().map(|val_type| convert_format_to_common_valtype(val_type)).collect();
             CanonicalValType::Tuple(converted_types)
         }
         FormatValType::Flags(names) => CanonicalValType::Flags(names.clone()),
@@ -722,10 +718,7 @@ pub fn deserialize_component_value(
                     }
                     let inner_value = deserialize_component_value(&data[offset..], case_type)?;
                     // We've already read the needed value, no need to update offset
-                    Ok(ComponentValue::Variant(
-                        case_name.clone(),
-                        Some(Box::new(inner_value)),
-                    ))
+                    Ok(ComponentValue::Variant(case_name.clone(), Some(Box::new(inner_value))))
                 }
                 None => {
                     // Case without a value
@@ -805,13 +798,9 @@ pub fn deserialize_component_value(
             let value = data[offset] != 0;
             // No need to update offset anymore as we return immediately
             if value {
-                Ok(ComponentValue::Result(Err(Box::new(ComponentValue::Bool(
-                    true,
-                )))))
+                Ok(ComponentValue::Result(Err(Box::new(ComponentValue::Bool(true)))))
             } else {
-                Ok(ComponentValue::Result(Err(Box::new(ComponentValue::Bool(
-                    false,
-                )))))
+                Ok(ComponentValue::Result(Err(Box::new(ComponentValue::Bool(false)))))
             }
         }
         FormatValType::ResultBoth(ok_type, err_type) => {
@@ -1118,11 +1107,8 @@ mod tests {
     #[test]
     fn test_primitive_value_encoding_decoding() {
         // Test a few primitive types
-        let values = vec![
-            ComponentValue::Bool(true),
-            ComponentValue::S32(42),
-            ComponentValue::F64(3.14159),
-        ];
+        let values =
+            vec![ComponentValue::Bool(true), ComponentValue::S32(42), ComponentValue::F64(3.14159)];
 
         for value in values {
             let encoded = serialize_component_value(&value).unwrap();

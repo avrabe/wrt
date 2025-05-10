@@ -53,16 +53,10 @@ mod tests {
             results: vec![wrt::types::ValueType::I32],
         };
 
-        let func_value = FunctionValue {
-            ty: func_type.clone(),
-            export_name: "add".to_string(),
-        };
+        let func_value = FunctionValue { ty: func_type.clone(), export_name: "add".to_string() };
 
         let component_func_type = ExternType::Function {
-            params: vec![
-                ("a".to_string(), ValType::S32),
-                ("b".to_string(), ValType::S32),
-            ],
+            params: vec![("a".to_string(), ValType::S32), ("b".to_string(), ValType::S32)],
             results: vec![ValType::S32],
         };
 

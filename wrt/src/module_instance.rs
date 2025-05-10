@@ -7,7 +7,8 @@ use crate::{
     module::Element,
     module::{Data, Module, OtherExport},
     prelude::TypesValue as Value,
-    types::FuncType,
+    prelude::FuncType,
+    prelude::*,
 };
 use std::sync::Arc;
 use wrt_runtime::{Memory, Table};
@@ -101,15 +102,23 @@ impl ModuleInstance {
     /// Gets an export by name
     pub fn get_export(&self, name: &str) -> Result<&OtherExport> {
         self.find_export(name)
-            .ok_or_else(|| Error::new(kinds::ExportNotFoundError(name.to_string())))
+            .ok_or_else(|| Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_EXPORT_NOT_FOUND,
+                kinds::ExportNotFoundError(name.to_string())
+            ))
     }
 
     /// Gets a function type by index
     pub fn get_function_type(&self, func_idx: u32) -> Result<&FuncType> {
         self.module.types.get(func_idx as usize).ok_or_else(|| {
-            Error::new(kinds::InvalidFunctionTypeError(format!(
-                "Invalid function type index: {func_idx}"
-            )))
+            Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_INVALID_FUNCTION_TYPE,
+                kinds::InvalidFunctionTypeError(format!(
+                    "Invalid function type index: {func_idx}"
+                ))
+            )
         })
     }
 
@@ -120,15 +129,23 @@ impl ModuleInstance {
             .functions
             .get(func_idx as usize)
             .ok_or_else(|| {
-                Error::new(kinds::FunctionNotFoundError(format!(
-                    "Function index {func_idx} out of bounds"
-                )))
+                Error::new(
+                    ErrorCategory::Validation,
+                    codes::VALIDATION_FUNCTION_NOT_FOUND,
+                    kinds::FunctionNotFoundError(format!(
+                        "Function index {func_idx} out of bounds"
+                    ))
+                )
             })?;
 
         func.code.get(pc).ok_or_else(|| {
-            Error::new(kinds::ExecutionError(format!(
-                "Instruction index {pc} out of bounds"
-            )))
+            Error::new(
+                ErrorCategory::Execution,
+                codes::EXECUTION_INSTRUCTION_INDEX_OUT_OF_BOUNDS,
+                kinds::ExecutionError(format!(
+                    "Instruction index {pc} out of bounds"
+                ))
+            )
         })
     }
 
@@ -137,7 +154,11 @@ impl ModuleInstance {
         self.tables
             .get(idx)
             .cloned()
-            .ok_or_else(|| Error::new(kinds::InvalidTableIndexError(idx as u32)))
+            .ok_or_else(|| Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_INVALID_TABLE_INDEX,
+                kinds::InvalidTableIndexError(idx as u32)
+            ))
     }
 
     /// Gets a table by index
@@ -145,7 +166,11 @@ impl ModuleInstance {
         self.tables
             .get_mut(idx)
             .cloned()
-            .ok_or_else(|| Error::new(kinds::InvalidTableIndexError(idx as u32)))
+            .ok_or_else(|| Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_INVALID_TABLE_INDEX,
+                kinds::InvalidTableIndexError(idx as u32)
+            ))
     }
 
     /// Set a value in the table at the specified index
@@ -201,9 +226,13 @@ impl ModuleInstance {
     pub fn set_global(&mut self, idx: usize, value: Value) -> Result<()> {
         if let Some(global_arc) = self.globals.get(idx) {
             // Global::set takes &self due to interior mutability (Mutex/Atomic)
-            global_arc.set(value)
+            global_arc.set(&value)
         } else {
-            Err(Error::new(kinds::InvalidGlobalIndexError(idx as u32)))
+            Err(Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_INVALID_GLOBAL_INDEX,
+                kinds::InvalidGlobalIndexError(idx as u32)
+            ))
         }
     }
 
@@ -212,7 +241,11 @@ impl ModuleInstance {
         self.module
             .elements
             .get(idx as usize)
-            .ok_or_else(|| Error::new(kinds::InvalidElementIndexError(idx)))
+            .ok_or_else(|| Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_INVALID_ELEMENT_INDEX,
+                kinds::InvalidElementIndexError(idx)
+            ))
     }
 
     /// Gets a memory by index
@@ -220,7 +253,11 @@ impl ModuleInstance {
         self.memories
             .get(idx)
             .cloned()
-            .ok_or_else(|| Error::new(kinds::InvalidMemoryIndexError(idx as u32)))
+            .ok_or_else(|| Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_INVALID_MEMORY_INDEX,
+                kinds::InvalidMemoryIndexError(idx as u32)
+            ))
     }
 
     /// Gets a memory by index (for mutable access)
@@ -228,7 +265,11 @@ impl ModuleInstance {
         self.memories
             .get(idx)
             .cloned()
-            .ok_or_else(|| Error::new(kinds::InvalidMemoryIndexError(idx as u32)))
+            .ok_or_else(|| Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_INVALID_MEMORY_INDEX,
+                kinds::InvalidMemoryIndexError(idx as u32)
+            ))
     }
 
     /// Gets a global by index
@@ -236,7 +277,11 @@ impl ModuleInstance {
         self.globals
             .get(idx)
             .cloned()
-            .ok_or_else(|| Error::new(kinds::InvalidGlobalIndexError(idx as u32)))
+            .ok_or_else(|| Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_INVALID_GLOBAL_INDEX,
+                kinds::InvalidGlobalIndexError(idx as u32)
+            ))
     }
 
     /// Gets a data segment by index
@@ -244,7 +289,11 @@ impl ModuleInstance {
         self.module
             .data
             .get(idx as usize)
-            .ok_or_else(|| Error::new(kinds::InvalidDataSegmentIndexError(idx)))
+            .ok_or_else(|| Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_INVALID_DATA_SEGMENT_INDEX,
+                kinds::InvalidDataSegmentIndexError(idx)
+            ))
     }
 
     /// Drops a data segment by index
@@ -265,9 +314,13 @@ impl ModuleInstance {
     /// Gets two tables for mutable access, ensuring they're different
     pub fn get_two_tables_mut(&mut self, idx1: u32, idx2: u32) -> Result<(Arc<Table>, Arc<Table>)> {
         if idx1 == idx2 {
-            return Err(Error::new(kinds::ValidationError(format!(
-                "Cannot get mutable references to the same table: {idx1} == {idx2}"
-            ))));
+            return Err(Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_DUPLICATE_TABLE_REFERENCE,
+                kinds::ValidationError(format!(
+                    "Cannot get mutable references to the same table: {idx1} == {idx2}"
+                ))
+            ));
         }
         let table1 = self.get_table(idx1 as usize)?;
         let table2 = self.get_table(idx2 as usize)?;
@@ -287,7 +340,11 @@ impl ModuleInstance {
     /// Gets a function address by index
     pub fn get_func_addr(&self, func_idx: u32) -> Result<FunctionAddr> {
         if func_idx as usize >= self.func_addrs.len() {
-            return Err(Error::new(kinds::InvalidFunctionIndexError(func_idx)));
+            return Err(Error::new(
+                ErrorCategory::Validation,
+                codes::VALIDATION_INVALID_FUNCTION_INDEX,
+                kinds::InvalidFunctionIndexError(func_idx)
+            ));
         }
         Ok(self.func_addrs[func_idx as usize].clone())
     }

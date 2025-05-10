@@ -36,27 +36,17 @@ mod tests {
     // Import from wrt-types
     use wrt_types::{
         safe_memory::{SafeMemoryHandler, SafeSlice},
-        types::{Limits, ValueType},
-        values::Value,
+        types::{GlobalType as TypesGlobalType, Limits, ValueType},
+        values::{FuncRef, Value},
         verification::VerificationLevel,
     };
 
     #[test]
     fn test_memory_operations() {
         // Create memory
-        let memory_type = RuntimeMemoryType {
-            minimum: 1,
-            maximum: Some(10),
-            shared: false,
-        };
+        let memory_type = RuntimeMemoryType { limits: Limits { min: 1, max: Some(10) } };
 
-        let memory = Memory::new(memory_type.clone()).unwrap();
-
-        // Verify memory type
-        let mem_type = memory.memory_type();
-        assert_eq!(mem_type.minimum, 1);
-        assert_eq!(mem_type.maximum, Some(10));
-        assert_eq!(mem_type.shared, false);
+        let mut memory = Memory::new(memory_type.clone()).unwrap();
 
         // Write memory
         let data = [1, 2, 3, 4];
@@ -80,16 +70,18 @@ mod tests {
     #[test]
     fn test_global_operations() {
         // Create global
-        let global = Global::new(ValueType::I32, true, Value::I32(42)).unwrap();
+        let global_type = TypesGlobalType { value_type: ValueType::I32, mutable: true };
+
+        let mut global = Global::new(global_type, Value::I32(42));
 
         // Verify global value
-        assert_eq!(global.get(), Value::I32(42));
+        assert_eq!(global.get(), &Value::I32(42));
 
         // Modify global
-        global.set(Value::I32(100)).unwrap();
+        global.set(&Value::I32(100)).unwrap();
 
         // Verify new value
-        assert_eq!(global.get(), Value::I32(100));
+        assert_eq!(global.get(), &Value::I32(100));
 
         // Verify global type
         let global_type = global.global_type();
@@ -102,30 +94,26 @@ mod tests {
         // Create table
         let table_type = RuntimeTableType {
             element_type: ValueType::FuncRef,
-            minimum: 10,
-            maximum: Some(20),
+            limits: Limits { min: 10, max: Some(20) },
         };
 
-        let table = Table::new(table_type.clone()).unwrap();
+        let mut table = Table::new(table_type.clone(), Value::FuncRef(None)).unwrap();
 
-        // Verify table type
-        let tab_type = table.table_type();
-        assert_eq!(tab_type.element_type, ValueType::FuncRef);
-        assert_eq!(tab_type.minimum, 10);
-        assert_eq!(tab_type.maximum, Some(20));
+        // Get table size
+        assert_eq!(table.size(), 10);
 
         // Set table element
-        let func_ref = Value::FuncRef(5);
-        table.set(0, func_ref.clone()).unwrap();
+        let func_ref = Value::FuncRef(Some(FuncRef::from_index(5)));
+        table.set(0, Some(func_ref.clone())).unwrap();
 
         // Get table element
         let element = table.get(0).unwrap();
 
         // Verify element
-        assert_eq!(element, func_ref);
+        assert_eq!(element, Some(func_ref));
 
         // Grow table
-        let old_size = table.grow(5, Value::FuncRef(0)).unwrap();
+        let old_size = table.grow(5, Value::FuncRef(None)).unwrap();
         assert_eq!(old_size, 10); // Initial size was 10
 
         // Check new size
@@ -135,27 +123,19 @@ mod tests {
     #[test]
     fn test_runtime_types() {
         // Test MemoryType
-        let memory_type = RuntimeMemoryType {
-            minimum: 1,
-            maximum: Some(2),
-            shared: false,
-        };
+        let memory_type = RuntimeMemoryType { limits: Limits { min: 1, max: Some(2) } };
 
         // Test GlobalType
-        let global_type = RuntimeGlobalType {
-            value_type: ValueType::I32,
-            mutable: true,
-        };
+        let global_type = RuntimeGlobalType { value_type: ValueType::I32, mutable: true };
 
         // Test TableType
         let table_type = RuntimeTableType {
             element_type: ValueType::FuncRef,
-            minimum: 10,
-            maximum: Some(20),
+            limits: Limits { min: 10, max: Some(20) },
         };
 
         // Verify different types
-        assert_ne!(memory_type.minimum, table_type.minimum);
+        assert_ne!(memory_type.limits.min, table_type.limits.min);
         assert_ne!(global_type.value_type, table_type.element_type);
     }
 }

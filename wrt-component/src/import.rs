@@ -25,12 +25,7 @@ pub struct Import {
 impl Import {
     /// Creates a new import
     pub fn new(namespace: Namespace, name: String, ty: ExternType, value: ExternValue) -> Self {
-        Self {
-            namespace,
-            name,
-            ty,
-            value,
-        }
+        Self { namespace, name, ty, value }
     }
 
     /// Creates an import identifier by combining namespace and name
@@ -69,9 +64,7 @@ pub struct ImportCollection {
 impl ImportCollection {
     /// Creates a new, empty import collection
     pub fn new() -> Self {
-        Self {
-            imports: HashMap::new(),
-        }
+        Self { imports: HashMap::new() }
     }
 
     /// Adds an import to the collection
@@ -139,10 +132,7 @@ mod tests {
                 results: vec![],
             },
             ExternValue::Function(FunctionValue {
-                ty: FuncType {
-                    params: vec![wrt_types::types::ValueType::I32],
-                    results: vec![],
-                },
+                ty: FuncType { params: vec![wrt_types::types::ValueType::I32], results: vec![] },
                 export_name: "print".to_string(),
             }),
         );

@@ -3,18 +3,18 @@ name = "wrt-error"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Error handling for the WRT WebAssembly runtime"
+description = "Error handling for the WebAssembly Runtime"
 repository = "https://github.com/avrabe/wrt"
+readme = "../README.md"
+keywords = ["webassembly", "wasm", "error", "no_std", "component-model"]
+categories = ["wasm", "no-std", "embedded"]
 
 [lib]
 name = "wrt_error"
 path = "src/lib.rs"
 
 [dependencies]
-# No external dependencies by default
-# Optional dependencies
-wasmparser = { version = "0.227.1", optional = true }
-wat = { version = "1.229.0", optional = true }
+# No external dependencies
 
 [features]
 default = ["std"]
@@ -23,13 +23,54 @@ alloc = []
 # Standard library features (includes alloc)
 std = ["alloc"]
 # For no_std support
-no_std = []
-# Optional integration with other libraries
-wasmparser = ["dep:wasmparser", "std"]
-wat = ["dep:wat", "std"]
+no_std = ["alloc"]
+# Performance optimization
+optimize = []
+# Safety features
+safety = ["alloc"]
+
+[profile.release]
+panic = "abort"
+
+[profile.test]
+panic = "abort"
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)', 'cfg(kani)', 'cfg(coverage)', 'cfg(doc)'] }
+missing_docs = "deny"
+unsafe_code = "forbid"
+static_mut_refs = "deny"
+let_underscore_drop = "warn"
+
+[lints.clippy]
+# Rule 1: Language subset
+inline_asm_x86_att_syntax = "deny"
+transmute_ptr_to_ref = "deny"
+# type_id = "deny" # Removed as it's not a direct lint and reflection isn't used.
+# dyn_box = "warn" # Commented out due to unknown lint warning, rule covered by manual review / other lints
+float_arithmetic = "warn"
+# Rule 2: Unsafe usage
+ptr_offset_with_cast = "warn"
+# Rule 3: Error handling & panics
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+result_unit_err = "warn"
+must_use_candidate = "warn"
+must_use_unit = "warn"
+# Rule 4: Control-flow soundness
+match_wildcard_for_single_variants = "warn"
+never_loop = "warn"
+unreachable = "deny"
+# Rule 5: Memory & concurrency safety
+# static_mut_reference = "deny" # Moved to lints.rust and renamed
+# arc_get_mut_unchecked = "deny" # Commented out due to unknown lint warning, rule covered by manual review / unsafe_code = "forbid"
+# Rule 8: Static analysis gates (CI)
+pedantic = "warn"
+# Rule 9: Documentation
+debug_assert_with_mut_call = "warn"
 
 # Configuration for Kani verification
 # This will only be used when running `cargo kani`

@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 description = "Example WebAssembly Module using WASI logging"
 repository = "https://github.com/avrabe/wrt"
+readme = "README.md"
+keywords = ["wasm", "webassembly", "example", "wasi"]
+categories = ["wasm", "development-tools::testing"]
 
 [lib]
 crate-type = ["cdylib"]

@@ -1,3 +1,12 @@
+// WRT - wrt-decoder
+// SW-REQ-ID: [SW-REQ-ID-wrt-decoder]
+//
+// Copyright (c) 2025 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+#![forbid(unsafe_code)] // Rule 2
+
 //! WebAssembly module decoder for wrt runtime
 //!
 //! This crate provides a high-level API for decoding WebAssembly binary modules
@@ -53,12 +62,14 @@ pub mod name_section;
 pub mod parser;
 pub mod prelude;
 pub mod producers_section;
+pub mod runtime_adapter;
 pub mod section_error;
 pub mod section_reader;
 pub mod sections;
 pub mod utils;
 pub mod validation;
 pub mod wasm;
+pub mod custom_section_utils;
 
 // Re-exports from error crate
 pub use wrt_error::{codes, kinds, Error, Result};
@@ -67,12 +78,15 @@ pub use wrt_error::{codes, kinds, Error, Result};
 pub use conversion::{
     byte_to_value_type, component_limits_to_format_limits, convert_to_wrt_error,
     format_error_to_wrt_error, format_func_type_to_types_func_type,
-    format_global_type_to_types_global_type, format_limits_to_component_limits,
+    format_global_to_types_global, format_limits_to_component_limits,
     format_limits_to_types_limits, format_memory_type_to_types_memory_type,
     format_table_type_to_types_table_type, format_value_type_to_value_type,
     format_value_types_to_value_types, section_code_to_section_type, section_type_to_section_code,
     types_limits_to_format_limits, value_type_to_byte, value_type_to_format_value_type,
 };
+
+// Re-export runtime adapter
+pub use runtime_adapter::{convert_to_runtime_module, RuntimeModuleBuilder};
 
 // Re-export safe_memory for backward compatibility
 pub use wrt_types::safe_memory;
@@ -111,7 +125,6 @@ pub use wrt_format::module::{Function, Global, Memory, Table};
 // Re-exports from wrt_types
 pub use wrt_types::{
     component::{ComponentType, ExternType},
-    conversion::binary_to_val_type,
     resource::ResourceId,
     types::ValueType,
     values::Value,
@@ -120,6 +133,9 @@ pub use wrt_types::{
 // Re-export validation from validation module
 pub use crate::decoder_core::validate::ValidationConfig;
 pub use validation::{validate_module, validate_module_with_config};
+
+// Re-export custom section utilities
+pub use custom_section_utils::{create_engine_state_section, get_data_from_state_section};
 
 /// Create a module from WebAssembly binary data
 ///

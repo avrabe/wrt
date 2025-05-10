@@ -1,6 +1,12 @@
 # Default recipe to run when just is called without arguments
 default: build
 
+# Variables for Sphinx documentation
+sphinx_source := "docs/source"
+sphinx_build_dir := "docs/_build"
+sphinx_opts := "-E" # -E: rebuild all files, -a: write all files
+sphinx_build := "sphinx-build"
+
 # ----------------- Build Commands -----------------
 
 # Build all crates and WAT files
@@ -8,788 +14,132 @@ build: build-wrt build-wrtd build-example build-adapter
 
 # Build the core WRT library
 build-wrt:
-    cargo build -p wrt
+    cargo build -p wrt --all-features
 
 # Build the WRT daemon
 build-wrtd:
-    cargo build -p wrtd
+    cargo build -p wrtd --all-features
 
 # Build the example module (debug mode)
 build-example: setup-rust-targets
-    # Use standard cargo build
     cargo build -p example --target wasm32-wasip2
 
 # Build the example module in release mode (optimized for size)
 build-example-release: setup-rust-targets
-    # Build with standard release optimizations
     cargo build -p example --target wasm32-wasip2 --release
 
 # Build the logging adapter component (debug mode)
 build-adapter: setup-rust-targets
-    # Ensure cargo-component is installed
     cargo install cargo-component --locked || true
-    # Build using cargo component
     cargo component build -p logging-adapter --target wasm32-wasip2
 
 # Build the logging adapter component (release mode)
 build-adapter-release: setup-rust-targets
-    cargo build -p logging-adapter --target wasm32-wasip2 --release
+    cargo component build -p logging-adapter --target wasm32-wasip2 --release
 
-# ----------------- Test Commands -----------------
-# 
-# Testing is split into different categories:
-# - test-wrt: Core library tests
-# - test-wrtd: Command line tool tests
-# - test-example: Example WebAssembly module tests
-# - test-docs: Documentation tests
-# - test-wrtd-*: Various wrtd functionality tests
-#
-# For testing wrtd with different parameters, use:
-# - just test-wrtd-example "--fuel 50 --stats"
-# - just test-wrtd-fuel 200
-# - just test-wrtd-stats
-# - just test-wrtd-help
-# - just test-wrtd-all
+# ----------------- Setup Commands -----------------
+setup-rust-targets:
+    rustup target add wasm32-unknown-unknown wasm32-wasip1 wasm32-wasip2 || true
 
-# Run tests for all crates
-test: setup-rust-targets test-wrt test-wrtd test-example test-docs test-wrtd-all
+# ----------------- Formatting Commands -----------------
+fmt:
+    @echo "Formatting Rust code..."
+    cargo fmt
 
-# Run tests for the WRT library with all feature combinations
-test-wrt:
-    # Default features
-    cargo test -p wrt --features wat-parsing
-    # No features
-    # cargo test -p wrt --no-default-features --features wat-parsing # Removed: wat-parsing requires std
-    # std feature only
-    cargo test -p wrt --no-default-features --features std,wat-parsing
-    # no_std feature only
-    # cargo test -p wrt --no-default-features --features no_std,wat-parsing # Removed: wat-parsing requires std
-    # All features
-    cargo test -p wrt --all-features # Removed redundant --features wat-parsing
+fmt-check:
+    @echo "Checking Rust code formatting (Daggerized)..."
+    cargo xtask fmt-check
 
-# Run tests for the WRT daemon
-test-wrtd:
-    cargo test -p wrtd
+# ----------------- CI Tasks (Safety-Critical Rust Checklist) -----------------
 
-# Run the official WebAssembly Specification Test Suite (.wast files)
-# Options:
-#   --create-files: Generate initial wast_passed.md and wast_failed.md
-#   --verify-passing: Only run tests in wast_passed.md, fail on regressions
-test-wast *ARGS="":
-    cargo xtask run-wast-tests {{ARGS}}
+# Consolidated Integrity Checks (Toolchain, File Presence, Headers)
+ci-integrity-checks:
+    @echo "CI: Running Daggerized integrity checks (toolchain, file presence, headers)..."
+    cargo xtask ci-integrity-checks
 
-# Run tests for the example component
-test-example:
-    cargo test -p example
+# Consolidated Static Analysis
+ci-static-analysis:
+    @echo "CI: Running Daggerized static analysis pipeline..."
+    cargo xtask ci-static-analysis
 
-# Test documentation builds
-test-docs:
-    # Test that documentation builds successfully (HTML only)
-    # Note: Currently allowing warnings (remove -n flag later when docs are fixed)
-    {{sphinx_build}} -M html "{{sphinx_source}}" "{{sphinx_build_dir}}" {{sphinx_opts}} -n
+# Consolidated Advanced Tests (Kani, Miri, Coverage)
+ci-advanced-tests:
+    @echo "CI: Running Daggerized advanced tests pipeline (Kani, Miri, Coverage)..."
+    cargo xtask ci-advanced-tests
 
-# Strict documentation check (fail on warnings)
-check-docs:
-    # Verify documentation builds with zero warnings
-    {{sphinx_build}} -M html "{{sphinx_source}}" "{{sphinx_build_dir}}" {{sphinx_opts}} # -W
+# Rule 9: Documentation
+ci-doc-check:
+    @echo "CI: Running local strict documentation checks via xtask..."
+    cargo xtask check-docs-strict
 
-# Run the example module with wasmtime (debug mode)
-run-example: build-example build-adapter setup-wasm-tools
-    echo "Running composed component (debug)..."
-    # Use the component artifact path generated by cargo component
-    wasmtime run --wasm component-model target/wasm32-wasip2/debug/example.wasm
+# General test suite execution for CI
+ci-test:
+    @echo "CI: Running all tests (Daggerized with feature configs)..."
+    cargo xtask run-tests
 
-# Run the example module with wasmtime (release mode)
-run-example-release: build-example-release build-adapter-release setup-wasm-tools
-    echo "Composing example and logging-adapter components (release)..."
-    wasm-tools compose target/wasm32-wasip2/release/example.wasm \
-        -d target/wasm32-wasip2/release/logging-adapter.wasm \
-        -o target/wasm32-wasip2/release/composed-example.wasm
-    echo "Running composed component (release)..."
-    wasmtime run --wasm component-model target/wasm32-wasip2/release/composed-example.wasm
-    # Report the size of the original example WebAssembly file using xtask
-    echo -n "Size of original example/hello-world.wasm: "
-    @cargo xtask fs file-size target/wasm32-wasip2/release/example.wasm
-    # Report the size of the composed WebAssembly file using xtask
-    echo -n "Size of composed composed-example.wasm: "
-    @cargo xtask fs file-size target/wasm32-wasip2/release/composed-example.wasm
+# Aggregate CI check - runs most critical checks
+ci-main: default ci-integrity-checks fmt-check ci-static-analysis ci-test ci-doc-check
+
+# Full CI suite - includes longer running checks
+ci-full: ci-main ci-advanced-tests
+
+# ----------------- Specific Test Runners & Dev Utilities -----------------
 
 # Test wrtd with the example component (release mode)
 # Additional arguments can be passed with e.g. `just test-wrtd-example "--fuel 100 --stats"`
 test-wrtd-example *ARGS="--call example:hello/example#hello": setup-rust-targets build-example-release build-wrtd
-    # Execute the example with wrtd, passing any additional arguments
-    ./target/debug/wrtd {{ARGS}} ./target/wasm32-wasip2/release/example.wasm  
-    # Report the size of the WebAssembly file using xtask
+    ./target/debug/wrtd {{ARGS}} ./target/wasm32-wasip2/release/example.wasm
     echo -n "Size of ./target/wasm32-wasip2/release/example.wasm: "
     @cargo xtask fs file-size ./target/wasm32-wasip2/release/example.wasm
 
-# Test wrtd with fuel-bounded execution and statistics
-test-wrtd-fuel FUEL="100": (test-wrtd-example "--call example:hello/example#hello --fuel " + FUEL + " --stats")
-    # The fuel test has already been executed by the dependency
-    
-# Test with memory debugging and memory search enabled
-test-wrtd-memory-debug FUEL="1000": build-example build-wrtd
-    # Execute with memory debugging and string search enabled
-    WRT_DEBUG_MEMORY=1 WRT_DEBUG_MEMORY_SEARCH=1 WRT_DEBUG_INSTRUCTIONS=1 ./target/debug/wrtd --call example:hello/example#hello -f {{FUEL}} ./target/wasm32-wasip2/debug/example.wasm
-    
-# Test with detailed memory debugging (more verbose searches)
-test-wrtd-memory-debug-detailed FUEL="1000": build-example build-wrtd
-    # Execute with detailed memory debugging and string search enabled
-    WRT_DEBUG_MEMORY=1 WRT_DEBUG_MEMORY_SEARCH=detailed WRT_DEBUG_INSTRUCTIONS=1 ./target/debug/wrtd --call example:hello/example#hello -f {{FUEL}} ./target/wasm32-wasip2/debug/example.wasm
-
-# Search memory for a specific pattern
-# Note: This recipe requires the 'grep' command to be available in the PATH.
-test-wrtd-memory-search PATTERN="Completed" FUEL="1000": build-example build-wrtd
-    # Search memory for a specific pattern
-    echo "Searching memory for pattern: '{{PATTERN}}'"
-    WRT_DEBUG_MEMORY=1 WRT_DEBUG_MEMORY_SEARCH=1 WRT_DEBUG_INSTRUCTIONS=1 ./target/debug/wrtd --call example:hello/example#hello -f {{FUEL}} ./target/wasm32-wasip2/debug/example.wasm | grep -A10 -B2 "{{PATTERN}}"
-
-# Test wrtd with statistics output
-test-wrtd-stats: (test-wrtd-example "--call example:hello/example#hello --stats")
-    # The stats test has already been executed by the dependency
-
-# Test wrtd with both fuel and statistics
-test-wrtd-fuel-stats FUEL="100": (test-wrtd-example "--call example:hello/example#hello --fuel " + FUEL + " --stats")
-    # The fuel+stats test has already been executed by the dependency
-
-# Test wrtd without any function call (should show available functions)
-test-wrtd-no-call: (test-wrtd-example "")
-    # The no-call test has already been executed by the dependency
-
-# Test wrtd with help output
+# Test wrtd with help output (simple check)
 test-wrtd-help: build-wrtd
     ./target/debug/wrtd --help
 
-# Test wrtd version output
-test-wrtd-version: build-wrtd
-    ./target/debug/wrtd --version
+# ----------------- xtask Integration -----------------
+# Delegate tasks to cargo-xtask for more complex operations
+xtask *ARGS:
+    cargo xtask {{ARGS}}
 
-# Comprehensive test of wrtd with all major options
-# This runs all the test commands defined above to verify different wrtd features
-# Usage: just test-wrtd-all
-test-wrtd-all: test-wrtd-example test-wrtd-fuel test-wrtd-stats test-wrtd-help test-wrtd-version test-wrtd-no-call
-
-# ----------------- Code Quality Commands -----------------
-
-# Format all Rust code
-fmt:
-    cargo fmt
-
-# ----------------- Code Coverage Commands -----------------
-
-# Install llvm-cov tools
-setup-llvm-cov:
-    cargo install cargo-llvm-cov || true
-
-# Generate code coverage report for all crates
-coverage: setup-llvm-cov
-    cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
-    
-# Generate code coverage report and open in browser
-coverage-html: setup-llvm-cov
-    cargo llvm-cov --all-features --workspace --open
-
-# Create baseline coverage report
-coverage-baseline: setup-llvm-cov
-    @mkdir -p docs
-    cargo llvm-cov --all-features --workspace --json --output-path coverage.json
-    @echo "Generating baseline coverage report..."
-    @echo "# Baseline Code Coverage Report" > docs/baseline_coverage.md
-    @echo "Generated on: $(date)" >> docs/baseline_coverage.md
-    @echo "\n## Summary\n" >> docs/baseline_coverage.md
-    cargo llvm-cov --all-features --workspace --summary-only >> docs/baseline_coverage.md
-    @echo "\nDetailed coverage data is available in coverage.json" >> docs/baseline_coverage.md
-    @echo "Baseline coverage report created at docs/baseline_coverage.md"
-
-# Check coverage against baseline
-coverage-check: setup-llvm-cov
-    cargo llvm-cov --all-features --workspace --summary-only
-
-# Check code style
-check:
-    cargo fmt -- --check
-    cargo clippy --package wrtd -- -W clippy::missing_panics_doc -W clippy::missing_docs_in_private_items -A clippy::missing_errors_doc -A dead_code -A clippy::borrowed_box -A clippy::vec_init_then_push -A clippy::new_without_default
-    # TBD: temporary disable checking no_std
-    cargo clippy --package wrt --features std -- -W clippy::missing_panics_doc -W clippy::missing_docs_in_private_items -A clippy::missing_errors_doc -A dead_code -A clippy::borrowed_box -A clippy::vec_init_then_push -A clippy::new_without_default
-    
-# Check for missing panic documentation across all wrt crates
-check-panic-docs:
-    #!/usr/bin/env bash
-    echo "Checking for undocumented panics across all crates..."
-    
-    # List of all crates in the workspace
-    CRATES=(
-        "wrt"
-        "wrtd"
-        "xtask"
-        "example"
-        "wrt-sync"
-        "wrt-error"
-        "wrt-format"
-        "wrt-types"
-        "wrt-decoder"
-        "wrt-component"
-        "wrt-host"
-        "wrt-logging"
-        "wrt-runtime"
-        "wrt-instructions"
-        "wrt-common"
-        "wrt-intercept"
-    )
-    
-    # Colors for output
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[0;33m'
-    NC='\033[0m' # No Color
-    
-    FAILED=0
-    FAILED_CRATES=()
-    
-    for crate in "$${CRATES[@]}"; do
-        if [ -d "$${crate}" ]; then
-            echo -e "Checking $${YELLOW}$${crate}$${NC}..."
-            if cargo clippy --manifest-path="$${crate}/Cargo.toml" -- -W clippy::missing_panics_doc 2>&1 | grep -q "missing_panics_doc"; then
-                echo -e "  $${RED}FAILED: Missing panic documentation detected$${NC}"
-                FAILED=1
-                FAILED_CRATES+=("$${crate}")
-                
-                # Show more details about the specific issues
-                cargo clippy --manifest-path="$${crate}/Cargo.toml" -- -W clippy::missing_panics_doc 2>&1 | grep "missing_panics_doc" | sed 's/^/    /'
-                echo ""
-            else
-                echo -e "  $${GREEN}PASSED$${NC}"
-            fi
-        else
-            echo -e "  $${RED}WARNING: Directory $${crate} does not exist$${NC}"
-        fi
-    done
-    
-    if [ $${FAILED} -eq 1 ]; then
-        echo -e "$${RED}The following crates have functions with undocumented panics:$${NC}"
-        for crate in "$${FAILED_CRATES[@]}"; do
-            echo -e "  - $${crate}"
-        done
-        
-        echo -e "\nPlease add appropriate panic documentation using the format:"
-        echo -e "/// # Panics"
-        echo -e "///"
-        echo -e "/// This function will panic if [describe condition]"
-        echo -e "///"
-        echo -e "/// Safety impact: [LOW|MEDIUM|HIGH]"
-        echo -e "/// Tracking: [WRTQ-XXX]"
-        echo ""
-        echo -e "See docs/source/development/panic_documentation.rst for more details."
-        exit 1
-    else
-        echo -e "\n$${GREEN}All checked crates have properly documented panics!$${NC}"
-    fi
-
-# Check import organization (std first, then third-party, then internal)
-check-imports:
-    # Build and run the cross-platform Rust utility for checking imports
-    cargo xtask check-imports
-
-# Check for unused dependencies
-check-udeps:
-    # Install cargo-machete if not already installed
-    cargo install cargo-machete || true
-    # Run cargo-machete to find unused dependencies
-    cargo machete
-
-# Run all checks (format, clippy, tests, imports, udeps, docs, wat files)
-check-all: check test check-imports check-udeps check-docs check-panic-docs test-wrtd-example
-
-# Pre-commit check to run before committing changes
-pre-commit: check-all
-    echo "✅ All checks passed! Code is ready to commit."
-
-# ----------------- Documentation Commands -----------------
-
-# Variables for Sphinx documentation
-sphinx_opts := ""
-sphinx_build := "sphinx-build"
-sphinx_source := "docs/source"
-sphinx_build_dir := "docs/_build"
-
-# Build HTML documentation
-docs-html:
-    {{sphinx_build}} -M html "{{sphinx_source}}" "{{sphinx_build_dir}}" {{sphinx_opts}}
-    
-# Build HTML documentation with PlantUML diagrams only (no Rust docs)
-docs-diagrams-only:
-    #!/usr/bin/env bash
-    set -e
-    
-    echo "Cleaning previous diagram build artifacts..."
-    cargo xtask fs rm-rf "{{sphinx_build_dir}}/html/_images/plantuml-*" || true
-    cargo xtask fs rm-rf "{{sphinx_build_dir}}/html/_plantuml" || true
-    
-    echo "Building documentation with PlantUML diagrams..."
-    {{sphinx_build}} -M html "{{sphinx_source}}" "{{sphinx_build_dir}}" {{sphinx_opts}}
-    
-    # Confirm diagrams were generated
-    echo -n "Generated PlantUML diagrams: "
-    cargo xtask fs count-files "{{sphinx_build_dir}}/html/_images" "plantuml-*" || echo "0 (error counting diagrams)"
-    echo "(If the count is 0, please check your PlantUML setup and .puml files)"
-
-# Build HTML documentation with PlantUML diagrams (alias for docs-diagrams-only)
-docs-with-diagrams: docs-diagrams-only
-    echo "Documentation with diagrams built successfully. HTML documentation available in docs/_build/html."
-
-# Build PDF documentation (requires LaTeX installation)
-docs-pdf:
-    {{sphinx_build}} -M latex "{{sphinx_source}}" "{{sphinx_build_dir}}" {{sphinx_opts}}
-    echo "LaTeX files generated in docs/_build/latex. Run 'make' in that directory to build PDF (requires LaTeX installation)."
-
-# Build all documentation formats (HTML with diagrams by default)
-docs: docs-diagrams-only
-    echo "Documentation built successfully. HTML documentation available in docs/_build/html."
-    echo "To build PDF documentation, run 'just docs-pdf' (requires LaTeX installation)."
-
-# Serve documentation locally with version switcher support
-docs-serve:
-    #!/usr/bin/env bash
-    echo "Starting local documentation server..."
-    echo "First, ensuring we have at least one versioned doc build..."
-    
-    # Check if docs/_build/versioned/main exists
-    if [ ! -d "docs/_build/versioned/main" ]; then
-        echo "Building main version documentation first..."
-        just docs-versioned main
-    fi
-    
-    # Start the server using the new xtask command
-    cargo xtask docs serve
-
-# Show Sphinx documentation help
-docs-help:
-    {{sphinx_build}} -M help "{{sphinx_source}}" "{{sphinx_build_dir}}" {{sphinx_opts}}
-
-# Build versioned documentation
-docs-versioned VERSION="main":
-    #!/usr/bin/env bash
-    set -e
-    
-    # Set version for documentation build
-    export DOCS_VERSION="{{VERSION}}"
-    export DOCS_VERSION_PATH_PREFIX="/"
-    
-    # Build documentation
-    (just docs-diagrams-only) || (
-        echo "⚠️  Warning: Documentation build encountered errors but will try to continue with versioning..."
-        cargo xtask fs mkdir-p docs/_build/html
-    )
-    
-    # Create directory structure for versioned docs
-    cargo xtask fs mkdir-p docs/_build/versioned/{{VERSION}}
-    
-    # Copy built HTML to versioned directory if it exists
-    if [ -d "docs/_build/html" ]; then
-        # Note: xtask doesn't support cp -r directly, so we need to create dirs first and then copy files
-        # This basic approach works but may need enhancement for complex structures
-        for file in docs/_build/html/*; do
-            if [ -f "$file" ]; then
-                cargo xtask fs cp "$file" "docs/_build/versioned/{{VERSION}}/$(basename "$file")"
-            elif [ -d "$file" ]; then
-                dirname=$(basename "$file")
-                cargo xtask fs mkdir-p "docs/_build/versioned/{{VERSION}}/$dirname"
-                # For directories, we still need to use cp -r
-                cp -r "$file"/* "docs/_build/versioned/{{VERSION}}/$dirname/" || (
-                    echo "⚠️  Error: Failed to copy directory $file."
-                )
-            fi
-        done || (
-            echo "⚠️  Error: Failed to copy HTML documentation to versioned directory."
-            cargo xtask fs mkdir-p docs/_build/versioned/{{VERSION}}
-            echo "<html><body><h1>Documentation Generation Failed</h1><p>The documentation for version {{VERSION}} could not be generated properly.</p></body></html>" > docs/_build/versioned/{{VERSION}}/index.html
-        )
-    else
-        echo "⚠️  Error: HTML documentation directory not found."
-        cargo xtask fs mkdir-p docs/_build/versioned/{{VERSION}}
-        echo "<html><body><h1>Documentation Generation Failed</h1><p>The documentation for version {{VERSION}} could not be generated properly.</p></body></html>" > docs/_build/versioned/{{VERSION}}/index.html
-    fi
-    
-    # Generate index file for root
-    cargo xtask fs cp docs/source/root_index.html docs/_build/versioned/index.html || (
-        echo "⚠️  Error: Failed to copy root index file."
-        echo "<html><body><h1>WRT Documentation</h1><p>Please select a version: <a href='./main/'>main</a></p></body></html>" > docs/_build/versioned/index.html
-    )
-    
-    # Generate the switcher.json file using the new xtask command
-    cargo xtask docs switcher-json
-    
-    echo "Versioned documentation processing completed for version {{VERSION}}."
-    echo "The documentation is available in docs/_build/versioned/{{VERSION}}/"
-
-# ----------------- WebAssembly WAT/WASM Commands -----------------
-
-# Convert a single WAT file to WASM
-# [Recipe 'convert-wat-to-wasm' removed]
-
-# Build all WAT files in examples directory
-# [Recipe 'build-wat-files' removed]
-
-# Check if all WAT files are properly converted to WASM
-# [Recipe 'check-wat-files' removed]
-
-# ----------------- Utility Commands -----------------
-
-# Clean all build artifacts
+# ----------------- Clean Commands -----------------
 clean:
     cargo clean
-    # Use xtask for cross-platform removal
-    cargo xtask fs rm-rf example/hello-world.wasm
-    cargo xtask fs rm-rf target/wasm32-wasip2/debug/example.wasm
-    cargo xtask fs rm-rf target/wasm32-wasip2/release/example.wasm
-    cargo xtask fs rm-rf target/wasm32-wasip2/debug/logging-adapter.wasm
-    cargo xtask fs rm-rf target/wasm32-wasip2/release/logging-adapter.wasm
-    cargo xtask fs rm-rf target/wasm32-wasip2/debug/composed-example.wasm
-    cargo xtask fs rm-rf target/wasm32-wasip2/release/composed-example.wasm
-    cargo xtask fs rm-rf docs/_build
-    # Also clean generated WASM files using xtask
-    cargo xtask fs find-delete examples "*.wasm"
+    rm -rf target/llvm-cov/
+    rm -f lcov.info coverage.json docs/baseline_coverage.md
+    rm -rf "{{sphinx_build_dir}}"
 
-# Install rust targets required for the project
-setup-rust-targets:
-    #!/usr/bin/env bash
-    echo "Installing required Rust targets..."
+# ----------------- Zephyr related tasks (Preserve these) -----------------
+ZEPHYR_SDK_VERSION := "0.16.5-1"
+ZEPHYR_WEST_VERSION := "1.2.0"
+ZEPHYR_PROJECT_DIR := ".zephyrproject/zephyr"
 
-    TARGET1="wasm32-unknown-unknown"
-    TARGET2="aarch64-unknown-none-softfloat"
-    TARGET3="wasm32-wasip2"
+zephyr-setup-sdk:
+    @echo "Setting up Zephyr SDK..."
+    # (SDK location needs to be configured, e.g. via environment variable or direct path)
+    # export ZEPHYR_SDK_INSTALL_DIR=/path/to/zephyr-sdk-{{ZEPHYR_SDK_VERSION}}
+    # west zephyr-export # If west manages the SDK
 
-    echo "Installing target: $TARGET1..."
-    rustup target add "$TARGET1" || { echo "ERROR: Failed to install Rust target '$TARGET1'. Please check rustup configuration."; exit 1; }
-    
-    echo "Installing target: $TARGET2..."
-    rustup target add "$TARGET2" || { echo "ERROR: Failed to install Rust target '$TARGET2'. Please check rustup configuration."; exit 1; }
+zephyr-setup-venv:
+    @echo "Setting up Zephyr Python virtual environment..."
+    python3 -m venv .zephyr-venv
+    source .zephyr-venv/bin/activate && pip install west=={{ZEPHYR_WEST_VERSION}} wheel
+    source .zephyr-venv/bin/activate && pip install -r {{ZEPHYR_PROJECT_DIR}}/scripts/requirements.txt
 
-    echo "Installing target: $TARGET3..."
-    rustup target add "$TARGET3" || { echo "ERROR: Failed to install Rust target '$TARGET3'. Please check rustup configuration."; exit 1; }
-    
-    echo "All required Rust targets are installed or were already present."
+zephyr-init:
+    @echo "Initializing/updating Zephyr workspace (west init/update)..."
+    # west init -l path/to/your/manifest # If not already initialized
+    source .zephyr-venv/bin/activate # Ensure venv is active
+    west update
 
-# Install WebAssembly tools (wasmtime-cli, wasm-tools)
-setup-wasm-tools:
-    #!/usr/bin/env bash
-    
-    echo "Installing essential WebAssembly tools using cargo (cross-platform)..."
-    cargo install wasmtime-cli --locked || { echo "ERROR: Failed to install wasmtime-cli."; exit 1; }
-    cargo install wasm-tools --locked || { echo "ERROR: Failed to install wasm-tools."; exit 1; }
-    cargo install wit-bindgen-cli --locked || { echo "ERROR: Failed to install wit-bindgen-cli."; exit 1; }
-    
-    echo "Verifying required WebAssembly tools installation..."
-    
-    # Check if wasmtime is available
-    if command -v wasmtime &> /dev/null; then
-        echo "✓ wasmtime is installed: $(wasmtime --version)"
-    else
-        echo "✗ ERROR: wasmtime command not found after installation attempt. Please check PATH and cargo install logs."
-        exit 1
-    fi
-    
-    # Check if wasm-tools is available
-    if command -v wasm-tools &> /dev/null; then
-        echo "✓ wasm-tools is installed: $(wasm-tools --version)"
-    else
-        echo "✗ ERROR: wasm-tools command not found after installation attempt. Please check PATH and cargo install logs."
-        exit 1
-    fi
+zephyr-build APP_NAME="hello_world" BOARD="native_posix":
+    @echo "Building Zephyr application: {{APP_NAME}} for board: {{BOARD}}..."
+    source .zephyr-venv/bin/activate
+    west build -b {{BOARD}} {{ZEPHYR_PROJECT_DIR}}/samples/basic/{{APP_NAME}} # Adjusted path for common sample
 
-    # Check if wit-bindgen is available
-    if command -v wit-bindgen &> /dev/null; then
-        echo "✓ wit-bindgen is installed: $(wit-bindgen --version)"
-    else
-        echo "✗ ERROR: wit-bindgen command not found after installation attempt. Please check PATH and cargo install logs."
-        exit 1
-    fi
-    
-    echo "Essential WebAssembly tools setup complete!"
+zephyr-run APP_NAME="hello_world" BOARD="native_posix": # Added BOARD to run for clarity
+    @echo "Running Zephyr application: {{APP_NAME}} on board: {{BOARD}}..."
+    source .zephyr-venv/bin/activate
+    west build -b {{BOARD}} -t run {{ZEPHYR_PROJECT_DIR}}/samples/basic/{{APP_NAME}}/build # Build dir path might vary
 
-# Install Python dependencies
-setup-python-deps: setup-rust-targets
-    cargo install git-cliff
-    cargo install sphinx-rustdocgen
-    pip install -r docs/requirements.txt
-
-# Install PlantUML (requires Java)
-setup-plantuml:
-    #!/usr/bin/env bash
-    # Use echo (not @echo) inside the script block for user messages
-    if ! command -v plantuml &> /dev/null; then
-        echo "Attempting to install PlantUML..."
-        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            # Linux installation
-            echo "Detected Linux, using apt-get..."
-            sudo apt-get update && sudo apt-get install -y plantuml || \
-                { echo "ERROR: Failed to install PlantUML via apt. Please install manually."; exit 1; }
-        elif [[ "$OSTYPE" == "darwin"* ]]; then
-            # macOS installation with Homebrew
-            echo "Detected macOS, using Homebrew..."
-            if command -v brew &> /dev/null; then
-                brew install plantuml || \
-                    { echo "ERROR: Failed to install PlantUML via Homebrew. Please install manually."; exit 1; }
-            else
-                echo "ERROR: Homebrew not found. Please install Homebrew first (brew.sh) or install PlantUML manually."
-                echo "Visit: https://plantuml.com/starting"
-                exit 1
-            fi
-        elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* || "$OSTYPE" == "win"* ]]; then
-            # Windows instructions
-            echo "Detected Windows."
-            echo "Please install PlantUML manually (requires Java)."
-            echo "1. Download the plantuml.jar from https://plantuml.com/download"
-            echo "2. Ensure Java is installed and in your PATH (run 'java -version')"
-            echo "3. Create a wrapper script (e.g., plantuml.bat) or place plantuml.jar in a directory included in your PATH."
-            echo "   (See https://plantuml.com/starting for guidance)"
-            echo "NOTE: Automatic installation not supported on Windows via this script."
-        else
-            echo "Unsupported OS for automatic PlantUML installation. Please install manually."
-            echo "Visit: https://plantuml.com/starting"
-            exit 1 # Exit for unsupported OS where we can't provide guidance
-        fi
-        # Re-check after attempting installation (Linux/macOS)
-        if ! command -v plantuml &> /dev/null && [[ "$OSTYPE" != "msys"* && "$OSTYPE" != "cygwin"* && "$OSTYPE" != "win"* ]]; then
-             echo "ERROR: PlantUML command still not found after installation attempt."
-             exit 1
-        fi
-        echo "PlantUML installation attempted (Linux/macOS) or manual instructions provided (Windows)."
-    else
-        echo "PlantUML command is already available in PATH."
-    fi
-    
-    # Check if Java is installed (required for PlantUML)
-    if ! command -v java &> /dev/null; then
-        echo "ERROR: Java is required for PlantUML but the 'java' command was not found in PATH."
-        echo "Please install a Java Development Kit (JDK) or Java Runtime Environment (JRE) version 11 or later."
-        exit 1
-    else
-        echo "Java command found."
-    fi
-    echo "PlantUML setup check complete. Ensure Java is installed and plantuml command works before building docs with diagrams."
-
-# Install Zephyr SDK and QEMU
-# NOTE: Zephyr setup is complex. If you encounter issues, please consult the official
-# Zephyr Getting Started guide: https://docs.zephyrproject.org/latest/develop/getting_started/index.html
-setup-zephyr-sdk:
-    #!/usr/bin/env bash
-    echo "Setting up Zephyr SDK and QEMU (requires Python 3)..."
-
-    PYTHON_CMD=python3
-    PIP_CMD=pip3
-    VENV_DIR=".zephyr-venv"
-    ZEPHYR_DIR=".zephyrproject"
-
-    # Check for Python 3
-    if ! command -v $PYTHON_CMD &> /dev/null; then
-        echo "ERROR: $PYTHON_CMD not found. Please install Python 3."
-        exit 1
-    fi
-
-    # Create a Python virtual environment
-    echo "Creating Python virtual environment in $VENV_DIR..."
-    $PYTHON_CMD -m venv "$VENV_DIR" || { echo "ERROR: Failed to create virtual environment."; exit 1; }
-
-    # Activate and install west (platform-independent part)
-    echo "Activating virtual environment and installing west..."
-    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* || "$OSTYPE" == "win"* ]]; then
-        # Windows activation
-        source "$VENV_DIR/Scripts/activate" || { echo "ERROR: Failed to activate virtual environment on Windows."; exit 1; }
-        PIP_CMD="pip"
-        # Ensure pip is available inside venv
-        if ! command -v $PIP_CMD &> /dev/null; 
-            echo "ERROR: pip command not found inside virtual environment on Windows."; deactivate; exit 1; 
-        fi
-    else
-        # Linux/macOS activation
-        source "$VENV_DIR/bin/activate" || { echo "ERROR: Failed to activate virtual environment."; exit 1; }
-    fi
-    
-    $PIP_CMD install west || { echo "ERROR: Failed to install west pip package."; deactivate; exit 1; }
-    echo "✓ west installed successfully in virtual environment."
-    
-    # Initialize Zephyr workspace locally (platform-independent part)
-    echo "Initializing Zephyr workspace in $ZEPHYR_DIR..."
-    cargo xtask fs mkdir-p "$ZEPHYR_DIR"
-    cd "$ZEPHYR_DIR" || { echo "ERROR: Failed to cd into $ZEPHYR_DIR"; deactivate; exit 1; }
-    west init -m https://github.com/zephyrproject-rtos/zephyr.git --mr main || { echo "ERROR: Failed to initialize Zephyr workspace (west init)."; cd ..; deactivate; exit 1; }
-    west update || { echo "ERROR: Failed to update Zephyr modules (west update)."; cd ..; deactivate; exit 1; }
-    west zephyr-export || echo "INFO: west zephyr-export command finished (may show errors if run outside Zephyr dir, usually harmless here)."
-    cd .. || exit
-    echo "✓ Zephyr workspace initialized."
-    
-    # Platform-specific dependencies and SDK install
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "Detected macOS. Installing QEMU and Zephyr SDK..."
-        if ! command -v brew &> /dev/null; then echo "ERROR: Homebrew (brew) not found. Please install it first."; deactivate; exit 1; fi
-        brew install qemu || { echo "ERROR: QEMU installation failed via brew."; deactivate; exit 1; }
-        west sdk-install || { echo "ERROR: Zephyr SDK installation failed (west sdk-install)."; deactivate; exit 1; }
-        echo "✓ Zephyr SDK and QEMU should be installed on macOS."
-
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "Detected Linux. Installing dependencies, QEMU, and Zephyr SDK..."
-        # Try installing dependencies quietly first
-        sudo apt update -qq > /dev/null 2>&1
-        sudo apt install -y -qq python3-pip python3-venv git wget tar xz-utils build-essential qemu-system-arm qemu-system-aarch64 > /dev/null 2>&1 || \
-            { echo "WARNING: Failed to install Linux dependencies quietly. Trying interactively..."; \
-              sudo apt update && sudo apt install -y python3-pip python3-venv git wget tar xz-utils build-essential qemu-system-arm qemu-system-aarch64 || \
-              { echo "ERROR: Failed to install Linux dependencies (apt). Please check permissions and package manager."; deactivate; exit 1; } } 
-        west sdk-install || { echo "ERROR: Zephyr SDK installation failed (west sdk-install)."; deactivate; exit 1; }
-        echo "✓ Zephyr SDK and QEMU should be installed on Linux."
-
-    elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* || "$OSTYPE" == "win"* ]]; then
-        echo "Detected Windows. Manual steps required for dependencies and SDK."
-        echo "Attempting to install QEMU using Chocolatey..."
-        if command -v choco &> /dev/null; then
-            choco install qemu -y || echo "WARNING: QEMU installation via Chocolatey failed. Please install manually or ensure it's in PATH."
-        else
-            echo "INFO: Chocolatey (choco) not found. Skipping automatic QEMU installation."
-            echo "      Please install QEMU manually if needed: https://www.qemu.org/download/"
-        fi
-        echo "Windows Manual Setup Required:"
-        echo "1. Install Zephyr SDK manually: Follow instructions at https://docs.zephyrproject.org/latest/develop/toolchains/zephyr_sdk.html#installing-the-sdk"
-        echo "2. Install remaining Windows dependencies: See https://docs.zephyrproject.org/latest/develop/getting_started/index.html#install-dependencies"
-        echo "   (Common tools: cmake, dtc (device-tree-compiler), ninja - often installed via pip or package managers like scoop/choco)"
-        echo "NOTE: The virtual environment ('$VENV_DIR') and Zephyr workspace ('$ZEPHYR_DIR') have been created."
-        
-    else
-        echo "Unsupported operating system. Please install the Zephyr SDK, QEMU, and dependencies manually."
-        echo "Refer to: https://docs.zephyrproject.org/latest/develop/getting_started/index.html"
-        deactivate
-        exit 1
-    fi
-    
-    echo "-------------------------------------------------------------------"
-    echo "Zephyr setup attempt finished."
-    echo "IMPORTANT: To use Zephyr tools (like west build/flash), you MUST"
-    echo "           activate the virtual environment in your shell session:" 
-    if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* || "$OSTYPE" == "win"* ]]; then
-         echo "             source $VENV_DIR/Scripts/activate"
-    else 
-         echo "             source $VENV_DIR/bin/activate"
-    fi
-    echo "-------------------------------------------------------------------"
-    deactivate # Deactivate venv after script finishes
-
-# Install required tools for development (local development)
-setup: setup-hooks setup-rust-targets setup-wasm-tools setup-python-deps setup-plantuml
-    echo "✅ All development tools installed successfully."
-
-# Setup for CI environments (without hooks)
-setup-ci: setup-rust-targets setup-wasm-tools setup-python-deps setup-plantuml
-    echo "✅ CI environment setup completed."
-
-# Minimal setup for CI that only installs necessary Rust targets and WASM tools
-setup-ci-minimal: setup-rust-targets setup-wasm-tools
-    echo "✅ Minimal CI environment setup completed (Rust targets and WASM tools)."
-
-# Install git hooks to enforce checks before commit/push
-setup-hooks:
-    echo "Setting up Git hooks using xtask (cross-platform)..."
-    cargo xtask fs cp .githooks/pre-commit .git/hooks/pre-commit
-    cargo xtask fs cp .githooks/pre-push .git/hooks/pre-push
-    # Note: chmod +x is removed for better cross-platform compatibility.
-    # Git usually handles hook execution based on shebang/file content on Windows.
-    # If hooks fail on Linux/macOS, ensure source files (.githooks/*) have execute permissions.
-    echo "Git hooks installed successfully. Checks will run automatically before each commit and push."
-
-# Show help
-help:
-    @just --list
-
-# Generate coverage report (LCOV and HTML)
-# Generate individual coverage reports for each crate
-coverage-individual:
-    cargo xtask coverage --mode individual --format lcov
-
-# Combine individual coverage reports using grcov
-coverage-combined:
-    cargo xtask coverage --mode combined --format all
-
-# Generate full coverage report (run individual tests, then combine with grcov)
-coverage-full:
-    # Define problematic crates that need to be excluded from coverage
-    cargo xtask coverage --mode individual --format lcov --exclude wrt-error
-    cargo xtask coverage --mode combined --format all
-
-# Generate robust coverage report using xtask
-coverage-robust:
-    cargo xtask robust-coverage --exclude wrt-host --html
-
-# Common steps for documentation generation
-docs-common:
-    #!/usr/bin/env bash
-    # Try to generate coverage if possible, but continue on failure
-    if [ "${SKIP_COVERAGE:-}" = "" ]; then
-        just coverage-robust || echo "⚠️  Warning: Failed to generate code coverage. Continuing with documentation build..."
-    else
-        echo "Skipping coverage generation (SKIP_COVERAGE is set)"
-    fi
-    
-    # Clean previous build artifacts
-    cargo xtask fs rm-rf "{{sphinx_build_dir}}"
-    cargo xtask fs mkdir-p "{{sphinx_build_dir}}"
-    
-    # Create the target static directory for coverage report
-    cargo xtask fs mkdir-p "{{sphinx_build_dir}}/html/_static/coverage"
-    
-    # Check if coverage report exists and copy if it does
-    if [ -d "target/coverage/html" ]; then
-        echo "Copying coverage report to documentation directory..."
-        # Use cp directly as xtask fs cp doesn't support wildcards
-        cp -r target/coverage/html/* "{{sphinx_build_dir}}/html/_static/coverage/" || \
-            echo "⚠️  Warning: Coverage report copy failed. Creating placeholder..."
-    else
-        echo "⚠️  Warning: Coverage report not found. Creating placeholder..."
-    fi
-    
-    # Create placeholder if needed
-    if [ ! -f "{{sphinx_build_dir}}/html/_static/coverage/index.html" ]; then
-        echo "<h1>Coverage Report Not Available</h1><p>The coverage report could not be generated due to build errors.</p>" > "{{sphinx_build_dir}}/html/_static/coverage/index.html"
-        echo "✅ Created placeholder coverage report"
-    fi
-
-# Check if Kani verifier is installed
-check-kani:
-    cargo xtask check-kani
-
-# Check qualification status
-qualification-status:
-    cargo xtask qualification status
-
-# Build qualification documentation (part of docs target)
-# ----------------- Development Setup Commands -----------------
-
-# Set up git hooks
-
-# Set up development environment
-setup-dev: setup-rust-targets setup-wasm-tools setup-hooks setup-llvm-cov
-    @echo "Development environment set up successfully"
-
-# ----------------- Test Registry Commands -----------------
-
-# Build the test registry and runner
-build-test-registry:
-    cargo build -p wrt-test-registry --features runner
-
-# Run the unified test registry with the CLI runner
-# This will run all tests in the registry
-# Arguments:
-#   --category=<category>  Only run tests in the specified category (e.g. "decoder")
-#   --name=<name>          Only run tests with names containing the specified string
-#   --no-std               Skip tests that require the standard library
-run-unified-tests *ARGS="":
-    cargo run -p wrt-test-registry --features runner --bin wrt-test-runner -- {{ARGS}}
-
-# List all tests in the test registry
-list-tests *ARGS="":
-    cargo run -p wrt-test-registry --features runner --bin wrt-test-runner -- list {{ARGS}}
-
-# Run decoder-specific tests using the test registry
-test-decoder:
-    cargo run -p wrt-test-registry --features runner --bin wrt-test-runner -- --category=decoder
-
-# Run instruction decoder tests
-test-instruction-decoder:
-    cargo run -p wrt-test-registry --features runner --bin wrt-test-runner -- --category=instruction-decoder
+# Add other Zephyr-specific tasks here as needed
+# Example: zephyr-flash, zephyr-debug, etc.

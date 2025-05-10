@@ -16,6 +16,7 @@ wrt-host = { path = "../wrt-host", version = "0.2.0" }
 wrt-types = { path = "../wrt-types", version = "0.2.0" }
 wrt-intercept = { path = "../wrt-intercept", version = "0.2.0" }
 wrt-decoder = { path = "../wrt-decoder", version = "0.2.0" }
+wrt-runtime = { path = "../wrt-runtime", version = "0.2.0" }
 
 # No-std support
 alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-alloc" }
@@ -39,6 +40,7 @@ std = [
     "wrt-types/std",
     "wrt-intercept/std",
     "wrt-decoder/std",
+    "wrt-runtime/std",
     "log",
 ]
 no_std = [
@@ -48,10 +50,15 @@ no_std = [
     "wrt-types/no_std",
     "wrt-intercept/no_std",
     "wrt-decoder/no_std",
+    "wrt-runtime/no_std",
     "alloc"
 ]
-alloc = ["wrt-error/alloc", "wrt-format/alloc", "wrt-host/alloc", "wrt-types/alloc", "wrt-intercept/alloc", "wrt-decoder/alloc", "dep:alloc"]
+alloc = ["wrt-error/alloc", "wrt-format/alloc", "wrt-host/alloc", "wrt-types/alloc", "wrt-intercept/alloc", "wrt-decoder/alloc", "wrt-runtime/alloc", "dep:alloc"]
 kani = ["wrt-host/kani", "wrt-intercept/kani"]
+
+# Performance and safety features
+optimize = ["wrt-error/optimize", "wrt-format/optimize", "wrt-host/optimize", "wrt-types/optimize", "wrt-intercept/optimize", "wrt-decoder/optimize", "wrt-runtime/optimize"]
+safety = ["wrt-error/safety", "wrt-format/safety", "wrt-host/safety", "wrt-types/safety", "wrt-intercept/safety", "wrt-decoder/safety", "wrt-runtime/safety", "alloc"]
 
 # Component Model features
 component-model-core = ["wrt-format/component-model-core"]
@@ -84,9 +91,44 @@ name = "interceptor_example"
 path = "examples/interceptor_example.rs"
 required-features = ["std"]
 
+[profile.release]
+panic = "abort"
+
+[profile.test]
+panic = "abort"
+
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] }
-unused_imports = "allow"
-unused_variables = "allow"
-unused_mut = "allow"
-unused_macros = "allow" 
+# Rule 1
+pointer_cast = "deny"
+# Rule 9
+missing_docs = "deny"
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Rule 1: Language subset
+inline_asm_x86_att_syntax = "warn"
+transmute_ptr_to_ref = "deny"
+type_id = "deny"
+dyn_trait = "warn"
+float_arithmetic = "warn"
+# Rule 2: Unsafe usage
+ptr_offset_with_cast = "warn"
+# Rule 3: Error handling & panics
+unwrap_used = "warn"
+panic = "warn" # Also covers Rule 4
+result_unit_err = "warn"
+let_underscore_drop = "warn"
+must_use_candidate = "warn"
+must_use_unit = "warn"
+# Rule 4: Control-flow soundness
+match_wildcard_for_single_variants = "warn"
+never_loop = "warn"
+unreachable = "warn" # Also related to Rule 4
+# Rule 5: Memory & concurrency safety
+static_mut_reference = "deny"
+arc_mutate = "deny"
+# Rule 8: Static analysis gates (CI)
+pedantic = "warn"
+# Rule 9: Documentation
+debug_assert_with_mut_call = "warn" 

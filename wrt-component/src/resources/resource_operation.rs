@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use wrt_types::resource::ResourceOperation;
+use wrt_types::ResourceOperation;
 
 // Re-export ResourceOperation for convenience
 pub use wrt_types::resource::ResourceOperation;
@@ -39,6 +39,50 @@ pub fn from_format_resource_operation(
         FormatOp::Borrow => ResourceOperation::Reference,
         FormatOp::Dereference => ResourceOperation::Dereference,
         _ => ResourceOperation::Read, // Default to read for unknown operations
+    }
+}
+
+/// Convert a Core ResourceOperation to a Format ResourceOperation
+#[cfg(not(feature = "safe-memory"))]
+pub fn core_to_format_resource_operation(op: &wrt_types::ResourceOperation) -> ResourceOperation {
+    match op {
+        wrt_types::ResourceOperation::New => ResourceOperation::New,
+        wrt_types::ResourceOperation::Drop => ResourceOperation::Drop,
+        wrt_types::ResourceOperation::Rep => ResourceOperation::Rep,
+    }
+}
+
+/// Convert a Format ResourceOperation to a Core ResourceOperation
+#[cfg(not(feature = "safe-memory"))]
+pub fn format_to_core_resource_operation(op: &ResourceOperation) -> wrt_types::ResourceOperation {
+    match op {
+        ResourceOperation::New => wrt_types::ResourceOperation::New,
+        ResourceOperation::Drop => wrt_types::ResourceOperation::Drop,
+        ResourceOperation::Rep => wrt_types::ResourceOperation::Rep,
+    }
+}
+
+#[cfg(feature = "safe-memory")]
+mod safe_memory {
+    use crate::prelude::*;
+    use wrt_types::ResourceOperation as FormatOp;
+
+    /// Convert a Core ResourceOperation to a Format ResourceOperation
+    pub fn core_to_format_resource_operation(op: &wrt_types::ResourceOperation) -> FormatOp {
+        match op {
+            wrt_types::ResourceOperation::New => FormatOp::New,
+            wrt_types::ResourceOperation::Drop => FormatOp::Drop,
+            wrt_types::ResourceOperation::Rep => FormatOp::Rep,
+        }
+    }
+
+    /// Convert a Format ResourceOperation to a Core ResourceOperation
+    pub fn format_to_core_resource_operation(op: &FormatOp) -> wrt_types::ResourceOperation {
+        match op {
+            FormatOp::New => wrt_types::ResourceOperation::New,
+            FormatOp::Drop => wrt_types::ResourceOperation::Drop,
+            FormatOp::Rep => wrt_types::ResourceOperation::Rep,
+        }
     }
 }
 

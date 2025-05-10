@@ -128,10 +128,7 @@ impl CustomSection {
 
     /// Create a new custom section from raw bytes
     pub fn from_bytes(name: String, data: &[u8]) -> Self {
-        Self {
-            name,
-            data: data.to_vec(),
-        }
+        Self { name, data: data.to_vec() }
     }
 
     /// Serialize the custom section to binary
@@ -229,9 +226,7 @@ pub fn parse_component_section_header(
     pos: usize,
 ) -> wrt_error::Result<(ComponentSectionHeader, usize)> {
     if pos >= bytes.len() {
-        return Err(wrt_error::Error::validation_error(
-            "Unexpected end of input",
-        ));
+        return Err(wrt_error::Error::validation_error("Unexpected end of input"));
     }
 
     let section_id = bytes[pos];
@@ -302,58 +297,19 @@ mod tests {
 
     #[test]
     fn test_component_section_type_conversion() {
-        assert_eq!(
-            ComponentSectionType::from_u8(0),
-            Some(ComponentSectionType::Custom)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(1),
-            Some(ComponentSectionType::CoreModule)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(2),
-            Some(ComponentSectionType::CoreInstance)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(3),
-            Some(ComponentSectionType::CoreType)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(4),
-            Some(ComponentSectionType::Component)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(5),
-            Some(ComponentSectionType::Instance)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(6),
-            Some(ComponentSectionType::Alias)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(7),
-            Some(ComponentSectionType::Type)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(8),
-            Some(ComponentSectionType::Canon)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(9),
-            Some(ComponentSectionType::Start)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(10),
-            Some(ComponentSectionType::Import)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(11),
-            Some(ComponentSectionType::Export)
-        );
-        assert_eq!(
-            ComponentSectionType::from_u8(12),
-            Some(ComponentSectionType::Value)
-        );
+        assert_eq!(ComponentSectionType::from_u8(0), Some(ComponentSectionType::Custom));
+        assert_eq!(ComponentSectionType::from_u8(1), Some(ComponentSectionType::CoreModule));
+        assert_eq!(ComponentSectionType::from_u8(2), Some(ComponentSectionType::CoreInstance));
+        assert_eq!(ComponentSectionType::from_u8(3), Some(ComponentSectionType::CoreType));
+        assert_eq!(ComponentSectionType::from_u8(4), Some(ComponentSectionType::Component));
+        assert_eq!(ComponentSectionType::from_u8(5), Some(ComponentSectionType::Instance));
+        assert_eq!(ComponentSectionType::from_u8(6), Some(ComponentSectionType::Alias));
+        assert_eq!(ComponentSectionType::from_u8(7), Some(ComponentSectionType::Type));
+        assert_eq!(ComponentSectionType::from_u8(8), Some(ComponentSectionType::Canon));
+        assert_eq!(ComponentSectionType::from_u8(9), Some(ComponentSectionType::Start));
+        assert_eq!(ComponentSectionType::from_u8(10), Some(ComponentSectionType::Import));
+        assert_eq!(ComponentSectionType::from_u8(11), Some(ComponentSectionType::Export));
+        assert_eq!(ComponentSectionType::from_u8(12), Some(ComponentSectionType::Value));
         assert_eq!(ComponentSectionType::from_u8(13), None);
     }
 

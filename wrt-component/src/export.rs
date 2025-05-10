@@ -26,13 +26,7 @@ pub struct Export {
 impl Export {
     /// Create a new export
     pub fn new(name: String, ty: ExternType, value: ExternValue) -> Self {
-        Self {
-            name,
-            ty,
-            value,
-            attributes: HashMap::new(),
-            integrity_hash: None,
-        }
+        Self { name, ty, value, attributes: HashMap::new(), integrity_hash: None }
     }
 
     /// Create a new export with attributes
@@ -42,13 +36,7 @@ impl Export {
         value: ExternValue,
         attributes: HashMap<String, String>,
     ) -> Self {
-        Self {
-            name,
-            ty,
-            value,
-            attributes,
-            integrity_hash: None,
-        }
+        Self { name, ty, value, attributes, integrity_hash: None }
     }
 
     /// Create a new export with integrity hash
@@ -58,13 +46,7 @@ impl Export {
         value: ExternValue,
         integrity_hash: String,
     ) -> Self {
-        Self {
-            name,
-            ty,
-            value,
-            attributes: HashMap::new(),
-            integrity_hash: Some(integrity_hash),
-        }
+        Self { name, ty, value, attributes: HashMap::new(), integrity_hash: Some(integrity_hash) }
     }
 
     /// Check if the export has a specific attribute
@@ -107,17 +89,11 @@ mod tests {
     #[test]
     fn test_export_creation() {
         let func_type = ExternType::Function {
-            params: vec![
-                ("a".to_string(), ValType::S32),
-                ("b".to_string(), ValType::S32),
-            ],
+            params: vec![("a".to_string(), ValType::S32), ("b".to_string(), ValType::S32)],
             results: vec![ValType::S32],
         };
 
-        let func_value = FunctionValue {
-            ty: func_type.clone(),
-            export_name: "add".to_string(),
-        };
+        let func_value = FunctionValue { ty: func_type.clone(), export_name: "add".to_string() };
 
         let export = Export {
             name: "add".to_string(),

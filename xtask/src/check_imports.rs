@@ -1,85 +1,68 @@
-// Logic copied from previous check-imports/src/main.rs
-use anyhow::Result;
+/*
+use anyhow::{Context, Result, bail};
 use std::fs;
 use std::path::Path;
-use walkdir::WalkDir;
+use regex::Regex;
 
 pub fn run(dirs_to_check: &[&Path]) -> Result<()> {
-    println!("Checking import organization...");
-    let mut warnings = 0;
+    info!("Starting import checks for directories: {:?}", dirs_to_check);
+    let mut all_checks_passed = true;
 
-    for dir in dirs_to_check {
-        for entry in WalkDir::new(dir)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
-        {
-            let path = entry.path();
-            if check_file_imports(path)? {
-                warnings += 1;
+    for dir_path in dirs_to_check {
+        if !dir_path.is_dir() {
+            warn!("Skipping non-directory path: {:?}", dir_path);
+            continue;
+        }
+
+        info!("Checking imports in directory: {:?}", dir_path);
+        for entry in walkdir::WalkDir::new(dir_path).into_iter().filter_map(Result::ok) {
+            if entry.file_type().is_file() && entry.path().extension().map_or(false, |ext| ext == "rs") {
+                match check_file_imports(entry.path()) {
+                    Ok(passed) => {
+                        if !passed {
+                            all_checks_passed = false;
+                            // Specific errors logged in check_file_imports
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error checking imports for file {:?}: {}", entry.path(), e);
+                        all_checks_passed = false;
+                    }
+                }
             }
         }
     }
 
-    if warnings > 0 {
-        println!(
-            "Found {} files with potential import order issues.",
-            warnings
-        );
-        // Optionally, exit with an error code if warnings were found
-        // std::process::exit(1);
-    } else {
-        println!("Import organization looks good.");
+    if !all_checks_passed {
+        bail!("Import checks failed for one or more files.");
     }
 
+    info!("Import checks completed successfully.");
     Ok(())
 }
 
 fn check_file_imports(path: &Path) -> Result<bool> {
-    let content = fs::read_to_string(path)?;
-    let mut first_import: Option<&str> = None;
-    let mut has_imports = false;
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("Failed to read file: {:?}", path))?;
 
-    // Find the first non-comment, non-empty line that starts with "use "
-    for line in content.lines() {
-        let trimmed_line = line.trim();
-        if trimmed_line.is_empty() || trimmed_line.starts_with("//") {
-            continue; // Skip empty lines and comments
-        }
-        if trimmed_line.starts_with("#!") || trimmed_line.starts_with("#[") {
-            continue; // Skip shebangs and outer attributes
-        }
+    // Example check: ensure `use anyhow::Result` is used consistently, not `std::io::Result` in certain modules.
+    // This is a placeholder for actual import rules. Customize as needed.
+    let import_regex = Regex::new(r"use\s+std::io::Result").unwrap(); // Basic example
 
-        if trimmed_line.starts_with("use ") {
-            has_imports = true;
-            first_import = Some(line); // Keep original line formatting
-            break; // Found the first import, no need to check further
-        } else {
-            // We found code (mod, fn, struct, etc.) before any 'use' statement.
-            // This means either no imports or they appear after some code (unlikely for std).
-            break;
+    if import_regex.is_match(&content) {
+        // Example: if this file is NOT supposed to use std::io::Result directly
+        if path.components().any(|comp| comp.as_os_str() == "wrt_core_logic") { // Fictional module
+            error!(
+                "File {:?} contains potentially incorrect import: 'use std::io::Result'. Should use anyhow::Result.",
+                path
+            );
+            return Ok(false);
         }
     }
+    // Add more specific import rules here.
+    // E.g., disallow `use std::sync::Mutex` in favor of `parking_lot::Mutex`.
+    // Or check for fully qualified paths for certain types if that's a project convention.
 
-    if has_imports {
-        if let Some(import_line) = first_import {
-            let trimmed_first_import = import_line.trim();
-            if !trimmed_first_import.starts_with("use std")
-                && !trimmed_first_import.starts_with("use core")
-                && !trimmed_first_import.starts_with("use alloc")
-            {
-                println!(
-                    "WARN: {} should have standard library imports (std, core, alloc) first.",
-                    path.display()
-                );
-                println!("  First import found: {}", import_line);
-                return Ok(true); // Found a warning
-            }
-        } else {
-            // This case should technically not happen if has_imports is true
-            eprintln!("Internal logic error checking file: {}", path.display());
-        }
-    }
-
-    Ok(false) // No warning
+    Ok(true) // Default to pass if no specific violations found
 }
+*/

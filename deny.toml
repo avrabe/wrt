@@ -1,0 +1,41 @@
+[licenses]
+unlicensed = "deny"
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MPL-2.0",
+    "Unlicense",
+]
+copyleft = "warn"
+confidence-threshold = 0.92
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow" # Workspaces often use this
+highlight = "all"
+
+# Example: Deny a specific problematic crate version
+# [[bans.deny]]
+# name = "some-crate"
+# version = "=0.1.0"
+# reason = "Known security issue in this specific version"
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+vulnerability = "deny"
+unmaintained = "warn"
+unsound = "deny"
+yanked = "warn"
+notice = "warn"
+ignore = []
+severity-threshold = "medium" # Deny advisories with medium or higher severity
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = []
+allow-registry = ["https://crates.io"] 

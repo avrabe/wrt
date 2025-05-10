@@ -11,22 +11,14 @@ use wrt_types::verification::VerificationLevel;
 #[test]
 fn test_safe_memory_integration() -> Result<()> {
     // Create memory with full verification level
-    let mem_type = MemoryType {
-        limits: Limits {
-            min: 1,
-            max: Some(2),
-        },
-    };
+    let mem_type = MemoryType { limits: Limits { min: 1, max: Some(2) } };
     let mut memory = Memory::new(mem_type)?;
     memory.set_verification_level(VerificationLevel::Full);
 
     // Create table with full verification level
     let table_type = wrt_runtime::types::TableType {
         element_type: ValueType::FuncRef,
-        limits: Limits {
-            min: 10,
-            max: Some(20),
-        },
+        limits: Limits { min: 10, max: Some(20) },
     };
     let mut table = Table::new(table_type, Value::FuncRef(None))?;
     table.set_verification_level(VerificationLevel::Full);
@@ -65,18 +57,9 @@ fn test_safe_memory_integration() -> Result<()> {
     table.init(5, &init_values)?;
 
     // Verify the initialization
-    assert_eq!(
-        table.get(5)?,
-        Some(Value::FuncRef(Some(FuncRef::from_index(100))))
-    );
-    assert_eq!(
-        table.get(6)?,
-        Some(Value::FuncRef(Some(FuncRef::from_index(101))))
-    );
-    assert_eq!(
-        table.get(7)?,
-        Some(Value::FuncRef(Some(FuncRef::from_index(102))))
-    );
+    assert_eq!(table.get(5)?, Some(Value::FuncRef(Some(FuncRef::from_index(100)))));
+    assert_eq!(table.get(6)?, Some(Value::FuncRef(Some(FuncRef::from_index(101)))));
+    assert_eq!(table.get(7)?, Some(Value::FuncRef(Some(FuncRef::from_index(102)))));
 
     // Test memory copy between Memory instances
     let mem_arc = Arc::new(memory.clone());

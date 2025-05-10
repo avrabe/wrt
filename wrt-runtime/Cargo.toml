@@ -6,13 +6,18 @@ description = "WebAssembly Component Model Runtime for WRT"
 license.workspace = true
 repository = "https://github.com/avrabe/wrt"
 documentation = "https://docs.rs/wrt-runtime"
+readme = "README.md"
 keywords = ["wasm", "webassembly", "runtime", "component-model"]
 categories = ["wasm", "no-std"]
 
 [dependencies]
-wrt-error = { path = "../wrt-error", version = "0.2.0" }
-wrt-types = { path = "../wrt-types", version = "0.2.0" }
-wrt-sync = { path = "../wrt-sync", version = "0.2.0" }
+wrt-error = { path = "../wrt-error", version = "0.2.0", default-features = false }
+wrt-types = { path = "../wrt-types", version = "0.2.0", default-features = false }
+wrt-sync = { path = "../wrt-sync", version = "0.2.0", default-features = false }
+wrt-decoder = { path = "../wrt-decoder", version = "0.2.0", default-features = false }
+wrt-instructions = { path = "../wrt-instructions", version = "0.2.0", default-features = false }
+wrt-host = { path = "../wrt-host", version = "0.2.0", default-features = false }
+wrt-intercept = { path = "../wrt-intercept", version = "0.2.0", default-features = false }
 
 # No-std support
 alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-alloc" }
@@ -22,27 +27,94 @@ alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-all
 [features]
 default = ["std"]
 std = [
-    "wrt-error/std", 
+    "wrt-error/std",
     "wrt-types/std",
     "wrt-sync/std",
+    "wrt-decoder/std",
+    "wrt-instructions/std",
+    "wrt-host/std",
+    "wrt-intercept/std",
 ]
 no_std = [
-    "wrt-error/no_std", 
+    "wrt-error/no_std",
     "wrt-types/no_std",
     "wrt-sync/no_std",
+    "wrt-decoder/no_std",
+    "wrt-instructions/no_std",
+    "wrt-host/no_std",
+    "wrt-intercept/no_std",
 ]
-alloc = ["wrt-error/alloc", "wrt-types/alloc", "wrt-sync/alloc", "dep:alloc"]
-optimize = ["wrt-types/optimize"]
-safety = ["wrt-types/safety"]
+alloc = [
+    "wrt-error/alloc",
+    "wrt-types/alloc",
+    "wrt-sync/alloc",
+    "wrt-decoder/alloc",
+    "wrt-instructions/alloc",
+    "wrt-host/alloc",
+    "wrt-intercept/alloc",
+    "dep:alloc"
+]
+optimize = [
+    "wrt-types/optimize",
+    "wrt-decoder/optimize",
+    "wrt-instructions/optimize",
+    "wrt-host/optimize",
+    "wrt-intercept/optimize",
+]
+safety = [
+    "wrt-types/safety",
+    "wrt-decoder/safety",
+    "wrt-instructions/safety",
+    "wrt-host/safety",
+    "wrt-intercept/safety",
+]
 kani = []
 kani-verifier = []
+
+[profile.release]
+panic = "abort"
+
+[profile.test]
+panic = "abort"
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] }
 unused_imports = "allow"
 unused_variables = "allow"
 unused_mut = "allow"
-unsafe_code = "warn"
+unsafe_code = "forbid"
+# Rule 1
+pointer_cast = "deny"
+# Rule 9
+missing_docs = "deny"
+
+[lints.clippy]
+# Rule 1: Language subset
+inline_asm_x86_att_syntax = "warn"
+transmute_ptr_to_ref = "deny"
+type_id = "deny"
+dyn_trait = "warn"
+float_arithmetic = "warn"
+# Rule 2: Unsafe usage
+ptr_offset_with_cast = "warn"
+# Rule 3: Error handling & panics
+unwrap_used = "warn"
+panic = "warn" # Also covers Rule 4
+result_unit_err = "warn"
+let_underscore_drop = "warn"
+must_use_candidate = "warn"
+must_use_unit = "warn"
+# Rule 4: Control-flow soundness
+match_wildcard_for_single_variants = "warn"
+never_loop = "warn"
+unreachable = "warn" # Also related to Rule 4
+# Rule 5: Memory & concurrency safety
+static_mut_reference = "deny"
+arc_mutate = "deny"
+# Rule 8: Static analysis gates (CI)
+pedantic = "warn"
+# Rule 9: Documentation
+debug_assert_with_mut_call = "warn"
 
 [dev-dependencies]
 proptest = "1.4.0" 

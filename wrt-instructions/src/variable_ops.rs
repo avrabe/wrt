@@ -45,7 +45,7 @@ pub trait VariableContext {
 }
 
 impl<T: VariableContext> PureInstruction<T, Error> for VariableOp {
-    fn execute(&self, context: &mut T) -> Result<(), Error> {
+    fn execute(&self, context: &mut T) -> Result<()> {
         match self {
             Self::LocalGet(index) => {
                 let value = context.get_local(*index)?;
@@ -157,11 +157,7 @@ mod tests {
 
         fn pop_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    codes::STACK_UNDERFLOW,
-                    "Stack underflow",
-                )
+                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
             })
         }
     }

@@ -1,12 +1,11 @@
-//! Shared WebAssembly type definitions for wrt with functional safety
-//!
-//! This crate provides type definitions and memory management utilities
-//! that are shared between wrt-decoder and wrt, with a focus on
-//! functional safety for ASIL-B compliance.
+// WRT - wrt-types
+// SW-REQ-ID: REQ_MEM_SAFETY_001
+//
+// Copyright (c) 2024 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![warn(unsafe_code)]
-#![warn(missing_docs)]
 
 // Import std when available
 #[cfg(feature = "std")]
@@ -39,8 +38,6 @@ pub mod component;
 pub mod component_value;
 /// Type conversion utilities
 pub mod conversion;
-/// Conversions between wrt_error and wrt_types
-pub mod error_convert;
 /// Operation tracking and fuel metering
 pub mod operations;
 /// Resource management
@@ -60,8 +57,10 @@ pub mod values;
 /// Verification and integrity checking
 pub mod verification;
 
+pub mod math_ops;
+
 // Re-export the most important types
-pub use bounded::{BoundedHashMap, BoundedStack, BoundedVec, CapacityError};
+pub use bounded::{BoundedStack, BoundedVec, CapacityError};
 pub use builtin::BuiltinType;
 pub use component::{
     ComponentType, ExternType, GlobalType, InstanceType, Limits, MemoryType, Namespace,
@@ -69,10 +68,7 @@ pub use component::{
 };
 pub use component_value::ComponentValue;
 // Re-export conversion utilities
-pub use conversion::{
-    binary_to_val_type, ref_type_to_val_type, val_type_to_binary, val_type_to_ref_type,
-};
-pub use error_convert::ErrorCategory;
+pub use conversion::{ref_type_to_val_type, val_type_to_ref_type};
 pub use operations::{
     global_fuel_consumed, global_operation_summary, record_global_operation,
     reset_global_operations, OperationSummary, OperationTracking, OperationType,
@@ -81,7 +77,7 @@ pub use operations::{
 pub use safe_memory::NoStdMemoryProvider;
 #[cfg(feature = "std")]
 pub use safe_memory::StdMemoryProvider;
-pub use safe_memory::{MemoryProvider, SafeMemoryHandler, SafeSlice, SafeStack};
+pub use safe_memory::{MemoryProvider, SafeMemoryHandler, SafeSlice};
 pub use traits::{FromFormat, ToFormat};
 pub use types::{BlockType, FuncType, RefType, ValueType};
 pub use validation::{BoundedCapacity, Checksummed, Validatable};
@@ -91,8 +87,9 @@ pub use verification::{Checksum, VerificationLevel};
 /// The WebAssembly binary format magic number: \0asm
 pub const WASM_MAGIC: [u8; 4] = [0x00, 0x61, 0x73, 0x6D];
 
-/// The WebAssembly binary format version
-pub const WASM_VERSION: u32 = 1;
+/// The WebAssembly Core Specification version this runtime aims to support.
+/// Version 2.0 includes features like multi-value returns, reference types, etc.
+pub const WASM_VERSION: u32 = 2;
 
 // Core feature re-exports
 // Note: These are feature-gated re-exports that shouldn't conflict with the main ones
@@ -101,3 +98,6 @@ pub const WASM_VERSION: u32 = 1;
 
 #[cfg(feature = "component-model-values")]
 pub use component_value::ValType;
+
+// Re-export key types
+pub use values::{FloatBits32, FloatBits64};

@@ -45,11 +45,7 @@ pub struct StatisticsConfig {
 #[cfg(feature = "std")]
 impl Default for StatisticsConfig {
     fn default() -> Self {
-        Self {
-            track_timing: true,
-            track_errors: true,
-            max_functions: 1000,
-        }
+        Self { track_timing: true, track_errors: true, max_functions: 1000 }
     }
 }
 
@@ -161,9 +157,9 @@ impl LinkInterceptorStrategy for StatisticsStrategy {
         let is_success = result.is_ok();
         let elapsed_ms = if self.config.track_timing {
             match self.executing.lock() {
-                Ok(mut executing) => executing
-                    .remove(&key)
-                    .map(|start| start.elapsed().as_secs_f64() * 1000.0),
+                Ok(mut executing) => {
+                    executing.remove(&key).map(|start| start.elapsed().as_secs_f64() * 1000.0)
+                }
                 _ => None,
             }
         } else {
@@ -244,19 +240,13 @@ mod tests {
         let args = vec![Value::I32(42)];
 
         // First call (success)
-        strategy
-            .before_call(source, target, function, &args)
-            .unwrap();
+        strategy.before_call(source, target, function, &args).unwrap();
         thread::sleep(Duration::from_millis(10)); // Simulate some work
         let result = Ok(vec![Value::I64(123)]);
-        strategy
-            .after_call(source, target, function, &args, result)
-            .unwrap();
+        strategy.after_call(source, target, function, &args, result).unwrap();
 
         // Second call (error)
-        strategy
-            .before_call(source, target, function, &args)
-            .unwrap();
+        strategy.before_call(source, target, function, &args).unwrap();
         thread::sleep(Duration::from_millis(5)); // Simulate some work
         let result = Err(wrt_error::Error::new(
             wrt_error::ErrorCategory::Runtime,
@@ -282,11 +272,8 @@ mod tests {
 
     #[test]
     fn test_statistics_config() {
-        let config = StatisticsConfig {
-            track_timing: false,
-            track_errors: true,
-            max_functions: 10,
-        };
+        let config =
+            StatisticsConfig { track_timing: false, track_errors: true, max_functions: 10 };
         let strategy = StatisticsStrategy::with_config(config);
 
         let source = "source";
@@ -295,13 +282,9 @@ mod tests {
         let args = vec![Value::I32(42)];
 
         // Make a call
-        strategy
-            .before_call(source, target, function, &args)
-            .unwrap();
+        strategy.before_call(source, target, function, &args).unwrap();
         let result = Ok(vec![Value::I64(123)]);
-        strategy
-            .after_call(source, target, function, &args, result)
-            .unwrap();
+        strategy.after_call(source, target, function, &args, result).unwrap();
 
         // Check statistics - timing should not be tracked
         let key = StatisticsStrategy::function_key(source, target, function);
@@ -325,13 +308,9 @@ mod tests {
         let function = "test_function";
         let args = vec![Value::I32(42)];
 
-        strategy
-            .before_call(source, target, function, &args)
-            .unwrap();
+        strategy.before_call(source, target, function, &args).unwrap();
         let result = Ok(vec![Value::I64(123)]);
-        strategy
-            .after_call(source, target, function, &args, result)
-            .unwrap();
+        strategy.after_call(source, target, function, &args, result).unwrap();
 
         // Verify we have stats
         assert_eq!(strategy.get_all_stats().len(), 1);

@@ -73,9 +73,7 @@ pub struct FormatInstanceType {
 impl RuntimeComponentType {
     /// Create a new runtime component type wrapper
     pub fn new(component_type: ComponentType) -> Self {
-        Self {
-            inner: component_type,
-        }
+        Self { inner: component_type }
     }
 
     /// Get the inner component type
@@ -131,9 +129,7 @@ impl From<ComponentTypeDefinition> for FormatComponentType {
 impl RuntimeInstanceType {
     /// Create a new runtime instance type wrapper
     pub fn new(instance_type: InstanceType) -> Self {
-        Self {
-            inner: instance_type,
-        }
+        Self { inner: instance_type }
     }
 
     /// Get the inner instance type
@@ -167,9 +163,7 @@ impl FormatInstanceType {
 
     /// Convert to ComponentTypeDefinition
     pub fn to_component_type_definition(&self) -> ComponentTypeDefinition {
-        ComponentTypeDefinition::Instance {
-            exports: self.exports.clone(),
-        }
+        ComponentTypeDefinition::Instance { exports: self.exports.clone() }
     }
 }
 
@@ -209,10 +203,7 @@ impl TryFrom<RuntimeComponentType> for FormatComponentType {
             })
             .collect();
 
-        Ok(Self {
-            imports: imports_result?,
-            exports: exports_result?,
-        })
+        Ok(Self { imports: imports_result?, exports: exports_result? })
     }
 }
 
@@ -265,9 +256,7 @@ impl TryFrom<RuntimeInstanceType> for FormatInstanceType {
             })
             .collect();
 
-        Ok(Self {
-            exports: exports_result?,
-        })
+        Ok(Self { exports: exports_result? })
     }
 }
 
@@ -284,9 +273,7 @@ impl TryFrom<FormatInstanceType> for RuntimeInstanceType {
             })
             .collect();
 
-        Ok(Self::new(InstanceType {
-            exports: exports_result?,
-        }))
+        Ok(Self::new(InstanceType { exports: exports_result? }))
     }
 }
 

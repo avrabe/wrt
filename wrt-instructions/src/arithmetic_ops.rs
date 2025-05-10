@@ -156,7 +156,7 @@ pub trait ArithmeticContext {
 }
 
 impl<T: ArithmeticContext> PureInstruction<T, Error> for ArithmeticOp {
-    fn execute(&self, context: &mut T) -> Result<(), Error> {
+    fn execute(&self, context: &mut T) -> Result<()> {
         match self {
             // Integer operations (i32)
             Self::I32Add => {
@@ -504,10 +504,7 @@ mod tests {
         context.push_arithmetic_value(Value::I32(-8)).unwrap();
         context.push_arithmetic_value(Value::I32(2)).unwrap();
         ArithmeticOp::I32ShrU.execute(&mut context).unwrap();
-        assert_eq!(
-            context.pop_arithmetic_value().unwrap(),
-            Value::I32(0x3FFFFFFE)
-        );
+        assert_eq!(context.pop_arithmetic_value().unwrap(), Value::I32(0x3FFFFFFE));
     }
 
     #[test]

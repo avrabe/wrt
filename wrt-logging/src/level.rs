@@ -67,9 +67,7 @@ impl FromStr for LogLevel {
             "warn" | "warning" => Ok(Self::Warn),
             "error" | "err" => Ok(Self::Error),
             "critical" | "fatal" => Ok(Self::Critical),
-            _ => Err(ParseLogLevelError {
-                invalid_level: s.to_string(),
-            }),
+            _ => Err(ParseLogLevelError { invalid_level: s.to_string() }),
         }
     }
 }
@@ -86,9 +84,7 @@ impl FromStr for LogLevel {
             "warn" | "warning" => Ok(Self::Warn),
             "error" | "err" => Ok(Self::Error),
             "critical" | "fatal" => Ok(Self::Critical),
-            _ => Err(ParseLogLevelError {
-                invalid_level: s.to_string(),
-            }),
+            _ => Err(ParseLogLevelError { invalid_level: s.to_string() }),
         }
     }
 }
@@ -149,10 +145,7 @@ mod tests {
         assert_eq!(LogLevel::from_string_or_default("info"), LogLevel::Info);
         assert_eq!(LogLevel::from_string_or_default("warn"), LogLevel::Warn);
         assert_eq!(LogLevel::from_string_or_default("error"), LogLevel::Error);
-        assert_eq!(
-            LogLevel::from_string_or_default("critical"),
-            LogLevel::Critical
-        );
+        assert_eq!(LogLevel::from_string_or_default("critical"), LogLevel::Critical);
 
         // Test invalid defaults to Info
         assert_eq!(LogLevel::from_string_or_default("invalid"), LogLevel::Info);

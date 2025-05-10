@@ -5,6 +5,9 @@ edition.workspace = true
 description = "Type definitions for WebAssembly Runtime (WRT)"
 license.workspace = true
 repository = "https://github.com/avrabe/wrt"
+readme = "README.md"
+keywords = ["wasm", "webassembly", "types", "no_std", "component-model", "safety"]
+categories = ["wasm", "no-std", "embedded", "science::math"]
 
 [features]
 # Default features for standard environments
@@ -14,14 +17,16 @@ default = [
     "component-model-core", 
     "component-model-values", 
     "component-model-fixed-lists", 
-    "component-model-namespaces"
+    "component-model-namespaces",
+    "wrt-sync/std"
 ]
 # Standard library support
-std = ["wrt-error/std", "log"]
+std = ["alloc", "wrt-error/std", "log", "wrt-sync/std"]
 # Allocator support for no_std environments
-alloc = ["dep:alloc", "wrt-error/alloc"]
+alloc = ["dep:alloc", "wrt-error/alloc", "wrt-sync/alloc"]
+
 # No standard library support (using alloc since most no_std code needs allocation)
-no_std = ["alloc", "wrt-error/no_std"]
+no_std = ["alloc", "wrt-error/no_std", "wrt-sync/alloc"]
 # Optional feature to bypass some safety checks in performance-critical paths
 optimize = []
 # Additional safety features for ASIL-B compliance
@@ -40,7 +45,8 @@ component-model-error-context = []  # 📝 Error context types and operations
 component-model-threading = []  # 🧵 Threading operations
 
 [dependencies]
-wrt-error = { path = "../wrt-error", version = "0.2.0" }
+wrt-error = { path = "../wrt-error", version = "0.2.0", default-features = false }
+wrt-sync = { path = "../wrt-sync", version = "0.2.0", default-features = false, features = ["alloc"] }
 
 # For formal verification
 kani-verifier = { version = "0.61.0", optional = true }
@@ -57,9 +63,37 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [package.metadata.kani]
 default-unwind = 2
 
+[profile.release]
+panic = "abort"
+
+[profile.test]
+panic = "abort"
+
 [lints.rust]
-unsafe_code = "warn"
-missing_docs = "warn"
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)', 'cfg(kani)', 'cfg(coverage)', 'cfg(doc)'] }
+unsafe_code = "deny"
+missing_docs = "deny"
+static_mut_refs = "deny"
+let_underscore_drop = "warn"
+
+[lints.clippy]
+inline_asm_x86_att_syntax = "deny"
+transmute_ptr_to_ref = "deny"
+float_arithmetic = "warn"
+ptr_offset_with_cast = "warn"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+result_unit_err = "warn"
+must_use_candidate = "warn"
+must_use_unit = "warn"
+match_wildcard_for_single_variants = "warn"
+never_loop = "warn"
+unreachable = "deny"
+pedantic = "warn"
+debug_assert_with_mut_call = "warn"
 
 [[bench]]
 name = "safe_memory_benchmarks"

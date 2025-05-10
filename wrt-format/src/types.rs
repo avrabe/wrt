@@ -76,3 +76,41 @@ pub fn parse_value_type(byte: u8) -> Result<ValueType> {
 pub fn value_type_to_byte(value_type: ValueType) -> u8 {
     crate::conversion::format_value_type(value_type)
 }
+
+/// Type for a global variable in the binary format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormatGlobalType {
+    pub value_type: ValueType, // This is wrt_types::ValueType re-exported in this file
+    pub mutable: bool,
+}
+
+/// Represents the core WebAssembly specification version of a module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum CoreWasmVersion {
+    /// WebAssembly Core Specification 2.0
+    #[default]
+    V2_0, // Assumes 0x01 0x00 0x00 0x00 version bytes
+    /// WebAssembly Core Specification 3.0 (Draft)
+    V3_0, // Assumes 0x03 0x00 0x00 0x00 version bytes (hypothetical)
+          // Potentially an Unknown or Other variant if needed
+}
+
+impl CoreWasmVersion {
+    /// Returns the raw version bytes for the Wasm module header.
+    pub fn to_bytes(self) -> [u8; 4] {
+        match self {
+            CoreWasmVersion::V2_0 => [0x01, 0x00, 0x00, 0x00],
+            CoreWasmVersion::V3_0 => [0x03, 0x00, 0x00, 0x00], // Hypothetical
+        }
+    }
+
+    /// Attempts to create a CoreWasmVersion from module header version bytes.
+    /// Returns None if the version bytes are not recognized.
+    pub fn from_bytes(bytes: [u8; 4]) -> Option<Self> {
+        match bytes {
+            [0x01, 0x00, 0x00, 0x00] => Some(CoreWasmVersion::V2_0),
+            [0x03, 0x00, 0x00, 0x00] => Some(CoreWasmVersion::V3_0), // Hypothetical
+            _ => None,
+        }
+    }
+}

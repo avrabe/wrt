@@ -253,9 +253,20 @@ pub fn extract_state_section(section: &CustomSection) -> Result<(StateHeader, Ve
 ///
 /// `true` if the module contains at least one state section
 pub fn has_state_sections(custom_sections: &[CustomSection]) -> bool {
-    custom_sections
-        .iter()
-        .any(|section| section.name.starts_with(STATE_SECTION_PREFIX))
+    custom_sections.iter().any(|section| section.name.starts_with(STATE_SECTION_PREFIX))
+}
+
+/// Checks if a given section name corresponds to a known `StateSection`.
+///
+/// # Arguments
+///
+/// * `name` - The name of the custom section to check.
+///
+/// # Returns
+///
+/// `true` if the name matches one of the `StateSection` variants, `false` otherwise.
+pub fn is_state_section_name(name: &str) -> bool {
+    StateSection::from_name(name).is_some()
 }
 
 #[cfg(test)]

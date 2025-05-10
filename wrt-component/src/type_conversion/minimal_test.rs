@@ -73,11 +73,9 @@ mod tests {
         C: TestConversion<From, To> + 'static,
     {
         fn convert_any(&self, from: &dyn Any) -> Result<Box<dyn Any>, TestConversionError> {
-            let from = from
-                .downcast_ref::<From>()
-                .ok_or_else(|| TestConversionError {
-                    message: "Source value doesn't match expected type".to_string(),
-                })?;
+            let from = from.downcast_ref::<From>().ok_or_else(|| TestConversionError {
+                message: "Source value doesn't match expected type".to_string(),
+            })?;
 
             let result = self.converter.convert(from)?;
             Ok(Box::new(result))
@@ -98,9 +96,7 @@ mod tests {
 
     impl TestRegistry {
         fn new() -> Self {
-            Self {
-                conversions: HashMap::new(),
-            }
+            Self { conversions: HashMap::new() }
         }
 
         fn register<From, To, F>(&mut self, converter: F) -> &mut Self
@@ -136,12 +132,9 @@ mod tests {
         {
             let key = (TypeId::of::<From>(), TypeId::of::<To>());
 
-            let converter = self
-                .conversions
-                .get(&key)
-                .ok_or_else(|| TestConversionError {
-                    message: "No converter registered for this type pair".to_string(),
-                })?;
+            let converter = self.conversions.get(&key).ok_or_else(|| TestConversionError {
+                message: "No converter registered for this type pair".to_string(),
+            })?;
 
             let result = converter.convert_any(from)?;
 
@@ -166,11 +159,9 @@ mod tests {
         let mut registry = TestRegistry::new();
 
         // Register a simple conversion
-        registry.register(
-            |src: &TestSource| -> Result<TestTarget, TestConversionError> {
-                Ok(TestTarget(src.0 * 2))
-            },
-        );
+        registry.register(|src: &TestSource| -> Result<TestTarget, TestConversionError> {
+            Ok(TestTarget(src.0 * 2))
+        });
 
         // Test the conversion
         let source = TestSource(21);
@@ -188,10 +179,7 @@ mod tests {
         let result = registry.convert::<TestSource, TestTarget>(&source);
 
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .message
-            .contains("No converter registered"));
+        assert!(result.unwrap_err().message.contains("No converter registered"));
     }
 
     #[test]
@@ -203,9 +191,9 @@ mod tests {
         assert!(!registry.can_convert::<TestTarget, TestSource>());
 
         // Register one conversion
-        registry.register(
-            |src: &TestSource| -> Result<TestTarget, TestConversionError> { Ok(TestTarget(src.0)) },
-        );
+        registry.register(|src: &TestSource| -> Result<TestTarget, TestConversionError> {
+            Ok(TestTarget(src.0))
+        });
 
         // Now one direction should work but not the other
         assert!(registry.can_convert::<TestSource, TestTarget>());

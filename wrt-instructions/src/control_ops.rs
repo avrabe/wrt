@@ -128,7 +128,7 @@ pub trait ControlContext {
 }
 
 impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
-    fn execute(&self, context: &mut T) -> Result<(), Error> {
+    fn execute(&self, context: &mut T) -> Result<()> {
         match self {
             Self::Block(block_type) => context.enter_block(Block::Block(block_type.clone())),
             Self::Loop(block_type) => context.enter_block(Block::Loop(block_type.clone())),
@@ -199,10 +199,9 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
             }
             Self::Return => context.return_function(),
             Self::Call(func_idx) => context.call_function(*func_idx),
-            Self::CallIndirect {
-                table_idx,
-                type_idx,
-            } => context.call_indirect(*table_idx, *type_idx),
+            Self::CallIndirect { table_idx, type_idx } => {
+                context.call_indirect(*table_idx, *type_idx)
+            }
             Self::Nop => {
                 // No operation, just return Ok
                 Ok(())
@@ -263,11 +262,7 @@ mod tests {
 
         fn pop_control_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    codes::STACK_UNDERFLOW,
-                    "Stack underflow",
-                )
+                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
             })
         }
 
@@ -312,11 +307,7 @@ mod tests {
 
         fn trap(&mut self, _message: &str) -> Result<()> {
             self.trapped = true;
-            Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::EXECUTION_ERROR,
-                "Execution trapped",
-            ))
+            Err(Error::new(ErrorCategory::Runtime, codes::EXECUTION_ERROR, "Execution trapped"))
         }
 
         fn get_current_block(&self) -> Option<&Block> {
@@ -330,9 +321,7 @@ mod tests {
 
         // Test block instruction
         let block_type = ControlBlockType::ValueType(Some(ValueType::I32));
-        ControlOp::Block(block_type.clone())
-            .execute(&mut context)
-            .unwrap();
+        ControlOp::Block(block_type.clone()).execute(&mut context).unwrap();
         assert_eq!(context.get_block_depth(), 1);
 
         // Test end instruction
@@ -358,9 +347,7 @@ mod tests {
         // Test if instruction with true condition
         context.push_control_value(Value::I32(1)).unwrap(); // True condition
         let if_type = ControlBlockType::ValueType(None);
-        ControlOp::If(if_type.clone())
-            .execute(&mut context)
-            .unwrap();
+        ControlOp::If(if_type.clone()).execute(&mut context).unwrap();
         assert_eq!(context.get_block_depth(), 1);
 
         // Test else instruction
@@ -412,12 +399,7 @@ mod tests {
         context.push_control_value(Value::I32(1)).unwrap(); // Index 1
         let table = vec![10, 20, 30];
         let default = 99;
-        ControlOp::BrTable {
-            table: table.clone(),
-            default,
-        }
-        .execute(&mut context)
-        .unwrap();
+        ControlOp::BrTable { table: table.clone(), default }.execute(&mut context).unwrap();
         assert!(context.branched.is_some());
         assert_eq!(context.branched.unwrap().label_idx, 20); // table[1]
 
@@ -426,9 +408,7 @@ mod tests {
 
         // Test br_table instruction with out-of-range index
         context.push_control_value(Value::I32(5)).unwrap(); // Index out of range
-        ControlOp::BrTable { table, default }
-            .execute(&mut context)
-            .unwrap();
+        ControlOp::BrTable { table, default }.execute(&mut context).unwrap();
         assert!(context.branched.is_some());
         assert_eq!(context.branched.unwrap().label_idx, 99); // default
     }
@@ -446,12 +426,7 @@ mod tests {
         assert_eq!(context.func_called, Some(42));
 
         // Test call_indirect instruction
-        ControlOp::CallIndirect {
-            table_idx: 1,
-            type_idx: 5,
-        }
-        .execute(&mut context)
-        .unwrap();
+        ControlOp::CallIndirect { table_idx: 1, type_idx: 5 }.execute(&mut context).unwrap();
         assert_eq!(context.indirect_call, Some((1, 5)));
     }
 

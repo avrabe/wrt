@@ -12,10 +12,8 @@ mod tests {
     // Helper function to run wrtd with specified arguments
     fn run_wrtd(wasm_file: &str, fuel: Option<u64>, call: Option<&str>) -> (bool, String) {
         // Find the wrtd binary in the target directory from the workspace root
-        let project_root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
-            .parent()
-            .unwrap()
-            .to_path_buf();
+        let project_root =
+            PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).parent().unwrap().to_path_buf();
 
         let wrtd_path = project_root.join("target/debug/wrtd");
         println!("Using wrtd at: {}", wrtd_path.display());
@@ -72,10 +70,8 @@ mod tests {
 
         // Execute with a high fuel limit and stats enabled
         // We'll use the standard run_wrtd function but enhance the Command with --stats
-        let project_root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
-            .parent()
-            .unwrap()
-            .to_path_buf();
+        let project_root =
+            PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).parent().unwrap().to_path_buf();
 
         let wrtd_path = project_root.join("target/debug/wrtd");
         println!("Using wrtd at: {}", wrtd_path.display());

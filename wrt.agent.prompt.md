@@ -78,3 +78,47 @@ A comprehensive report including:
 4. Recommendations for future improvements
 
 Once you've completed each phase and validated that it meets the criteria for that phase, mark it as complete and move on to the next phase. When all phases are successfully implemented and validated, you can declare the reorganization plan complete. 
+
+
+-----
+fix each create based on the implementation sequence and the success metrics:
+
+## Implementation Sequence
+
+The implementation will proceed in order of dependency, starting from the most fundamental crates:
+
+1. `wrt-error`: Error handling foundation: done.
+2. `wrt-types`: Core and runtime type definitions: done
+3. `wrt-format`: Format specifications: done
+4. `wrt-decoder`: Binary parsing. Should be the only one using wrt-format. The resulting api shall then use the wrt-types.
+6. `wrt-sync`: Synchronization primitives: done
+5. `wrt-instructions`: Instruction encoding/decoding: done
+7. `wrt-intercept`: Function interception: done
+8. `wrt-host`: Host interface: done
+9. `wrt-component`: Component model: done
+10. `wrt-runtime`: Runtime execution: done
+12. `wrt`: Main library integration: to be finished before to go to the next crate.
+
+11. `wrt-test-registry`: Test framework
+
+This ensures that fixes at the foundation level propagate properly through the dependency chain.
+
+## Success Metrics
+
+The reorganization will be considered successful if:
+
+0. Everything builds and can be tested.
+0. Each crate does not implement things from the other crates. 
+Crates get reimported into a prelude.rs
+All crates build successfully with both std and no_std features
+All tests pass. Run cargo test for std and non_std
+No clippy warnings are present: run cargo clippy
+Documentation is complete and builds without warnings
+Code duplication is eliminated
+Type system is consistent across all crates
+Error handling is standardized 
+Ensure to use SafeMemory and other types before Vec
+No shortcut. Fixing errors and implementing the actual features is mandatory.
+Replace example code or stubs with real implementation. Ask if more information is needed.
+Everything is license: MIT
+All runtime crates should use wrt-decoder if reading from a warm module is needed or a serialisation into it. Only wrt-decoder shall use wrt-format.

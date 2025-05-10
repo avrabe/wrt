@@ -18,10 +18,7 @@ pub fn run(output_path: &Path) -> Result<(), Box<dyn Error>> {
     // Write output to file
     fs::write(output_path, content)?;
 
-    println!(
-        "Safety analysis report generated at: {}",
-        output_path.display()
-    );
+    println!("Safety analysis report generated at: {}", output_path.display());
     Ok(())
 }
 

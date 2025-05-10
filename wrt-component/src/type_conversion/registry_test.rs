@@ -15,17 +15,13 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a simple conversion
-        registry.register(
-            |src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
-                Ok(SimpleTarget(src.0 * 2))
-            },
-        );
+        registry.register(|src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
+            Ok(SimpleTarget(src.0 * 2))
+        });
 
         // Test the conversion
         let source = SimpleSource(21);
-        let target = registry
-            .convert::<SimpleSource, SimpleTarget>(&source)
-            .unwrap();
+        let target = registry.convert::<SimpleSource, SimpleTarget>(&source).unwrap();
 
         assert_eq!(target, SimpleTarget(42));
     }
@@ -52,11 +48,9 @@ mod tests {
         assert!(!registry.can_convert::<SimpleTarget, SimpleSource>());
 
         // Register one conversion
-        registry.register(
-            |src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
-                Ok(SimpleTarget(src.0))
-            },
-        );
+        registry.register(|src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
+            Ok(SimpleTarget(src.0))
+        });
 
         // Now one direction should work but not the other
         assert!(registry.can_convert::<SimpleSource, SimpleTarget>());
@@ -68,20 +62,18 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a conversion that can fail
-        registry.register(
-            |src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
-                if src.0 < 0 {
-                    return Err(ConversionError {
-                        kind: ConversionErrorKind::OutOfRange,
-                        source_type: std::any::type_name::<SimpleSource>(),
-                        target_type: std::any::type_name::<SimpleTarget>(),
-                        context: Some("Value must be non-negative".to_string()),
-                        source: None,
-                    });
-                }
-                Ok(SimpleTarget(src.0))
-            },
-        );
+        registry.register(|src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
+            if src.0 < 0 {
+                return Err(ConversionError {
+                    kind: ConversionErrorKind::OutOfRange,
+                    source_type: std::any::type_name::<SimpleSource>(),
+                    target_type: std::any::type_name::<SimpleTarget>(),
+                    context: Some("Value must be non-negative".to_string()),
+                    source: None,
+                });
+            }
+            Ok(SimpleTarget(src.0))
+        });
 
         // Test successful conversion
         let good_source = SimpleSource(42);

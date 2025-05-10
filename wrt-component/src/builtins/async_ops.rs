@@ -24,11 +24,7 @@ use std::{
     vec::Vec,
 };
 
-#[cfg(all(
-    feature = "component-model-async",
-    not(feature = "std"),
-    feature = "alloc"
-))]
+#[cfg(all(feature = "component-model-async", not(feature = "std"), feature = "alloc"))]
 use alloc::{boxed::Box, collections::HashMap, sync::Arc, vec::Vec};
 
 #[cfg(feature = "component-model-async")]
@@ -116,10 +112,7 @@ impl AsyncValueStore {
 
                 Ok(())
             }
-            None => Err(Error::new(AsyncError(format!(
-                "Async ID not found: {}",
-                id
-            )))),
+            None => Err(Error::new(AsyncError(format!("Async ID not found: {}", id)))),
         }
     }
 
@@ -137,10 +130,7 @@ impl AsyncValueStore {
 
                 Ok(())
             }
-            None => Err(Error::new(AsyncError(format!(
-                "Async ID not found: {}",
-                id
-            )))),
+            None => Err(Error::new(AsyncError(format!("Async ID not found: {}", id)))),
         }
     }
 
@@ -148,10 +138,7 @@ impl AsyncValueStore {
     pub fn get_status(&self, id: u32) -> Result<AsyncStatus> {
         match self.values.get(&id) {
             Some(async_value) => Ok(async_value.status.clone()),
-            None => Err(Error::new(AsyncError(format!(
-                "Async ID not found: {}",
-                id
-            )))),
+            None => Err(Error::new(AsyncError(format!("Async ID not found: {}", id)))),
         }
     }
 
@@ -171,15 +158,10 @@ impl AsyncValueStore {
                             .unwrap_or_else(|| "Async operation failed".to_string()),
                     )))
                 } else {
-                    Err(Error::new(AsyncError(
-                        "Async operation still pending".to_string(),
-                    )))
+                    Err(Error::new(AsyncError("Async operation still pending".to_string())))
                 }
             }
-            None => Err(Error::new(AsyncError(format!(
-                "Async ID not found: {}",
-                id
-            )))),
+            None => Err(Error::new(AsyncError(format!("Async ID not found: {}", id)))),
         }
     }
 
@@ -191,10 +173,7 @@ impl AsyncValueStore {
                 async_value.waker = Some(waker);
                 Ok(())
             }
-            None => Err(Error::new(AsyncError(format!(
-                "Async ID not found: {}",
-                id
-            )))),
+            None => Err(Error::new(AsyncError(format!("Async ID not found: {}", id)))),
         }
     }
 
@@ -208,10 +187,7 @@ impl AsyncValueStore {
         if self.values.remove(&id).is_some() {
             Ok(())
         } else {
-            Err(Error::new(AsyncError(format!(
-                "Async ID not found: {}",
-                id
-            ))))
+            Err(Error::new(AsyncError(format!("Async ID not found: {}", id))))
         }
     }
 }
@@ -272,10 +248,7 @@ impl BuiltinHandler for AsyncNewHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate args - async.new takes no arguments
         if !args.is_empty() {
-            return Err(Error::new(format!(
-                "async.new: Expected 0 arguments, got {}",
-                args.len()
-            )));
+            return Err(Error::new(format!("async.new: Expected 0 arguments, got {}", args.len())));
         }
 
         // Create a new async value
@@ -289,9 +262,7 @@ impl BuiltinHandler for AsyncNewHandler {
     }
 
     fn clone_handler(&self) -> Box<dyn BuiltinHandler> {
-        Box::new(Self {
-            async_store: self.async_store.clone(),
-        })
+        Box::new(Self { async_store: self.async_store.clone() })
     }
 }
 
@@ -319,10 +290,7 @@ impl BuiltinHandler for AsyncGetHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate args
         if args.len() != 1 {
-            return Err(Error::new(format!(
-                "async.get: Expected 1 argument, got {}",
-                args.len()
-            )));
+            return Err(Error::new(format!("async.get: Expected 1 argument, got {}", args.len())));
         }
 
         // Extract the async ID from args
@@ -342,9 +310,7 @@ impl BuiltinHandler for AsyncGetHandler {
     }
 
     fn clone_handler(&self) -> Box<dyn BuiltinHandler> {
-        Box::new(Self {
-            async_store: self.async_store.clone(),
-        })
+        Box::new(Self { async_store: self.async_store.clone() })
     }
 }
 
@@ -372,10 +338,7 @@ impl BuiltinHandler for AsyncPollHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate args
         if args.len() != 1 {
-            return Err(Error::new(format!(
-                "async.poll: Expected 1 argument, got {}",
-                args.len()
-            )));
+            return Err(Error::new(format!("async.poll: Expected 1 argument, got {}", args.len())));
         }
 
         // Extract the async ID from args
@@ -402,9 +365,7 @@ impl BuiltinHandler for AsyncPollHandler {
     }
 
     fn clone_handler(&self) -> Box<dyn BuiltinHandler> {
-        Box::new(Self {
-            async_store: self.async_store.clone(),
-        })
+        Box::new(Self { async_store: self.async_store.clone() })
     }
 }
 
@@ -437,10 +398,7 @@ impl BuiltinHandler for AsyncWaitHandler {
 
         // Validate args
         if args.len() != 1 {
-            return Err(Error::new(format!(
-                "async.wait: Expected 1 argument, got {}",
-                args.len()
-            )));
+            return Err(Error::new(format!("async.wait: Expected 1 argument, got {}", args.len())));
         }
 
         // Extract the async ID from args
@@ -455,19 +413,14 @@ impl BuiltinHandler for AsyncWaitHandler {
         };
 
         // Wait for the async computation to complete
-        let future = AsyncValueFuture {
-            store: self.async_store.clone(),
-            id: async_id,
-        };
+        let future = AsyncValueFuture { store: self.async_store.clone(), id: async_id };
 
         // Block on the future
         block_on(future)
     }
 
     fn clone_handler(&self) -> Box<dyn BuiltinHandler> {
-        Box::new(Self {
-            async_store: self.async_store.clone(),
-        })
+        Box::new(Self { async_store: self.async_store.clone() })
     }
 }
 
@@ -587,14 +540,10 @@ mod tests {
             let pending_id = async_store.create_async(AsyncStatus::Pending);
 
             let ready_id = async_store.create_async(AsyncStatus::Pending);
-            async_store
-                .set_result(ready_id, vec![ComponentValue::U32(42)])
-                .unwrap();
+            async_store.set_result(ready_id, vec![ComponentValue::U32(42)]).unwrap();
 
             let failed_id = async_store.create_async(AsyncStatus::Pending);
-            async_store
-                .set_error(failed_id, "Test error".to_string())
-                .unwrap();
+            async_store.set_error(failed_id, "Test error".to_string()).unwrap();
 
             (pending_id, ready_id, failed_id)
         };

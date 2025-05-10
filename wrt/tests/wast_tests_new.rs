@@ -48,9 +48,7 @@ fn test_wast_directive(
     match directive {
         WastDirective::Module(ref mut wast_module) => {
             // Get the binary from the WAST module
-            let binary = wast_module
-                .encode()
-                .map_err(|e| Error::Parse(e.to_string()))?;
+            let binary = wast_module.encode().map_err(|e| Error::Parse(e.to_string()))?;
 
             // Debug output
             println!("Binary: {:02x?}", binary);
@@ -64,18 +62,11 @@ fn test_wast_directive(
 
             // Instantiate the module
             let instance_idx = engine.instantiate(loaded_module)?;
-            println!(
-                "DEBUG: instantiate called for module with instance index {}",
-                instance_idx
-            );
+            println!("DEBUG: instantiate called for module with instance index {}", instance_idx);
 
             Ok(())
         }
-        WastDirective::AssertReturn {
-            span: _,
-            exec,
-            results,
-        } => {
+        WastDirective::AssertReturn { span: _, exec, results } => {
             match exec {
                 WastExecute::Invoke(invoke) => {
                     let args: Result<Vec<Value>, _> =
@@ -227,13 +218,7 @@ fn load_passing_tests() -> std::collections::HashSet<PathBuf> {
     // Let's make sure we're using absolute paths by resolving them against the workspace root
     passing_tests
         .into_iter()
-        .map(|path| {
-            if path.is_absolute() {
-                path
-            } else {
-                workspace_root.join(path)
-            }
-        })
+        .map(|path| if path.is_absolute() { path } else { workspace_root.join(path) })
         .collect()
 }
 
@@ -312,10 +297,7 @@ fn test_wast_files() -> Result<(), Error> {
             if !passing_tests.contains(&abs_path)
                 && !passing_tests.contains(&rel_path_from_workspace)
             {
-                println!(
-                    "  Skipping (not in passing list): {}",
-                    rel_display_path.display()
-                );
+                println!("  Skipping (not in passing list): {}", rel_display_path.display());
                 continue;
             }
 
@@ -334,11 +316,7 @@ fn test_wast_files() -> Result<(), Error> {
         }
     }
 
-    println!(
-        "Tests completed: {} passed, {} failed",
-        tests_passed,
-        tests_run - tests_passed
-    );
+    println!("Tests completed: {} passed, {} failed", tests_passed, tests_run - tests_passed);
 
     Ok(())
 }

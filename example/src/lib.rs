@@ -49,10 +49,7 @@ struct MyLogger {
 
 impl GuestLogger for MyLogger {
     fn new(level: Level) -> MyLogger {
-        MyLogger {
-            level: Cell::new(level),
-            contents: RefCell::new(String::new()),
-        }
+        MyLogger { level: Cell::new(level), contents: RefCell::new(String::new()) }
     }
 
     fn log(&self, level: Level, msg: String) {

@@ -1,3 +1,11 @@
+// WRT - wrt-types
+// Module: Validation Utilities
+// SW-REQ-ID: REQ_SAFETY_VALIDATION_001 // Placeholder ID, to be confirmed
+//
+// Copyright (c) 2024 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
 //! Validation infrastructure for bounded collections
 //!
 //! This module provides traits and utilities for implementing validation
@@ -28,7 +36,11 @@ pub trait Validatable {
     ///
     /// Returns Ok(()) if validation passes, or an error describing
     /// what validation check failed.
-    fn validate(&self) -> Result<(), Self::Error>;
+    ///
+    /// # Errors
+    ///
+    /// Returns `Self::Error` if validation fails.
+    fn validate(&self) -> core::result::Result<(), Self::Error>;
 
     /// Get the validation level this object is configured with
     fn validation_level(&self) -> VerificationLevel;
@@ -82,6 +94,11 @@ pub trait BoundedCapacity {
 ///
 /// This function encapsulates the logic for deciding when to perform
 /// validation based on the verification level and operation importance.
+///
+/// # Errors
+///
+/// Returns `Self::Error` if validation fails.
+#[must_use]
 pub fn should_validate(level: VerificationLevel, operation_importance: u8) -> bool {
     level.should_verify(operation_importance)
 }
@@ -90,6 +107,11 @@ pub fn should_validate(level: VerificationLevel, operation_importance: u8) -> bo
 ///
 /// This function encapsulates the logic for deciding when to perform
 /// redundant validation checks based on the verification level.
+///
+/// # Errors
+///
+/// Returns `Self::Error` if validation fails.
+#[must_use]
 pub fn should_validate_redundant(level: VerificationLevel) -> bool {
     level.should_verify_redundant()
 }
@@ -163,24 +185,12 @@ mod tests {
     #[test]
     fn test_should_validate() {
         // None level should never validate
-        assert!(!should_validate(
-            VerificationLevel::None,
-            importance::CRITICAL
-        ));
+        assert!(!should_validate(VerificationLevel::None, importance::CRITICAL));
 
         // Standard level should validate based on importance
-        assert!(should_validate(
-            VerificationLevel::Standard,
-            importance::CRITICAL
-        ));
-        assert!(should_validate(
-            VerificationLevel::Standard,
-            importance::MUTATION
-        ));
-        assert!(should_validate(
-            VerificationLevel::Standard,
-            importance::READ
-        ));
+        assert!(should_validate(VerificationLevel::Standard, importance::CRITICAL));
+        assert!(should_validate(VerificationLevel::Standard, importance::MUTATION));
+        assert!(should_validate(VerificationLevel::Standard, importance::READ));
 
         // Full level should always validate
         assert!(should_validate(VerificationLevel::Full, importance::READ));

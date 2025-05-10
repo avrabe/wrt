@@ -64,10 +64,7 @@ pub fn run(output_path: &Path, format: &str) -> Result<(), Box<dyn Error>> {
     // Write output to file
     fs::write(output_path, output_content)?;
 
-    println!(
-        "Traceability matrix generated at: {}",
-        output_path.display()
-    );
+    println!("Traceability matrix generated at: {}", output_path.display());
     Ok(())
 }
 
@@ -78,10 +75,7 @@ fn build_relationships(
 ) -> Vec<crate::qualification::Relationship> {
     // This would build the relationships between requirements and specifications
     // Placeholder implementation
-    vec![Relationship {
-        requirement: "REQ_001".to_string(),
-        specification: "SPEC_001".to_string(),
-    }]
+    vec![Relationship { requirement: "REQ_001".to_string(), specification: "SPEC_001".to_string() }]
 }
 
 fn generate_rst_traceability(relationships: &[Relationship]) -> String {
@@ -102,10 +96,7 @@ fn generate_rst_traceability(relationships: &[Relationship]) -> String {
         std::collections::HashMap::new();
 
     for rel in relationships {
-        req_to_specs
-            .entry(rel.requirement.clone())
-            .or_default()
-            .push(rel.specification.clone());
+        req_to_specs.entry(rel.requirement.clone()).or_default().push(rel.specification.clone());
     }
 
     // Sort by requirement ID
@@ -138,10 +129,7 @@ fn generate_md_traceability(relationships: &[Relationship]) -> String {
         std::collections::HashMap::new();
 
     for rel in relationships {
-        req_to_specs
-            .entry(rel.requirement.clone())
-            .or_default()
-            .push(rel.specification.clone());
+        req_to_specs.entry(rel.requirement.clone()).or_default().push(rel.specification.clone());
     }
 
     // Sort by requirement ID

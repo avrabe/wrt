@@ -58,8 +58,5 @@ fn verify_logging_ext() {
     };
 
     // Verify that we can log
-    registry_with_handler.handle_log(LogOperation::new(
-        LogLevel::Info,
-        "test message".to_string(),
-    ));
+    registry_with_handler.handle_log(LogOperation::new(LogLevel::Info, "test message".to_string()));
 }

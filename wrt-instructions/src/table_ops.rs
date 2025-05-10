@@ -102,15 +102,11 @@ pub trait TableContext {
 }
 
 impl<T: TableContext> PureInstruction<T, Error> for TableOp {
-    fn execute(&self, context: &mut T) -> Result<(), Error> {
+    fn execute(&self, context: &mut T) -> Result<()> {
         match self {
             Self::TableGet(table_index) => {
                 let index = context.pop_table_value()?.as_i32().ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::INVALID_TYPE,
-                        "Invalid table type",
-                    )
+                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Invalid table type")
                 })?;
 
                 if index < 0 {
@@ -134,11 +130,7 @@ impl<T: TableContext> PureInstruction<T, Error> for TableOp {
             Self::TableSet(table_index) => {
                 let value = context.pop_table_value()?;
                 let index = context.pop_table_value()?.as_i32().ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::INVALID_TYPE,
-                        "Invalid table type",
-                    )
+                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Invalid table type")
                 })?;
 
                 if index < 0 {
@@ -171,11 +163,7 @@ impl<T: TableContext> PureInstruction<T, Error> for TableOp {
             }
             Self::TableGrow(table_index) => {
                 let delta = context.pop_table_value()?.as_i32().ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::INVALID_TYPE,
-                        "Invalid table type",
-                    )
+                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Invalid table type")
                 })?;
                 let init_value = context.pop_table_value()?;
 
@@ -206,19 +194,11 @@ impl<T: TableContext> PureInstruction<T, Error> for TableOp {
             }
             Self::TableFill(table_index) => {
                 let len = context.pop_table_value()?.as_i32().ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::INVALID_TYPE,
-                        "Invalid table type",
-                    )
+                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Invalid table type")
                 })?;
                 let val = context.pop_table_value()?;
                 let dst = context.pop_table_value()?.as_i32().ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::INVALID_TYPE,
-                        "Invalid table type",
-                    )
+                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Invalid table type")
                 })?;
 
                 if dst < 0 || len < 0 {
@@ -248,30 +228,15 @@ impl<T: TableContext> PureInstruction<T, Error> for TableOp {
 
                 context.fill_table(*table_index, dst as u32, ref_val, len as u32)
             }
-            Self::TableCopy {
-                dst_table,
-                src_table,
-            } => {
+            Self::TableCopy { dst_table, src_table } => {
                 let len = context.pop_table_value()?.as_i32().ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::INVALID_TYPE,
-                        "Invalid table type",
-                    )
+                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Invalid table type")
                 })?;
                 let src = context.pop_table_value()?.as_i32().ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::INVALID_TYPE,
-                        "Invalid table type",
-                    )
+                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Invalid table type")
                 })?;
                 let dst = context.pop_table_value()?.as_i32().ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::INVALID_TYPE,
-                        "Invalid table type",
-                    )
+                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Invalid table type")
                 })?;
 
                 if dst < 0 || src < 0 || len < 0 {
@@ -293,30 +258,15 @@ impl<T: TableContext> PureInstruction<T, Error> for TableOp {
 
                 context.copy_table(*dst_table, dst as u32, *src_table, src as u32, len as u32)
             }
-            Self::TableInit {
-                table_index,
-                elem_index,
-            } => {
+            Self::TableInit { table_index, elem_index } => {
                 let len = context.pop_table_value()?.as_i32().ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::INVALID_TYPE,
-                        "Invalid table type",
-                    )
+                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Invalid table type")
                 })?;
                 let src = context.pop_table_value()?.as_i32().ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::INVALID_TYPE,
-                        "Invalid table type",
-                    )
+                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Invalid table type")
                 })?;
                 let dst = context.pop_table_value()?.as_i32().ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::INVALID_TYPE,
-                        "Invalid table type",
-                    )
+                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Invalid table type")
                 })?;
 
                 if dst < 0 || src < 0 || len < 0 {
@@ -378,19 +328,11 @@ mod tests {
             ];
 
             let elem_segments = vec![
-                vec![
-                    RefValue::FuncRef(1),
-                    RefValue::FuncRef(2),
-                    RefValue::FuncRef(3),
-                ], // Elem 0
-                vec![RefValue::FuncRef(4), RefValue::FuncRef(5)], // Elem 1
+                vec![RefValue::FuncRef(1), RefValue::FuncRef(2), RefValue::FuncRef(3)], // Elem 0
+                vec![RefValue::FuncRef(4), RefValue::FuncRef(5)],                       // Elem 1
             ];
 
-            Self {
-                tables,
-                stack: Vec::new(),
-                elem_segments,
-            }
+            Self { tables, stack: Vec::new(), elem_segments }
         }
     }
 
@@ -635,11 +577,7 @@ mod tests {
 
         fn pop_table_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    codes::STACK_UNDERFLOW,
-                    "Stack underflow",
-                )
+                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
             })
         }
     }
@@ -650,9 +588,7 @@ mod tests {
 
         // Set table[0][2] to FuncRef(42)
         context.push_table_value(Value::I32(2)).unwrap();
-        context
-            .push_table_value(Value::FuncRef(Some(FuncRef::from_index(42))))
-            .unwrap();
+        context.push_table_value(Value::FuncRef(Some(FuncRef::from_index(42)))).unwrap();
         TableOp::TableSet(0).execute(&mut context).unwrap();
 
         // Get table[0][2]
@@ -689,9 +625,7 @@ mod tests {
 
         // Fill table[0][3..6] with FuncRef(99)
         context.push_table_value(Value::I32(3)).unwrap(); // dst
-        context
-            .push_table_value(Value::FuncRef(Some(FuncRef::from_index(99))))
-            .unwrap(); // val
+        context.push_table_value(Value::FuncRef(Some(FuncRef::from_index(99)))).unwrap(); // val
         context.push_table_value(Value::I32(3)).unwrap(); // len
         TableOp::TableFill(0).execute(&mut context).unwrap();
 
@@ -723,26 +657,15 @@ mod tests {
         let mut context = MockTableContext::new();
 
         // Set up source values
-        context
-            .set_table_element(0, 1, RefValue::FuncRef(101))
-            .unwrap();
-        context
-            .set_table_element(0, 2, RefValue::FuncRef(102))
-            .unwrap();
-        context
-            .set_table_element(0, 3, RefValue::FuncRef(103))
-            .unwrap();
+        context.set_table_element(0, 1, RefValue::FuncRef(101)).unwrap();
+        context.set_table_element(0, 2, RefValue::FuncRef(102)).unwrap();
+        context.set_table_element(0, 3, RefValue::FuncRef(103)).unwrap();
 
         // Copy table[0][1..4] to table[1][0..3]
         context.push_table_value(Value::I32(0)).unwrap(); // dst
         context.push_table_value(Value::I32(1)).unwrap(); // src
         context.push_table_value(Value::I32(3)).unwrap(); // len
-        TableOp::TableCopy {
-            dst_table: 1,
-            src_table: 0,
-        }
-        .execute(&mut context)
-        .unwrap();
+        TableOp::TableCopy { dst_table: 1, src_table: 0 }.execute(&mut context).unwrap();
 
         // Check copied values
         context.push_table_value(Value::I32(0)).unwrap();
@@ -775,12 +698,7 @@ mod tests {
         context.push_table_value(Value::I32(4)).unwrap(); // dst
         context.push_table_value(Value::I32(1)).unwrap(); // src
         context.push_table_value(Value::I32(2)).unwrap(); // len
-        TableOp::TableInit {
-            table_index: 0,
-            elem_index: 0,
-        }
-        .execute(&mut context)
-        .unwrap();
+        TableOp::TableInit { table_index: 0, elem_index: 0 }.execute(&mut context).unwrap();
 
         // Check initialized values (should be FuncRef(2) and FuncRef(3))
         context.push_table_value(Value::I32(4)).unwrap();
@@ -804,11 +722,7 @@ mod tests {
         context.push_table_value(Value::I32(7)).unwrap(); // dst
         context.push_table_value(Value::I32(0)).unwrap(); // src
         context.push_table_value(Value::I32(1)).unwrap(); // len
-        let result = TableOp::TableInit {
-            table_index: 0,
-            elem_index: 0,
-        }
-        .execute(&mut context);
+        let result = TableOp::TableInit { table_index: 0, elem_index: 0 }.execute(&mut context);
         assert!(result.is_err());
     }
 }

@@ -29,6 +29,7 @@
 use crate::prelude::*;
 
 // Explicitly import the types we need to avoid confusion
+use wrt_error::kinds::{InvalidArgumentError, NotImplementedError};
 use wrt_format::component::ExternType as FormatExternType;
 use wrt_format::component::ValType as FormatValType;
 use wrt_format::component::{
@@ -160,14 +161,14 @@ pub fn value_type_to_format_val_type(value_type: &ValueType) -> Result<FormatVal
         ValueType::FuncRef => Err(Error::new(
             ErrorCategory::Type,
             codes::NOT_IMPLEMENTED,
-            kinds::NotImplementedError(
+            NotImplementedError(
                 "FuncRef type not directly convertible to component format".to_string(),
             ),
         )),
         ValueType::ExternRef => Err(Error::new(
             ErrorCategory::Type,
             codes::NOT_IMPLEMENTED,
-            kinds::NotImplementedError(
+            NotImplementedError(
                 "ExternRef type not directly convertible to component format".to_string(),
             ),
         )),
@@ -353,9 +354,7 @@ pub fn types_valtype_to_format_valtype(types_val_type: &TypesValType) -> FormatV
                 .map(|(name, opt_type)| {
                     (
                         name.clone(),
-                        opt_type
-                            .as_ref()
-                            .map(|val_type| types_valtype_to_format_valtype(val_type)),
+                        opt_type.as_ref().map(|val_type| types_valtype_to_format_valtype(val_type)),
                     )
                 })
                 .collect();
@@ -368,10 +367,8 @@ pub fn types_valtype_to_format_valtype(types_val_type: &TypesValType) -> FormatV
             FormatValType::FixedList(Box::new(types_valtype_to_format_valtype(elem_type)), *size)
         }
         TypesValType::Tuple(types) => {
-            let converted_types = types
-                .iter()
-                .map(|val_type| types_valtype_to_format_valtype(val_type))
-                .collect();
+            let converted_types =
+                types.iter().map(|val_type| types_valtype_to_format_valtype(val_type)).collect();
             FormatValType::Tuple(converted_types)
         }
         TypesValType::Flags(names) => FormatValType::Flags(names.clone()),
@@ -443,10 +440,7 @@ pub fn format_to_runtime_extern_type(
                 .map(|val_type| format_val_type_to_value_type(val_type))
                 .collect::<Result<Vec<_>>>()?;
 
-            Ok(TypesExternType::Function(TypesFuncType::new(
-                converted_params,
-                converted_results,
-            )))
+            Ok(TypesExternType::Function(TypesFuncType::new(converted_params, converted_results)))
         }
         FormatExternType::Value(val_type) => {
             // Convert to most appropriate TypesExternType - likely Function with no params/results
@@ -460,10 +454,7 @@ pub fn format_to_runtime_extern_type(
         FormatExternType::Type(type_idx) => {
             // Type reference - this would need context from the component
             // For now, provide a sensible default
-            Ok(TypesExternType::Function(TypesFuncType::new(
-                vec![],
-                vec![],
-            )))
+            Ok(TypesExternType::Function(TypesFuncType::new(vec![], vec![])))
         }
         FormatExternType::Instance { exports } => {
             // Convert each export to a TypesExternType
@@ -474,20 +465,14 @@ pub fn format_to_runtime_extern_type(
                 })
                 .collect();
 
-            Ok(TypesExternType::Instance(InstanceType {
-                exports: converted_exports?,
-            }))
+            Ok(TypesExternType::Instance(InstanceType { exports: converted_exports? }))
         }
         FormatExternType::Component { imports, exports } => {
             // Convert imports to TypesExternType
             let converted_imports: Result<Vec<(String, String, TypesExternType)>> = imports
                 .iter()
                 .map(|(ns, name, ext_type)| {
-                    Ok((
-                        ns.clone(),
-                        name.clone(),
-                        format_to_runtime_extern_type(ext_type)?,
-                    ))
+                    Ok((ns.clone(), name.clone(), format_to_runtime_extern_type(ext_type)?))
                 })
                 .collect();
 
@@ -541,9 +526,8 @@ pub fn runtime_to_format_extern_type(
     match types_extern_type {
         ExternType::Function(func_type) => {
             // Convert parameter types
-            let param_names: Vec<String> = (0..func_type.params.len())
-                .map(|i| format!("param{}", i))
-                .collect();
+            let param_names: Vec<String> =
+                (0..func_type.params.len()).map(|i| format!("param{}", i)).collect();
 
             // Create param_types manually to handle errors gracefully
             let mut param_types = Vec::new();
@@ -565,10 +549,7 @@ pub fn runtime_to_format_extern_type(
                 }
             }
 
-            Ok(FormatExternType::Function {
-                params: param_types,
-                results: result_types,
-            })
+            Ok(FormatExternType::Function { params: param_types, results: result_types })
         }
         ExternType::Table(table_type) => Err(Error::new(
             ErrorCategory::System,
@@ -595,9 +576,7 @@ pub fn runtime_to_format_extern_type(
                 })
                 .collect();
 
-            Ok(FormatExternType::Instance {
-                exports: exports_format?,
-            })
+            Ok(FormatExternType::Instance { exports: exports_format? })
         }
         ExternType::Component(component_type) => {
             // Convert imports to FormatExternType
@@ -605,11 +584,7 @@ pub fn runtime_to_format_extern_type(
                 .imports
                 .iter()
                 .map(|(ns, name, ext_type)| {
-                    Ok((
-                        ns.clone(),
-                        name.clone(),
-                        runtime_to_format_extern_type(ext_type)?,
-                    ))
+                    Ok((ns.clone(), name.clone(), runtime_to_format_extern_type(ext_type)?))
                 })
                 .collect();
 
@@ -622,10 +597,7 @@ pub fn runtime_to_format_extern_type(
                 })
                 .collect();
 
-            Ok(FormatExternType::Component {
-                imports: imports_format?,
-                exports: exports_format?,
-            })
+            Ok(FormatExternType::Component { imports: imports_format?, exports: exports_format? })
         }
         ExternType::Resource(resource_type) => {
             // Note: Since FormatExternType doesn't have a direct Resource variant,
@@ -636,9 +608,7 @@ pub fn runtime_to_format_extern_type(
                 _ => FormatValType::Own(0),              // Default to type index 0
             };
 
-            Ok(FormatExternType::Value(convert_types_to_format_valtype(
-                &val_type,
-            )))
+            Ok(FormatExternType::Value(convert_types_to_format_valtype(&val_type)))
         }
     }
 }
@@ -662,7 +632,7 @@ pub fn format_to_common_val_type(val_type: &FormatValType) -> Result<ValueType> 
         _ => Err(Error::new(
             ErrorCategory::Type,
             codes::NOT_IMPLEMENTED,
-            kinds::NotImplementedError(format!("Cannot convert {:?} to core ValueType", val_type)),
+            NotImplementedError(format!("Cannot convert {:?} to core ValueType", val_type)),
         )),
     }
 }
@@ -686,7 +656,7 @@ pub fn common_to_format_val_type(value_type: &ValueType) -> Result<FormatValType
         _ => Err(Error::new(
             ErrorCategory::Type,
             codes::NOT_IMPLEMENTED,
-            kinds::NotImplementedError(format!(
+            NotImplementedError(format!(
                 "Value type {:?} cannot be directly mapped to component format",
                 value_type
             )),
@@ -709,7 +679,7 @@ pub fn extern_type_to_func_type(extern_type: &ExternType) -> Result<TypesFuncTyp
         _ => Err(Error::new(
             ErrorCategory::Type,
             codes::INVALID_TYPE,
-            kinds::InvalidArgumentError("ExternType is not a function".to_string()),
+            InvalidArgumentError(format!("ExternType is not a function: {:?}", extern_type)),
         )),
     }
 }
@@ -837,7 +807,7 @@ pub fn types_componentvalue_to_format_constvalue(
         _ => Err(Error::new(
             ErrorCategory::Type,
             codes::CONVERSION_ERROR,
-            kinds::ConversionError(format!(
+            NotImplementedError(format!(
                 "Cannot convert {:?} to format ConstValue",
                 types_component_value
             )),
@@ -870,7 +840,7 @@ pub fn core_value_to_types_componentvalue(
         _ => Err(Error::new(
             ErrorCategory::Type,
             codes::CONVERSION_ERROR,
-            kinds::ConversionError(
+            NotImplementedError(
                 "Unsupported value type for conversion to component value".to_string(),
             ),
         )),
@@ -917,7 +887,9 @@ pub fn types_componentvalue_to_core_value(
         _ => Err(Error::new(
             ErrorCategory::Type,
             codes::CONVERSION_ERROR,
-            "Unsupported component value type for conversion to core value".to_string(),
+            NotImplementedError(
+                "Unsupported component value type for conversion to core value".to_string(),
+            ),
         )),
     }
 }
@@ -952,9 +924,8 @@ pub fn complete_types_to_format_extern_type(
     match types_extern_type {
         wrt_types::ExternType::Function(func_type) => {
             // Convert parameter types
-            let param_names: Vec<String> = (0..func_type.params.len())
-                .map(|i| format!("param{}", i))
-                .collect();
+            let param_names: Vec<String> =
+                (0..func_type.params.len()).map(|i| format!("param{}", i)).collect();
 
             // Create param_types manually to handle errors gracefully
             let mut param_types = Vec::new();
@@ -976,10 +947,7 @@ pub fn complete_types_to_format_extern_type(
                 }
             }
 
-            Ok(FormatExternType::Function {
-                params: param_types,
-                results: result_types,
-            })
+            Ok(FormatExternType::Function { params: param_types, results: result_types })
         }
         wrt_types::ExternType::Table(table_type) => Err(Error::new(
             ErrorCategory::Type,
@@ -1012,9 +980,7 @@ pub fn complete_types_to_format_extern_type(
                 })
                 .collect();
 
-            Ok(FormatExternType::Instance {
-                exports: exports_result?,
-            })
+            Ok(FormatExternType::Instance { exports: exports_result? })
         }
         wrt_types::ExternType::Component(component_type) => {
             // Convert component imports
@@ -1037,10 +1003,7 @@ pub fn complete_types_to_format_extern_type(
                 })
                 .collect();
 
-            Ok(FormatExternType::Component {
-                imports: imports_result?,
-                exports: exports_result?,
-            })
+            Ok(FormatExternType::Component { imports: imports_result?, exports: exports_result? })
         }
     }
 }
@@ -1072,7 +1035,10 @@ pub fn complete_format_to_types_extern_type(
                         return Err(Error::new(
                             ErrorCategory::Type,
                             codes::CONVERSION_ERROR,
-                            format!("Cannot convert {:?} to core ValueType", format_val_type),
+                            NotImplementedError(format!(
+                                "Cannot convert {:?} to core ValueType",
+                                format_val_type
+                            )),
                         ))
                     }
                 }
@@ -1089,17 +1055,17 @@ pub fn complete_format_to_types_extern_type(
                         return Err(Error::new(
                             ErrorCategory::Type,
                             codes::CONVERSION_ERROR,
-                            format!("Cannot convert {:?} to core ValueType", format_val_type),
+                            NotImplementedError(format!(
+                                "Cannot convert {:?} to core ValueType",
+                                format_val_type
+                            )),
                         ))
                     }
                 }
             }
 
             // Create a new FuncType properly
-            Ok(wrt_types::ExternType::Function(wrt_types::FuncType::new(
-                param_types,
-                result_types,
-            )))
+            Ok(wrt_types::ExternType::Function(wrt_types::FuncType::new(param_types, result_types)))
         }
         FormatExternType::Value(format_val_type) => {
             // Value types typically map to globals in the runtime
@@ -1111,7 +1077,10 @@ pub fn complete_format_to_types_extern_type(
                     return Err(Error::new(
                         ErrorCategory::Type,
                         codes::CONVERSION_ERROR,
-                        format!("Cannot convert {:?} to core ValueType", format_val_type),
+                        NotImplementedError(format!(
+                            "Cannot convert {:?} to core ValueType",
+                            format_val_type
+                        )),
                     ))
                 }
             };
@@ -1138,9 +1107,7 @@ pub fn complete_format_to_types_extern_type(
                 })
                 .collect();
 
-            Ok(wrt_types::ExternType::Instance(wrt_types::InstanceType {
-                exports: export_types?,
-            }))
+            Ok(wrt_types::ExternType::Instance(wrt_types::InstanceType { exports: export_types? }))
         }
         FormatExternType::Component { imports, exports } => {
             // Convert component imports

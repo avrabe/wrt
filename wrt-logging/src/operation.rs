@@ -25,11 +25,7 @@ impl LogOperation {
     /// Create a new log operation
     #[must_use]
     pub const fn new(level: LogLevel, message: String) -> Self {
-        Self {
-            level,
-            message,
-            component_id: None,
-        }
+        Self { level, message, component_id: None }
     }
 
     /// Create a new log operation with a component ID
@@ -38,11 +34,7 @@ impl LogOperation {
         message: S1,
         component_id: S2,
     ) -> Self {
-        Self {
-            level,
-            message: message.into(),
-            component_id: Some(component_id.into()),
-        }
+        Self { level, message: message.into(), component_id: Some(component_id.into()) }
     }
 }
 

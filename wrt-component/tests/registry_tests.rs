@@ -32,17 +32,13 @@ fn test_basic_registry_functionality() {
     let mut registry = TypeConversionRegistry::new();
 
     // Register a simple conversion
-    registry.register(
-        |src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
-            Ok(SimpleTarget(src.0 * 2))
-        },
-    );
+    registry.register(|src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
+        Ok(SimpleTarget(src.0 * 2))
+    });
 
     // Test the conversion
     let source = SimpleSource(21);
-    let target = registry
-        .convert::<SimpleSource, SimpleTarget>(&source)
-        .unwrap();
+    let target = registry.convert::<SimpleSource, SimpleTarget>(&source).unwrap();
 
     assert_eq!(target, SimpleTarget(42));
 }
@@ -52,31 +48,18 @@ fn test_complex_conversion() {
     let mut registry = TypeConversionRegistry::new();
 
     // Register a more complex conversion
-    registry.register(
-        |src: &ComplexSource| -> Result<ComplexTarget, ConversionError> {
-            Ok(ComplexTarget {
-                value: src.value,
-                description: format!("Converted from: {}", src.name),
-            })
-        },
-    );
+    registry.register(|src: &ComplexSource| -> Result<ComplexTarget, ConversionError> {
+        Ok(ComplexTarget { value: src.value, description: format!("Converted from: {}", src.name) })
+    });
 
     // Test the conversion
-    let source = ComplexSource {
-        value: 42,
-        name: "Test Source".to_string(),
-    };
+    let source = ComplexSource { value: 42, name: "Test Source".to_string() };
 
-    let target = registry
-        .convert::<ComplexSource, ComplexTarget>(&source)
-        .unwrap();
+    let target = registry.convert::<ComplexSource, ComplexTarget>(&source).unwrap();
 
     assert_eq!(
         target,
-        ComplexTarget {
-            value: 42,
-            description: "Converted from: Test Source".to_string(),
-        }
+        ComplexTarget { value: 42, description: "Converted from: Test Source".to_string() }
     );
 }
 
@@ -85,20 +68,18 @@ fn test_conversion_error_handling() {
     let mut registry = TypeConversionRegistry::new();
 
     // Register a conversion that can fail
-    registry.register(
-        |src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
-            if src.0 < 0 {
-                return Err(ConversionError {
-                    kind: ConversionErrorKind::OutOfRange,
-                    source_type: std::any::type_name::<SimpleSource>(),
-                    target_type: std::any::type_name::<SimpleTarget>(),
-                    context: Some("Value must be non-negative".to_string()),
-                    source: None,
-                });
-            }
-            Ok(SimpleTarget(src.0))
-        },
-    );
+    registry.register(|src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
+        if src.0 < 0 {
+            return Err(ConversionError {
+                kind: ConversionErrorKind::OutOfRange,
+                source_type: std::any::type_name::<SimpleSource>(),
+                target_type: std::any::type_name::<SimpleTarget>(),
+                context: Some("Value must be non-negative".to_string()),
+                source: None,
+            });
+        }
+        Ok(SimpleTarget(src.0))
+    });
 
     // Test successful conversion
     let good_source = SimpleSource(42);
@@ -121,25 +102,21 @@ fn test_bidirectional_conversions() {
     let mut registry = TypeConversionRegistry::new();
 
     // Register conversions in both directions
-    registry.register(
-        |src: &SimpleSource| -> Result<SimpleTarget, ConversionError> { Ok(SimpleTarget(src.0)) },
-    );
+    registry.register(|src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
+        Ok(SimpleTarget(src.0))
+    });
 
-    registry.register(
-        |src: &SimpleTarget| -> Result<SimpleSource, ConversionError> { Ok(SimpleSource(src.0)) },
-    );
+    registry.register(|src: &SimpleTarget| -> Result<SimpleSource, ConversionError> {
+        Ok(SimpleSource(src.0))
+    });
 
     // Test forward conversion
     let source = SimpleSource(42);
-    let target = registry
-        .convert::<SimpleSource, SimpleTarget>(&source)
-        .unwrap();
+    let target = registry.convert::<SimpleSource, SimpleTarget>(&source).unwrap();
     assert_eq!(target, SimpleTarget(42));
 
     // Test reverse conversion
-    let source_again = registry
-        .convert::<SimpleTarget, SimpleSource>(&target)
-        .unwrap();
+    let source_again = registry.convert::<SimpleTarget, SimpleSource>(&target).unwrap();
     assert_eq!(source_again, SimpleSource(42));
 }
 
@@ -170,17 +147,15 @@ fn test_chained_conversion_errors() {
     };
 
     // Register a conversion that returns a chained error
-    registry.register(
-        |_src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
-            Err(ConversionError {
-                kind: ConversionErrorKind::ConversionFailed,
-                source_type: std::any::type_name::<SimpleSource>(),
-                target_type: std::any::type_name::<SimpleTarget>(),
-                context: Some("Outer conversion failed".to_string()),
-                source: Some(Box::new(nested_error)),
-            })
-        },
-    );
+    registry.register(|_src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
+        Err(ConversionError {
+            kind: ConversionErrorKind::ConversionFailed,
+            source_type: std::any::type_name::<SimpleSource>(),
+            target_type: std::any::type_name::<SimpleTarget>(),
+            context: Some("Outer conversion failed".to_string()),
+            source: Some(Box::new(nested_error)),
+        })
+    });
 
     // Test the error chaining
     let source = SimpleSource(42);
@@ -195,14 +170,8 @@ fn test_chained_conversion_errors() {
 
     // Check inner error
     let inner_error = error.source.unwrap();
-    assert!(matches!(
-        inner_error.kind,
-        ConversionErrorKind::InvalidVariant
-    ));
-    assert!(inner_error
-        .context
-        .unwrap()
-        .contains("Inner conversion failed"));
+    assert!(matches!(inner_error.kind, ConversionErrorKind::InvalidVariant));
+    assert!(inner_error.context.unwrap().contains("Inner conversion failed"));
 }
 
 #[test]
@@ -214,9 +183,9 @@ fn test_can_convert_check() {
     assert!(!registry.can_convert::<SimpleTarget, SimpleSource>());
 
     // Register one conversion
-    registry.register(
-        |src: &SimpleSource| -> Result<SimpleTarget, ConversionError> { Ok(SimpleTarget(src.0)) },
-    );
+    registry.register(|src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
+        Ok(SimpleTarget(src.0))
+    });
 
     // Now one direction should work but not the other
     assert!(registry.can_convert::<SimpleSource, SimpleTarget>());

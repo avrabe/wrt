@@ -17,6 +17,7 @@ This section contains documentation for developers working on the WebAssembly Ru
    :maxdepth: 2
    :caption: Development Documentation:
 
+   developer_tooling
    panic_documentation
    panic_registry_proposal
 

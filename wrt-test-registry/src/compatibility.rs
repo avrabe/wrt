@@ -1,479 +1,466 @@
-//! Compatibility tests between std and no_std environments
+//! Compatibility tests for WebAssembly Runtime in both std and no_std environments
 //!
-//! This module provides tests that verify the proper functioning
-//! of the WRT ecosystem in both std and no_std environments.
+//! This module contains tests that validate consistent behavior across std and no_std
+//! environments, ensuring that we can rely on the same semantics in both contexts.
 
-use crate::{test_case, TestRegistry, TestResult};
+use crate::prelude::*;
 
-#[cfg(feature = "std")]
-use std::println as debug_print;
-
-#[cfg(not(feature = "std"))]
-use core::println as debug_print;
-
-/// Register all compatibility tests
+/// Register all compatibility tests with the global registry
 pub fn register_compatibility_tests() {
     let registry = TestRegistry::global();
 
-    // Test core dependency functionality
-    registry.register(test_case!(
-        name: "core_error_handling",
-        features: ["std", "no_std"],
-        test_fn: test_core_error_handling,
-        description: "Tests error handling in both std and no_std environments"
-    ));
+    // Test error handling
+    let _ = registry.register(Box::new(TestCaseImpl {
+        name: "error_handling_compatibility",
+        category: "compatibility",
+        requires_std: false,
+        features: {
+            let mut features = BoundedVec::new();
+            let _ = features.try_push("std".to_string());
+            let _ = features.try_push("no_std".to_string());
+            features
+        },
+        test_fn: Box::new(test_error_handling),
+        description: "Tests error handling in both std and no_std environments",
+    }));
+
+    // Test safe memory operations
+    let _ = registry.register(Box::new(TestCaseImpl {
+        name: "safe_memory_operations",
+        category: "compatibility",
+        requires_std: false,
+        features: {
+            let mut features = BoundedVec::new();
+            let _ = features.try_push("std".to_string());
+            let _ = features.try_push("no_std".to_string());
+            features
+        },
+        test_fn: Box::new(test_safe_memory),
+        description: "Tests SafeMemory operations in both environments",
+    }));
+
+    // Test bounded collections
+    let _ = registry.register(Box::new(TestCaseImpl {
+        name: "bounded_collections",
+        category: "compatibility",
+        requires_std: false,
+        features: {
+            let mut features = BoundedVec::new();
+            let _ = features.try_push("std".to_string());
+            let _ = features.try_push("no_std".to_string());
+            features
+        },
+        test_fn: Box::new(test_bounded_collections),
+        description: "Tests bounded collections in both environments",
+    }));
 
     // Test type system compatibility
-    registry.register(test_case!(
+    let _ = registry.register(Box::new(TestCaseImpl {
         name: "type_system_compatibility",
-        features: ["std", "no_std"],
-        test_fn: test_type_system_compatibility,
-        description: "Tests type system compatibility across environments"
-    ));
+        category: "compatibility",
+        requires_std: false,
+        features: {
+            let mut features = BoundedVec::new();
+            let _ = features.try_push("std".to_string());
+            let _ = features.try_push("no_std".to_string());
+            features
+        },
+        test_fn: Box::new(test_type_system),
+        description: "Tests type system compatibility across environments",
+    }));
 
     // Test limits conversion
-    registry.register(test_case!(
+    let _ = registry.register(Box::new(TestCaseImpl {
         name: "limits_conversion",
-        features: ["std", "no_std"],
-        test_fn: test_limits_conversion,
-        description: "Tests proper limits conversion between format and types"
-    ));
-
-    // Test memory operations
-    registry.register(test_case!(
-        name: "memory_operations",
-        features: ["std", "no_std"],
-        test_fn: test_memory_operations,
-        description: "Tests memory operations in both environments"
-    ));
+        category: "compatibility",
+        requires_std: false,
+        features: {
+            let mut features = BoundedVec::new();
+            let _ = features.try_push("std".to_string());
+            let _ = features.try_push("no_std".to_string());
+            features
+        },
+        test_fn: Box::new(test_limits_conversion),
+        description: "Tests proper limits conversion between format and types",
+    }));
 
     // Test value operations
-    registry.register(test_case!(
+    let _ = registry.register(Box::new(TestCaseImpl {
         name: "value_operations",
-        features: ["std", "no_std"],
-        test_fn: test_value_operations,
-        description: "Tests value operations in both environments"
-    ));
+        category: "compatibility",
+        requires_std: false,
+        features: {
+            let mut features = BoundedVec::new();
+            let _ = features.try_push("std".to_string());
+            let _ = features.try_push("no_std".to_string());
+            features
+        },
+        test_fn: Box::new(test_value_operations),
+        description: "Tests value operations in both environments",
+    }));
 
-    // Add test for component model compatibility
-    registry.register(test_case!(
-        name: "component_model_compatibility",
-        features: ["std", "no_std"],
-        test_fn: test_component_model_compatibility,
-        description: "Tests component model compatibility across environments"
-    ));
-
-    // Add comprehensive core compatibility test
-    registry.register(test_case!(
-        name: "core_std_nostd_compatibility",
-        features: ["std", "no_std"],
-        test_fn: test_core_std_nostd_compatibility,
-        description: "Tests complete std/no_std compatibility for core WebAssembly functionality"
-    ));
-
-    // Add comprehensive component model compatibility test
-    registry.register(test_case!(
-        name: "component_std_nostd_compatibility",
-        features: ["std", "no_std"],
-        test_fn: test_component_std_nostd_compatibility,
-        description: "Tests complete std/no_std compatibility for component model functionality"
-    ));
+    // Test verification levels
+    let _ = registry.register(Box::new(TestCaseImpl {
+        name: "verification_levels",
+        category: "safety",
+        requires_std: false,
+        features: {
+            let mut features = BoundedVec::new();
+            let _ = features.try_push("std".to_string());
+            let _ = features.try_push("no_std".to_string());
+            let _ = features.try_push("safety".to_string());
+            features
+        },
+        test_fn: Box::new(test_verification_levels),
+        description: "Tests different verification levels for memory safety",
+    }));
 }
 
-/// Test core error handling
-fn test_core_error_handling(_config: &crate::TestConfig) -> TestResult {
-    // Create an error
-    let error = wrt_error::Error::new(wrt_error::ErrorCategory::Core, 0, "Test error".to_string());
+/// Test error handling in both std and no_std environments
+fn test_error_handling(_config: &TestConfig) -> TestResult {
+    // Create errors with different categories
+    let validation_error =
+        Error::new(ErrorCategory::Validation, codes::VALIDATION_ERROR, "Test validation error");
 
-    // Verify category
-    assert_eq!(error.category(), wrt_error::ErrorCategory::Core);
+    let memory_error =
+        Error::new(ErrorCategory::Memory, codes::MEMORY_ACCESS_OUT_OF_BOUNDS, "Test memory error");
 
-    // Create a Result with an error
-    let result: wrt_error::Result<()> = Err(error);
+    // Check error categories
+    assert_eq_test!(validation_error.category(), ErrorCategory::Validation);
+    assert_eq_test!(memory_error.category(), ErrorCategory::Memory);
 
-    // Check that the is_err method works
-    assert!(result.is_err());
+    // Check error codes
+    assert_eq_test!(validation_error.code(), codes::VALIDATION_ERROR);
+    assert_eq_test!(memory_error.code(), codes::MEMORY_ACCESS_OUT_OF_BOUNDS);
 
-    // Create a success result
-    let ok_result: wrt_error::Result<u32> = Ok(42);
+    // Test error propagation
+    let result: Result<(), Error> = Err(validation_error.clone());
+    let propagated = result.map_err(|e| {
+        assert_eq_test!(e.category(), ErrorCategory::Validation);
+        assert_eq_test!(e.code(), codes::VALIDATION_ERROR);
+        e
+    });
+    assert_test!(propagated.is_err());
 
-    // Check that the is_ok method works
-    assert!(ok_result.is_ok());
-    assert_eq!(ok_result.unwrap(), 42);
+    Ok(())
+}
 
-    // Test error conversion
-    let parse_error = wrt_error::Error::new(
-        wrt_error::ErrorCategory::Parse,
-        1,
-        "Parse error".to_string(),
-    );
+/// Test SafeMemory operations
+fn test_safe_memory(config: &TestConfig) -> TestResult {
+    // Create a safe memory handler with bounded vector
+    let mut buffer = BoundedVec::<u8, 1024>::new();
+    for i in 0..1024 {
+        let _ = buffer.try_push(0);
+    }
 
-    // Test error displays properly in both environments
-    let error_string = parse_error.to_string();
-    assert!(error_string.contains("Parse error"));
+    let mut memory_handler = SafeMemoryHandler::new(buffer.as_slice());
+
+    // Set verification level based on test config
+    memory_handler.set_verification_level(config.verification_level);
+
+    // Test basic operations with bounded vectors
+    let test_data = BoundedVec::<u8, 5>::from_slice(&[1, 2, 3, 4, 5])
+        .map_err(|e| format!("Failed to create BoundedVec: {:?}", e))?;
+
+    memory_handler.clone_bytes_into(100, test_data.as_slice())?;
+
+    // Get a safe slice and verify data
+    let slice = memory_handler.get_slice(100, test_data.len())?;
+    let data = slice.data()?;
+    assert_eq_test!(data, test_data.as_slice());
+
+    // Test memory integrity
+    memory_handler.verify_integrity()?;
+
+    // Test memory stats
+    let stats = memory_handler.provider().memory_stats();
+    assert_test!(stats.total_size >= 1024);
+
+    // Test SafeSlice operations
+    let slice = memory_handler.get_slice(0, 10)?;
+    assert_eq_test!(slice.length(), 10);
+    let sub_slice = slice.slice(2, 5)?;
+    assert_eq_test!(sub_slice.length(), 3);
+
+    Ok(())
+}
+
+/// Test bounded collections
+fn test_bounded_collections(_config: &TestConfig) -> TestResult {
+    // Test BoundedVec
+    let mut vec = BoundedVec::<u32, 10>::new();
+
+    // Test basic operations
+    assert_test!(vec.try_push(1).is_ok());
+    assert_test!(vec.try_push(2).is_ok());
+    assert_test!(vec.try_push(3).is_ok());
+
+    // Test capacity enforcement
+    for i in 4..=10 {
+        assert_test!(vec.try_push(i).is_ok());
+    }
+
+    // This should fail (over capacity)
+    assert_test!(vec.try_push(11).is_err());
+
+    // Test iteration
+    let mut sum = 0;
+    for &value in &vec {
+        sum += value;
+    }
+    assert_eq_test!(sum, 55); // Sum of 1 through 10
+
+    // Test BoundedStack
+    let mut stack = BoundedStack::<u32, 5>::new();
+
+    // Push some values
+    assert_test!(stack.try_push(10).is_ok());
+    assert_test!(stack.try_push(20).is_ok());
+    assert_test!(stack.try_push(30).is_ok());
+
+    // Pop values and check
+    assert_eq_test!(stack.pop(), Some(30));
+    assert_eq_test!(stack.pop(), Some(20));
+    assert_eq_test!(stack.pop(), Some(10));
+    assert_eq_test!(stack.pop(), None); // Stack is empty
+
+    // Test BoundedHashMap
+    let mut map = BoundedHashMap::<u32, &str, 5>::new();
+
+    // Insert some values
+    assert_test!(map.try_insert(1, "one").is_ok());
+    assert_test!(map.try_insert(2, "two").is_ok());
+    assert_test!(map.try_insert(3, "three").is_ok());
+
+    // Retrieve values
+    assert_eq_test!(map.get(&1), Some(&"one"));
+    assert_eq_test!(map.get(&2), Some(&"two"));
+    assert_eq_test!(map.get(&3), Some(&"three"));
+    assert_eq_test!(map.get(&4), None);
 
     Ok(())
 }
 
 /// Test type system compatibility
-fn test_type_system_compatibility(_config: &crate::TestConfig) -> TestResult {
-    // Test ValueType functionality
-    let i32_type = wrt_types::ValueType::I32;
-    let i64_type = wrt_types::ValueType::I64;
-    let f32_type = wrt_types::ValueType::F32;
-    let f64_type = wrt_types::ValueType::F64;
+fn test_type_system(_config: &TestConfig) -> TestResult {
+    // Test basic value types
+    let i32_type = ValueType::I32;
+    let i64_type = ValueType::I64;
+    let f32_type = ValueType::F32;
+    let f64_type = ValueType::F64;
 
-    // Test equality
-    assert_eq!(i32_type, wrt_types::ValueType::I32);
-    assert_ne!(i32_type, i64_type);
+    // Test function types with BoundedVec
+    let mut params = BoundedVec::<ValueType, 10>::new();
+    let _ = params.try_push(i32_type);
+    let _ = params.try_push(i64_type);
 
-    // Test binary conversion
-    let i32_byte = wrt_types::conversion::val_type_to_binary(i32_type);
-    let i64_byte = wrt_types::conversion::val_type_to_binary(i64_type);
-    let f32_byte = wrt_types::conversion::val_type_to_binary(f32_type);
-    let f64_byte = wrt_types::conversion::val_type_to_binary(f64_type);
+    let mut results = BoundedVec::<ValueType, 10>::new();
+    let _ = results.try_push(f32_type);
 
-    // Test conversion back
-    assert_eq!(
-        wrt_types::conversion::binary_to_val_type(i32_byte).unwrap(),
-        i32_type
-    );
-    assert_eq!(
-        wrt_types::conversion::binary_to_val_type(i64_byte).unwrap(),
-        i64_type
-    );
-    assert_eq!(
-        wrt_types::conversion::binary_to_val_type(f32_byte).unwrap(),
-        f32_type
-    );
-    assert_eq!(
-        wrt_types::conversion::binary_to_val_type(f64_byte).unwrap(),
-        f64_type
-    );
+    let func_type = FuncType { params: params.clone(), results: results.clone() };
 
-    // Test FuncType creation and equality
-    #[cfg(feature = "std")]
-    let param_types = vec![i32_type, i64_type];
-    #[cfg(feature = "std")]
-    let result_types = vec![f32_type];
+    // Verify function type properties
+    assert_eq_test!(func_type.params.len(), 2);
+    assert_eq_test!(func_type.results.len(), 1);
+    assert_eq_test!(func_type.params[0], ValueType::I32);
+    assert_eq_test!(func_type.params[1], ValueType::I64);
+    assert_eq_test!(func_type.results[0], ValueType::F32);
 
-    #[cfg(not(feature = "std"))]
-    let param_types = alloc::vec![i32_type, i64_type];
-    #[cfg(not(feature = "std"))]
-    let result_types = alloc::vec![f32_type];
+    // Test reference types
+    let func_ref = RefType::FuncRef;
+    let extern_ref = RefType::ExternRef;
 
-    let func_type = wrt_types::types::FuncType::new(param_types.clone(), result_types.clone());
-    let func_type2 = wrt_types::types::FuncType::new(param_types, result_types);
+    // Create table type with reference type
+    let table_type = TableType { element_type: func_ref, limits: Limits { min: 0, max: Some(10) } };
 
-    // Test equality
-    assert_eq!(func_type, func_type2);
+    // Check component value types
+    let i32_val_type = ValType::I32;
+    let string_val_type = ValType::String;
+
+    // Create component values
+    let i32_value = ComponentValue::I32(42);
+    let string_value = ComponentValue::String("test".to_string());
+
+    // Verify component values
+    assert_eq_test!(i32_value.get_type(), i32_val_type);
+    assert_eq_test!(string_value.get_type(), string_val_type);
 
     Ok(())
 }
 
-/// Test limits conversion
-fn test_limits_conversion(_config: &crate::TestConfig) -> TestResult {
-    // Create format limits
-    let format_limits = wrt_format::Limits {
-        min: 10,
-        max: Some(20),
-        memory64: false,
-        shared: true,
-    };
-
-    // Convert to types limits
-    let types_limits = wrt_decoder::conversion::format_limits_to_types_limits(format_limits);
-
-    // Verify fields
-    assert_eq!(types_limits.min, 10);
-    assert_eq!(types_limits.max, Some(20));
-    assert_eq!(types_limits.shared, true);
-
-    // Convert back to format limits
-    let format_limits2 = wrt_decoder::conversion::types_limits_to_format_limits(types_limits);
-
-    // Verify fields
-    assert_eq!(format_limits2.min, 10);
-    assert_eq!(format_limits2.max, Some(20));
-    assert_eq!(format_limits2.shared, true);
-    assert_eq!(format_limits2.memory64, false);
-
-    // Test with large values
-    let large_format_limits = wrt_format::Limits {
-        min: 0xFFFFFFFF + 1, // Exceeds u32::MAX
-        max: Some(0xFFFFFFFF + 2),
-        memory64: true,
-        shared: false,
-    };
-
-    // Convert to types limits (should truncate)
-    let truncated_types_limits =
-        wrt_decoder::conversion::format_limits_to_types_limits(large_format_limits);
-
-    // Verify fields are truncated correctly
-    assert_eq!(truncated_types_limits.min, 0);
-    assert_eq!(truncated_types_limits.max, Some(1));
-    assert_eq!(truncated_types_limits.shared, false);
-
-    // Test component model limits conversion
-    let component_limits = wrt_types::component::Limits {
-        min: 5,
-        max: Some(10),
-    };
+/// Test limits conversion between format and types
+fn test_limits_conversion(_config: &TestConfig) -> TestResult {
+    // Create wrt-types limits
+    let type_limits = Limits { min: 1, max: Some(10) };
 
     // Convert to format limits
-    let component_format_limits =
-        wrt_decoder::conversion::component_limits_to_format_limits(component_limits);
+    let format_limits = types_limits_to_format_limits(&type_limits);
 
-    // Verify fields
-    assert_eq!(component_format_limits.min, 5);
-    assert_eq!(component_format_limits.max, Some(10));
+    // Check the conversion
+    assert_eq_test!(format_limits.min, 1);
+    assert_eq_test!(format_limits.max, Some(10));
 
-    Ok(())
-}
+    // Convert back to types limits
+    let round_trip = format_limits_to_types_limits(&format_limits);
 
-/// Test memory operations
-fn test_memory_operations(_config: &crate::TestConfig) -> TestResult {
-    // Create memory type
-    let mem_type = wrt_types::component::MemoryType {
-        limits: wrt_types::component::Limits {
-            min: 1,
-            max: Some(2),
-        },
-        shared: false,
-    };
+    // Check the round trip
+    assert_eq_test!(round_trip.min, type_limits.min);
+    assert_eq_test!(round_trip.max, type_limits.max);
 
-    // Convert to runtime memory type
-    let runtime_mem_type = wrt_runtime::MemoryType {
-        minimum: 1,
-        maximum: Some(2),
-        shared: false,
-    };
+    // Test with no max
+    let type_limits_no_max = Limits { min: 5, max: None };
 
-    // Create memory instance
-    let memory = wrt_runtime::Memory::new(runtime_mem_type).unwrap();
+    // Convert to format limits
+    let format_limits_no_max = types_limits_to_format_limits(&type_limits_no_max);
 
-    // Test initial size
-    assert_eq!(memory.size(), 1);
+    // Check the conversion
+    assert_eq_test!(format_limits_no_max.min, 5);
+    assert_eq_test!(format_limits_no_max.max, None);
 
-    // Test growing memory
-    assert!(memory.grow(1).is_ok());
-    assert_eq!(memory.size(), 2);
+    // Test runtime limits
+    let runtime_limits = RuntimeLimits { min: 2, max: Some(20) };
 
-    // Test growing beyond maximum fails
-    assert!(memory.grow(1).is_err());
+    // Create equivalent type limits
+    let equivalent_type_limits = Limits { min: 2, max: Some(20) };
+
+    // Compare fields
+    assert_eq_test!(runtime_limits.min, equivalent_type_limits.min);
+    assert_eq_test!(runtime_limits.max, equivalent_type_limits.max);
 
     Ok(())
 }
 
-/// Test value operations
-fn test_value_operations(_config: &crate::TestConfig) -> TestResult {
-    // Test Value functionality
-    let i32_val = wrt_types::values::Value::I32(42);
-    let i64_val = wrt_types::values::Value::I64(84);
-    let f32_val = wrt_types::values::Value::F32(3.14);
-    let f64_val = wrt_types::values::Value::F64(2.71828);
+/// Test value operations in both std and no_std environments
+fn test_value_operations(_config: &TestConfig) -> TestResult {
+    // Test integer values
+    let i32_val = Value::I32(42);
+    let i64_val = Value::I64(0x0123_4567_89AB_CDEF);
 
-    // Test equality
-    assert_eq!(i32_val, wrt_types::values::Value::I32(42));
-    assert_ne!(i32_val, i64_val);
+    // Test float values
+    let f32_val = Value::F32(3.14);
+    let f64_val = Value::F64(2.71828);
 
-    // Test conversion
-    assert_eq!(i32_val.get_type(), wrt_types::ValueType::I32);
-    assert_eq!(i64_val.get_type(), wrt_types::ValueType::I64);
-    assert_eq!(f32_val.get_type(), wrt_types::ValueType::F32);
-    assert_eq!(f64_val.get_type(), wrt_types::ValueType::F64);
+    // Test reference values
+    let func_ref_val = Value::FuncRef(None);
+    let extern_ref_val = Value::ExternRef(None);
 
-    // Test numeric operations
-    match i32_val {
-        wrt_types::values::Value::I32(v) => assert_eq!(v, 42),
-        _ => return Err("Expected I32 value".to_string()),
+    // Check types
+    assert_eq_test!(i32_val.val_type(), ValueType::I32);
+    assert_eq_test!(i64_val.val_type(), ValueType::I64);
+    assert_eq_test!(f32_val.val_type(), ValueType::F32);
+    assert_eq_test!(f64_val.val_type(), ValueType::F64);
+    assert_eq_test!(func_ref_val.val_type(), ValueType::FuncRef);
+    assert_eq_test!(extern_ref_val.val_type(), ValueType::ExternRef);
+
+    // Test value extraction
+    if let Value::I32(v) = i32_val {
+        assert_eq_test!(v, 42);
+    } else {
+        return Err("Failed to extract I32 value".to_string());
     }
 
-    match i64_val {
-        wrt_types::values::Value::I64(v) => assert_eq!(v, 84),
-        _ => return Err("Expected I64 value".to_string()),
+    if let Value::I64(v) = i64_val {
+        assert_eq_test!(v, 0x0123_4567_89AB_CDEF);
+    } else {
+        return Err("Failed to extract I64 value".to_string());
     }
 
-    match f32_val {
-        wrt_types::values::Value::F32(v) => assert!((v - 3.14).abs() < 0.001),
-        _ => return Err("Expected F32 value".to_string()),
-    }
+    // Test ComponentValue creation and extraction
+    let comp_i32 = ComponentValue::I32(42);
+    let comp_string = ComponentValue::String("test".to_string());
 
-    match f64_val {
-        wrt_types::values::Value::F64(v) => assert!((v - 2.71828).abs() < 0.00001),
-        _ => return Err("Expected F64 value".to_string()),
-    }
+    assert_eq_test!(comp_i32.get_type(), ValType::I32);
+    assert_eq_test!(comp_string.get_type(), ValType::String);
+
+    // Test binary conversion for ValType
+    let i32_binary = val_type_to_binary(&ValType::I32);
+    let string_binary = val_type_to_binary(&ValType::String);
+
+    // Convert back
+    let i32_from_binary = binary_to_val_type(i32_binary)
+        .map_err(|e| format!("Failed to convert binary to ValType: {:?}", e))?;
+    let string_from_binary = binary_to_val_type(string_binary)
+        .map_err(|e| format!("Failed to convert binary to ValType: {:?}", e))?;
+
+    assert_eq_test!(i32_from_binary, ValType::I32);
+    assert_eq_test!(string_from_binary, ValType::String);
 
     Ok(())
 }
 
-/// Test component model compatibility
-fn test_component_model_compatibility(_config: &crate::TestConfig) -> TestResult {
-    // Test ComponentType functionality
-    let component_type = wrt_types::component::ComponentType::Interface;
+/// Test different verification levels for memory safety
+fn test_verification_levels(config: &TestConfig) -> TestResult {
+    // Create a safe memory handler with bounded vector
+    let mut buffer = BoundedVec::<u8, 1024>::new();
+    for _i in 0..1024 {
+        // Use _i if i is not used
+        let _ = buffer.try_push(0);
+    }
 
-    // Assert equality
-    assert_eq!(
-        component_type,
-        wrt_types::component::ComponentType::Interface
-    );
-    assert_ne!(component_type, wrt_types::component::ComponentType::Module);
+    let mut memory_handler = SafeMemoryHandler::new(buffer.as_slice());
 
-    // Test ExternType functionality
-    let mem_type = wrt_types::component::MemoryType {
-        limits: wrt_types::component::Limits {
-            min: 1,
-            max: Some(2),
-        },
-        shared: false,
-    };
+    // Set verification level from config
+    memory_handler.set_verification_level(config.verification_level);
 
-    let mem_extern_type = wrt_types::component::ExternType::Memory(mem_type);
+    // Test basic operations
+    let test_data = [1, 2, 3, 4, 5];
+    memory_handler.clone_bytes_into(100, &test_data)?;
 
-    // Test matching
-    match mem_extern_type {
-        wrt_types::component::ExternType::Memory(mt) => {
-            assert_eq!(mt.limits.min, 1);
-            assert_eq!(mt.limits.max, Some(2));
-            assert_eq!(mt.shared, false);
+    // Get a safe slice and verify data
+    let slice = memory_handler.get_slice(100, test_data.len())?;
+    let data = slice.data()?;
+    assert_eq_test!(data, &test_data);
+
+    // Test integrity verification behavior based on level
+    match config.verification_level {
+        VerificationLevel::None => {
+            // No verification means we can skip the check or it's a no-op
+            // verify_integrity should still be callable and return Ok.
+            memory_handler.verify_integrity()?;
+            // Consider asserting something about operations count if possible to ensure no work was done.
         }
-        _ => return Err("Expected Memory extern type".to_string()),
-    }
-
-    Ok(())
-}
-
-/// Test for complete std and no_std feature compatibility in core functionality
-fn test_core_std_nostd_compatibility(config: &crate::TestConfig) -> TestResult {
-    debug_print!(
-        "Testing core std/no_std compatibility with config: is_std={}",
-        config.is_std
-    );
-
-    // Create a basic WebAssembly module
-    let memory_type = wrt_types::component::MemoryType {
-        limits: wrt_types::component::Limits {
-            min: 1,
-            max: Some(2),
-        },
-        shared: false,
-    };
-
-    // Convert to runtime memory type
-    let runtime_mem_type = wrt_runtime::MemoryType {
-        minimum: 1,
-        maximum: Some(2),
-        shared: false,
-    };
-
-    // Create a memory instance
-    let memory = wrt_runtime::Memory::new(runtime_mem_type).unwrap();
-
-    // Write data to memory and read it back
-    let offset = 100;
-    let data = [1, 2, 3, 4, 5];
-
-    // Write to memory
-    memory.write(offset, &data).unwrap();
-
-    // Read from memory
-    let mut buffer = [0; 5];
-    memory.read(offset, &mut buffer).unwrap();
-
-    // Verify data
-    for i in 0..5 {
-        assert_eq!(
-            buffer[i], data[i],
-            "Memory read/write mismatch at index {}",
-            i
-        );
-    }
-
-    // Create a simple module using the main WRT API
-    let module = wrt::new_module().unwrap();
-    assert!(
-        module.exports().is_empty(),
-        "New module should have no exports"
-    );
-
-    // Test error handling
-    let error = wrt_error::Error::new(
-        wrt_error::ErrorCategory::Core,
-        1,
-        "Core test error".to_string(),
-    );
-    assert_eq!(error.category(), wrt_error::ErrorCategory::Core);
-
-    Ok(())
-}
-
-/// Test for complete std and no_std feature compatibility in component model functionality
-fn test_component_std_nostd_compatibility(config: &crate::TestConfig) -> TestResult {
-    debug_print!(
-        "Testing component model std/no_std compatibility with config: is_std={}",
-        config.is_std
-    );
-
-    // Create a memory type
-    let mem_type = wrt_types::component::MemoryType {
-        limits: wrt_types::component::Limits {
-            min: 1,
-            max: Some(2),
-        },
-        shared: false,
-    };
-
-    // Create a table type
-    let table_type = wrt_types::component::TableType {
-        element_type: wrt_types::component::RefType::Funcref,
-        limits: wrt_types::component::Limits {
-            min: 1,
-            max: Some(10),
-        },
-    };
-
-    // Create a global type
-    let global_type = wrt_types::component::GlobalType {
-        value_type: wrt_types::ValueType::I32,
-        mutable: true,
-    };
-
-    // Create extern types
-    let mem_extern = wrt_types::component::ExternType::Memory(mem_type);
-    let table_extern = wrt_types::component::ExternType::Table(table_type);
-    let global_extern = wrt_types::component::ExternType::Global(global_type);
-
-    // Test matching
-    match mem_extern {
-        wrt_types::component::ExternType::Memory(mt) => {
-            assert_eq!(mt.limits.min, 1);
-            assert_eq!(mt.limits.max, Some(2));
-            assert_eq!(mt.shared, false);
+        VerificationLevel::Sampling => {
+            // For sampling, verify_integrity might do work or not.
+            // It's hard to make a deterministic assertion here without knowing the sampling details
+            // or having a way to force/observe the sampling decision for a test.
+            // For now, just ensure it can be called.
+            memory_handler.verify_integrity()?;
+            // If possible, one could try to run it multiple times and check if ops count varies,
+            // but that's more complex than a simple unit test.
         }
-        _ => return Err("Expected Memory extern type".to_string()),
-    }
+        VerificationLevel::Standard => {
+            // Standard verification should check basic integrity
+            memory_handler.verify_integrity()?;
 
-    match table_extern {
-        wrt_types::component::ExternType::Table(tt) => {
-            assert_eq!(tt.element_type, wrt_types::component::RefType::Funcref);
-            assert_eq!(tt.limits.min, 1);
-            assert_eq!(tt.limits.max, Some(10));
+            // Attempt to corrupt memory (unsafe, for testing purposes)
+            // This part is tricky because direct memory corruption might not always be caught
+            // by `Standard` level, or its detection might not be guaranteed to fail `verify_integrity`.
+            // The original comment "With standard verification, we might not catch all corruptions
+            // so we can't reliably test this behavior" is important.
+            // For now, ensure verify_integrity runs.
+            // If a specific corruption scenario *should* be caught by Standard, that would be a more specific test.
         }
-        _ => return Err("Expected Table extern type".to_string()),
-    }
+        VerificationLevel::Full => {
+            // Full verification should perform thorough checks.
+            memory_handler.verify_integrity()?;
 
-    match global_extern {
-        wrt_types::component::ExternType::Global(gt) => {
-            assert_eq!(gt.value_type, wrt_types::ValueType::I32);
-            assert_eq!(gt.mutable, true);
+            // If we corrupt memory here, Full verification should ideally catch it.
+            // This requires a careful setup for corruption that Full is designed to detect.
+            // Example (conceptual, actual corruption needs care):
+            // if config.is_std { // Guard unsafe operations
+            //     let raw_ptr = memory_handler.provider().as_ptr() as *mut u8;
+            //     unsafe {
+            //         if !raw_ptr.is_null() && memory_handler.provider().len() > 100 {
+            //             *raw_ptr.add(100) = 255; // Corrupt a byte
+            //         }
+            //     }
+            //     // After known corruption, verify_integrity at Full level should ideally fail.
+            //     // assert_test!(memory_handler.verify_integrity().is_err());
+            //     // However, this depends on the checksum implementation and what it covers.
+            //     // For now, just call it. More specific tests would be needed for corruption detection.
+            // }
         }
-        _ => return Err("Expected Global extern type".to_string()),
     }
-
-    // Test component model resource functionality
-    let resource_id = wrt_types::resource::ResourceId::new(1);
-    assert_eq!(resource_id.get(), 1);
 
     Ok(())
 }

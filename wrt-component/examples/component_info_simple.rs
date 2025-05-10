@@ -101,10 +101,7 @@ fn analyze_module(binary: &[u8]) -> Result<()> {
             _ => "Unknown",
         };
 
-        println!(
-            "Section {}: {} (size: {})",
-            section_id, section_name, section_size
-        );
+        println!("Section {}: {} (size: {})", section_id, section_name, section_size);
 
         // Analyze custom section
         if section_id == 0 {
@@ -406,12 +403,7 @@ fn analyze_memory_usage(module: &Module) -> Result<()> {
     println!("Data segments: {}", data_segments.len());
 
     for (i, data) in data_segments.iter().enumerate() {
-        println!(
-            "  Data {}: memory={}, size={} bytes",
-            i,
-            data.memory_index,
-            data.data.len()
-        );
+        println!("  Data {}: memory={}, size={} bytes", i, data.memory_index, data.data.len());
 
         match &data.offset {
             wrt_decoder::DataSegmentOffset::Active(expr) => {
@@ -472,10 +464,7 @@ fn analyze_component(binary: &[u8]) -> Result<()> {
     if !exports.is_empty() {
         println!("\nComponent Exports:");
         for export in &exports {
-            println!(
-                "  {}: {} (index: {})",
-                export.name, export.kind, export.index
-            );
+            println!("  {}: {} (index: {})", export.name, export.kind, export.index);
         }
     }
 
@@ -518,10 +507,7 @@ fn analyze_binary_format(binary: &[u8]) -> Result<()> {
     let magic = &binary[0..4];
     let version = u32::from_le_bytes([binary[4], binary[5], binary[6], binary[7]]);
 
-    println!(
-        "Magic bytes: {:02x} {:02x} {:02x} {:02x}",
-        magic[0], magic[1], magic[2], magic[3]
-    );
+    println!("Magic bytes: {:02x} {:02x} {:02x} {:02x}", magic[0], magic[1], magic[2], magic[3]);
     println!("Version: {}", version);
 
     // Identify binary type
@@ -598,18 +584,12 @@ fn analyze_binary_format(binary: &[u8]) -> Result<()> {
 
     // Print section counts
     println!("\nSection counts:");
-    let section_names = if magic == b"\0asm" {
-        &module_section_names
-    } else {
-        &component_section_names
-    };
+    let section_names =
+        if magic == b"\0asm" { &module_section_names } else { &component_section_names };
 
     for (id, count) in section_counts.iter() {
-        let name = if *id < section_names.len() as u8 {
-            section_names[*id as usize]
-        } else {
-            "Unknown"
-        };
+        let name =
+            if *id < section_names.len() as u8 { section_names[*id as usize] } else { "Unknown" };
 
         println!("  Section {}: {} (count: {})", id, name, count);
     }

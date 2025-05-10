@@ -101,16 +101,12 @@ fn test_zero_copy_strategy() {
     let source = vec![1, 2, 3, 4, 5];
     let mut destination = vec![0; 5];
 
-    strategy
-        .copy_memory(&source, &mut destination, 0, 5)
-        .unwrap();
+    strategy.copy_memory(&source, &mut destination, 0, 5).unwrap();
     assert_eq!(destination, vec![1, 2, 3, 4, 5]);
 
     // Test with offset
     let mut destination = vec![0; 3];
-    strategy
-        .copy_memory(&source, &mut destination, 2, 3)
-        .unwrap();
+    strategy.copy_memory(&source, &mut destination, 2, 3).unwrap();
     assert_eq!(destination, vec![3, 4, 5]);
 
     // Test is_appropriate_for
@@ -135,25 +131,19 @@ fn test_bounded_copy_strategy() {
     let source = vec![1, 2, 3, 4, 5];
     let mut destination = vec![0; 5];
 
-    strategy
-        .copy_memory(&source, &mut destination, 0, 5)
-        .unwrap();
+    strategy.copy_memory(&source, &mut destination, 0, 5).unwrap();
     assert_eq!(destination, vec![1, 2, 3, 4, 5]);
 
     // Test with boundaries
     // This should work fine
     let large_source = vec![0; 1024];
     let mut large_dest = vec![0; 1024];
-    assert!(strategy
-        .copy_memory(&large_source, &mut large_dest, 0, 1024)
-        .is_ok());
+    assert!(strategy.copy_memory(&large_source, &mut large_dest, 0, 1024).is_ok());
 
     // This should fail (exceeds max_copy_size)
     let too_large_source = vec![0; 2048];
     let mut too_large_dest = vec![0; 2048];
-    assert!(strategy
-        .copy_memory(&too_large_source, &mut too_large_dest, 0, 2048)
-        .is_err());
+    assert!(strategy.copy_memory(&too_large_source, &mut too_large_dest, 0, 2048).is_err());
 
     // Test is_appropriate_for
     // Should be appropriate for components with minimum trust level
@@ -174,17 +164,13 @@ fn test_full_isolation_strategy() {
     let source = vec![1, 2, 3, 4, 5];
     let mut destination = vec![0; 5];
 
-    strategy
-        .copy_memory(&source, &mut destination, 0, 5)
-        .unwrap();
+    strategy.copy_memory(&source, &mut destination, 0, 5).unwrap();
     assert_eq!(destination, vec![1, 2, 3, 4, 5]);
 
     // This should fail (exceeds max_copy_size of 16KB in default settings)
     let large_source = vec![0; 20 * 1024]; // 20KB
     let mut large_dest = vec![0; 20 * 1024];
-    assert!(strategy
-        .copy_memory(&large_source, &mut large_dest, 0, 20 * 1024)
-        .is_err());
+    assert!(strategy.copy_memory(&large_source, &mut large_dest, 0, 20 * 1024).is_err());
 
     // Test is_appropriate_for - should work for any trust level
     assert!(strategy.is_appropriate_for(0, 0, false));
@@ -236,14 +222,10 @@ fn test_memory_bounds_checking() {
     let mut small_dest = vec![0; 3];
 
     // This should fail because we're trying to copy 5 bytes into a 3-byte buffer
-    assert!(strategy
-        .copy_memory(&source, &mut small_dest, 0, 5)
-        .is_err());
+    assert!(strategy.copy_memory(&source, &mut small_dest, 0, 5).is_err());
 
     // This should fail because the offset + size exceeds source length
-    assert!(strategy
-        .copy_memory(&source, &mut small_dest, 3, 3)
-        .is_err());
+    assert!(strategy.copy_memory(&source, &mut small_dest, 3, 3).is_err());
 
     // This should succeed
     assert!(strategy.copy_memory(&source, &mut small_dest, 0, 3).is_ok());
@@ -265,15 +247,9 @@ fn test_integration_with_multiple_strategies() {
     let mut dest3 = vec![0; 5];
 
     // Apply each strategy
-    zero_copy
-        .copy_memory(&source_data, &mut dest1, 0, 5)
-        .unwrap();
-    bounded_copy
-        .copy_memory(&source_data, &mut dest2, 0, 5)
-        .unwrap();
-    full_isolation
-        .copy_memory(&source_data, &mut dest3, 0, 5)
-        .unwrap();
+    zero_copy.copy_memory(&source_data, &mut dest1, 0, 5).unwrap();
+    bounded_copy.copy_memory(&source_data, &mut dest2, 0, 5).unwrap();
+    full_isolation.copy_memory(&source_data, &mut dest3, 0, 5).unwrap();
 
     // All should have the same result
     assert_eq!(dest1, vec![10, 20, 30, 40, 50]);

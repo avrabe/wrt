@@ -1,24 +1,30 @@
 //! Behavior traits defining the core interfaces for the WebAssembly runtime engine.
 
-use std::any::Any;
-use std::sync::Arc;
+// use std::any::Any; // Covered by prelude
+// use std::sync::Arc; // Covered by prelude
+
+use crate::prelude::*; // Should bring in Value, FuncType, Error, Result, Arc, Vec, Box, Mutex, MutexGuard, etc.
 
 use crate::{
-    error::{kinds, Error, Result},
-    global::Global,
-    module::{Data, Element, Function},
-    stackless::StacklessEngine,
+    global::Global, // This will be wrt::global::Global - needs to become prelude::Global from wrt_runtime
+    module::{Data, Element, Function}, // These need to be prelude versions from wrt_runtime
+    stackless::StacklessEngine, // This is wrt::stackless::StacklessEngine - needs to become prelude::StacklessEngine from wrt_runtime
 };
 
-// Import from prelude
-use crate::prelude::{
-    BlockType, FuncType, InstructionType, Limits, MemoryType, Mutex, MutexGuard,
-    TypesValue as Value,
-};
+// No longer needed due to prelude::*
+// use wrt_error::{Error, Result, kinds}; 
 
-use wrt_runtime::Memory;
+// No longer needed due to prelude::*
+// use crate::prelude::{
+//     BlockType, FuncType, InstructionType, Limits, MemoryType, Mutex, MutexGuard,
+//     TypesValue as Value,
+// };
+
+// These should come from prelude (wrt_runtime::Memory, wrt_runtime::Table)
+use wrt_runtime::Memory; 
 use wrt_runtime::Table;
-use wrt_types::safe_memory::SafeSlice;
+// SafeSlice is in prelude from wrt_types::safe_memory
+// use wrt_types::safe_memory::SafeSlice;
 
 /// Represents the outcome of executing a single instruction, guiding the engine's next action.
 #[derive(Debug)]
@@ -54,9 +60,7 @@ pub trait StackBehavior: std::fmt::Debug {
         match self.pop()? {
             Value::I32(0) => Ok(false),
             Value::I32(1) => Ok(true),
-            _ => Err(Error::new(kinds::InvalidTypeError(
-                "Expected boolean (i32 0 or 1)".to_string(),
-            ))),
+            _ => Err(Error::new(prelude::ErrorCategory::Type, prelude::codes::TYPE_MISMATCH_ERROR, "Expected boolean (i32 0 or 1)".to_string())),
         }
     }
 
@@ -64,9 +68,7 @@ pub trait StackBehavior: std::fmt::Debug {
     fn pop_i32(&mut self) -> Result<i32, Error> {
         match self.pop()? {
             Value::I32(v) => Ok(v),
-            _ => Err(Error::new(kinds::InvalidTypeError(
-                "Expected i32".to_string(),
-            ))),
+            _ => Err(Error::new(prelude::ErrorCategory::Type, prelude::codes::TYPE_MISMATCH_ERROR, "Expected i32".to_string())),
         }
     }
 
@@ -74,10 +76,7 @@ pub trait StackBehavior: std::fmt::Debug {
     fn pop_v128(&mut self) -> Result<[u8; 16], Error> {
         match self.pop()? {
             Value::V128(bytes) => Ok(bytes),
-            other => Err(Error::new(kinds::InvalidTypeError(format!(
-                "Expected v128, found {}",
-                other.type_()
-            )))),
+            other => Err(Error::new(prelude::ErrorCategory::Type, prelude::codes::TYPE_MISMATCH_ERROR, format!("Expected v128, found {}", other.value_type()))),
         }
     }
 
@@ -85,10 +84,7 @@ pub trait StackBehavior: std::fmt::Debug {
     fn pop_i64(&mut self) -> Result<i64, Error> {
         match self.pop()? {
             Value::I64(val) => Ok(val),
-            other => Err(Error::new(kinds::InvalidTypeError(format!(
-                "Expected i64, found {}",
-                other.type_()
-            )))),
+            other => Err(Error::new(prelude::ErrorCategory::Type, prelude::codes::TYPE_MISMATCH_ERROR, format!("Expected i64, found {}", other.value_type()))),
         }
     }
 
@@ -459,9 +455,7 @@ pub trait InstructionExecutor: std::fmt::Debug {
     ) -> Result<ControlFlow, Error> {
         // This implementation is no longer needed as stackless.rs directly uses execute
         // with a cloned frame, avoiding the borrow checker issues
-        Err(Error::new(kinds::ExecutionError(
-            "execute_with_frame_idx is deprecated, use execute directly".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::Execution, prelude::codes::EXECUTION_ERROR, "execute_with_frame_idx is deprecated, use execute directly".to_string()))
     }
 }
 
@@ -553,7 +547,7 @@ impl FrameBehavior for NullBehavior {
     }
 
     fn get_local(&self, idx: usize) -> Result<Value, Error> {
-        Err(Error::new(kinds::InvalidLocalIndexError(idx as u32)))
+        Err(Error::new(prelude::ErrorCategory::InvalidLocalIndex, prelude::codes::INVALID_LOCAL_INDEX_ERROR, idx as u32))
     }
 
     fn as_any(&mut self) -> &mut dyn std::any::Any {
@@ -561,11 +555,11 @@ impl FrameBehavior for NullBehavior {
     }
 
     fn set_local(&mut self, idx: usize, _value: Value) -> Result<(), Error> {
-        Err(Error::new(kinds::InvalidLocalIndexError(idx as u32)))
+        Err(Error::new(prelude::ErrorCategory::InvalidLocalIndex, prelude::codes::INVALID_LOCAL_INDEX_ERROR, idx as u32))
     }
 
     fn get_global(&self, idx: usize, _engine: &StacklessEngine) -> Result<Arc<Global>, Error> {
-        Err(Error::new(kinds::InvalidGlobalIndexError(idx as u32)))
+        Err(Error::new(prelude::ErrorCategory::InvalidGlobalIndex, prelude::codes::INVALID_GLOBAL_INDEX_ERROR, idx as u32))
     }
 
     fn set_global(
@@ -574,11 +568,11 @@ impl FrameBehavior for NullBehavior {
         _value: Value,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::InvalidGlobalIndexError(idx as u32)))
+        Err(Error::new(prelude::ErrorCategory::InvalidGlobalIndex, prelude::codes::INVALID_GLOBAL_INDEX_ERROR, idx as u32))
     }
 
     fn get_memory(&self, idx: usize, _engine: &StacklessEngine) -> Result<Arc<Memory>, Error> {
-        Err(Error::new(kinds::InvalidMemoryIndexError(idx as u32)))
+        Err(Error::new(prelude::ErrorCategory::InvalidMemoryIndex, prelude::codes::INVALID_MEMORY_INDEX_ERROR, idx as u32))
     }
 
     fn get_memory_mut(
@@ -586,14 +580,11 @@ impl FrameBehavior for NullBehavior {
         idx: usize,
         _engine: &StacklessEngine,
     ) -> Result<Arc<Memory>, Error> {
-        Err(Error::new(kinds::InvalidMemoryIndexError(idx as u32)))
+        Err(Error::new(prelude::ErrorCategory::InvalidMemoryIndex, prelude::codes::INVALID_MEMORY_INDEX_ERROR, idx as u32))
     }
 
     fn get_table(&self, idx: usize, _engine: &StacklessEngine) -> Result<Arc<Table>, Error> {
-        Err(Error::new(kinds::NotImplementedError(format!(
-            "NullBehavior::get_table for index: {}",
-            idx
-        ))))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, format!("NullBehavior::get_table for index: {}", idx)))
     }
 
     fn get_table_mut(
@@ -601,10 +592,7 @@ impl FrameBehavior for NullBehavior {
         idx: usize,
         _engine: &StacklessEngine,
     ) -> Result<Arc<Table>, Error> {
-        Err(Error::new(kinds::NotImplementedError(format!(
-            "NullBehavior::get_table_mut for index: {}",
-            idx
-        ))))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, format!("NullBehavior::get_table_mut for index: {}", idx)))
     }
 
     fn pc(&self) -> usize {
@@ -650,51 +638,35 @@ impl FrameBehavior for NullBehavior {
     fn set_return_pc(&mut self, _pc: Option<usize>) {}
 
     fn load_i32(&self, _addr: usize, _align: u32, _engine: &StacklessEngine) -> Result<i32, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::load_i32".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::load_i32".to_string()))
     }
 
     fn load_i64(&self, _addr: usize, _align: u32, _engine: &StacklessEngine) -> Result<i64, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::load_i64".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::load_i64".to_string()))
     }
 
     fn load_f32(&self, _addr: usize, _align: u32, _engine: &StacklessEngine) -> Result<f32, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::load_f32".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::load_f32".to_string()))
     }
 
     fn load_f64(&self, _addr: usize, _align: u32, _engine: &StacklessEngine) -> Result<f64, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::load_f64".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::load_f64".to_string()))
     }
 
     fn load_i8(&self, _addr: usize, _align: u32, _engine: &StacklessEngine) -> Result<i8, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::load_i8".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::load_i8".to_string()))
     }
 
     fn load_u8(&self, _addr: usize, _align: u32, _engine: &StacklessEngine) -> Result<u8, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::load_u8".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::load_u8".to_string()))
     }
 
     fn load_i16(&self, _addr: usize, _align: u32, _engine: &StacklessEngine) -> Result<i16, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::load_i16".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::load_i16".to_string()))
     }
 
     fn load_u16(&self, _addr: usize, _align: u32, _engine: &StacklessEngine) -> Result<u16, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::load_u16".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::load_u16".to_string()))
     }
 
     fn load_v128(
@@ -703,9 +675,7 @@ impl FrameBehavior for NullBehavior {
         _align: u32,
         _engine: &StacklessEngine,
     ) -> Result<[u8; 16], Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::load_v128".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::load_v128".to_string()))
     }
 
     fn store_i32(
@@ -715,9 +685,7 @@ impl FrameBehavior for NullBehavior {
         _value: i32,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::store_i32".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::store_i32".to_string()))
     }
 
     fn store_i64(
@@ -727,9 +695,7 @@ impl FrameBehavior for NullBehavior {
         _value: i64,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::store_i64".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::store_i64".to_string()))
     }
 
     fn store_f32(
@@ -739,9 +705,7 @@ impl FrameBehavior for NullBehavior {
         _value: f32,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::store_f32".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::store_f32".to_string()))
     }
 
     fn store_f64(
@@ -751,9 +715,7 @@ impl FrameBehavior for NullBehavior {
         _value: f64,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::store_f64".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::store_f64".to_string()))
     }
 
     fn store_i8(
@@ -763,9 +725,7 @@ impl FrameBehavior for NullBehavior {
         _value: i8,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::store_i8".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::store_i8".to_string()))
     }
 
     fn store_u8(
@@ -775,9 +735,7 @@ impl FrameBehavior for NullBehavior {
         _value: u8,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::store_u8".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::store_u8".to_string()))
     }
 
     fn store_i16(
@@ -787,9 +745,7 @@ impl FrameBehavior for NullBehavior {
         _value: i16,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::store_i16".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::store_i16".to_string()))
     }
 
     fn store_u16(
@@ -799,9 +755,7 @@ impl FrameBehavior for NullBehavior {
         _value: u16,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::store_u16".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::store_u16".to_string()))
     }
 
     fn store_v128(
@@ -811,21 +765,15 @@ impl FrameBehavior for NullBehavior {
         _value: [u8; 16],
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::store_v128".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::store_v128".to_string()))
     }
 
     fn memory_size(&self, _engine: &StacklessEngine) -> Result<u32, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::memory_size".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::memory_size".to_string()))
     }
 
     fn memory_grow(&mut self, _pages: u32, _engine: &StacklessEngine) -> Result<u32, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::memory_grow".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::memory_grow".to_string()))
     }
 
     fn table_get(
@@ -834,9 +782,7 @@ impl FrameBehavior for NullBehavior {
         _idx: u32,
         _engine: &StacklessEngine,
     ) -> Result<Value, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::table_get".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::table_get".to_string()))
     }
 
     fn table_set(
@@ -846,15 +792,11 @@ impl FrameBehavior for NullBehavior {
         _value: Value,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::table_set".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::table_set".to_string()))
     }
 
     fn table_size(&self, _table_idx: u32, _engine: &StacklessEngine) -> Result<u32, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::table_size".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::table_size".to_string()))
     }
 
     fn table_grow(
@@ -864,9 +806,7 @@ impl FrameBehavior for NullBehavior {
         _value: Value,
         _engine: &StacklessEngine,
     ) -> Result<u32, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::table_grow".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::table_grow".to_string()))
     }
 
     // Match trait: engine should be &StacklessEngine
@@ -879,9 +819,7 @@ impl FrameBehavior for NullBehavior {
         _len: u32,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::table_init".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::table_init".to_string()))
     }
 
     // Match trait: engine should be &StacklessEngine
@@ -894,16 +832,12 @@ impl FrameBehavior for NullBehavior {
         _len: u32,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::table_copy".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::table_copy".to_string()))
     }
 
     // Match trait: engine should be &StacklessEngine
     fn elem_drop(&mut self, _elem_idx: u32, _engine: &StacklessEngine) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::elem_drop".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::elem_drop".to_string()))
     }
 
     fn table_fill(
@@ -914,15 +848,11 @@ impl FrameBehavior for NullBehavior {
         _n: u32,
         _engine: &StacklessEngine,
     ) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::table_fill".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::table_fill".to_string()))
     }
 
     fn get_function_type(&self, func_idx: u32) -> Result<FuncType, Error> {
-        Err(Error::new(kinds::InvalidFunctionIndexError(
-            func_idx as usize,
-        )))
+        Err(Error::new(prelude::ErrorCategory::InvalidFunctionIndex, prelude::codes::INVALID_FUNCTION_INDEX_ERROR, func_idx as usize))
     }
 
     fn get_two_tables_mut(
@@ -931,9 +861,7 @@ impl FrameBehavior for NullBehavior {
         _idx2: u32,
         _engine: &StacklessEngine,
     ) -> Result<(Arc<Table>, Arc<Table>), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::get_two_tables_mut".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::get_two_tables_mut".to_string()))
     }
 
     fn get_element_segment(
@@ -941,10 +869,7 @@ impl FrameBehavior for NullBehavior {
         elem_idx: u32,
         _engine: &StacklessEngine,
     ) -> Result<Arc<Element>, Error> {
-        Err(Error::new(kinds::NotImplementedError(format!(
-            "NullBehavior::get_element_segment for index: {}",
-            elem_idx
-        ))))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, format!("NullBehavior::get_element_segment for index: {}", elem_idx)))
     }
 
     fn get_data_segment(
@@ -952,24 +877,15 @@ impl FrameBehavior for NullBehavior {
         data_idx: u32,
         _engine: &StacklessEngine,
     ) -> Result<Arc<Data>, Error> {
-        Err(Error::new(kinds::NotImplementedError(format!(
-            "NullBehavior::get_data_segment for index: {}",
-            data_idx
-        ))))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, format!("NullBehavior::get_data_segment for index: {}", data_idx)))
     }
 
     fn drop_data_segment(&mut self, data_idx: u32, _engine: &StacklessEngine) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(format!(
-            "NullBehavior::drop_data_segment for index: {}",
-            data_idx
-        ))))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, format!("NullBehavior::drop_data_segment for index: {}", data_idx)))
     }
 
     fn set_data_segment(&mut self, _idx: u32, _segment: Arc<Data>) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(format!(
-            "NullBehavior::set_data_segment for index: {}",
-            _idx
-        ))))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, format!("NullBehavior::set_data_segment for index: {}", _idx)))
     }
 
     fn pop_bool(&mut self, stack: &mut dyn StackBehavior) -> Result<bool, Error> {
@@ -985,9 +901,7 @@ impl FrameBehavior for NullBehavior {
     }
 
     fn pop_label(&mut self) -> Result<Label, Error> {
-        Err(Error::new(kinds::ExecutionError(
-            "Cannot pop_label from NullBehavior frame".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::Execution, prelude::codes::EXECUTION_ERROR, "Cannot pop_label from NullBehavior frame".to_string()))
     }
 
     fn get_label(&self, depth: usize) -> Option<&Label> {
@@ -999,9 +913,7 @@ impl FrameBehavior for NullBehavior {
     }
 
     fn get_global_mut(&mut self, _index: usize) -> Result<MutexGuard<Value>, Error> {
-        Err(Error::new(kinds::ExecutionError(
-            "Cannot get_global_mut from NullBehavior frame".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::Execution, prelude::codes::EXECUTION_ERROR, "Cannot get_global_mut from NullBehavior frame".to_string()))
     }
 }
 
@@ -1053,15 +965,15 @@ impl StackBehavior for NullBehavior {
     }
 
     fn pop(&mut self) -> Result<Value, Error> {
-        Err(Error::new(kinds::StackUnderflowError))
+        Err(Error::new(prelude::ErrorCategory::StackUnderflow, prelude::codes::STACK_UNDERFLOW_ERROR, ""))
     }
 
     fn peek(&self) -> Result<&Value, Error> {
-        Err(Error::new(kinds::StackUnderflowError))
+        Err(Error::new(prelude::ErrorCategory::StackUnderflow, prelude::codes::STACK_UNDERFLOW_ERROR, ""))
     }
 
     fn peek_mut(&mut self) -> Result<&mut Value, Error> {
-        Err(Error::new(kinds::StackUnderflowError))
+        Err(Error::new(prelude::ErrorCategory::StackUnderflow, prelude::codes::STACK_UNDERFLOW_ERROR, ""))
     }
 
     fn values(&self) -> &[Value] {
@@ -1085,9 +997,7 @@ impl StackBehavior for NullBehavior {
     }
 
     fn pop_label(&mut self) -> Result<Label, Error> {
-        Err(Error::new(kinds::ExecutionError(
-            "Cannot pop_label from NullBehavior stack".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::Execution, prelude::codes::EXECUTION_ERROR, "Cannot pop_label from NullBehavior stack".to_string()))
     }
 
     fn get_label(&self, _depth: usize) -> Option<&Label> {
@@ -1101,9 +1011,7 @@ impl StackBehavior for NullBehavior {
     }
 
     fn pop_frame_label(&mut self) -> Result<Label, Error> {
-        Err(Error::new(kinds::ExecutionError(
-            "Cannot pop_frame_label from NullBehavior stack".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::Execution, prelude::codes::EXECUTION_ERROR, "Cannot pop_frame_label from NullBehavior stack".to_string()))
     }
 
     fn execute_function_call_direct(
@@ -1113,9 +1021,7 @@ impl StackBehavior for NullBehavior {
         _func_idx: u32,
         _args: Vec<Value>,
     ) -> Result<Vec<Value>, Error> {
-        Err(Error::new(kinds::ExecutionError(
-            "Cannot execute_function_call_direct on NullBehavior".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::Execution, prelude::codes::EXECUTION_ERROR, "Cannot execute_function_call_direct on NullBehavior".to_string()))
     }
 
     fn as_any(&mut self) -> &mut dyn std::any::Any {
@@ -1130,9 +1036,7 @@ impl InstructionExecutor for NullBehavior {
         _frame: &mut dyn FrameBehavior,
         _engine: &mut StacklessEngine,
     ) -> Result<ControlFlow, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "NullBehavior::execute".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "NullBehavior::execute".to_string()))
     }
 
     fn execute_with_frame_idx(
@@ -1143,9 +1047,7 @@ impl InstructionExecutor for NullBehavior {
     ) -> Result<ControlFlow, Error> {
         // This implementation is no longer needed as stackless.rs directly uses execute
         // with a cloned frame, avoiding the borrow checker issues
-        Err(Error::new(kinds::ExecutionError(
-            "execute_with_frame_idx is deprecated, use execute directly".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::Execution, prelude::codes::EXECUTION_ERROR, "execute_with_frame_idx is deprecated, use execute directly".to_string()))
     }
 }
 
@@ -1221,19 +1123,15 @@ impl ModuleBehavior for NullBehavior {
         instruction: &InstructionType,
     ) -> Result<ControlFlow, Error> {
         // Default implementation delegates to the instruction's execute method
-        instruction.execute(self, self.frame_idx(), _engine)
+        instruction.execute(self, self.func_idx(), _engine)
     }
 
     fn table_elem_get(&self, _table_idx: u32, _idx: u32) -> Result<Value, Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "table_elem_get not implemented".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "table_elem_get not implemented".to_string()))
     }
 
     fn push_label(&mut self, _label: Label) -> Result<(), Error> {
-        Err(Error::new(kinds::NotImplementedError(
-            "push_label not implemented".to_string(),
-        )))
+        Err(Error::new(prelude::ErrorCategory::NotImplemented, prelude::codes::NOT_IMPLEMENTED_ERROR, "push_label not implemented".to_string()))
     }
 
     fn get_label(&self, _depth: usize) -> Option<&Label> {

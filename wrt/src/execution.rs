@@ -462,7 +462,7 @@ pub fn parse_float<T: Into<f64> + From<f64>>(value_str: &str) -> Result<T> {
         // Parse as decimal float
         match clean_str.parse::<f64>() {
             Ok(val) => Ok(T::from(val)),
-            Err(_) => Err(Error::new(crate::error::kinds::ParseError(format!(
+            Err(_) => Err(Error::new(kinds::ParseError(format!(
                 "Invalid float format: {}",
                 value_str
             )))),
@@ -480,7 +480,7 @@ fn parse_hex_float_internal(hex_str: &str) -> Result<f64> {
     } else if hex_str.starts_with("+0x") {
         (false, &hex_str[3..])
     } else {
-        return Err(Error::new(crate::error::kinds::ParseError(format!(
+        return Err(Error::new(kinds::ParseError(format!(
             "Invalid hex float format: {}",
             hex_str
         ))));
@@ -489,7 +489,7 @@ fn parse_hex_float_internal(hex_str: &str) -> Result<f64> {
     // Split into integer and fractional parts
     let parts: Vec<&str> = hex_str.split('.').collect();
     if parts.len() > 2 {
-        return Err(Error::new(crate::error::kinds::ParseError(format!(
+        return Err(Error::new(kinds::ParseError(format!(
             "Invalid hex float format, multiple decimal points: {}",
             hex_str
         ))));
@@ -530,7 +530,7 @@ fn parse_hex_float_internal(hex_str: &str) -> Result<f64> {
 
         if !int_part.is_empty() {
             u64::from_str_radix(int_part, 16).map_err(|_| {
-                Error::new(crate::error::kinds::ParseError(format!(
+                Error::new(kinds::ParseError(format!(
                     "Invalid hex integer part: {}",
                     int_part
                 )))
@@ -553,7 +553,7 @@ fn parse_hex_float_internal(hex_str: &str) -> Result<f64> {
         if !frac_part.is_empty() {
             // Convert hex fraction to decimal
             let frac_val = u64::from_str_radix(frac_part, 16).map_err(|_| {
-                Error::new(crate::error::kinds::ParseError(format!(
+                Error::new(kinds::ParseError(format!(
                     "Invalid hex fractional part: {}",
                     frac_part
                 )))

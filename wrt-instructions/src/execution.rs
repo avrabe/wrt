@@ -117,22 +117,14 @@ impl PureExecutionContext for ExecutionContext {
         #[cfg(feature = "safety")]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Core,
-                    codes::STACK_UNDERFLOW,
-                    "Stack underflow",
-                )
+                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
             })
         }
 
         #[cfg(not(feature = "safety"))]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Core,
-                    codes::STACK_UNDERFLOW,
-                    "Stack underflow",
-                )
+                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
             })
         }
     }
@@ -236,22 +228,14 @@ impl PureExecutionContext for TestExecutionContext {
         #[cfg(feature = "safety")]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Core,
-                    codes::STACK_UNDERFLOW,
-                    "Stack underflow",
-                )
+                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
             })
         }
 
         #[cfg(not(feature = "safety"))]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Core,
-                    codes::STACK_UNDERFLOW,
-                    "Stack underflow",
-                )
+                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
             })
         }
     }

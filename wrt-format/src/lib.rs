@@ -1,3 +1,12 @@
+// WRT - wrt-format
+// SW-REQ-ID: [SW-REQ-ID-wrt-format]
+//
+// Copyright (c) 2025 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+#![forbid(unsafe_code)] // Rule 2
+
 //! WebAssembly format handling for WRT
 //!
 //! This crate defines and handles the WebAssembly binary format specifications,
@@ -40,8 +49,8 @@ pub use alloc::{
 
 // Re-export core types from wrt-types
 pub use wrt_types::{BlockType, FuncType, RefType, ValueType};
-// Re-export error types from wrt-types error_convert module
-pub use wrt_types::error_convert::{Error, ErrorCategory};
+// Re-export error types directly from wrt-error
+pub use wrt_error::{Error, ErrorCategory};
 // Re-export Result type from wrt-types
 pub use wrt_types::Result;
 // Re-export resource types from wrt-types
@@ -81,10 +90,13 @@ pub use conversion::{
     block_type_to_format_block_type, format_block_type_to_block_type, format_limits_to_wrt_limits,
     wrt_limits_to_format_limits,
 };
-pub use error::{parse_error, runtime_error, type_error, validation_error, IntoError};
+pub use error::{
+    parse_error, wrt_runtime_error as runtime_error, wrt_type_error as type_error,
+    wrt_validation_error as validation_error,
+};
 pub use module::Module;
 pub use section::{CustomSection, Section};
-pub use state::{create_state_section, extract_state_section, StateSection};
+pub use state::{create_state_section, extract_state_section, is_state_section_name, StateSection};
 // Use the conversion module versions for consistency
 pub use types::{FormatBlockType, Limits, MemoryIndexType};
 pub use validation::Validatable;
@@ -99,6 +111,9 @@ pub use binary::{
     COMPONENT_MAGIC, COMPONENT_SORT_COMPONENT, COMPONENT_SORT_CORE, COMPONENT_SORT_FUNC,
     COMPONENT_SORT_INSTANCE, COMPONENT_SORT_TYPE, COMPONENT_SORT_VALUE, COMPONENT_VERSION,
 };
+
+// Re-export safe memory utilities
+pub use safe_memory::safe_slice;
 
 // Public functions for feature detection
 /// Check if a component model feature is available in a binary
@@ -152,24 +167,4 @@ pub mod verification {
 
         assert_eq!(value, decoded);
     }
-}
-
-// Import safe memory types from wrt-types for memory safety
-#[cfg(feature = "safety")]
-pub use wrt_types::safe_memory::{MemoryProvider, SafeSlice, SafeStack, StdMemoryProvider};
-
-// Import additional memory types based on features
-#[cfg(all(feature = "safety", not(feature = "std")))]
-pub use wrt_types::safe_memory::NoStdMemoryProvider;
-
-/// Create a safe slice from binary data
-#[cfg(feature = "safety")]
-pub fn safe_slice(data: &[u8]) -> wrt_types::safe_memory::SafeSlice<'_> {
-    wrt_types::safe_memory::SafeSlice::new(data)
-}
-
-/// Get the default verification level for memory operations
-#[cfg(feature = "safety")]
-pub fn default_verification_level() -> wrt_types::verification::VerificationLevel {
-    wrt_types::verification::VerificationLevel::Standard
 }

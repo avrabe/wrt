@@ -7,6 +7,7 @@
 // or when explicitly running cargo kani. This prevents interference with
 // coverage testing.
 #[cfg(any(doc, kani))]
+/// Kani verification proofs for error handling.
 pub mod kani_verification {
     use crate::Result;
     use crate::{ErrorCategory, ErrorSource};
@@ -14,6 +15,8 @@ pub mod kani_verification {
     // Only import Error and ResultExt when alloc is available
     #[cfg(feature = "alloc")]
     use crate::{Error, ResultExt};
+    #[cfg(feature = "alloc")]
+    use alloc::format;
 
     use core::fmt::{self, Debug, Display};
 

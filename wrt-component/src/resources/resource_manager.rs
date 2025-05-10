@@ -5,8 +5,9 @@
 
 use super::{MemoryStrategy, Resource, ResourceInterceptor, ResourceTable, VerificationLevel};
 use crate::prelude::*;
-use wrt_format::component::ResourceOperation as FormatResourceOperation;
+use wrt_error::kinds::PoisonedLockError;
 use wrt_types::component_value::ComponentValue;
+use wrt_types::ResourceOperation as FormatResourceOperation;
 
 /// Unique identifier for a resource
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -75,11 +76,11 @@ impl ResourceManager {
 
     /// Add a resource interceptor
     pub fn add_interceptor(&self, interceptor: Arc<dyn ResourceInterceptor>) -> Result<()> {
-        let mut table = self.table.lock().map_err(|_| {
+        let mut table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
         table.add_interceptor(interceptor);
@@ -88,11 +89,11 @@ impl ResourceManager {
 
     /// Create a new resource
     pub fn create_resource(&self, type_idx: u32, data: Arc<dyn Any + Send + Sync>) -> Result<u32> {
-        let mut table = self.table.lock().map_err(|_| {
+        let mut table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
         table.create_resource(type_idx, data)
@@ -111,11 +112,11 @@ impl ResourceManager {
         data: Arc<dyn Any + Send + Sync>,
         name: &str,
     ) -> Result<u32> {
-        let mut table = self.table.lock().map_err(|_| {
+        let mut table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
 
@@ -134,11 +135,11 @@ impl ResourceManager {
 
     /// Borrow a resource
     pub fn borrow_resource(&self, handle: u32) -> Result<u32> {
-        let mut table = self.table.lock().map_err(|_| {
+        let mut table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
         table.borrow_resource(handle)
@@ -153,11 +154,11 @@ impl ResourceManager {
         let resource = self.get_resource(id.0)?;
 
         // Attempt to downcast to the requested type
-        let resource_guard = resource.lock().map_err(|_| {
+        let resource_guard = resource.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
 
@@ -177,11 +178,11 @@ impl ResourceManager {
 
     /// Drop a resource
     pub fn drop_resource(&self, handle: u32) -> Result<()> {
-        let mut table = self.table.lock().map_err(|_| {
+        let mut table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
         table.drop_resource(handle)
@@ -194,11 +195,11 @@ impl ResourceManager {
 
     /// Get a resource by handle
     pub fn get_resource(&self, handle: u32) -> Result<Arc<Mutex<Resource>>> {
-        let table = self.table.lock().map_err(|_| {
+        let table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
         table.get_resource(handle)
@@ -218,11 +219,11 @@ impl ResourceManager {
         handle: u32,
         operation: FormatResourceOperation,
     ) -> Result<ComponentValue> {
-        let mut table = self.table.lock().map_err(|_| {
+        let mut table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
         table.apply_operation(handle, operation)
@@ -230,11 +231,11 @@ impl ResourceManager {
 
     /// Set memory strategy for a resource
     pub fn set_memory_strategy(&self, handle: u32, strategy: MemoryStrategy) -> Result<()> {
-        let mut table = self.table.lock().map_err(|_| {
+        let mut table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
         table.set_memory_strategy(handle, strategy)
@@ -242,11 +243,11 @@ impl ResourceManager {
 
     /// Set verification level for a resource
     pub fn set_verification_level(&self, handle: u32, level: VerificationLevel) -> Result<()> {
-        let mut table = self.table.lock().map_err(|_| {
+        let mut table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
         table.set_verification_level(handle, level)
@@ -274,11 +275,11 @@ impl ResourceManager {
 
     /// Get the number of resources
     pub fn resource_count(&self) -> Result<usize> {
-        let table = self.table.lock().map_err(|_| {
+        let table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
         Ok(table.resource_count())
@@ -286,11 +287,11 @@ impl ResourceManager {
 
     /// Clean up unused resources
     pub fn cleanup_unused_resources(&self) -> Result<usize> {
-        let mut table = self.table.lock().map_err(|_| {
+        let mut table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
         Ok(table.cleanup_unused_resources())
@@ -298,11 +299,11 @@ impl ResourceManager {
 
     /// Clear all resources (legacy API)
     pub fn clear(&self) -> Result<()> {
-        let mut table = self.table.lock().map_err(|_| {
+        let mut table = self.table.lock().map_err(|e| {
             Error::new(
-                ErrorCategory::System,
-                codes::MUTEX_ERROR,
-                "Failed to acquire resource table lock".to_string(),
+                ErrorCategory::Runtime,
+                codes::POISONED_LOCK,
+                PoisonedLockError(format!("Failed to acquire mutex lock: {}", e)),
             )
         })?;
         let _ = table.cleanup_unused_resources();
@@ -324,10 +325,7 @@ impl fmt::Debug for ResourceManager {
             .field("instance_id", &self.instance_id)
             .field("resource_count", &count)
             .field("default_memory_strategy", &self.default_memory_strategy)
-            .field(
-                "default_verification_level",
-                &self.default_verification_level,
-            )
+            .field("default_verification_level", &self.default_verification_level)
             .field("max_resources", &self.max_resources)
             .finish()
     }
@@ -430,18 +428,8 @@ mod tests {
         let resource1 = manager.get_resource(handle).unwrap();
         let resource2 = manager.get_resource(borrow_handle).unwrap();
 
-        let data1 = resource1
-            .lock()
-            .unwrap()
-            .data
-            .downcast_ref::<i32>()
-            .unwrap();
-        let data2 = resource2
-            .lock()
-            .unwrap()
-            .data
-            .downcast_ref::<i32>()
-            .unwrap();
+        let data1 = resource1.lock().unwrap().data.downcast_ref::<i32>().unwrap();
+        let data2 = resource2.lock().unwrap().data.downcast_ref::<i32>().unwrap();
 
         assert_eq!(*data1, *data2);
     }

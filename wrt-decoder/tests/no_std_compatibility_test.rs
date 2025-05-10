@@ -76,13 +76,7 @@ fn test_verification_levels() {
 
     // Verify they all work
     Parser::from_safe_slice(none_slice).next().unwrap().unwrap();
-    Parser::from_safe_slice(sampling_slice)
-        .next()
-        .unwrap()
-        .unwrap();
-    Parser::from_safe_slice(standard_slice)
-        .next()
-        .unwrap()
-        .unwrap();
+    Parser::from_safe_slice(sampling_slice).next().unwrap().unwrap();
+    Parser::from_safe_slice(standard_slice).next().unwrap().unwrap();
     Parser::from_safe_slice(full_slice).next().unwrap().unwrap();
 }

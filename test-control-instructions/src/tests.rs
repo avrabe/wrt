@@ -29,11 +29,7 @@ pub fn register_control_instruction_tests() {
         let encoded_block = encode_instruction(&block_instr)
             .map_err(|e| format!("Failed to encode block: {:?}", e))?;
 
-        assert_eq_test!(
-            encoded_block,
-            block_bytes,
-            "Encoded bytes should match original"
-        );
+        assert_eq_test!(encoded_block, block_bytes, "Encoded bytes should match original");
 
         Ok(())
     });
@@ -53,11 +49,7 @@ pub fn register_control_instruction_tests() {
         let encoded_loop = encode_instruction(&loop_instr)
             .map_err(|e| format!("Failed to encode loop: {:?}", e))?;
 
-        assert_eq_test!(
-            encoded_loop,
-            loop_bytes,
-            "Encoded bytes should match original"
-        );
+        assert_eq_test!(encoded_loop, loop_bytes, "Encoded bytes should match original");
 
         Ok(())
     });
@@ -85,71 +77,45 @@ pub fn register_control_instruction_tests() {
     });
 
     // Test br_table instruction
-    register_test!(
-        "parse_encode_br_table",
-        "instruction-decoder",
-        false,
-        || {
-            let br_table_bytes = vec![
-                0x0E, // br_table
-                0x02, // count = 2
-                0x00, // label 0
-                0x01, // label 1
-                0x02, // default label 2
-            ];
-            let (br_table_instr, br_table_bytes_read) = parse_instruction(&br_table_bytes)
-                .map_err(|e| format!("Failed to parse br_table: {:?}", e))?;
+    register_test!("parse_encode_br_table", "instruction-decoder", false, || {
+        let br_table_bytes = vec![
+            0x0E, // br_table
+            0x02, // count = 2
+            0x00, // label 0
+            0x01, // label 1
+            0x02, // default label 2
+        ];
+        let (br_table_instr, br_table_bytes_read) = parse_instruction(&br_table_bytes)
+            .map_err(|e| format!("Failed to parse br_table: {:?}", e))?;
 
-            assert_eq_test!(
-                br_table_bytes_read,
-                br_table_bytes.len(),
-                "Should read all bytes"
-            );
+        assert_eq_test!(br_table_bytes_read, br_table_bytes.len(), "Should read all bytes");
 
-            let encoded_br_table = encode_instruction(&br_table_instr)
-                .map_err(|e| format!("Failed to encode br_table: {:?}", e))?;
+        let encoded_br_table = encode_instruction(&br_table_instr)
+            .map_err(|e| format!("Failed to encode br_table: {:?}", e))?;
 
-            assert_eq_test!(
-                encoded_br_table,
-                br_table_bytes,
-                "Encoded bytes should match original"
-            );
+        assert_eq_test!(encoded_br_table, br_table_bytes, "Encoded bytes should match original");
 
-            Ok(())
-        }
-    );
+        Ok(())
+    });
 
     // Test nested blocks
-    register_test!(
-        "parse_encode_nested_blocks",
-        "instruction-decoder",
-        false,
-        || {
-            let nested_bytes = vec![
-                0x02, 0x40, // outer block
-                0x02, 0x40, // inner block
-                0x0B, // inner end
-                0x0B, // outer end
-            ];
-            let (nested_instr, nested_bytes_read) = parse_instruction(&nested_bytes)
-                .map_err(|e| format!("Failed to parse nested blocks: {:?}", e))?;
+    register_test!("parse_encode_nested_blocks", "instruction-decoder", false, || {
+        let nested_bytes = vec![
+            0x02, 0x40, // outer block
+            0x02, 0x40, // inner block
+            0x0B, // inner end
+            0x0B, // outer end
+        ];
+        let (nested_instr, nested_bytes_read) = parse_instruction(&nested_bytes)
+            .map_err(|e| format!("Failed to parse nested blocks: {:?}", e))?;
 
-            assert_eq_test!(
-                nested_bytes_read,
-                nested_bytes.len(),
-                "Should read all bytes"
-            );
+        assert_eq_test!(nested_bytes_read, nested_bytes.len(), "Should read all bytes");
 
-            let encoded_nested = encode_instruction(&nested_instr)
-                .map_err(|e| format!("Failed to encode nested blocks: {:?}", e))?;
+        let encoded_nested = encode_instruction(&nested_instr)
+            .map_err(|e| format!("Failed to encode nested blocks: {:?}", e))?;
 
-            assert_eq_test!(
-                encoded_nested,
-                nested_bytes,
-                "Encoded bytes should match original"
-            );
+        assert_eq_test!(encoded_nested, nested_bytes, "Encoded bytes should match original");
 
-            Ok(())
-        }
-    );
+        Ok(())
+    });
 }

@@ -1,3 +1,12 @@
+// WRT - wrt
+// SW-REQ-ID: [SW-REQ-ID-wrt]
+//
+// Copyright (c) 2024 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+#![forbid(unsafe_code)] // Rule 2
+
 //! WebAssembly Runtime (WRT)
 //!
 //! A pure Rust implementation of the WebAssembly runtime, supporting the WebAssembly Core
@@ -14,7 +23,23 @@
 //! - Stackless execution engine for environments with limited stack space
 //! - no_std compatibility
 //! - Comprehensive error handling
-//! - Safe memory implementation
+//! - Safe memory implementation with ASIL-B compliance features
+//!
+//! ## Organization
+//!
+//! WRT follows a modular design with specialized crates:
+//!
+//! - `wrt-error`: Error handling foundation
+//! - `wrt-types`: Core and runtime type definitions
+//! - `wrt-format`: Format specifications
+//! - `wrt-decoder`: Binary parsing
+//! - `wrt-sync`: Synchronization primitives
+//! - `wrt-instructions`: Instruction encoding/decoding
+//! - `wrt-intercept`: Function interception
+//! - `wrt-host`: Host interface
+//! - `wrt-component`: Component model
+//! - `wrt-runtime`: Runtime execution
+//! - `wrt`: Main library integration (this crate)
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(clippy::all)]
@@ -54,79 +79,20 @@ macro_rules! debug_println {
 
 // Include prelude module for consistent imports across crates
 pub mod prelude;
-// Don't glob-import the prelude to avoid name conflicts
-// We'll use qualified imports instead
 
-// Core module imports
-mod behavior;
-mod component;
-mod decoder_integration;
-mod error;
-mod execution;
-mod format_adapter;
-mod global;
-mod instructions;
-mod instructions_adapter;
-mod interface;
-mod memory;
-mod memory_adapter;
-mod module;
-mod module_instance;
-mod resource;
-mod serialization;
-mod shared_instructions;
-mod stack;
-mod stackless;
-mod stackless_extensions;
-mod stackless_frame;
-mod sync;
-mod table;
-mod types;
-mod validation;
-mod values;
+// Module adapters for integration between specialized crates
+pub mod decoder_integration;
+pub mod instructions_adapter;
+pub mod memory_adapter;
 
-// Public exports with careful naming to avoid conflicts
-pub use crate::behavior::InstructionExecutor;
-pub use crate::component::{Component, Host, InstanceValue};
-pub use crate::execution::ExecutionStats;
-pub use crate::global::Global;
-pub use crate::instructions::Instruction;
-pub use crate::memory::Memory;
-pub use crate::module::{ExportKind, Function, Import, Module, OtherExport};
-pub use crate::stackless::StacklessEngine;
-pub use crate::stackless_frame::StacklessFrame;
-pub use crate::table::Table;
-pub use crate::types::BlockType;
-
-// Import types from prelude with explicit namespace
-use prelude::{RuntimeMemoryType, RuntimeTableType, TypesMemoryType, TypesTableType};
-// Import both Limits types to handle type conversion properly
-use wrt_runtime::types::Limits as RuntimeLimits;
-use wrt_types::types::Limits as TypesLimits;
+// Re-export all public types and functionality through the prelude
+pub use crate::prelude::*;
 
 /// Version of the WebAssembly Core specification implemented
 pub const CORE_VERSION: &str = "1.0";
 
 /// Version of the WebAssembly Component Model specification implemented
 pub const COMPONENT_VERSION: &str = "0.1.0";
-
-/// Execution engine for WebAssembly modules
-///
-/// This type represents an execution engine that can be used to run WebAssembly modules.
-#[derive(Debug, Clone, Copy)]
-pub struct ExecutionEngine;
-
-/// Create a new execution engine for WebAssembly modules.
-///
-/// This function creates a new execution engine that can be used to run
-/// WebAssembly modules.
-///
-/// # Returns
-///
-/// A new execution engine.
-pub fn new_engine() -> ExecutionEngine {
-    ExecutionEngine
-}
 
 /// Create a new stackless execution engine for WebAssembly modules.
 ///
@@ -136,17 +102,17 @@ pub fn new_engine() -> ExecutionEngine {
 /// # Returns
 ///
 /// A new stackless execution engine.
-pub fn new_stackless_engine() -> stackless::StacklessEngine {
-    stackless::StacklessEngine::new()
+pub fn new_stackless_engine() -> StacklessEngine {
+    StacklessEngine::new()
 }
 
 /// Create a new, empty WebAssembly module.
 ///
 /// # Returns
 ///
-/// A `WrtResult` containing the new module, or an error if the module
+/// A `Result` containing the new module, or an error if the module
 /// could not be created.
-pub fn new_module() -> prelude::WrtResult<Module> {
+pub fn new_module() -> Result<Module> {
     Module::new()
 }
 
@@ -159,17 +125,8 @@ pub fn new_module() -> prelude::WrtResult<Module> {
 /// # Returns
 ///
 /// A new memory instance.
-pub fn new_memory(mem_type: TypesMemoryType) -> Memory {
-    // Convert from wrt-types MemoryType to wrt-runtime MemoryType
-    // Need to convert between different Limits types
-    let runtime_mem_type = RuntimeMemoryType {
-        limits: RuntimeLimits {
-            min: mem_type.limits.min,
-            max: mem_type.limits.max,
-        },
-    };
-
-    Memory::new(runtime_mem_type).unwrap()
+pub fn new_memory(mem_type: ComponentMemoryType) -> Memory {
+    Memory::new(mem_type).unwrap()
 }
 
 /// Create a new WebAssembly memory adapter with the given type.
@@ -181,18 +138,8 @@ pub fn new_memory(mem_type: TypesMemoryType) -> Memory {
 /// # Returns
 ///
 /// A new memory adapter instance.
-pub fn new_memory_adapter(mem_type: TypesMemoryType) -> Memory {
-    // Convert from wrt-types MemoryType to wrt-runtime MemoryType
-    // Need to convert between different Limits types
-    let runtime_mem_type = RuntimeMemoryType {
-        limits: RuntimeLimits {
-            min: mem_type.limits.min,
-            max: mem_type.limits.max,
-        },
-    };
-
-    // Use the concrete SafeMemoryAdapter implementation
-    memory_adapter::SafeMemoryAdapter::new(runtime_mem_type).unwrap()
+pub fn new_memory_adapter(mem_type: ComponentMemoryType) -> Memory {
+    memory_adapter::new_memory_adapter(mem_type).unwrap()
 }
 
 /// Create a new WebAssembly table with the given type.
@@ -204,19 +151,27 @@ pub fn new_memory_adapter(mem_type: TypesMemoryType) -> Memory {
 /// # Returns
 ///
 /// A new table instance.
-pub fn new_table(table_type: TypesTableType) -> Table {
-    // Convert from wrt-types TableType to wrt-runtime TableType
-    // Need to convert between different Limits types
-    let runtime_table_type = RuntimeTableType {
-        element_type: table_type.element_type,
-        limits: RuntimeLimits {
-            min: table_type.limits.min,
-            max: table_type.limits.max,
-        },
-    };
-
+pub fn new_table(table_type: ComponentTableType) -> Table {
     // Create a default value based on the element type
-    let default_value = wrt_types::values::Value::default_for_type(&table_type.element_type);
+    let default_value = Value::default_for_type(&table_type.element_type);
 
-    Table::new(runtime_table_type, default_value).unwrap()
+    Table::new(table_type, default_value).unwrap()
+}
+
+/// Load a module from a WebAssembly binary.
+///
+/// This is a convenience function that loads a WebAssembly module
+/// from a binary buffer, handling validation and instantiation.
+///
+/// # Arguments
+///
+/// * `binary` - The WebAssembly binary to load
+///
+/// # Returns
+///
+/// A Result containing the runtime module or an error
+pub fn load_module_from_binary(binary: &[u8]) -> Result<Module> {
+    // Directly use the function re-exported by the prelude from wrt_runtime
+    // The types `Result` and `Module` are also from the prelude (originating in wrt_error and wrt_runtime)
+    prelude::load_module_from_binary(binary)
 }

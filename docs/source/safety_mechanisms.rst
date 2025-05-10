@@ -82,15 +82,24 @@ Code Safety Mechanisms
 .. safety:: Unsafe Code Protection Rev3
    :id: SAFETY_UNSAFE_003
    :status: active
-   :links: REQ_CODE_QUALITY_002, IMPL_CODE_REVIEW_001
+   :links: REQ_CODE_QUALITY_002, IMPL_CODE_REVIEW_001, IMPL_CI_LINTING_001, IMPL_CI_STATIC_ANALYSIS_001
    
-   The runtime implements unsafe code protection with:
+   The runtime implements unsafe code protection with a combination of manual reviews and automated checks:
    
-   * Strict code reviews for all unsafe blocks
-   * Documentation of invariants and safety guarantees
-   * Comprehensive test coverage for unsafe regions
-   * Abstraction of unsafe code behind safe interfaces
-   * Verification of unsafe code preconditions and postconditions
+   * **Manual Reviews & Design**:
+     * Strict code reviews for any introduction or modification of `unsafe` blocks.
+     * Clear documentation of invariants, safety guarantees, and preconditions for any `unsafe` code.
+     * Abstraction of `unsafe` operations behind safe, well-tested interfaces.
+   * **Automated Enforcement & Detection**:
+     * Workspace-wide prohibition of `unsafe` code via `#![forbid(unsafe_code)]` in all crate lib/main files and `unsafe_code = "forbid"` in `Cargo.toml` lint settings. Exceptions must be explicitly justified and reviewed.
+     * Configuration of `panic = "abort"` for release and test profiles in `Cargo.toml` to prevent unwinding.
+     * Comprehensive static analysis using `clippy` with a pedantic ruleset (e.g., denying `transmute_ptr_to_ref`, `unwrap_used`, `float_arithmetic`, etc.), configured in `Cargo.toml`. See :ref:`dev-linting` for details.
+     * Automated detection of `unsafe` code usage statistics via `cargo geiger`, integrated into the CI pipeline. See :ref:`dev-geiger`.
+     * Standardized file headers enforcing copyright, license (Apache-2.0), and SPDX identifiers, checked by `xtask ci-checks headers`.
+   * **Testing & Verification**:
+     * Comprehensive test coverage specifically targeting regions involving `unsafe` code if unavoidable.
+     * Formal verification methods (e.g., Kani) applied to critical `unsafe` sections where feasible.
+     * Memory safety checks using Miri for `unsafe` blocks during CI runs.
 
 Testing Safety Mechanisms
 -------------------------

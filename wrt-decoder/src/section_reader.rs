@@ -3,7 +3,7 @@
 //! This module provides a reader for WebAssembly module sections. It allows
 //! identifying and extracting section data without parsing the entire module.
 
-use wrt_error::{Error, Result};
+use wrt_error::Result;
 use wrt_format::binary;
 use wrt_format::section::{
     CODE_ID, CUSTOM_ID, DATA_COUNT_ID, DATA_ID, ELEMENT_ID, EXPORT_ID, FUNCTION_ID, GLOBAL_ID,
@@ -134,10 +134,7 @@ impl<'a> SectionReader<'a> {
 
             // Read section size using LEB128 encoding
             let (section_size, bytes_read) =
-                match binary::read_leb128_u32(self.binary, self.current_offset) {
-                    Ok(result) => result,
-                    Err(e) => return Err(e),
-                };
+                binary::read_leb128_u32(self.binary, self.current_offset)?;
             self.current_offset += bytes_read;
 
             // Skip this section if there's not enough bytes for the content
@@ -188,11 +185,7 @@ impl<'a> SectionReader<'a> {
         }
 
         // Read section size using LEB128 encoding
-        let (section_size, bytes_read) =
-            match binary::read_leb128_u32(self.binary, self.current_offset) {
-                Ok(result) => result,
-                Err(e) => return Err(e),
-            };
+        let (section_size, bytes_read) = binary::read_leb128_u32(self.binary, self.current_offset)?;
         self.current_offset += bytes_read;
 
         // Skip this section if there's not enough bytes for the content
@@ -227,10 +220,7 @@ impl<'a> SectionReader<'a> {
                 match id {
                     CUSTOM_ID => {
                         // For custom sections, extract the name
-                        let (name, bytes_read) = match binary::read_string(data, 0) {
-                            Ok(result) => result,
-                            Err(e) => return Err(e),
-                        };
+                        let (name, bytes_read) = binary::read_string(data, 0)?;
                         let data = &data[bytes_read..];
                         Ok(Some(SectionPayload::Custom {
                             name: name.to_string(),

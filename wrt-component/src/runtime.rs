@@ -5,8 +5,8 @@
 
 use crate::prelude::*;
 
-// Re-export Memory and Table from wrt-runtime
-pub use wrt_runtime::{GlobalType, Memory, MemoryType, Table, TableType};
+// Import from wrt-types instead of wrt-runtime
+use wrt_types::component::{GlobalType, MemoryType, TableType};
 
 /// WebAssembly function type
 #[derive(Debug, Clone, PartialEq)]
@@ -15,6 +15,60 @@ pub struct FuncType {
     pub params: Vec<ValueType>,
     /// Result types
     pub results: Vec<ValueType>,
+}
+
+/// Memory instance for components
+#[derive(Debug)]
+pub struct Memory {
+    /// Memory type
+    pub ty: MemoryType,
+    /// Memory data
+    data: Vec<u8>,
+}
+
+impl Memory {
+    /// Create a new memory instance
+    pub fn new(ty: MemoryType) -> Result<Self> {
+        let data = vec![0; ty.min as usize * 65536];
+        Ok(Self { ty, data })
+    }
+
+    /// Get memory data
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Get mutable memory data
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.data
+    }
+}
+
+/// Table instance for components
+#[derive(Debug)]
+pub struct Table {
+    /// Table type
+    pub ty: TableType,
+    /// Table elements
+    elements: Vec<Option<usize>>,
+}
+
+impl Table {
+    /// Create a new table instance
+    pub fn new(ty: TableType) -> Result<Self> {
+        let elements = vec![None; ty.min as usize];
+        Ok(Self { ty, elements })
+    }
+
+    /// Get table elements
+    pub fn elements(&self) -> &[Option<usize>] {
+        &self.elements
+    }
+
+    /// Get mutable table elements
+    pub fn elements_mut(&mut self) -> &mut Vec<Option<usize>> {
+        &mut self.elements
+    }
 }
 
 /// WebAssembly global instance

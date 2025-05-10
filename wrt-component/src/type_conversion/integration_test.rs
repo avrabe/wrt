@@ -25,16 +25,10 @@ mod integration_tests {
                 FormatValType::Record(vec![
                     ("name".to_string(), FormatValType::String),
                     ("age".to_string(), FormatValType::U32),
-                    (
-                        "address".to_string(),
-                        FormatValType::Option(Box::new(FormatValType::String)),
-                    ),
+                    ("address".to_string(), FormatValType::Option(Box::new(FormatValType::String))),
                 ]),
             ),
-            (
-                "skills".to_string(),
-                FormatValType::List(Box::new(FormatValType::String)),
-            ),
+            ("skills".to_string(), FormatValType::List(Box::new(FormatValType::String))),
             (
                 "status".to_string(),
                 FormatValType::Variant(vec![
@@ -46,14 +40,11 @@ mod integration_tests {
         ]);
 
         // Convert from format to types
-        let types_type = registry
-            .convert::<FormatValType, TypesValType>(&format_type)
-            .unwrap();
+        let types_type = registry.convert::<FormatValType, TypesValType>(&format_type).unwrap();
 
         // Convert back to format
-        let format_type_back = registry
-            .convert::<TypesValType, FormatValType>(&types_type)
-            .unwrap();
+        let format_type_back =
+            registry.convert::<TypesValType, FormatValType>(&types_type).unwrap();
 
         // The structure should be preserved after round-trip conversion
         // (In a real test, we'd do deep comparison, but that would require implementing PartialEq)
@@ -84,30 +75,26 @@ mod integration_tests {
                     ]),
                 ),
             ],
-            results: vec![FormatValType::Result(Box::new(FormatValType::Variant(
-                vec![
-                    ("ok".to_string(), Some(FormatValType::String)),
-                    (
-                        "err".to_string(),
-                        Some(FormatValType::Variant(vec![
-                            ("notFound".to_string(), None),
-                            ("timeout".to_string(), None),
-                            ("other".to_string(), Some(FormatValType::String)),
-                        ])),
-                    ),
-                ],
-            )))],
+            results: vec![FormatValType::Result(Box::new(FormatValType::Variant(vec![
+                ("ok".to_string(), Some(FormatValType::String)),
+                (
+                    "err".to_string(),
+                    Some(FormatValType::Variant(vec![
+                        ("notFound".to_string(), None),
+                        ("timeout".to_string(), None),
+                        ("other".to_string(), Some(FormatValType::String)),
+                    ])),
+                ),
+            ])))],
         };
 
         // Convert to runtime type
-        let types_function = registry
-            .convert::<FormatExternType, TypesExternType>(&format_function)
-            .unwrap();
+        let types_function =
+            registry.convert::<FormatExternType, TypesExternType>(&format_function).unwrap();
 
         // Convert back to format type
-        let format_function_back = registry
-            .convert::<TypesExternType, FormatExternType>(&types_function)
-            .unwrap();
+        let format_function_back =
+            registry.convert::<TypesExternType, FormatExternType>(&types_function).unwrap();
 
         // Check structure is preserved
         if let FormatExternType::Function { params, results } = &format_function_back {
@@ -167,9 +154,8 @@ mod integration_tests {
         let runtime_type = RuntimeComponentType::new(component_type);
 
         // Convert to FormatComponentType
-        let format_type = registry
-            .convert::<RuntimeComponentType, FormatComponentType>(&runtime_type)
-            .unwrap();
+        let format_type =
+            registry.convert::<RuntimeComponentType, FormatComponentType>(&runtime_type).unwrap();
 
         // Check the structure
         assert_eq!(format_type.imports.len(), 1);
@@ -179,9 +165,8 @@ mod integration_tests {
         assert_eq!(format_type.exports[0].0, "greet");
 
         // Convert back to RuntimeComponentType
-        let runtime_type_back = registry
-            .convert::<FormatComponentType, RuntimeComponentType>(&format_type)
-            .unwrap();
+        let runtime_type_back =
+            registry.convert::<FormatComponentType, RuntimeComponentType>(&format_type).unwrap();
         let inner = runtime_type_back.inner();
 
         // Check the structure is preserved
@@ -205,9 +190,8 @@ mod integration_tests {
         let runtime_instance = RuntimeInstanceType::new(instance_type);
 
         // Convert to format type
-        let format_instance = registry
-            .convert::<RuntimeInstanceType, FormatInstanceType>(&runtime_instance)
-            .unwrap();
+        let format_instance =
+            registry.convert::<RuntimeInstanceType, FormatInstanceType>(&runtime_instance).unwrap();
 
         // Check the structure
         assert_eq!(format_instance.exports.len(), 2);
@@ -215,9 +199,8 @@ mod integration_tests {
         assert_eq!(format_instance.exports[1].0, "setData");
 
         // Convert back to runtime type
-        let runtime_instance_back = registry
-            .convert::<FormatInstanceType, RuntimeInstanceType>(&format_instance)
-            .unwrap();
+        let runtime_instance_back =
+            registry.convert::<FormatInstanceType, RuntimeInstanceType>(&format_instance).unwrap();
         let inner = runtime_instance_back.inner();
 
         // Check the structure is preserved

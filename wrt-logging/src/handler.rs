@@ -43,8 +43,7 @@ impl LoggingExt for CallbackRegistry {
     }
 
     fn has_log_handler(&self) -> bool {
-        self.get_callback::<LogHandler>(&CallbackType::Logging)
-            .is_some()
+        self.get_callback::<LogHandler>(&CallbackType::Logging).is_some()
     }
 }
 
@@ -62,20 +61,14 @@ mod tests {
         assert!(!registry.has_log_handler());
 
         // Logging without handler should not panic
-        registry.handle_log(LogOperation::new(
-            LogLevel::Info,
-            "test message".to_string(),
-        ));
+        registry.handle_log(LogOperation::new(LogLevel::Info, "test message".to_string()));
 
         // Register handler
         let received = Arc::new(Mutex::new(Vec::new()));
         {
             let received = received.clone();
             registry.register_log_handler(move |log_op| {
-                received
-                    .lock()
-                    .unwrap()
-                    .push((log_op.level, log_op.message));
+                received.lock().unwrap().push((log_op.level, log_op.message));
             });
         }
 
@@ -83,15 +76,9 @@ mod tests {
         assert!(registry.has_log_handler());
 
         // Log some messages
-        registry.handle_log(LogOperation::new(
-            LogLevel::Info,
-            "info message".to_string(),
-        ));
+        registry.handle_log(LogOperation::new(LogLevel::Info, "info message".to_string()));
 
-        registry.handle_log(LogOperation::new(
-            LogLevel::Error,
-            "error message".to_string(),
-        ));
+        registry.handle_log(LogOperation::new(LogLevel::Error, "error message".to_string()));
 
         // Check received messages
         let received = received.lock().unwrap();

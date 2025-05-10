@@ -1,3 +1,11 @@
+// WRT - wrt-verification-tool
+// SW-REQ-ID: [SW-REQ-ID-wrt-verification-tool]
+//
+// Copyright (c) 2025 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+#![forbid(unsafe_code)] // Rule 2
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "std")]
@@ -359,10 +367,7 @@ fn test_larger_module() -> Result<(), String> {
     }
 
     if section_count < 3 {
-        return Err(format!(
-            "Expected at least 3 sections, found {}",
-            section_count
-        ));
+        return Err(format!("Expected at least 3 sections, found {}", section_count));
     }
 
     println!("✅ Parser handles larger modules correctly");

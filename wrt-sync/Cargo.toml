@@ -29,11 +29,41 @@ std = []
 alloc = ["dep:alloc"]
 # For complete no_std support
 no_std = []
+# Performance optimization
+optimize = []
+# Safety features
+safety = ["alloc"]
 # Optional feature for formal verification using Kani
 kani = ["dep:kani-verifier"]
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)', 'cfg(kani)', 'cfg(coverage)', 'cfg(doc)'] }
+# Rule 1
+# pointer_cast = "deny" // Removed, not a standard lint
+# Rule 9
+missing_docs = "deny"
+
+[lints.clippy]
+# Rule 1: Language subset
+inline_asm_x86_att_syntax = "warn"
+transmute_ptr_to_ref = "deny"
+float_arithmetic = "warn"
+# Rule 2: Unsafe usage
+ptr_offset_with_cast = "warn"
+# Rule 3: Error handling & panics
+unwrap_used = "deny"
+panic = "deny"
+result_unit_err = "warn"
+must_use_candidate = "warn"
+must_use_unit = "warn"
+# Rule 4: Control-flow soundness
+match_wildcard_for_single_variants = "warn"
+never_loop = "warn"
+unreachable = "deny"
+# Rule 8: Static analysis gates (CI)
+pedantic = "warn"
+# Rule 9: Documentation
+debug_assert_with_mut_call = "warn"
 
 # Configuration for Kani verification
 # This will only be used when running `cargo kani`

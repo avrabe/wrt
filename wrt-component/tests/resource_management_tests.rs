@@ -44,18 +44,14 @@ fn test_host_resource_management() {
     let id = resource_manager.add_host_resource(test_value.clone());
 
     // Verify we can retrieve it
-    let retrieved = resource_manager
-        .get_host_resource::<Arc<Mutex<i32>>>(id)
-        .unwrap();
+    let retrieved = resource_manager.get_host_resource::<Arc<Mutex<i32>>>(id).unwrap();
     assert_eq!(*retrieved.lock().unwrap(), 42);
 
     // Modify the value through the retrieved reference
     *retrieved.lock().unwrap() = 100;
 
     // Verify the value was changed
-    let retrieved_again = resource_manager
-        .get_host_resource::<Arc<Mutex<i32>>>(id)
-        .unwrap();
+    let retrieved_again = resource_manager.get_host_resource::<Arc<Mutex<i32>>>(id).unwrap();
     assert_eq!(*retrieved_again.lock().unwrap(), 100);
 
     // Verify original reference reflects changes
@@ -92,10 +88,7 @@ fn test_resource_lifecycle() {
         resource_manager.get_resource_type(id1),
         Some(std::any::TypeId::of::<Box<String>>())
     );
-    assert_eq!(
-        resource_manager.get_resource_type(id2),
-        Some(std::any::TypeId::of::<Box<i32>>())
-    );
+    assert_eq!(resource_manager.get_resource_type(id2), Some(std::any::TypeId::of::<Box<i32>>()));
 
     // Delete resources
     resource_manager.delete_resource(id1);
@@ -360,35 +353,24 @@ fn test_resource_system_integration() {
     let complex_id = resource_manager.add_host_resource(Box::new((String::from("name"), 42, true)));
 
     // Register resources with memory manager
-    memory_manager
-        .register_resource(string_id, &resource_manager)
-        .unwrap();
-    memory_manager
-        .register_resource(vector_id, &resource_manager)
-        .unwrap();
+    memory_manager.register_resource(string_id, &resource_manager).unwrap();
+    memory_manager.register_resource(vector_id, &resource_manager).unwrap();
 
     // Access resources
-    let string_res = resource_manager
-        .get_host_resource::<String>(string_id)
-        .unwrap();
+    let string_res = resource_manager.get_host_resource::<String>(string_id).unwrap();
     assert_eq!(*string_res, "text resource");
 
-    let vector_res = resource_manager
-        .get_host_resource::<Vec<i32>>(vector_id)
-        .unwrap();
+    let vector_res = resource_manager.get_host_resource::<Vec<i32>>(vector_id).unwrap();
     assert_eq!(*vector_res, vec![1, 2, 3, 4, 5]);
 
-    let complex_res = resource_manager
-        .get_host_resource::<Box<(String, i32, bool)>>(complex_id)
-        .unwrap();
+    let complex_res =
+        resource_manager.get_host_resource::<Box<(String, i32, bool)>>(complex_id).unwrap();
     assert_eq!(complex_res.0, "name");
     assert_eq!(complex_res.1, 42);
     assert_eq!(complex_res.2, true);
 
     // Access through memory manager
-    let vector_mem = memory_manager
-        .get_memory(vector_id, ResourceOperation::Read)
-        .unwrap();
+    let vector_mem = memory_manager.get_memory(vector_id, ResourceOperation::Read).unwrap();
     // Memory representation would depend on the actual implementation
 
     // Clean up

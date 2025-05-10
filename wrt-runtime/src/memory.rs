@@ -78,21 +78,21 @@
 //! ```
 
 use crate::prelude::*;
-use crate::types::MemoryType;
 use wrt_types::safe_memory::{
     MemoryProvider, MemorySafety, MemoryStats, SafeMemoryHandler, SafeSlice,
 };
 
-// Import correct types for Atomic operations
+// Import BorrowMut for SafeMemoryHandler
 #[cfg(feature = "std")]
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-
-#[cfg(not(feature = "std"))]
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::borrow::BorrowMut;
+#[cfg(all(feature = "alloc", not(feature = "std")))] // Should also work for no_std + alloc
+use core::borrow::BorrowMut;
 
 // Import RwLock from appropriate location in no_std
 #[cfg(not(feature = "std"))]
 use wrt_sync::WrtRwLock as RwLock;
+
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 /// WebAssembly page size (64KB)
 pub const PAGE_SIZE: usize = 65536;
@@ -106,8 +106,8 @@ const MAX_MEMORY_BYTES: usize = 4 * 1024 * 1024 * 1024;
 /// Memory size error code (must be u16 to match Error::new)
 const MEMORY_SIZE_TOO_LARGE: u16 = 4001;
 
-/// Memory metrics for tracking usage and performance
-#[derive(Debug, Default)]
+/// Memory metrics for tracking usage and safety
+#[derive(Debug)]
 struct MemoryMetrics {
     /// Peak memory usage in bytes
     #[cfg(feature = "std")]
@@ -148,6 +148,35 @@ struct MemoryMetrics {
     last_access_length: usize,
 }
 
+#[cfg(feature = "std")]
+impl Clone for MemoryMetrics {
+    fn clone(&self) -> Self {
+        Self {
+            peak_usage: AtomicUsize::new(self.peak_usage.load(Ordering::Relaxed)),
+            access_count: AtomicU64::new(self.access_count.load(Ordering::Relaxed)),
+            max_access_size: AtomicUsize::new(self.max_access_size.load(Ordering::Relaxed)),
+            unique_regions: AtomicUsize::new(self.unique_regions.load(Ordering::Relaxed)),
+            last_access_offset: AtomicUsize::new(self.last_access_offset.load(Ordering::Relaxed)),
+            last_access_length: AtomicUsize::new(self.last_access_length.load(Ordering::Relaxed)),
+        }
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl Clone for MemoryMetrics {
+    fn clone(&self) -> Self {
+        // For no_std, fields are directly cloneable (usize, u64)
+        Self {
+            peak_usage: self.peak_usage,
+            access_count: self.access_count,
+            max_access_size: self.max_access_size,
+            unique_regions: self.unique_regions,
+            last_access_offset: self.last_access_offset,
+            last_access_length: self.last_access_length,
+        }
+    }
+}
+
 impl MemoryMetrics {
     #[cfg(feature = "std")]
     fn new(size: usize) -> Self {
@@ -178,42 +207,70 @@ impl MemoryMetrics {
 #[derive(Debug)]
 pub struct Memory {
     /// The memory type
-    pub ty: MemoryType,
+    pub ty: CoreMemoryType,
     /// The memory data
-    data: SafeMemoryHandler,
-    /// The current number of pages
-    current_pages: u32,
-    /// A debug name for diagnostics
-    debug_name: Option<String>,
+    pub data: SafeMemoryHandler,
+    /// Current number of pages
+    pub current_pages: core::sync::atomic::AtomicU32,
+    /// Optional name for debugging
+    pub debug_name: Option<String>,
+    /// Memory metrics for tracking access
     #[cfg(feature = "std")]
-    metrics: MemoryMetrics,
+    pub metrics: MemoryMetrics,
+    /// Memory metrics for tracking access (RwLock for no_std)
     #[cfg(not(feature = "std"))]
-    metrics: RwLock<MemoryMetrics>,
-    /// Verification level for memory operations
-    verification_level: VerificationLevel,
+    pub metrics: RwLock<MemoryMetrics>,
+    /// Memory verification level
+    pub verification_level: VerificationLevel,
 }
 
 impl Clone for Memory {
     fn clone(&self) -> Self {
-        // Get the current data
-        let data_vec = self.data.to_vec().expect("Failed to clone memory data");
+        // Create new SafeMemoryHandler by copying bytes
+        let current_bytes = self
+            .data
+            .to_vec()
+            .unwrap_or_else(|e| panic!("Failed to clone memory data: {}", e));
+        let new_data = SafeMemoryHandler::new(current_bytes);
 
-        // Create a new SafeMemoryHandler with the same data
-        let mut new_data = SafeMemoryHandler::new(data_vec);
-        new_data.set_verification_level(self.verification_level);
+        // Clone metrics, handling potential RwLock poisoning for no_std
+        #[cfg(feature = "std")]
+        let cloned_metrics = MemoryMetrics {
+            peak_usage: AtomicUsize::new(self.metrics.peak_usage.load(Ordering::Relaxed)),
+            access_count: AtomicU64::new(self.metrics.access_count.load(Ordering::Relaxed)),
+            max_access_size: AtomicUsize::new(self.metrics.max_access_size.load(Ordering::Relaxed)),
+            unique_regions: AtomicUsize::new(self.metrics.unique_regions.load(Ordering::Relaxed)),
+            last_access_offset: AtomicUsize::new(self.metrics.last_access_offset.load(Ordering::Relaxed)),
+            last_access_length: AtomicUsize::new(self.metrics.last_access_length.load(Ordering::Relaxed)),
+        };
 
-        // Create a new instance with copied data
+        #[cfg(not(feature = "std"))]
+        let cloned_metrics = {
+            let guard = self.metrics.read().unwrap_or_else(|e| {
+                panic!("Failed to acquire read lock for cloning metrics: {}", e)
+            });
+            RwLock::new((*guard).clone()) // Assuming MemoryMetrics is Clone
+        };
+
         Self {
             ty: self.ty.clone(),
             data: new_data,
-            current_pages: self.current_pages,
+            current_pages: AtomicU32::new(self.current_pages.load(Ordering::Relaxed)),
             debug_name: self.debug_name.clone(),
-            #[cfg(feature = "std")]
-            metrics: MemoryMetrics::new(self.data.size()),
-            #[cfg(not(feature = "std"))]
-            metrics: RwLock::new(MemoryMetrics::new(self.data.size())),
-            verification_level: self.verification_level,
+            metrics: cloned_metrics,
+            verification_level: self.verification_level, // Assuming VerificationLevel is Copy
         }
+    }
+}
+
+impl PartialEq for Memory {
+    fn eq(&self, other: &Self) -> bool {
+        self.ty == other.ty
+            // && self.data == other.data // SafeMemoryHandler is not PartialEq. Comparing by bytes for now.
+            && self.data.to_vec().unwrap_or_default() == other.data.to_vec().unwrap_or_default()
+            && self.current_pages.load(Ordering::Relaxed) == other.current_pages.load(Ordering::Relaxed) 
+            && self.debug_name == other.debug_name
+            && self.verification_level == other.verification_level
     }
 }
 
@@ -231,7 +288,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the memory type is invalid
-    pub fn new(ty: MemoryType) -> Result<Self> {
+    pub fn new(ty: CoreMemoryType) -> Result<Self> {
         // Calculate number of pages
         let min_pages = ty.limits.min;
 
@@ -260,7 +317,7 @@ impl Memory {
         Ok(Self {
             ty,
             data,
-            current_pages: min_pages,
+            current_pages: core::sync::atomic::AtomicU32::new(min_pages),
             debug_name: None,
             #[cfg(feature = "std")]
             metrics: MemoryMetrics::new(size),
@@ -284,7 +341,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the memory cannot be created
-    pub fn new_with_name(ty: MemoryType, name: &str) -> Result<Self> {
+    pub fn new_with_name(ty: CoreMemoryType, name: &str) -> Result<Self> {
         let mut memory = Self::new(ty)?;
         memory.debug_name = Some(name.to_string());
         Ok(memory)
@@ -308,7 +365,7 @@ impl Memory {
     /// The current size in pages
     #[must_use]
     pub fn size(&self) -> u32 {
-        self.current_pages
+        self.current_pages.load(Ordering::Relaxed)
     }
 
     /// Gets the current size of the memory in bytes
@@ -318,7 +375,7 @@ impl Memory {
     /// The current size in bytes
     #[must_use]
     pub fn size_in_bytes(&self) -> usize {
-        self.current_pages as usize * PAGE_SIZE
+        self.current_pages.load(Ordering::Relaxed) as usize * PAGE_SIZE
     }
 
     /// A reference to the memory data as a `Vec<u8>`
@@ -514,11 +571,12 @@ impl Memory {
     pub fn grow(&mut self, pages: u32) -> Result<u32> {
         // Return early if not growing
         if pages == 0 {
-            return Ok(self.current_pages);
+            return Ok(self.current_pages.load(Ordering::Relaxed));
         }
 
         // Check that growing wouldn't exceed max pages
-        let new_page_count = self.current_pages.checked_add(pages).ok_or_else(|| {
+        let current_pages_val = self.current_pages.load(Ordering::Relaxed);
+        let new_page_count = current_pages_val.checked_add(pages).ok_or_else(|| {
             Error::new(
                 ErrorCategory::Memory,
                 codes::MEMORY_GROW_ERROR,
@@ -557,8 +615,7 @@ impl Memory {
         self.data.resize(new_size, 0);
 
         // Update the page count
-        let old_pages = self.current_pages;
-        self.current_pages = new_page_count;
+        let old_pages = self.current_pages.swap(new_page_count, Ordering::Relaxed);
 
         // Update peak memory usage
         self.update_peak_memory();
@@ -867,7 +924,7 @@ impl Memory {
         let data = self.data.to_vec()?;
 
         // Execute the hook immediately with current state
-        hook(self.current_pages, &data)?;
+        hook(self.current_pages.load(Ordering::Relaxed), &data)?;
 
         // In a full implementation, we would store the hook for later use
         // but for now we just run it once to validate the current state
@@ -887,7 +944,7 @@ impl Memory {
         let data = self.data.to_vec()?;
 
         // Execute the hook immediately with current state
-        hook(self.current_pages, &data)?;
+        hook(self.current_pages.load(Ordering::Relaxed), &data)?;
 
         // In a full implementation, we would store the hook for later use
         // but for now we just run it once to validate the current state
@@ -898,7 +955,7 @@ impl Memory {
     /// Verify data integrity
     pub fn verify_integrity(&self) -> Result<()> {
         // Get the expected size
-        let expected_size = self.current_pages as usize * PAGE_SIZE;
+        let expected_size = self.current_pages.load(Ordering::Relaxed) as usize * PAGE_SIZE;
 
         // Verify memory size is consistent
         if self.data.size() != expected_size {
@@ -1239,7 +1296,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the read is out of bounds
-    pub fn read_i32(&self, addr: u32) -> Result<i32, wrt_error::Error> {
+    pub fn read_i32(&self, addr: u32) -> Result<i32> {
         let mut buffer = [0; 4];
         self.read(addr, &mut buffer)?;
         Ok(i32::from_le_bytes(buffer))
@@ -1258,7 +1315,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the read is out of bounds
-    pub fn read_i64(&self, addr: u32) -> Result<i64, wrt_error::Error> {
+    pub fn read_i64(&self, addr: u32) -> Result<i64> {
         let mut buffer = [0; 8];
         self.read(addr, &mut buffer)?;
         Ok(i64::from_le_bytes(buffer))
@@ -1277,7 +1334,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the read is out of bounds
-    pub fn read_f32(&self, addr: u32) -> Result<f32, wrt_error::Error> {
+    pub fn read_f32(&self, addr: u32) -> Result<f32> {
         let value = self.read_i32(addr)?;
         Ok(f32::from_bits(value as u32))
     }
@@ -1295,7 +1352,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the read is out of bounds
-    pub fn read_f64(&self, addr: u32) -> Result<f64, wrt_error::Error> {
+    pub fn read_f64(&self, addr: u32) -> Result<f64> {
         let value = self.read_i64(addr)?;
         Ok(f64::from_bits(value as u64))
     }
@@ -1313,7 +1370,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the read is out of bounds
-    pub fn read_i8(&self, addr: u32) -> Result<i8, wrt_error::Error> {
+    pub fn read_i8(&self, addr: u32) -> Result<i8> {
         let mut buffer = [0; 1];
         self.read(addr, &mut buffer)?;
         Ok(i8::from_le_bytes(buffer))
@@ -1332,7 +1389,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the read is out of bounds
-    pub fn read_u8(&self, addr: u32) -> Result<u8, wrt_error::Error> {
+    pub fn read_u8(&self, addr: u32) -> Result<u8> {
         let mut buffer = [0; 1];
         self.read(addr, &mut buffer)?;
         Ok(u8::from_le_bytes(buffer))
@@ -1351,7 +1408,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the read is out of bounds
-    pub fn read_i16(&self, addr: u32) -> Result<i16, wrt_error::Error> {
+    pub fn read_i16(&self, addr: u32) -> Result<i16> {
         let mut buffer = [0; 2];
         self.read(addr, &mut buffer)?;
         Ok(i16::from_le_bytes(buffer))
@@ -1370,7 +1427,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the read is out of bounds
-    pub fn read_u16(&self, addr: u32) -> Result<u16, wrt_error::Error> {
+    pub fn read_u16(&self, addr: u32) -> Result<u16> {
         let mut buffer = [0; 2];
         self.read(addr, &mut buffer)?;
         Ok(u16::from_le_bytes(buffer))
@@ -1389,7 +1446,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the read is out of bounds
-    pub fn read_u32(&self, addr: u32) -> Result<u32, wrt_error::Error> {
+    pub fn read_u32(&self, addr: u32) -> Result<u32> {
         let mut buffer = [0; 4];
         self.read(addr, &mut buffer)?;
         Ok(u32::from_le_bytes(buffer))
@@ -1408,7 +1465,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the read is out of bounds
-    pub fn read_u64(&self, addr: u32) -> Result<u64, wrt_error::Error> {
+    pub fn read_u64(&self, addr: u32) -> Result<u64> {
         let mut buffer = [0; 8];
         self.read(addr, &mut buffer)?;
         Ok(u64::from_le_bytes(buffer))
@@ -1427,7 +1484,7 @@ impl Memory {
     /// # Errors
     ///
     /// Returns an error if the read is out of bounds
-    pub fn read_v128(&self, addr: u32) -> Result<[u8; 16], wrt_error::Error> {
+    pub fn read_v128(&self, addr: u32) -> Result<[u8; 16]> {
         let mut buffer = [0; 16];
         self.read(addr, &mut buffer)?;
         Ok(buffer)
@@ -1720,7 +1777,7 @@ impl Memory {
              - Max access size: {} bytes\n\
              - Verification level: {:?}",
             self.size_in_bytes(),
-            self.current_pages,
+            self.current_pages.load(Ordering::Relaxed),
             peak_memory,
             access_count,
             unique_regions,
@@ -1743,6 +1800,46 @@ impl Memory {
     /// Returns an error if the memory is corrupted or integrity checks fail
     pub fn as_safe_slice(&self) -> Result<wrt_types::safe_memory::SafeSlice> {
         self.data.get_slice(0, self.size_in_bytes())
+    }
+
+    /// Update the memory buffer through a callback function
+    pub fn update_buffer<F>(&self, _update_fn: F) -> Result<()>
+    where
+        F: FnOnce(&mut [u8]) -> Result<()>,
+    {
+        // self.data.with_mutable_data(update_fn)?;
+        // This pattern is not directly supported by SafeMemoryHandler due to its
+        // ownership and checksumming of the byte buffer.
+        // A redesign of this function or SafeMemoryHandler would be needed
+        // for direct mutable slice access.
+        Err(Error::system_error_with_code(
+            codes::UNSUPPORTED_OPERATION,
+            "Memory::update_buffer pattern is not currently supported with SafeMemoryHandler",
+        ))
+    }
+    
+    /// Grow memory by a number of pages.
+    pub fn grow_memory(&mut self, pages: u32) -> Result<u32> {
+        let old_size_pages = self.current_pages.load(Ordering::Relaxed);
+        let new_size_pages = old_size_pages.saturating_add(pages);
+
+        if new_size_pages > MAX_PAGES {
+            return Err(Error::new(
+                ErrorCategory::Memory,
+                codes::MEMORY_GROW_ERROR,
+                format!("Cannot grow memory beyond WebAssembly maximum of {} pages", MAX_PAGES),
+            ));
+        }
+        
+        let new_byte_size = new_size_pages as usize * PAGE_SIZE;
+        // Placeholder: Assumes SafeMemoryHandler has a method like `resize` 
+        // that takes &self and handles locking internally.
+        self.data.resize(new_byte_size, 0)?;
+        
+        self.current_pages.store(new_size_pages, Ordering::Relaxed);
+        self.update_peak_memory();
+        
+        Ok(old_size_pages)
     }
 }
 

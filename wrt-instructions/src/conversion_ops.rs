@@ -21,6 +21,11 @@ pub enum ConversionOp {
     I32TruncF64U,
     /// Convert i32 to f32 (reinterpret bits)
     I32ReinterpretF32,
+    // Wasm 2.0: Sign-extension operators for i32
+    /// Sign-extend 8-bit integer to 32-bit integer
+    I32Extend8S,
+    /// Sign-extend 16-bit integer to 32-bit integer
+    I32Extend16S,
 
     // i64 conversions
     /// Sign-extend i32 to i64
@@ -37,6 +42,13 @@ pub enum ConversionOp {
     I64TruncF64U,
     /// Convert i64 to f64 (reinterpret bits)
     I64ReinterpretF64,
+    // Wasm 2.0: Sign-extension operators for i64
+    /// Sign-extend 8-bit integer to 64-bit integer
+    I64Extend8S,
+    /// Sign-extend 16-bit integer to 64-bit integer
+    I64Extend16S,
+    /// Sign-extend 32-bit integer to 64-bit integer
+    I64Extend32S,
 
     // f32 conversions
     /// Convert i32 to f32 (signed)
@@ -65,6 +77,24 @@ pub enum ConversionOp {
     F64PromoteF32,
     /// Reinterpret i64 bits as f64
     F64ReinterpretI64,
+
+    // Wasm 2.0: Non-trapping float-to-int conversions
+    /// Convert f32 to i32 (signed, saturate)
+    I32TruncSatF32S,
+    /// Convert f32 to i32 (unsigned, saturate)
+    I32TruncSatF32U,
+    /// Convert f64 to i32 (signed, saturate)
+    I32TruncSatF64S,
+    /// Convert f64 to i32 (unsigned, saturate)
+    I32TruncSatF64U,
+    /// Convert f32 to i64 (signed, saturate)
+    I64TruncSatF32S,
+    /// Convert f32 to i64 (unsigned, saturate)
+    I64TruncSatF32U,
+    /// Convert f64 to i64 (signed, saturate)
+    I64TruncSatF64S,
+    /// Convert f64 to i64 (unsigned, saturate)
+    I64TruncSatF64U,
 }
 
 /// Execution context for conversion operations
@@ -77,7 +107,7 @@ pub trait ConversionContext {
 }
 
 impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
-    fn execute(&self, context: &mut T) -> Result<(), Error> {
+    fn execute(&self, context: &mut T) -> Result<()> {
         match self {
             // i32 conversions
             Self::I32WrapI64 => {
@@ -478,9 +508,7 @@ mod tests {
     #[test]
     fn test_i32_wrap_i64() {
         let mut context = MockExecutionContext::new();
-        context
-            .push_conversion_value(Value::I64(0x1_0000_0000))
-            .unwrap();
+        context.push_conversion_value(Value::I64(0x1_0000_0000)).unwrap();
         ConversionOp::I32WrapI64.execute(&mut context).unwrap();
         assert_eq!(context.pop_conversion_value().unwrap(), Value::I32(0));
     }

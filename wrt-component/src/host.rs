@@ -35,9 +35,7 @@ pub struct Host {
 impl Host {
     /// Creates a new empty host
     pub fn new() -> Self {
-        Self {
-            functions: HashMap::new(),
-        }
+        Self { functions: HashMap::new() }
     }
 
     /// Adds a host function
@@ -92,10 +90,7 @@ mod tests {
         let mut host = Host::new();
 
         let func_type = ExternType::Function {
-            params: vec![
-                ("a".to_string(), ValType::S32),
-                ("b".to_string(), ValType::S32),
-            ],
+            params: vec![("a".to_string(), ValType::S32), ("b".to_string(), ValType::S32)],
             results: vec![ValType::S32],
         };
 

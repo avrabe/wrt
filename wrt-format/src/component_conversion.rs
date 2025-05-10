@@ -58,6 +58,7 @@ pub fn value_type_to_format_val_type(value_type: &ValueType) -> Result<FormatVal
         ValueType::I64 => Ok(FormatValType::S64),
         ValueType::F32 => Ok(FormatValType::F32),
         ValueType::F64 => Ok(FormatValType::F64),
+        ValueType::V128 => unimplemented!("V128 to FormatValType mapping is not yet defined"),
         ValueType::FuncRef => Ok(FormatValType::Own(0)), // Map to handle
         ValueType::ExternRef => Ok(FormatValType::Own(0)), // Map to handle
     }
@@ -70,6 +71,7 @@ pub fn map_wasm_type_to_component(ty: ValueType) -> FormatValType {
         ValueType::I64 => FormatValType::S64,
         ValueType::F32 => FormatValType::F32,
         ValueType::F64 => FormatValType::F64,
+        ValueType::V128 => unimplemented!("V128 to FormatValType mapping is not yet defined"),
         ValueType::FuncRef => FormatValType::Own(0), // Map to handle
         ValueType::ExternRef => FormatValType::Own(0), // Map to handle
     }

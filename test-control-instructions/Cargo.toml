@@ -3,8 +3,11 @@ name = "test-control-instructions"
 version.workspace = true
 edition.workspace = true
 description = "Test utilities for WebAssembly control instructions"
-license = "MIT"
+license.workspace = true
 repository = "https://github.com/avrabe/wrt"
+readme = "README.md"
+keywords = ["wasm", "webassembly", "test", "control-flow", "utilities"]
+categories = ["wasm", "development-tools::testing"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

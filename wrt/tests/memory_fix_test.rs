@@ -5,10 +5,7 @@ use wrt::Result;
 #[test]
 fn test_memory_operations() -> Result<()> {
     // Create a memory type with 1 page (64 KiB) and a maximum of 2 pages
-    let memory_type = MemoryType {
-        min: 1,
-        max: Some(2),
-    };
+    let memory_type = MemoryType { min: 1, max: Some(2) };
 
     // Create a new memory instance with the specified type
     let memory = Memory::new(memory_type)?;
@@ -21,16 +18,8 @@ fn test_memory_operations() -> Result<()> {
     memory.write_u32(200, 0x12345678)?;
 
     // Read values back and verify they match
-    assert_eq!(
-        memory.read_byte(100)?,
-        42,
-        "Read value doesn't match written value"
-    );
-    assert_eq!(
-        memory.read_u32(200)?,
-        0x12345678,
-        "Read u32 doesn't match written value"
-    );
+    assert_eq!(memory.read_byte(100)?, 42, "Read value doesn't match written value");
+    assert_eq!(memory.read_u32(200)?, 0x12345678, "Read u32 doesn't match written value");
 
     // Test memory growth
     let old_size = memory.grow(1)?;
@@ -38,17 +27,10 @@ fn test_memory_operations() -> Result<()> {
     assert_eq!(memory.size(), 2, "New size should be 2 pages");
 
     // Verify memory access after growth still works
-    assert_eq!(
-        memory.read_byte(100)?,
-        42,
-        "Memory content changed after growth"
-    );
+    assert_eq!(memory.read_byte(100)?, 42, "Memory content changed after growth");
 
     // Test attempting to grow beyond max
-    assert!(
-        memory.grow(1).is_err(),
-        "Should not be able to grow beyond max"
-    );
+    assert!(memory.grow(1).is_err(), "Should not be able to grow beyond max");
 
     Ok(())
 }

@@ -1,3 +1,11 @@
+// WRT - wrt-types
+// Module: WebAssembly Component Model Built-in Types
+// SW-REQ-ID: REQ_WASM_COMPONENT_001 (Example: Relates to component model built-ins)
+//
+// Copyright (c) 2024 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
 //! WebAssembly Component Model built-in type definitions
 //!
 //! This module defines the built-in types and operations available in the
@@ -179,12 +187,8 @@ impl BuiltinType {
     pub fn all_available() -> Vec<Self> {
         // Create a vector with the resource built-ins which are always available
         #[allow(unused_mut)]
-        let mut result = vec![
-            Self::ResourceCreate,
-            Self::ResourceDrop,
-            Self::ResourceRep,
-            Self::ResourceGet,
-        ];
+        let mut result =
+            vec![Self::ResourceCreate, Self::ResourceDrop, Self::ResourceRep, Self::ResourceGet];
 
         // Async built-ins
         #[cfg(feature = "component-model-async")]
@@ -234,32 +238,14 @@ mod tests {
 
     #[test]
     fn test_builtin_from_str() {
-        assert_eq!(
-            BuiltinType::from_str("resource.create"),
-            Ok(BuiltinType::ResourceCreate)
-        );
-        assert_eq!(
-            BuiltinType::from_str("resource.drop"),
-            Ok(BuiltinType::ResourceDrop)
-        );
-        assert_eq!(
-            BuiltinType::from_str("resource.rep"),
-            Ok(BuiltinType::ResourceRep)
-        );
-        assert_eq!(
-            BuiltinType::from_str("resource.get"),
-            Ok(BuiltinType::ResourceGet)
-        );
-        assert_eq!(
-            BuiltinType::from_str("unknown.builtin"),
-            Err(ParseBuiltinError)
-        );
+        assert_eq!(BuiltinType::from_str("resource.create"), Ok(BuiltinType::ResourceCreate));
+        assert_eq!(BuiltinType::from_str("resource.drop"), Ok(BuiltinType::ResourceDrop));
+        assert_eq!(BuiltinType::from_str("resource.rep"), Ok(BuiltinType::ResourceRep));
+        assert_eq!(BuiltinType::from_str("resource.get"), Ok(BuiltinType::ResourceGet));
+        assert_eq!(BuiltinType::from_str("unknown.builtin"), Err(ParseBuiltinError));
 
         // Also test the parse convenience method
-        assert_eq!(
-            BuiltinType::parse("resource.create"),
-            Some(BuiltinType::ResourceCreate)
-        );
+        assert_eq!(BuiltinType::parse("resource.create"), Some(BuiltinType::ResourceCreate));
         assert_eq!(BuiltinType::parse("unknown.builtin"), None);
     }
 

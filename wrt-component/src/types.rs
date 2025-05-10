@@ -4,6 +4,7 @@
 
 use crate::component::Component;
 use crate::prelude::*;
+use wrt_error::kinds::InvalidState;
 
 /// Represents an instantiated component
 #[derive(Debug)]
@@ -40,11 +41,7 @@ impl Default for ComponentInstanceState {
 impl ComponentInstance {
     /// Create a new component instance
     pub fn new(component: Arc<Component>, id: &str) -> Self {
-        Self {
-            component,
-            id: id.to_string(),
-            state: ComponentInstanceState::Initialized,
-        }
+        Self { component, id: id.to_string(), state: ComponentInstanceState::Initialized }
     }
 
     /// Get the component reference
@@ -76,9 +73,9 @@ impl ComponentInstance {
             Ok(())
         } else {
             Err(Error::new(
-                ErrorCategory::Runtime,
+                ErrorCategory::Component,
                 codes::INVALID_STATE,
-                kinds::InvalidState("Component is not in a startable state".to_string()),
+                InvalidState("Component is not in a startable state".to_string()),
             ))
         }
     }
@@ -90,9 +87,9 @@ impl ComponentInstance {
             Ok(())
         } else {
             Err(Error::new(
-                ErrorCategory::Runtime,
+                ErrorCategory::Component,
                 codes::INVALID_STATE,
-                kinds::InvalidState("Component is not running".to_string()),
+                InvalidState("Component is not running".to_string()),
             ))
         }
     }
@@ -106,9 +103,9 @@ impl ComponentInstance {
             Ok(())
         } else {
             Err(Error::new(
-                ErrorCategory::Runtime,
+                ErrorCategory::Component,
                 codes::INVALID_STATE,
-                kinds::InvalidState("Component is already stopped or in error state".to_string()),
+                InvalidState("Component is already stopped or in error state".to_string()),
             ))
         }
     }

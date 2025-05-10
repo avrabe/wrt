@@ -106,16 +106,13 @@ impl BuiltinSerialization {
     /// # Returns
     ///
     /// A `Result` containing the deserialized values or an error
-    pub fn deserialize(
-        bytes: &[u8],
-        types: &[wrt_format::component::ValType],
-    ) -> Result<Vec<ComponentValue>> {
+    pub fn deserialize(bytes: &[u8], types: &[ValType]) -> Result<Vec<ComponentValue>> {
         let mut result = Vec::new();
         let mut offset = 0;
 
         for ty in types {
             match ty {
-                wrt_format::component::ValType::S32 => {
+                ValType::S32 => {
                     if offset + 4 > bytes.len() {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Parse,
@@ -128,7 +125,7 @@ impl BuiltinSerialization {
                     result.push(ComponentValue::S32(i32::from_le_bytes(buf)));
                     offset += 4;
                 }
-                wrt_format::component::ValType::S64 => {
+                ValType::S64 => {
                     if offset + 8 > bytes.len() {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Parse,
@@ -141,7 +138,7 @@ impl BuiltinSerialization {
                     result.push(ComponentValue::S64(i64::from_le_bytes(buf)));
                     offset += 8;
                 }
-                wrt_format::component::ValType::F32 => {
+                ValType::F32 => {
                     if offset + 4 > bytes.len() {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Parse,
@@ -154,7 +151,7 @@ impl BuiltinSerialization {
                     result.push(ComponentValue::F32(f32::from_le_bytes(buf)));
                     offset += 4;
                 }
-                wrt_format::component::ValType::F64 => {
+                ValType::F64 => {
                     if offset + 8 > bytes.len() {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Parse,
@@ -179,6 +176,71 @@ impl BuiltinSerialization {
 
         Ok(result)
     }
+
+    // NOTE: The following two functions (serialize_args, supported_serialization_types) were erroneously added
+    // by a previous edit and should be removed if they are not part of the original DefaultBuiltinSerialization.
+    // For now, I am commenting them out to ensure the build doesn't break, but they should be deleted if not needed.
+    /*
+    fn serialize_args(
+        &self,
+        context: &InterceptContext,
+        args: &[ComponentValue],
+        types: &[ValType],
+    ) -> Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+        for (index, value) in args.iter().enumerate() {
+            match types.get(index) {
+                Some(ty) => match ty {
+                    ValType::S32 => {
+                        if let Some(ComponentValue::S32(val)) = args.get(index) {
+                            bytes.extend_from_slice(&val.to_le_bytes());
+                        }
+                    }
+                    ValType::S64 => {
+                        if let Some(ComponentValue::S64(val)) = args.get(index) {
+                            bytes.extend_from_slice(&val.to_le_bytes());
+                        }
+                    }
+                    ValType::F32 => {
+                        if let Some(ComponentValue::F32(val)) = args.get(index) {
+                            bytes.extend_from_slice(&val.to_le_bytes());
+                        }
+                    }
+                    ValType::F64 => {
+                        if let Some(ComponentValue::F64(val)) = args.get(index) {
+                            bytes.extend_from_slice(&val.to_le_bytes());
+                        }
+                    }
+                    _ => {
+                        return Err(Error::new(
+                            wrt_error::ErrorCategory::Type,
+                            wrt_error::codes::INVALID_TYPE,
+                            "Unsupported value type for serialization",
+                        ))
+                    }
+                },
+                None => {
+                    return Err(Error::new(
+                        wrt_error::ErrorCategory::Type,
+                        wrt_error::codes::INVALID_TYPE,
+                        "Index out of bounds for serialization",
+                    ))
+                }
+            }
+        }
+        Ok(bytes)
+    }
+
+    fn supported_serialization_types() -> Vec<ValType> {
+        // Example: only basic numeric types are supported for now
+        vec![
+            ValType::S32,
+            ValType::S64,
+            ValType::F32,
+            ValType::F64,
+        ]
+    }
+    */
 }
 
 /// The BuiltinInterceptor trait defines methods for intercepting and
@@ -261,33 +323,33 @@ mod tests {
     #[test]
     fn test_builtin_serialization() {
         let values = vec![
-            ComponentValue::S32(42),
-            ComponentValue::S64(1234567890),
-            ComponentValue::F32(3.14),
-            ComponentValue::F64(2.71828),
+            ComponentValue::S32(123),
+            ComponentValue::S64(456),
+            ComponentValue::F32(1.23),
+            ComponentValue::F64(4.56),
         ];
 
-        let serialized = BuiltinSerialization::serialize(&values).unwrap();
+        let serialized_bytes = BuiltinSerialization::serialize(&values).unwrap();
 
-        let types = vec![
-            wrt_format::component::ValType::S32,
-            wrt_format::component::ValType::S64,
-            wrt_format::component::ValType::F32,
-            wrt_format::component::ValType::F64,
-        ];
+        let types = vec![ValType::S32, ValType::S64, ValType::F32, ValType::F64];
 
-        let deserialized = BuiltinSerialization::deserialize(&serialized, &types).unwrap();
+        let deserialized_values =
+            BuiltinSerialization::deserialize(&serialized_bytes, &types).unwrap();
 
-        assert_eq!(deserialized.len(), values.len());
-        assert_eq!(deserialized[0], values[0]);
-        assert_eq!(deserialized[1], values[1]);
+        assert_eq!(deserialized_values.len(), values.len());
+        assert_eq!(deserialized_values[0], values[0]);
+        assert_eq!(deserialized_values[1], values[1]);
         // For floating point, we need to handle potential rounding issues
-        if let (ComponentValue::F32(a), ComponentValue::F32(b)) = (&deserialized[2], &values[2]) {
+        if let (ComponentValue::F32(a), ComponentValue::F32(b)) =
+            (&deserialized_values[2], &values[2])
+        {
             assert!((a - b).abs() < f32::EPSILON);
         } else {
             panic!("Expected F32 values");
         }
-        if let (ComponentValue::F64(a), ComponentValue::F64(b)) = (&deserialized[3], &values[3]) {
+        if let (ComponentValue::F64(a), ComponentValue::F64(b)) =
+            (&deserialized_values[3], &values[3])
+        {
             assert!((a - b).abs() < f64::EPSILON);
         } else {
             panic!("Expected F64 values");

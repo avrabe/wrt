@@ -35,10 +35,7 @@ pub fn check_all_wat(dir: &Path) -> Result<()> {
         found_wat = true;
         let wasm_file = wat_to_wasm_path(&wat_file)?;
         if needs_conversion(&wat_file, &wasm_file)? {
-            println!(
-                "WARNING: WASM file needs to be rebuilt: {}",
-                wasm_file.display()
-            );
+            println!("WARNING: WASM file needs to be rebuilt: {}", wasm_file.display());
             needs_rebuild = true;
         }
     }
@@ -74,11 +71,7 @@ pub fn convert_wat(wat_path: &Path, wasm_path: &Path, skip_if_fresh: bool) -> Re
         return Ok(false);
     }
 
-    println!(
-        "Converting {} to {}...",
-        wat_path.display(),
-        wasm_path.display()
-    );
+    println!("Converting {} to {}...", wat_path.display(), wasm_path.display());
 
     let wat_text = fs::read_to_string(wat_path)
         .with_context(|| format!("Failed to read WAT file: {}", wat_path.display()))?;
@@ -89,10 +82,7 @@ pub fn convert_wat(wat_path: &Path, wasm_path: &Path, skip_if_fresh: bool) -> Re
     // Ensure target directory exists
     if let Some(parent) = wasm_path.parent() {
         fs::create_dir_all(parent).with_context(|| {
-            format!(
-                "Failed to create directory for WASM file: {}",
-                parent.display()
-            )
+            format!("Failed to create directory for WASM file: {}", parent.display())
         })?;
     }
 
@@ -126,10 +116,7 @@ fn find_wat_files(dir: &Path) -> Result<Vec<PathBuf>> {
 /// Determines the corresponding .wasm path for a given .wat path.
 pub fn wat_to_wasm_path(wat_path: &Path) -> Result<PathBuf> {
     if wat_path.extension().is_none_or(|ext| ext != "wat") {
-        bail!(
-            "Input file does not have a .wat extension: {}",
-            wat_path.display()
-        );
+        bail!("Input file does not have a .wat extension: {}", wat_path.display());
     }
     Ok(wat_path.with_extension("wasm"))
 }

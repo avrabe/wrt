@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.rs text diff=rust eol=lf
+*.toml text diff=toml eol=lf
+*.md text eol=lf
+*.sh eol=lf
+*.py eol=lf 

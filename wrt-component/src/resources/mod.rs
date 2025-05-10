@@ -4,6 +4,7 @@
 //! including resource lifetime management, memory optimization, and interception support.
 
 use crate::prelude::*;
+use std::sync::Weak;
 
 // Submodules
 pub mod buffer_pool;
@@ -94,14 +95,7 @@ impl Resource {
     /// Create a new resource
     pub fn new(type_idx: u32, data: Arc<dyn Any + Send + Sync>) -> Self {
         let now = Instant::now();
-        Self {
-            type_idx,
-            data,
-            name: None,
-            created_at: now,
-            last_accessed: now,
-            access_count: 0,
-        }
+        Self { type_idx, data, name: None, created_at: now, last_accessed: now, access_count: 0 }
     }
 
     /// Create a new resource with a debug name
@@ -218,10 +212,7 @@ impl fmt::Debug for ResourceTable {
             .field("next_handle", &self.next_handle)
             .field("max_resources", &self.max_resources)
             .field("default_memory_strategy", &self.default_memory_strategy)
-            .field(
-                "default_verification_level",
-                &self.default_verification_level,
-            )
+            .field("default_verification_level", &self.default_verification_level)
             .field("interceptor_count", &self.interceptors.len())
             .finish()
     }
@@ -274,11 +265,7 @@ impl ResourceTable {
             return Err(Error::new(
                 ErrorCategory::Resource,
                 codes::RESOURCE_ERROR,
-                format!(
-                    "Maximum number of resources ({}) reached",
-                    self.max_resources
-                )
-                .to_string(),
+                format!("Maximum number of resources ({}) reached", self.max_resources).to_string(),
             ));
         }
 
@@ -311,10 +298,7 @@ impl ResourceTable {
     /// Create a borrowed reference to a resource
     pub fn borrow_resource(&mut self, handle: u32) -> Result<u32> {
         // Check if the resource exists
-        let resource_opt = self
-            .resources
-            .get(&handle)
-            .map(|entry| entry.resource.clone());
+        let resource_opt = self.resources.get(&handle).map(|entry| entry.resource.clone());
 
         let resource = match resource_opt {
             Some(r) => r,
@@ -545,8 +529,7 @@ impl ResourceTable {
 }
 
 /// Buffer pool for reusing memory buffers
-#[derive(Debug, Clone)]
-pub struct BufferPool {
+pub struct BufferPoolImpl {
     /// Map of buffer sizes to pools of buffers
     pools: Arc<Mutex<HashMap<usize, Vec<Vec<u8>>>>>,
     /// Maximum buffer size to keep in the pool
@@ -555,7 +538,7 @@ pub struct BufferPool {
     max_buffers_per_size: usize,
 }
 
-impl BufferPool {
+impl BufferPoolImpl {
     /// Create a new buffer pool
     pub fn new(max_buffer_size: usize) -> Self {
         Self {
@@ -569,11 +552,7 @@ impl BufferPool {
     pub fn allocate(&mut self, min_size: usize) -> Vec<u8> {
         let mut pools = self.pools.lock().unwrap();
         // Find the smallest buffer size that fits
-        let size_key = pools
-            .keys()
-            .filter(|&size| *size >= min_size)
-            .min()
-            .cloned();
+        let size_key = pools.keys().filter(|&size| *size >= min_size).min().cloned();
 
         if let Some(size) = size_key {
             if let Some(buffers) = pools.get_mut(&size) {
@@ -622,11 +601,7 @@ impl BufferPool {
             total_capacity += size * buffers.len();
         }
 
-        BufferPoolStats {
-            total_buffers,
-            total_capacity,
-            size_count: pools.len(),
-        }
+        BufferPoolStats { total_buffers, total_capacity, size_count: pools.len() }
     }
 
     /// Clear all buffers from the pool
@@ -694,9 +669,7 @@ mod tests {
 
     impl TestInterceptor {
         fn new() -> Self {
-            Self {
-                operations: std::sync::Mutex::new(Vec::new()),
-            }
+            Self { operations: std::sync::Mutex::new(Vec::new()) }
         }
 
         fn get_operations(&self) -> Vec<String> {
@@ -706,34 +679,22 @@ mod tests {
 
     impl ResourceInterceptor for TestInterceptor {
         fn on_resource_create(&self, type_idx: u32, _resource: &Resource) -> Result<()> {
-            self.operations
-                .lock()
-                .unwrap()
-                .push(format!("create: {}", type_idx));
+            self.operations.lock().unwrap().push(format!("create: {}", type_idx));
             Ok(())
         }
 
         fn on_resource_drop(&self, handle: u32) -> Result<()> {
-            self.operations
-                .lock()
-                .unwrap()
-                .push(format!("drop: {}", handle));
+            self.operations.lock().unwrap().push(format!("drop: {}", handle));
             Ok(())
         }
 
         fn on_resource_borrow(&self, handle: u32) -> Result<()> {
-            self.operations
-                .lock()
-                .unwrap()
-                .push(format!("borrow: {}", handle));
+            self.operations.lock().unwrap().push(format!("borrow: {}", handle));
             Ok(())
         }
 
         fn on_resource_access(&self, handle: u32) -> Result<()> {
-            self.operations
-                .lock()
-                .unwrap()
-                .push(format!("access: {}", handle));
+            self.operations.lock().unwrap().push(format!("access: {}", handle));
             Ok(())
         }
 
@@ -807,18 +768,8 @@ mod tests {
         let resource1 = table.get_resource(handle).unwrap();
         let resource2 = table.get_resource(borrow_handle).unwrap();
 
-        let data1 = resource1
-            .lock()
-            .unwrap()
-            .data
-            .downcast_ref::<TestData>()
-            .unwrap();
-        let data2 = resource2
-            .lock()
-            .unwrap()
-            .data
-            .downcast_ref::<TestData>()
-            .unwrap();
+        let data1 = resource1.lock().unwrap().data.downcast_ref::<TestData>().unwrap();
+        let data2 = resource2.lock().unwrap().data.downcast_ref::<TestData>().unwrap();
 
         assert_eq!(data1.value, 42);
         assert_eq!(data2.value, 42);
@@ -840,7 +791,7 @@ mod tests {
 
     #[test]
     fn test_buffer_pool() {
-        let mut pool = BufferPool::new(4096);
+        let mut pool = BufferPoolImpl::new(4096);
 
         // Get a buffer
         let buffer1 = pool.allocate(100);
@@ -873,14 +824,10 @@ mod tests {
         let handle = table.create_resource(1, data).unwrap();
 
         // Default strategy is BoundedCopy
-        table
-            .set_memory_strategy(handle, MemoryStrategy::ZeroCopy)
-            .unwrap();
+        table.set_memory_strategy(handle, MemoryStrategy::ZeroCopy).unwrap();
 
         // Invalid handle should fail
-        assert!(table
-            .set_memory_strategy(999, MemoryStrategy::ZeroCopy)
-            .is_err());
+        assert!(table.set_memory_strategy(999, MemoryStrategy::ZeroCopy).is_err());
     }
 
     #[test]
@@ -920,9 +867,7 @@ mod tests {
         let _resource = table.get_resource(handle).unwrap();
 
         // Apply an operation
-        table
-            .apply_operation(handle, FormatResourceOperation::Rep)
-            .unwrap();
+        table.apply_operation(handle, FormatResourceOperation::Rep).unwrap();
 
         // Check interceptor operations
         let operations = interceptor.get_operations();
@@ -955,15 +900,11 @@ mod tests {
         );
 
         // Test regular operation
-        let result = table
-            .apply_operation(handle, FormatResourceOperation::Rep)
-            .unwrap();
+        let result = table.apply_operation(handle, FormatResourceOperation::Rep).unwrap();
         assert!(matches!(result, ComponentValue::U32(_)));
 
         // Test intercepted operation
-        let result = table
-            .apply_operation(42, FormatResourceOperation::Rep)
-            .unwrap();
+        let result = table.apply_operation(42, FormatResourceOperation::Rep).unwrap();
         assert!(matches!(result, ComponentValue::Bool(true)));
 
         // Check that operations were recorded
@@ -988,10 +929,7 @@ mod tests {
         table.resources.insert(
             even_handle,
             ResourceEntry {
-                resource: Arc::new(Mutex::new(Resource::new(
-                    1,
-                    Arc::new(TestData { value: 2 }),
-                ))),
+                resource: Arc::new(Mutex::new(Resource::new(1, Arc::new(TestData { value: 2 })))),
                 borrows: Vec::new(),
                 memory_strategy: MemoryStrategy::ZeroCopy,
                 verification_level: VerificationLevel::Critical,
@@ -1001,10 +939,7 @@ mod tests {
         table.resources.insert(
             odd_handle,
             ResourceEntry {
-                resource: Arc::new(Mutex::new(Resource::new(
-                    1,
-                    Arc::new(TestData { value: 3 }),
-                ))),
+                resource: Arc::new(Mutex::new(Resource::new(1, Arc::new(TestData { value: 3 })))),
                 borrows: Vec::new(),
                 memory_strategy: MemoryStrategy::ZeroCopy,
                 verification_level: VerificationLevel::Critical,

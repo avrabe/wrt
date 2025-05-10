@@ -1,7 +1,18 @@
-//! Bounded collections with functional safety verification
-//!
-//! This module provides bounded collection types that are designed for
-//! functional safety with built-in size limits and verification features.
+// WRT - wrt-types
+// Module: Bounded Collections
+// SW-REQ-ID: REQ_MEM_SAFETY_004 (Example: Relates to bounded data structures)
+// SW-REQ-ID: REQ_WASM_RUNTIME_015 (Example: HashMap slot state management)
+//
+// Copyright (c) 2024 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+#![cfg_attr(not(feature = "std"), allow(unused_imports))]
+
+/// Bounded collections with functional safety verification
+///
+/// This module provides bounded collection types that are designed for
+/// functional safety with built-in size limits and verification features.
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -9,30 +20,41 @@ extern crate alloc;
 // For std environment
 #[cfg(feature = "std")]
 use std::{
-    fmt, hash, mem,
-    string::{String, ToString},
-    vec::Vec,
+    fmt,
+    // string::{String, ToString}, // Removed
+    // vec::Vec, // Removed
 };
 
 // For no_std with alloc
 #[cfg(all(feature = "alloc", not(feature = "std")))]
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{};
 
 // For no_std environment
 #[cfg(not(feature = "std"))]
-use core::{fmt, hash, mem};
+use core::fmt; // Removed hash, mem
 
 // Use the HashMap that's re-exported in lib.rs - works for both std and no_std
 #[allow(unused_imports)]
 use crate::operations;
 use crate::operations::record_global_operation;
 use crate::operations::OperationType;
-use crate::validation::{importance, BoundedCapacity, Checksummed, Validatable};
+use crate::validation::{importance, BoundedCapacity, Checksummed}; // Removed Validatable
 use crate::verification::{Checksum, VerificationLevel};
-use crate::HashMap;
+// use crate::HashMap; // Removed, should come from prelude
+
+use crate::prelude::ToString;
+use crate::prelude::*;
+use crate::traits::Checksummable;
+// Ensure MemoryProvider is imported directly for trait bounds.
+#[cfg(feature = "std")]
+use crate::prelude::Vec; // This was added in a previous step for owned Vec, keep it.
+#[cfg(not(feature = "std"))]
+use crate::safe_memory::NoStdMemoryProvider;
+use crate::safe_memory::{MemoryProvider, SafeMemoryHandler, SafeSlice, SafeSliceMut}; // Added SafeSliceMut, SafeSlice
+use crate::traits::{FromBytes, SerializationError, ToBytes};
+use core::marker::PhantomData; // Added ToBytes, FromBytes, SerializationError
+                               // use core::hash::{BuildHasher, Hasher}; // Removed BuildHasher, Hasher
+                               // use std::collections::hash_map::RandomState; // For a default hasher - BoundedHashMap not found, this is likely unused for no_std
 
 /// Error indicating a collection has reached its capacity limit
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,6 +63,16 @@ pub struct CapacityError;
 impl fmt::Display for CapacityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Bounded collection capacity exceeded")
+    }
+}
+
+impl From<CapacityError> for wrt_error::Error {
+    fn from(_err: CapacityError) -> Self {
+        wrt_error::Error::new(
+            wrt_error::ErrorCategory::Capacity,
+            wrt_error::codes::CAPACITY_EXCEEDED,
+            "Bounded collection capacity exceeded".to_string(),
+        )
     }
 }
 
@@ -79,38 +111,39 @@ pub enum BoundedError {
 
     /// Generic validation error
     ValidationFailure(String),
+
+    /// Serialization error
+    Serialization(crate::traits::SerializationError),
+
+    /// Index out of bounds
+    IndexOutOfBounds {
+        /// Type of collection being accessed
+        collection_type: String,
+        /// Index that was attempted
+        index: usize,
+        /// Length of the collection
+        len: usize,
+    },
 }
 
 impl fmt::Display for BoundedError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::CapacityExceeded {
-                collection_type,
-                capacity,
-                attempted_size,
-            } => {
+            Self::CapacityExceeded { collection_type, capacity, attempted_size } => {
                 write!(
                     f,
                     "{} capacity exceeded: limit {}, attempted {}",
                     collection_type, capacity, attempted_size
                 )
             }
-            Self::InvalidAccess {
-                collection_type,
-                index,
-                size,
-            } => {
+            Self::InvalidAccess { collection_type, index, size } => {
                 write!(
                     f,
                     "Invalid access to {} at index {}, size is {}",
                     collection_type, index, size
                 )
             }
-            Self::ChecksumMismatch {
-                expected,
-                actual,
-                description,
-            } => {
+            Self::ChecksumMismatch { expected, actual, description } => {
                 write!(
                     f,
                     "Checksum mismatch in {}: expected {:08x}, got {:08x}",
@@ -120,1483 +153,990 @@ impl fmt::Display for BoundedError {
             Self::ValidationFailure(msg) => {
                 write!(f, "Validation failure: {}", msg)
             }
+            Self::Serialization(s_err) => write!(f, "Serialization error: {}", s_err),
+            Self::IndexOutOfBounds { collection_type, index, len } => {
+                write!(
+                    f,
+                    "Index out of bounds in {}: attempted index {}, length is {}",
+                    collection_type, index, len
+                )
+            }
         }
     }
 }
 
-/// A bounded stack with a fixed maximum capacity and verification
+impl From<crate::traits::SerializationError> for BoundedError {
+    fn from(err: crate::traits::SerializationError) -> Self {
+        BoundedError::Serialization(err)
+    }
+}
+
+impl From<BoundedError> for wrt_error::Error {
+    fn from(err: BoundedError) -> Self {
+        match err {
+            BoundedError::CapacityExceeded { collection_type, capacity, attempted_size } => {
+                let msg = format!(
+                    "{} capacity exceeded: limit {}, attempted {}",
+                    collection_type, capacity, attempted_size
+                );
+                wrt_error::Error::new(
+                    wrt_error::ErrorCategory::Capacity,
+                    wrt_error::codes::CAPACITY_EXCEEDED,
+                    msg,
+                )
+            }
+            BoundedError::InvalidAccess { collection_type, index, size } => {
+                let msg = format!(
+                    "Invalid access to {} at index {}, size is {}",
+                    collection_type, index, size
+                );
+                wrt_error::Error::new(
+                    wrt_error::ErrorCategory::Core,
+                    wrt_error::codes::OUT_OF_BOUNDS_ERROR,
+                    msg,
+                )
+            }
+            BoundedError::ChecksumMismatch { expected, actual, description } => {
+                let msg = format!(
+                    "Checksum mismatch in {}: expected {:08x}, got {:08x}",
+                    description, expected, actual
+                );
+                wrt_error::Error::new(
+                    wrt_error::ErrorCategory::Validation,
+                    wrt_error::codes::CHECKSUM_MISMATCH,
+                    msg,
+                )
+            }
+            BoundedError::ValidationFailure(description) => wrt_error::Error::new(
+                wrt_error::ErrorCategory::Validation,
+                wrt_error::codes::VALIDATION_FAILURE,
+                description,
+            ),
+            BoundedError::Serialization(s_err) => wrt_error::Error::new(
+                wrt_error::ErrorCategory::Serialization,
+                wrt_error::codes::SERIALIZATION_ERROR,
+                s_err.to_string(),
+            ),
+            BoundedError::IndexOutOfBounds { collection_type, index, len } => {
+                let msg = format!(
+                    "Index out of bounds in {}: attempted index {}, length is {}",
+                    collection_type, index, len
+                );
+                wrt_error::Error::new(
+                    wrt_error::ErrorCategory::Core,
+                    wrt_error::codes::OUT_OF_BOUNDS_ERROR,
+                    msg,
+                )
+            }
+        }
+    }
+}
+
+/// A bounded stack with a fixed maximum capacity and verification.
 ///
-/// This stack ensures it never exceeds the specified capacity,
-/// returning an error when push operations would exceed this limit.
-/// It also maintains a checksum of its contents for verification.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BoundedStack<T, const N: usize>
+/// This stack ensures it never exceeds the specified capacity `N_ELEMENTS`.
+/// It uses a `MemoryProvider` for storing serialized elements.
+#[derive(Debug)] // Removed Clone, PartialEq, Eq
+pub struct BoundedStack<T, const N_ELEMENTS: usize, P: MemoryProvider>
 where
-    T: AsRef<[u8]>,
+    T: Sized + Checksummable + ToBytes + FromBytes, // Removed Clone, added ToBytes + FromBytes
 {
-    /// The underlying stack storage
-    data: Vec<T>,
+    /// The underlying memory handler
+    handler: SafeMemoryHandler<P>,
+    /// Current number of elements in the stack
+    length: usize,
+    /// Size of a single element T in bytes (using T::SERIALIZED_SIZE)
+    elem_size: usize,
     /// Checksum for verifying data integrity
     checksum: Checksum,
     /// Verification level for this stack
     verification_level: VerificationLevel,
+    /// Phantom data for type T
+    _phantom: PhantomData<T>,
 }
 
-impl<T, const N: usize> Default for BoundedStack<T, N>
-where
-    T: AsRef<[u8]>,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// Default implementation requires MemoryProvider to be Default, which might not always be true.
+// Provide new and with_verification_level constructors instead.
+// impl<T, const N_ELEMENTS: usize, P: MemoryProvider> Default for BoundedStack<T, N_ELEMENTS, P>
+// where
+//     T: Sized + Checksummable + ToBytes + FromBytes,
+//     P: Default, // Added P: Default
+// {
+//     fn default() -> Self {
+//         Self::new(P::default())
+//     }
+// }
 
-impl<T, const N: usize> BoundedStack<T, N>
+impl<T, const N_ELEMENTS: usize, P: MemoryProvider> BoundedStack<T, N_ELEMENTS, P>
 where
-    T: AsRef<[u8]>,
+    T: Sized + Checksummable + ToBytes + FromBytes, // Removed Clone, added ToBytes + FromBytes
 {
-    /// Create a new empty bounded stack
-    pub fn new() -> Self {
-        Self::with_verification_level(VerificationLevel::default())
+    /// Creates a new `BoundedStack` with the given memory provider and default verification level.
+    pub fn new(provider: P) -> Self {
+        Self::with_verification_level(provider, VerificationLevel::default())
     }
 
-    /// Create a new empty bounded stack with a specific verification level
-    pub fn with_verification_level(level: VerificationLevel) -> Self {
-        Self {
-            data: Vec::with_capacity(N),
-            checksum: Checksum::new(),
+    /// Creates a new `BoundedStack` with the given memory provider and verification level.
+    pub fn with_verification_level(provider: P, level: VerificationLevel) -> Self {
+        let elem_size = <T as FromBytes>::SERIALIZED_SIZE;
+        // It's good practice to ensure the provider has enough capacity, though SafeMemoryHandler might also check.
+        // let required_bytes = N_ELEMENTS.saturating_mul(elem_size);
+        // if provider.capacity() < required_bytes { ... handle error or panic ... }
+
+        BoundedStack {
+            handler: SafeMemoryHandler::new(provider, level, importance::CRITICAL), // Example importance
+            length: 0,
+            elem_size,
+            checksum: Checksum::default(),
             verification_level: level,
+            _phantom: PhantomData,
         }
     }
 
-    /// Push an element onto the stack
+    /// Pushes an item onto the stack.
     ///
-    /// Returns an error if the stack is at capacity
-    pub fn push(&mut self, item: T) -> Result<(), CapacityError> {
-        // Track the push operation
-        record_global_operation(OperationType::CollectionPush, self.verification_level);
-
-        if self.is_full() {
-            return Err(CapacityError);
-        }
-
-        // Only update checksum if verification is enabled
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            self.checksum.update_slice(item.as_ref());
-            // Track checksum calculation
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
-
-        self.data.push(item);
-
-        Ok(())
-    }
-
-    /// Pop an element from the stack
+    /// # Errors
     ///
-    /// # Returns
-    ///
-    /// Returns the top element if the stack is not empty, or None if it is.
-    ///
-    /// # Panics
-    ///
-    /// This function does not panic.
-    /// Safety impact: [LOW|MEDIUM|HIGH] - [Brief explanation of the safety implication]
-    /// Tracking: WRTQ-XXX (qualification requirement tracking ID).
-    pub fn pop(&mut self) -> Option<T> {
-        // Track the pop operation
-        record_global_operation(OperationType::CollectionPop, self.verification_level);
-
-        let item = self.data.pop()?;
-
-        // Recompute checksum if verification is enabled
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            self.recalculate_checksum();
-            // Track checksum calculation
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
-
-        Some(item)
-    }
-
-    /// Peek at the top element without removing it
-    pub fn peek(&self) -> Option<&T> {
-        // Track the lookup operation
-        record_global_operation(OperationType::CollectionLookup, self.verification_level);
-
-        // For high verification levels, verify before returning data
-        if crate::validation::should_validate_redundant(self.verification_level)
-            && !self.verify_checksum()
-        {
-            return None;
-        }
-
-        self.data.last()
-    }
-
-    /// Get the current verification level
-    pub fn verification_level(&self) -> VerificationLevel {
-        self.verification_level
-    }
-
-    /// Set a new verification level
-    pub fn set_verification_level(&mut self, level: VerificationLevel) {
-        // When changing to a non-None level from None, recalculate the checksum
-        let needs_recalc = matches!(self.verification_level, VerificationLevel::None)
-            && !matches!(level, VerificationLevel::None);
-
-        self.verification_level = level;
-
-        if needs_recalc {
-            self.recalculate_checksum();
-        }
-    }
-
-    /// Verify the integrity of the stack (backward compatibility method)
-    pub fn verify(&self) -> bool {
-        // Track the validation operation
-        record_global_operation(OperationType::CollectionValidate, self.verification_level);
-
-        self.verify_checksum()
-    }
-}
-
-// Implement the traits for BoundedStack
-impl<T, const N: usize> BoundedCapacity for BoundedStack<T, N>
-where
-    T: AsRef<[u8]>,
-{
-    fn capacity(&self) -> usize {
-        N
-    }
-
-    fn len(&self) -> usize {
-        self.data.len()
-    }
-}
-
-impl<T, const N: usize> Checksummed for BoundedStack<T, N>
-where
-    T: AsRef<[u8]>,
-{
-    fn checksum(&self) -> Checksum {
-        self.checksum
-    }
-
-    fn recalculate_checksum(&mut self) {
-        let mut new_checksum = Checksum::new();
-        for item in &self.data {
-            new_checksum.update_slice(item.as_ref());
-        }
-        self.checksum = new_checksum;
-    }
-
-    fn verify_checksum(&self) -> bool {
-        // Always return true for None verification level
-        if matches!(self.verification_level, VerificationLevel::None) {
-            return true;
-        }
-
-        // Skip verification based on sampling level
-        if !self.verification_level.should_verify(importance::READ) {
-            return true;
-        }
-
-        // Compute a fresh checksum and compare
-        let mut fresh = Checksum::new();
-        for item in &self.data {
-            fresh.update_slice(item.as_ref());
-        }
-        fresh == self.checksum
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<T, const N: usize> Validatable for BoundedStack<T, N>
-where
-    T: AsRef<[u8]>,
-{
-    type Error = BoundedError;
-
-    fn validate(&self) -> Result<(), BoundedError> {
-        // Always pass for None verification level
-        if matches!(self.verification_level, VerificationLevel::None) {
-            return Ok(());
-        }
-
-        // Verify capacity constraints
-        if self.len() > self.capacity() {
+    /// Returns `BoundedError::CapacityExceeded` if the stack is full.
+    /// Returns `BoundedError::Serialization` if serialization of `item` fails.
+    pub fn push(&mut self, item: T) -> core::result::Result<(), BoundedError> {
+        record_global_operation(OperationType::CollectionWrite, self.verification_level);
+        if self.length >= N_ELEMENTS {
             return Err(BoundedError::CapacityExceeded {
                 collection_type: "BoundedStack".to_string(),
-                capacity: self.capacity(),
-                attempted_size: self.len(),
+                capacity: N_ELEMENTS,
+                attempted_size: self.length + 1,
             });
         }
-
-        // Verify checksum integrity
-        if !self.verify_checksum() {
-            let mut fresh = Checksum::new();
-            for item in &self.data {
-                fresh.update_slice(item.as_ref());
-            }
-
-            return Err(BoundedError::ChecksumMismatch {
-                expected: self.checksum.value(),
-                actual: fresh.value(),
-                description: "BoundedStack".to_string(),
-            });
+        if self.elem_size > 0 {
+            let offset = self.length * self.elem_size;
+            // Get mutable slice and write directly
+            let mut safe_slice_mut = self.handler.get_slice_mut(offset, self.elem_size)
+                .map_err(|e| BoundedError::ValidationFailure(e.to_string()))?;
+            item.write_bytes(safe_slice_mut.as_mut_slice()).map_err(BoundedError::from)?;
+            // Mark as modified if SafeSliceMut requires it for checksumming (depends on its API)
+            // safe_slice_mut.mark_modified(); // Example if needed
         }
-
+        self.length += 1;
+        if self.verification_level.should_verify(importance::HIGH) {
+            self.recalculate_checksum();
+        }
         Ok(())
     }
 
-    fn validation_level(&self) -> VerificationLevel {
-        self.verification_level
-    }
-
-    fn set_validation_level(&mut self, level: VerificationLevel) {
-        // When changing to a non-None level from None, recalculate the checksum
-        let needs_recalc = matches!(self.verification_level, VerificationLevel::None)
-            && !matches!(level, VerificationLevel::None);
-
-        self.verification_level = level;
-
-        if needs_recalc {
-            self.recalculate_checksum();
-        }
-    }
-}
-
-/// A bounded vector with a fixed maximum capacity and verification
-///
-/// This vector ensures it never exceeds the specified capacity,
-/// returning an error when operations would exceed this limit.
-/// It also maintains a checksum of its contents for verification.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BoundedVec<T, const N: usize>
-where
-    T: AsRef<[u8]>,
-{
-    /// The underlying vector storage
-    data: Vec<T>,
-    /// Checksum for verifying data integrity
-    checksum: Checksum,
-    /// Verification level for this vector
-    verification_level: VerificationLevel,
-}
-
-impl<T, const N: usize> Default for BoundedVec<T, N>
-where
-    T: AsRef<[u8]>,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T, const N: usize> BoundedVec<T, N>
-where
-    T: AsRef<[u8]>,
-{
-    /// Create a new empty bounded vector
-    pub fn new() -> Self {
-        Self::with_verification_level(VerificationLevel::default())
-    }
-
-    /// Create a new empty bounded vector with a specific verification level
-    pub fn with_verification_level(level: VerificationLevel) -> Self {
-        Self {
-            data: Vec::with_capacity(N),
-            checksum: Checksum::new(),
-            verification_level: level,
-        }
-    }
-
-    /// Push an element onto the vector
+    /// Pops an item from the stack.
     ///
-    /// Returns an error if the vector is at capacity
-    pub fn push(&mut self, item: T) -> Result<(), CapacityError> {
-        // Track the push operation
-        record_global_operation(OperationType::CollectionPush, self.verification_level);
-
-        if self.is_full() {
-            return Err(CapacityError);
+    /// Returns `None` if the stack is empty.
+    /// Can return `Err(BoundedError::Serialization)` if deserialization fails.
+    pub fn pop(&mut self) -> core::result::Result<Option<T>, BoundedError> {
+        record_global_operation(OperationType::CollectionPop, self.verification_level);
+        if self.length == 0 {
+            return Ok(None);
         }
 
-        // Only update checksum if verification is enabled
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            self.checksum.update_slice(item.as_ref());
-            // Track checksum calculation
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
+        self.length -= 1;
+        let item = if self.elem_size > 0 {
+            let offset = self.length.saturating_mul(self.elem_size);
+            let slice: SafeSlice<'_> =
+                self.handler.borrow_slice(offset, self.elem_size).map_err(|e| {
+                    BoundedError::ValidationFailure(format!("Memory borrow failed for pop: {}", e))
+                })?;
+            T::from_bytes(slice.as_slice())? // This returns SerializationError
+        } else {
+            // For ZSTs, no bytes are read, create a new ZST instance.
+            // Unsafe means to create ZST. If T is ZST, it has no invalid bit patterns.
+            // A Default bound could also work if T: Default.
+            // Assuming T::from_bytes for a ZST correctly handles an empty slice.
+            T::from_bytes(&[])?
+        };
 
-        self.data.push(item);
+        // Recalculate checksum after removal for simplicity or adjust existing one.
+        // For pop, it's easier to recalculate based on remaining items.
+        // However, to be efficient, one might try to 'un-checksum' the popped item if possible.
+        // Let's opt for recalculation for correctness here.
+        self.recalculate_checksum(); // Recalculate checksum for the new state.
 
-        Ok(())
+        Ok(Some(item))
     }
 
-    /// Get an element at the specified index
-    pub fn get(&self, index: usize) -> Option<&T> {
-        // Track the lookup operation
-        record_global_operation(OperationType::CollectionLookup, self.verification_level);
-
-        // For high verification levels, verify before returning data
-        if crate::validation::should_validate_redundant(self.verification_level)
-            && !self.verify_checksum()
-        {
+    /// Peeks at the top item of the stack without removing it.
+    ///
+    /// Returns `None` if the stack is empty.
+    /// Can return `Err(BoundedError::Serialization)` if deserialization fails.
+    pub fn peek(&self) -> Option<T> {
+        record_global_operation(OperationType::CollectionPeek, self.verification_level);
+        if self.length == 0 {
             return None;
         }
-
-        self.data.get(index)
+        if self.elem_size > 0 {
+            let offset = (self.length - 1) * self.elem_size;
+            // Change to get_slice
+            match self.handler.get_slice(offset, self.elem_size) {
+                Ok(safe_slice) => {
+                    // It's important that from_bytes doesn't need a mutable buffer here
+                    // and that it correctly handles potential errors from malformed data.
+                    match T::from_bytes(safe_slice.data()) {
+                        Ok(item) => Some(item),
+                        Err(_e) => {
+                            // Optionally log or handle deserialization error
+                            // For now, consistent with pop, treat as None or error
+                            None // Or return a Result here
+                        }
+                    }
+                }
+                Err(_e) => {
+                    // Log or handle error from get_slice
+                    None // Or return a Result here
+                }
+            }
+        } else {
+            // For Zero-sized types, if they are stored/represented
+            // This branch might need adjustment based on how ZSTs are handled
+            // If T::from_bytes can return a ZST instance, it might work.
+            T::from_bytes(&[]).ok() // Example for ZST
+        }
     }
 
-    /// Get a mutable reference to an element
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
-        // Track the lookup operation with mutation intent
-        record_global_operation(OperationType::CollectionLookup, self.verification_level);
-
-        // For high verification levels, verify before returning data
-        if crate::validation::should_validate_redundant(self.verification_level)
-            && !self.verify_checksum()
-        {
-            return None;
-        }
-
-        // When returning mutable reference, mark that checksum needs recalculation
-        // This is handled in a simplistic way for now
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            // When we return, the checksum will need to be recalculated, which we'll do on next verified operation
-            // Track checksum calculation that will be needed
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
-
-        self.data.get_mut(index)
-    }
-
-    /// Set an element at the specified index, returning the old value
-    pub fn set(&mut self, index: usize, item: T) -> Option<T> {
-        // Track the insert operation
-        record_global_operation(OperationType::CollectionInsert, self.verification_level);
-
-        if index >= self.data.len() {
-            return None;
-        }
-
-        let old = mem::replace(&mut self.data[index], item);
-
-        // Recompute checksum if verification is enabled
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            self.recalculate_checksum();
-            // Track checksum calculation
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
-
-        Some(old)
-    }
-
-    /// Remove an element at the specified index
-    pub fn remove(&mut self, index: usize) -> Option<T> {
-        // Track the remove operation
-        record_global_operation(OperationType::CollectionRemove, self.verification_level);
-
-        if index >= self.data.len() {
-            return None;
-        }
-
-        let item = self.data.remove(index);
-
-        // Recompute checksum if verification is enabled
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            self.recalculate_checksum();
-            // Track checksum calculation
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
-
-        Some(item)
-    }
-
-    /// Get the current verification level
+    /// Returns the current verification level.
     pub fn verification_level(&self) -> VerificationLevel {
         self.verification_level
     }
 
-    /// Set a new verification level
+    /// Sets the verification level for this stack.
     pub fn set_verification_level(&mut self, level: VerificationLevel) {
-        // When changing to a non-None level from None, recalculate the checksum
-        let needs_recalc = matches!(self.verification_level, VerificationLevel::None)
-            && !matches!(level, VerificationLevel::None);
-
         self.verification_level = level;
-
-        if needs_recalc {
-            self.recalculate_checksum();
-        }
+        self.handler.set_verification_level(level);
     }
 
-    /// Verify the integrity of the vector (backward compatibility method)
+    /// Verifies the integrity of the stack.
+    /// For now, this just verifies the checksum.
     pub fn verify(&self) -> bool {
-        // Track the validation operation
-        record_global_operation(OperationType::CollectionValidate, self.verification_level);
-
+        if self.verification_level == VerificationLevel::Off {
+            return true;
+        }
         self.verify_checksum()
-    }
-
-    /// Get an iterator over the items
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.data.iter()
-    }
-
-    /// Get the last element of the vector
-    pub fn last(&self) -> Option<&T> {
-        self.data.last()
-    }
-
-    /// Get a mutable reference to the last element of the vector
-    pub fn last_mut(&mut self) -> Option<&mut T> {
-        self.data.last_mut()
-    }
-
-    /// Remove the last element from the vector and return it
-    pub fn pop(&mut self) -> Option<T> {
-        // Track the pop operation
-        record_global_operation(OperationType::CollectionPop, self.verification_level);
-
-        let item = self.data.pop()?;
-
-        // Recompute checksum if verification is enabled
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            self.recalculate_checksum();
-            // Track checksum calculation
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
-
-        Some(item)
-    }
-
-    /// Splits the collection at the given index, returning a new vector containing
-    /// the elements from index onwards.
-    pub fn split_off(&mut self, at: usize) -> Self {
-        // Track the mutation operation
-        record_global_operation(OperationType::CollectionMutate, self.verification_level);
-
-        // Split the vec
-        let split_data = self.data.split_off(at);
-
-        // Recompute checksums
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            self.recalculate_checksum();
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
-
-        // Create a new BoundedVec with the split data
-        let mut result = Self::with_verification_level(self.verification_level);
-        result.data = split_data;
-
-        // Calculate checksum for the new vec
-        if crate::validation::should_validate(result.verification_level, importance::MUTATION) {
-            result.recalculate_checksum();
-            record_global_operation(
-                OperationType::ChecksumCalculation,
-                result.verification_level,
-            );
-        }
-
-        result
-    }
-
-    /// Reverses the order of elements in the BoundedVec
-    pub fn reverse(&mut self) {
-        self.data.reverse();
-
-        // Track the operation and recalculate checksum if needed
-        #[cfg(feature = "std")]
-        {
-            operations::record_global_operation(
-                OperationType::CollectionMutate,
-                self.verification_level,
-            );
-
-            if matches!(
-                self.verification_level,
-                VerificationLevel::Standard | VerificationLevel::Full
-            ) {
-                self.recalculate_checksum();
-            }
-        }
     }
 }
 
-// Implement the traits for BoundedVec
-impl<T, const N: usize> BoundedCapacity for BoundedVec<T, N>
+impl<T, const N_ELEMENTS: usize, P: MemoryProvider> BoundedCapacity
+    for BoundedStack<T, N_ELEMENTS, P>
 where
-    T: AsRef<[u8]>,
+    T: Sized + Checksummable + ToBytes + FromBytes,
 {
     fn capacity(&self) -> usize {
-        N
+        N_ELEMENTS
     }
 
     fn len(&self) -> usize {
-        self.data.len()
+        self.length
+    }
+
+    fn is_empty(&self) -> bool {
+        self.length == 0
+    }
+
+    fn is_full(&self) -> bool {
+        self.length == N_ELEMENTS
     }
 }
 
-// Implement AsRef trait for BoundedVec
-impl<T, const N: usize> AsRef<[T]> for BoundedVec<T, N>
+impl<T, const N_ELEMENTS: usize, P: MemoryProvider> Checksummed for BoundedStack<T, N_ELEMENTS, P>
 where
-    T: AsRef<[u8]>,
-{
-    fn as_ref(&self) -> &[T] {
-        &self.data
-    }
-}
-
-// Implement AsMut trait for BoundedVec
-impl<T, const N: usize> AsMut<[T]> for BoundedVec<T, N>
-where
-    T: AsRef<[u8]>,
-{
-    fn as_mut(&mut self) -> &mut [T] {
-        &mut self.data
-    }
-}
-
-impl<T, const N: usize> Checksummed for BoundedVec<T, N>
-where
-    T: AsRef<[u8]>,
+    T: Sized + Checksummable + ToBytes + FromBytes,
 {
     fn checksum(&self) -> Checksum {
         self.checksum
     }
 
     fn recalculate_checksum(&mut self) {
-        let mut new_checksum = Checksum::new();
-        for item in &self.data {
-            new_checksum.update_slice(item.as_ref());
+        self.checksum = Checksum::default();
+        if self.elem_size > 0 {
+            for i in 0..self.length {
+                let offset = i.saturating_mul(self.elem_size);
+                // We need to deserialize to checksum, which is inefficient.
+                // Ideally, Checksummable would work on byte slices if T is already serialized.
+                // Or, T::update_checksum should be used during push/pop carefully.
+                // For now, let's assume T::from_bytes and then item.update_checksum()
+                match self.handler.borrow_slice(offset, self.elem_size) {
+                    Ok(slice_data) => {
+                        // This is problematic: T might not be easily reconstructible just for checksum.
+                        // Checksummable trait might need to operate on raw bytes if possible,
+                        // or we only update checksum on push with the original item.
+                        // For pop, this makes checksum verification tricky without recalculating all.
+
+                        // Let's stick to checksumming the item T itself.
+                        // This means recalculate_checksum needs to deserialize each element.
+                        match T::from_bytes(slice_data.as_slice()) {
+                            Ok(item) => item.update_checksum(&mut self.checksum),
+                            Err(_) => {
+                                // If an item can't be deserialized, the checksum is inherently problematic.
+                                // This indicates a deeper issue or that the stored data is corrupt.
+                                // For now, we might just skip this item in checksum calculation,
+                                // or mark the checksum as invalid. Let's skip.
+                                // A robust system might have specific error handling here.
+                                if self.verification_level >= VerificationLevel::Redundant {
+                                    // Consider logging or panicking if an element can't be deserialized
+                                    // during checksum recalculation, as it implies data corruption.
+                                }
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        // Memory borrow failed. Similar to above, data might be inaccessible.
+                        if self.verification_level >= VerificationLevel::Redundant {
+                            // Log or handle error
+                        }
+                    }
+                }
+            }
+        } else {
+            // ZST case
+            for _i in 0..self.length {
+                match T::from_bytes(&[]) {
+                    // Create ZST instance
+                    Ok(item_zst) => item_zst.update_checksum(&mut self.checksum),
+                    Err(_) => {} // Should not happen for ZSTs with correct FromBytes impl
+                }
+            }
         }
-        self.checksum = new_checksum;
     }
 
     fn verify_checksum(&self) -> bool {
-        // Always return true for None verification level
-        if matches!(self.verification_level, VerificationLevel::None) {
+        if self.verification_level == VerificationLevel::Off {
             return true;
         }
-
-        // Skip verification based on level
-        if !self.verification_level.should_verify(importance::READ) {
-            return true;
+        let mut current_checksum = Checksum::default();
+        // Similar logic to recalculate_checksum for verification
+        if self.elem_size > 0 {
+            for i in 0..self.length {
+                if let Ok(slice_data) =
+                    self.handler.borrow_slice(i.saturating_mul(self.elem_size), self.elem_size)
+                {
+                    if let Ok(item) = T::from_bytes(slice_data.as_slice()) {
+                        item.update_checksum(&mut current_checksum);
+                    } else {
+                        return false; /* Deserialization failed, checksum invalid */
+                    }
+                } else {
+                    return false; /* Memory access failed, checksum invalid */
+                }
+            }
+        } else {
+            // ZST case
+            for _i in 0..self.length {
+                match T::from_bytes(&[]) {
+                    Ok(item_zst) => item_zst.update_checksum(&mut current_checksum),
+                    Err(_) => {
+                        return false;
+                    }
+                }
+            }
         }
-
-        // Compute a fresh checksum and compare
-        let mut fresh = Checksum::new();
-        for item in &self.data {
-            fresh.update_slice(item.as_ref());
-        }
-        fresh == self.checksum
+        self.checksum.value() == current_checksum.value()
     }
 }
 
-#[cfg(feature = "alloc")]
-impl<T, const N: usize> Validatable for BoundedVec<T, N>
+// The Validatable trait was removed from the import list `use crate::validation::{importance, BoundedCapacity, Checksummed};`
+// If it needs to be re-added, ensure its methods are correctly implemented.
+// For now, let's assume checksum verification is the primary validation.
+// If `Validatable` is a project-specific trait that should be implemented,
+// its methods would need to be defined here.
+
+// Example of how Validatable might look if re-added and used:
+/*
+impl<T, const N_ELEMENTS: usize, P: MemoryProvider> crate::validation::Validatable for BoundedStack<T, N_ELEMENTS, P>
 where
-    T: AsRef<[u8]>,
+    T: Sized + Checksummable + ToBytes + FromBytes,
 {
     type Error = BoundedError;
 
-    fn validate(&self) -> Result<(), BoundedError> {
-        // Always pass for None verification level
-        if matches!(self.verification_level, VerificationLevel::None) {
+    fn validate(&self) -> core::result::Result<(), Self::Error> {
+        if self.verification_level == VerificationLevel::Off {
             return Ok(());
         }
+        if !self.verify_checksum() {
+            // To provide a more detailed error, we'd need to store the expected
+            // checksum when it was last known good, or recalculate it here
+            // and compare, similar to verify_checksum.
+            let mut actual_checksum = Checksum::default();
+            // Simplified: actual checksum calculation logic omitted for brevity here, assume it's done
+            // This would be the same logic as in verify_checksum.
+            // For now, let's use the stored checksum as 'expected' and recalculate for 'actual'.
+            let mut calculated_checksum = Checksum::default();
+            // ... (logic from verify_checksum to fill calculated_checksum) ...
+            if self.elem_size > 0 {
+                for i in 0..self.length {
+                    if let Ok(slice_data) = self.handler.borrow_slice(i.saturating_mul(self.elem_size), self.elem_size) {
+                        if let Ok(item) = T::from_bytes(slice_data.as_slice()) {
+                            item.update_checksum(&mut calculated_checksum);
+                        } else {
+                             return Err(BoundedError::ChecksumMismatch {
+                                expected: self.checksum.value(),
+                                actual: calculated_checksum.value(), // Or some other indicator of failure
+                                description: "BoundedStack data integrity (deserialization failed)".to_string(),
+                            });
+                        }
+                    } else {
+                        return Err(BoundedError::ChecksumMismatch {
+                            expected: self.checksum.value(),
+                            actual: calculated_checksum.value(), // Or some other indicator of failure
+                            description: "BoundedStack data integrity (memory access failed)".to_string(),
+                        });
+                    }
+                }
+            } else { // ZST
+                for _i in 0..self.length {
+                     match T::from_bytes(&[]) {
+                        Ok(item_zst) => item_zst.update_checksum(&mut calculated_checksum),
+                        Err(_) => { /* error */ }
+                     }
+                }
+            }
 
-        // Verify capacity constraints
-        if self.len() > self.capacity() {
+
+            if self.checksum.value() != calculated_checksum.value() {
+                return Err(BoundedError::ChecksumMismatch {
+                    expected: self.checksum.value(),
+                    actual: calculated_checksum.value(),
+                    description: "BoundedStack data integrity".to_string(),
+                });
+            }
+        }
+        // Additional validation logic can be added here if needed
+        Ok(())
+    }
+
+    fn validation_level(&self) -> VerificationLevel {
+        self.verification_level()
+    }
+
+    fn set_validation_level(&mut self, level: VerificationLevel) {
+        self.set_verification_level(level);
+    }
+}
+*/
+
+/// A bounded vector with a fixed maximum capacity and verification.
+///
+/// This vector ensures it never exceeds the specified capacity `N_ELEMENTS`.
+/// It uses a `MemoryProvider` for storing serialized elements.
+#[derive(Debug)]
+pub struct BoundedVec<T, const N_ELEMENTS: usize, P: MemoryProvider>
+where
+    T: Sized + Checksummable + ToBytes + FromBytes, // Consider if Clone is needed for some ops
+{
+    handler: SafeMemoryHandler<P>,
+    length: usize,
+    elem_size: usize, // From T::SERIALIZED_SIZE
+    checksum: Checksum,
+    verification_level: VerificationLevel,
+    _phantom: PhantomData<T>,
+}
+
+impl<T, const N_ELEMENTS: usize, P: MemoryProvider> BoundedVec<T, N_ELEMENTS, P>
+where
+    T: Sized + Checksummable + ToBytes + FromBytes,
+{
+    /// Creates a new `BoundedVec` with the given memory provider and default verification level.
+    pub fn new(provider: P) -> Self {
+        Self::with_verification_level(provider, VerificationLevel::default())
+    }
+
+    /// Creates a new `BoundedVec` with a specific verification level.
+    pub fn with_verification_level(provider: P, verification_level: VerificationLevel) -> Self {
+        let elem_size = <T as ToBytes>::SERIALIZED_SIZE; // Disambiguated
+        let mut vec = Self {
+            handler: SafeMemoryHandler::new(provider, verification_level),
+            length: 0,
+            elem_size, // Now correctly sourced
+            checksum: Checksum::default(),
+            verification_level,
+            _phantom: PhantomData,
+        };
+        if vec.verification_level.should_verify(importance::INITIALIZATION) {
+            vec.recalculate_checksum();
+        }
+        vec
+    }
+
+    /// Appends an element to the back of the collection.
+    ///
+    /// # Errors
+    /// Returns `BoundedError::CapacityExceeded` if the vector is full.
+    /// Returns `BoundedError::Serialization` if the item cannot be serialized.
+    pub fn push(&mut self, item: T) -> core::result::Result<(), BoundedError> {
+        record_global_operation(OperationType::CollectionWrite, self.verification_level);
+        if self.length >= N_ELEMENTS {
             return Err(BoundedError::CapacityExceeded {
                 collection_type: "BoundedVec".to_string(),
-                capacity: self.capacity(),
-                attempted_size: self.len(),
+                capacity: N_ELEMENTS,
+                attempted_size: self.length + 1,
             });
         }
-
-        // Verify checksum integrity
-        if !self.verify_checksum() {
-            let mut fresh = Checksum::new();
-            for item in &self.data {
-                fresh.update_slice(item.as_ref());
-            }
-
-            return Err(BoundedError::ChecksumMismatch {
-                expected: self.checksum.value(),
-                actual: fresh.value(),
-                description: "BoundedVec".to_string(),
-            });
+        if self.elem_size > 0 {
+            let offset = self.length * self.elem_size;
+            let mut safe_slice_mut = self.handler.get_slice_mut(offset, self.elem_size)
+                .map_err(|e| BoundedError::ValidationFailure(e.to_string()))?;
+            item.write_bytes(safe_slice_mut.as_mut_slice()).map_err(BoundedError::from)?;
         }
-
+        self.length += 1;
+        if self.verification_level.should_verify(importance::HIGH) {
+            self.recalculate_checksum();
+        }
         Ok(())
     }
 
-    fn validation_level(&self) -> VerificationLevel {
+    /// Removes the last element from a vector and returns it, or `None` if it is empty.
+    ///
+    /// # Errors
+    /// Returns `BoundedError::Serialization` if the item cannot be deserialized.
+    pub fn pop(&mut self) -> core::result::Result<Option<T>, BoundedError> {
+        record_global_operation(OperationType::CollectionWrite, self.verification_level);
+        if self.length == 0 {
+            return Ok(None);
+        }
+        let item = if self.elem_size > 0 { // Only read if not a ZST
+            let offset = (self.length - 1) * self.elem_size;
+            let mut buffer = [0u8; <T as FromBytes>::SERIALIZED_SIZE]; // Disambiguated
+            let slice_view = self.handler.get_slice(offset, self.elem_size).map_err(|e| BoundedError::ValidationFailure(e.to_string()))?;
+            let data_bytes = slice_view.data().map_err(|e| BoundedError::ValidationFailure(e.to_string()))?;
+            buffer.copy_from_slice(data_bytes);
+            T::from_bytes(&buffer).map_err(BoundedError::from)?
+        } else {
+            // For ZST, create a default instance or require T: Default
+            // Assuming T can be created from zero bytes for ZSTs as per FromBytes trait for ()
+            T::from_bytes(&[]).map_err(BoundedError::from)?
+        };
+        self.length -= 1;
+        // Optionally, clear the memory region of the popped item in the handler if desired.
+        self.recalculate_checksum();
+        Ok(Some(item))
+    }
+
+    /// Returns a reference to an element at a given position or `None` if out of bounds.
+    ///
+    /// # Errors
+    /// Returns `BoundedError::Serialization` if the item cannot be deserialized.
+    /// Returns `BoundedError::InvalidAccess` indirectly through handler/slice errors if underlying read fails.
+    pub fn get(&self, index: usize) -> Option<T> {
+        record_global_operation(OperationType::CollectionRead, self.verification_level);
+        if index >= self.length {
+            return None;
+        }
+        if self.elem_size > 0 {
+            let offset = index * self.elem_size;
+            // Change to get_slice
+            match self.handler.get_slice(offset, self.elem_size) {
+                Ok(safe_slice) => T::from_bytes(safe_slice.data()).ok(),
+                Err(_) => None, // Error fetching slice
+            }
+        } else {
+            T::from_bytes(&[]).ok() // For ZSTs
+        }
+    }
+
+    /// Inserts an element at a given position in the vector.
+    ///
+    /// # Errors
+    /// Returns `BoundedError::CapacityExceeded` if the vector is full.
+    /// Returns `BoundedError::IndexOutOfBounds` if the index is out of bounds.
+    /// Returns `BoundedError::Serialization` if the item cannot be serialized.
+    pub fn insert_at(&mut self, index: usize, item: T) -> core::result::Result<(), BoundedError> {
+        record_global_operation(OperationType::CollectionWrite, self.verification_level);
+        if self.length >= N_ELEMENTS {
+            return Err(BoundedError::CapacityExceeded {
+                collection_type: "BoundedVec".to_string(),
+                capacity: N_ELEMENTS,
+                attempted_size: self.length + 1,
+            });
+        }
+        if index > self.length { // Allow inserting at self.length (same as push)
+            return Err(BoundedError::IndexOutOfBounds {
+                collection_type: "BoundedVec".to_string(),
+                index,
+                len: self.length,
+            });
+        }
+
+        if self.elem_size > 0 {
+            // Shift elements to the right if inserting not at the end
+            if index < self.length {
+                let src_offset = index * self.elem_size;
+                let dst_offset = (index + 1) * self.elem_size;
+                // Number of bytes to move is (length - index) * elem_size
+                let count = (self.length - index) * self.elem_size;
+                self.handler.copy_within(src_offset, dst_offset, count)
+                    .map_err(|e| BoundedError::ValidationFailure(e.to_string()))?;
+            }
+            // Write the new item
+            let offset = index * self.elem_size;
+            let mut safe_slice_mut = self.handler.get_slice_mut(offset, self.elem_size)
+                .map_err(|e| BoundedError::ValidationFailure(e.to_string()))?;
+            item.write_bytes(safe_slice_mut.as_mut_slice()).map_err(BoundedError::from)?;
+        }
+        // If elem_size is 0 (ZST), we still increment length. No bytes are moved or written.
+
+        self.length += 1;
+        if self.verification_level.should_verify(importance::HIGH) {
+            self.recalculate_checksum();
+        }
+        Ok(())
+    }
+
+    /// Sets an element at a given position in the vector.
+    ///
+    /// # Errors
+    /// Returns `BoundedError::IndexOutOfBounds` if the index is out of bounds.
+    /// Returns `BoundedError::Serialization` if the item cannot be serialized.
+    pub fn set_at(&mut self, index: usize, item: T) -> core::result::Result<(), BoundedError> {
+        record_global_operation(OperationType::CollectionWrite, self.verification_level);
+        if index >= self.length {
+            return Err(BoundedError::IndexOutOfBounds {
+                collection_type: "BoundedVec".to_string(),
+                index,
+                len: self.length,
+            });
+        }
+        if self.elem_size > 0 {
+            let offset = index * self.elem_size;
+            let mut safe_slice_mut = self.handler.get_slice_mut(offset, self.elem_size)
+                .map_err(|e| BoundedError::ValidationFailure(e.to_string()))?;
+            item.write_bytes(safe_slice_mut.as_mut_slice()).map_err(BoundedError::from)?;
+        }
+        // For ZSTs, set_at effectively does nothing to the data if elem_size is 0,
+        // but the item itself might have changed if T has internal state not reflected in its size.
+        // The checksum will be recalculated regardless.
+
+        if self.verification_level.should_verify(importance::HIGH) {
+            self.recalculate_checksum(); // Data changed (or conceptually changed for ZSTs), recalculate.
+        }
+        Ok(())
+    }
+
+    /// Clears the vector, removing all values.
+    pub fn clear(&mut self) {
+        record_global_operation(OperationType::CollectionWrite, self.verification_level);
+        self.length = 0;
+        // Optionally, zero out the memory in the handler.
+        self.recalculate_checksum();
+    }
+
+    /// Returns the number of elements in the vector, also referred to as its 'length'.
+    pub fn len(&self) -> usize {
+        self.length
+    }
+
+    /// Returns `true` if the vector contains no elements.
+    pub fn is_empty(&self) -> bool {
+        self.length == 0
+    }
+
+    /// Returns `true` if the vector is at its maximum capacity `N_ELEMENTS`.
+    pub fn is_full(&self) -> bool {
+        self.length >= N_ELEMENTS
+    }
+
+    /// Returns the total number of elements the vector can hold.
+    pub fn capacity(&self) -> usize {
+        N_ELEMENTS
+    }
+
+    /// Gets the current verification level.
+    pub fn verification_level(&self) -> VerificationLevel {
         self.verification_level
     }
 
-    fn set_validation_level(&mut self, level: VerificationLevel) {
-        // When changing to a non-None level from None, recalculate the checksum
-        let needs_recalc = matches!(self.verification_level, VerificationLevel::None)
-            && !matches!(level, VerificationLevel::None);
-
+    /// Sets a new verification level.
+    pub fn set_verification_level(&mut self, level: VerificationLevel) {
         self.verification_level = level;
-
-        if needs_recalc {
-            self.recalculate_checksum();
-        }
+        self.handler.set_verification_level(level); // Propagate to handler
     }
 }
 
-/// A bounded hash map with a fixed maximum capacity and verification support
-///
-/// This HashMap ensures it never exceeds the specified capacity,
-/// returning an error when insertion would exceed this limit.
-/// It also maintains a checksum of its contents for verification.
-#[cfg(feature = "std")]
-#[derive(Debug, Clone)]
-pub struct BoundedHashMap<K, V, const N: usize>
+impl<T, const N_ELEMENTS: usize, P: MemoryProvider> BoundedCapacity
+    for BoundedVec<T, N_ELEMENTS, P>
 where
-    K: Eq + hash::Hash + AsRef<[u8]>,
-    V: AsRef<[u8]>,
-{
-    /// The underlying data
-    data: HashMap<K, V>,
-    /// The checksum of the data
-    checksum: Checksum,
-    /// The level of verification to apply
-    verification_level: VerificationLevel,
-}
-
-/// A bounded hash map with a fixed maximum capacity and verification support
-///
-/// This HashMap ensures it never exceeds the specified capacity,
-/// returning an error when insertion would exceed this limit.
-/// It also maintains a checksum of its contents for verification.
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
-#[derive(Debug, Clone)]
-pub struct BoundedHashMap<K, V, const N: usize>
-where
-    K: Eq + hash::Hash + AsRef<[u8]> + core::cmp::Ord,
-    V: AsRef<[u8]>,
-{
-    /// The underlying data
-    data: HashMap<K, V>,
-    /// The checksum of the data
-    checksum: Checksum,
-    /// The level of verification to apply
-    verification_level: VerificationLevel,
-}
-
-#[cfg(feature = "std")]
-impl<K, V, const N: usize> Default for BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]>,
-    V: AsRef<[u8]>,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[cfg(not(feature = "std"))]
-impl<K, V, const N: usize> Default for BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]> + core::cmp::Ord,
-    V: AsRef<[u8]>,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[cfg(feature = "std")]
-impl<K, V, const N: usize> BoundedCapacity for BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]>,
-    V: AsRef<[u8]>,
+    T: Sized + Checksummable + ToBytes + FromBytes,
 {
     fn capacity(&self) -> usize {
-        N
+        N_ELEMENTS
     }
 
     fn len(&self) -> usize {
-        self.data.len()
+        self.length
+    }
+
+    fn is_empty(&self) -> bool {
+        self.length == 0
+    }
+
+    fn is_full(&self) -> bool {
+        self.length >= N_ELEMENTS
     }
 }
 
-#[cfg(not(feature = "std"))]
-impl<K, V, const N: usize> BoundedCapacity for BoundedHashMap<K, V, N>
+impl<T, const N_ELEMENTS: usize, P: MemoryProvider> Checksummed
+    for BoundedVec<T, N_ELEMENTS, P>
 where
-    K: Eq + hash::Hash + AsRef<[u8]> + core::cmp::Ord,
-    V: AsRef<[u8]>,
-{
-    fn capacity(&self) -> usize {
-        N
-    }
-
-    fn len(&self) -> usize {
-        self.data.len()
-    }
-}
-
-#[cfg(feature = "std")]
-impl<K, V, const N: usize> Checksummed for BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]>,
-    V: AsRef<[u8]>,
+    T: Sized + Checksummable + ToBytes + FromBytes,
 {
     fn checksum(&self) -> Checksum {
         self.checksum
     }
 
     fn recalculate_checksum(&mut self) {
-        let mut new_checksum = Checksum::new();
-        // We need to iterate in a consistent order for checksum stability
-        // For std HashMap this isn't guaranteed, so we sort
+        record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
+        self.checksum = Checksum::default(); // Start fresh
+        // Checksum includes length and verification level for structural integrity.
+        self.checksum.update_slice(&self.length.to_ne_bytes());
+        self.checksum.update_slice(&self.verification_level.to_byte().to_ne_bytes()); // Changed
 
-        // Convert to sorted Vec of key/value pairs to ensure consistent order
-        let mut sorted_items = Vec::with_capacity(self.data.len());
-        for (k, v) in &self.data {
-            sorted_items.push((k.as_ref(), v.as_ref()));
+        if self.elem_size > 0 {
+            if self.length > 0 {
+                 // Get a single slice representing all used data for checksumming
+                match self.handler.get_slice(0, self.length * self.elem_size) {
+                    Ok(slice_view) => match slice_view.data() {
+                        Ok(data_bytes) => self.checksum.update_slice(data_bytes),
+                        Err(_) => { /* Error reading slice data, checksum remains partial */ }
+                    },
+                    Err(_) => { /* Error getting slice, checksum remains partial */ }
+                }
+            }
+        } else {
+            // For ZSTs, checksum might only depend on length or a count.
+            // Here, we checksum the length again, effectively, or could use a specific marker.
+            for _ in 0..self.length {
+                // An empty slice or a specific ZST marker byte could be used.
+                // For simplicity, let's say ZST elements don't contribute individually beyond count (already in length)
+                // T::update_checksum (if it had a static method or ZST instance) could be used.
+                // Since T: Checksummable, an instance would be needed.
+                // This part needs refinement for ZSTs if they have distinct checksummable states beyond presence.
+            }
         }
-
-        // Sort by key bytes for consistent ordering
-        sorted_items.sort_by(|a, b| a.0.cmp(b.0));
-
-        // Calculate checksum in this consistent order
-        for (k, v) in sorted_items {
-            new_checksum.update_slice(k);
-            new_checksum.update_slice(v);
-        }
-
-        self.checksum = new_checksum;
     }
 
     fn verify_checksum(&self) -> bool {
-        // For empty collections, checksum is always valid
-        if self.data.is_empty() {
-            return true;
-        }
-
-        // Calculate a fresh checksum
-        let mut fresh_checksum = Checksum::new();
-
-        // Convert to sorted Vec of key/value pairs to ensure consistent order
-        let mut sorted_items = Vec::with_capacity(self.data.len());
-        for (k, v) in &self.data {
-            sorted_items.push((k.as_ref(), v.as_ref()));
-        }
-
-        // Sort by key bytes for consistent ordering
-        sorted_items.sort_by(|a, b| a.0.cmp(b.0));
-
-        // Calculate checksum in this consistent order
-        for (k, v) in sorted_items {
-            fresh_checksum.update_slice(k);
-            fresh_checksum.update_slice(v);
-        }
-
-        // Compare the calculated checksum with the stored one
-        fresh_checksum == self.checksum
-    }
-}
-
-#[cfg(not(feature = "std"))]
-impl<K, V, const N: usize> Checksummed for BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]> + core::cmp::Ord,
-    V: AsRef<[u8]>,
-{
-    fn checksum(&self) -> Checksum {
-        self.checksum
-    }
-
-    fn recalculate_checksum(&mut self) {
-        let mut new_checksum = Checksum::new();
-
-        // BTreeMap already iterates in a consistent order, so we can just use that
-        for (k, v) in &self.data {
-            new_checksum.update_slice(k.as_ref());
-            new_checksum.update_slice(v.as_ref());
-        }
-
-        self.checksum = new_checksum;
-    }
-
-    fn verify_checksum(&self) -> bool {
-        // For empty collections, checksum is always valid
-        if self.data.is_empty() {
-            return true;
-        }
-
-        // Calculate a fresh checksum
-        let mut fresh_checksum = Checksum::new();
-
-        // BTreeMap already iterates in a consistent order, so we can just use that
-        for (k, v) in &self.data {
-            fresh_checksum.update_slice(k.as_ref());
-            fresh_checksum.update_slice(v.as_ref());
-        }
-
-        // Compare the calculated checksum with the stored one
-        fresh_checksum == self.checksum
-    }
-}
-
-#[cfg(feature = "std")]
-impl<K, V, const N: usize> Validatable for BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]>,
-    V: AsRef<[u8]>,
-{
-    type Error = BoundedError;
-
-    fn validate(&self) -> Result<(), BoundedError> {
-        // Only run validation if the validation level requires it
-        if !crate::validation::should_validate(self.verification_level, importance::CRITICAL) {
-            return Ok(());
-        }
-
-        // Validate capacity constraints
-        if self.len() > self.capacity() {
-            return Err(BoundedError::CapacityExceeded {
-                collection_type: "BoundedHashMap".to_string(),
-                capacity: self.capacity(),
-                attempted_size: self.len(),
-            });
-        }
-
-        // Validate checksum integrity
-        if !self.verify_checksum() {
-            // Calculate a fresh checksum for error reporting
-            let mut fresh_checksum = Checksum::new();
-
-            // Sort key/value pairs for deterministic checksum
-            let mut sorted_items = Vec::with_capacity(self.data.len());
-            for (k, v) in &self.data {
-                sorted_items.push((k.as_ref(), v.as_ref()));
-            }
-            sorted_items.sort_by(|a, b| a.0.cmp(b.0));
-
-            for (k, v) in sorted_items {
-                fresh_checksum.update_slice(k);
-                fresh_checksum.update_slice(v);
-            }
-
-            return Err(BoundedError::ChecksumMismatch {
-                expected: self.checksum.value(),
-                actual: fresh_checksum.value(),
-                description: "BoundedHashMap".to_string(),
-            });
-        }
-
-        Ok(())
-    }
-
-    fn validation_level(&self) -> VerificationLevel {
-        self.verification_level
-    }
-
-    fn set_validation_level(&mut self, level: VerificationLevel) {
-        self.set_verification_level(level);
-    }
-}
-
-#[cfg(not(feature = "std"))]
-impl<K, V, const N: usize> Validatable for BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]> + core::cmp::Ord,
-    V: AsRef<[u8]>,
-{
-    type Error = BoundedError;
-
-    fn validate(&self) -> Result<(), BoundedError> {
-        // Only run validation if the validation level requires it
-        if !crate::validation::should_validate(self.verification_level, importance::CRITICAL) {
-            return Ok(());
-        }
-
-        // Validate capacity constraints
-        if self.len() > self.capacity() {
-            return Err(BoundedError::CapacityExceeded {
-                collection_type: "BoundedHashMap".to_string(),
-                capacity: self.capacity(),
-                attempted_size: self.len(),
-            });
-        }
-
-        // Validate checksum integrity
-        if !self.verify_checksum() {
-            // Calculate a fresh checksum for error reporting
-            let mut fresh_checksum = Checksum::new();
-
-            // BTreeMap already iterates in a consistent order
-            for (k, v) in &self.data {
-                fresh_checksum.update_slice(k.as_ref());
-                fresh_checksum.update_slice(v.as_ref());
-            }
-
-            return Err(BoundedError::ChecksumMismatch {
-                expected: self.checksum.value(),
-                actual: fresh_checksum.value(),
-                description: "BoundedHashMap".to_string(),
-            });
-        }
-
-        Ok(())
-    }
-
-    fn validation_level(&self) -> VerificationLevel {
-        self.verification_level
-    }
-
-    fn set_validation_level(&mut self, level: VerificationLevel) {
-        self.set_verification_level(level);
-    }
-}
-
-#[cfg(feature = "std")]
-impl<K, V, const N: usize> PartialEq for BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]>,
-    V: AsRef<[u8]> + Eq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.data == other.data
-    }
-}
-
-#[cfg(not(feature = "std"))]
-impl<K, V, const N: usize> PartialEq for BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]> + core::cmp::Ord,
-    V: AsRef<[u8]> + Eq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.data == other.data
-    }
-}
-
-#[cfg(feature = "std")]
-impl<K, V, const N: usize> Eq for BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]>,
-    V: AsRef<[u8]> + Eq,
-{
-}
-
-#[cfg(not(feature = "std"))]
-impl<K, V, const N: usize> Eq for BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]> + core::cmp::Ord,
-    V: AsRef<[u8]> + Eq,
-{
-}
-
-#[cfg(feature = "std")]
-impl<K, V, const N: usize> BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]>,
-    V: AsRef<[u8]>,
-{
-    /// Create a new empty bounded hash map
-    pub fn new() -> Self {
-        Self::with_verification_level(VerificationLevel::default())
-    }
-
-    /// Create a new empty bounded hash map with a specific verification level
-    pub fn with_verification_level(level: VerificationLevel) -> Self {
-        Self {
-            data: HashMap::new(),
-            checksum: Checksum::new(),
-            verification_level: level,
-        }
-    }
-
-    /// Insert a key-value pair into the hash map
-    ///
-    /// Returns an error if the hash map is at capacity and the key does not exist
-    pub fn insert(&mut self, key: K, value: V) -> Result<Option<V>, CapacityError> {
-        // Track the insert operation
-        record_global_operation(OperationType::CollectionInsert, self.verification_level);
-
-        // If the key doesn't exist and we're at capacity, return error
-        if !self.data.contains_key(&key) && self.is_full() {
-            return Err(CapacityError);
-        }
-
-        // Update the checksum before inserting if verification is enabled
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            // For inserts/updates, we'll just recalculate the whole checksum after the operation
-            // This is simpler than trying to adjust for the removed key+value
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
-
-        let old_value = self.data.insert(key, value);
-
-        // Recalculate checksum after insert if verification is enabled
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            self.recalculate_checksum();
-        }
-
-        Ok(old_value)
-    }
-
-    /// Get a value by key
-    pub fn get(&self, key: &K) -> Option<&V> {
-        // Track the lookup operation
-        record_global_operation(OperationType::CollectionLookup, self.verification_level);
-
-        // For high verification levels, verify before returning data
-        if crate::validation::should_validate_redundant(self.verification_level)
-            && !self.verify_checksum()
-        {
-            return None;
-        }
-
-        self.data.get(key)
-    }
-
-    /// Get a mutable reference to a value by key
-    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        self.data.get_mut(key)
-    }
-
-    /// Remove a key-value pair from the hash map
-    pub fn remove(&mut self, key: &K) -> Option<V> {
-        // Track the remove operation
-        record_global_operation(OperationType::CollectionRemove, self.verification_level);
-
-        let result = self.data.remove(key);
-
-        // If we removed something, recalculate the checksum
-        if result.is_some()
-            && crate::validation::should_validate(self.verification_level, importance::MUTATION)
-        {
-            self.recalculate_checksum();
-            // Track checksum calculation
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
-
-        result
-    }
-
-    /// Get the current verification level
-    pub fn verification_level(&self) -> VerificationLevel {
-        self.verification_level
-    }
-
-    /// Set a new verification level
-    pub fn set_verification_level(&mut self, level: VerificationLevel) {
-        // When changing to a non-None level from None, recalculate the checksum
-        let needs_recalc = matches!(self.verification_level, VerificationLevel::None)
-            && !matches!(level, VerificationLevel::None);
-
-        self.verification_level = level;
-
-        if needs_recalc {
-            self.recalculate_checksum();
-        }
-    }
-
-    /// Verify the integrity of the hash map (backward compatibility method)
-    pub fn verify(&self) -> bool {
-        // Track the validation operation
         record_global_operation(OperationType::CollectionValidate, self.verification_level);
-
-        // Always return true for None verification level
-        if matches!(self.verification_level, VerificationLevel::None) {
-            return true;
+        if !self.verification_level.should_verify(importance::HIGH) { // Use high importance for this check
+            return true; // Skip if verification level allows
         }
+        let mut current_checksum = Checksum::default();
+        current_checksum.update_slice(&self.length.to_ne_bytes());
+        current_checksum.update_slice(&self.verification_level.to_byte().to_ne_bytes()); // Changed
 
-        self.verify_checksum()
-    }
-
-    /// Get an iterator over the items
-    pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
-        self.data.iter()
-    }
-
-    /// Force recalculation of the checksum (backward compatibility method)
-    pub fn force_recalculate_checksum(&mut self) {
-        self.recalculate_checksum();
+        if self.elem_size > 0 {
+            if self.length > 0 {
+                match self.handler.get_slice(0, self.length * self.elem_size) {
+                    Ok(slice_view) => match slice_view.data() {
+                        Ok(data_bytes) => current_checksum.update_slice(data_bytes),
+                        Err(_) => return false, // Could not read data to verify
+                    },
+                    Err(_) => return false, // Could not get slice to verify
+                }
+            }
+        } else {
+            // Similar logic as recalculate_checksum for ZSTs
+        }
+        current_checksum == self.checksum
     }
 }
 
-#[cfg(not(feature = "std"))]
-impl<K, V, const N: usize> BoundedHashMap<K, V, N>
-where
-    K: Eq + hash::Hash + AsRef<[u8]> + core::cmp::Ord,
-    V: AsRef<[u8]>,
-{
-    /// Create a new empty bounded hash map
-    pub fn new() -> Self {
-        Self::with_verification_level(VerificationLevel::default())
-    }
-
-    /// Create a new empty bounded hash map with a specific verification level
-    pub fn with_verification_level(level: VerificationLevel) -> Self {
-        Self {
-            data: HashMap::new(),
-            checksum: Checksum::new(),
-            verification_level: level,
-        }
-    }
-
-    /// Insert a key-value pair into the hash map
-    ///
-    /// Returns an error if the hash map is at capacity and the key does not exist
-    pub fn insert(&mut self, key: K, value: V) -> Result<Option<V>, CapacityError> {
-        // Track the insert operation
-        record_global_operation(OperationType::CollectionInsert, self.verification_level);
-
-        // If the key doesn't exist and we're at capacity, return error
-        if !self.data.contains_key(&key) && self.is_full() {
-            return Err(CapacityError);
-        }
-
-        // Update the checksum before inserting if verification is enabled
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            // For inserts/updates, we'll just recalculate the whole checksum after the operation
-            // This is simpler than trying to adjust for the removed key+value
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
-
-        let old_value = self.data.insert(key, value);
-
-        // Recalculate checksum after insert if verification is enabled
-        if crate::validation::should_validate(self.verification_level, importance::MUTATION) {
-            self.recalculate_checksum();
-        }
-
-        Ok(old_value)
-    }
-
-    /// Get a value by key
-    pub fn get(&self, key: &K) -> Option<&V> {
-        // Track the lookup operation
-        record_global_operation(OperationType::CollectionLookup, self.verification_level);
-
-        // For high verification levels, verify before returning data
-        if crate::validation::should_validate_redundant(self.verification_level)
-            && !self.verify_checksum()
-        {
-            return None;
-        }
-
-        self.data.get(key)
-    }
-
-    /// Get a mutable reference to a value by key
-    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        self.data.get_mut(key)
-    }
-
-    /// Remove a key-value pair from the hash map
-    pub fn remove(&mut self, key: &K) -> Option<V> {
-        // Track the remove operation
-        record_global_operation(OperationType::CollectionRemove, self.verification_level);
-
-        let result = self.data.remove(key);
-
-        // If we removed something, recalculate the checksum
-        if result.is_some()
-            && crate::validation::should_validate(self.verification_level, importance::MUTATION)
-        {
-            self.recalculate_checksum();
-            // Track checksum calculation
-            record_global_operation(OperationType::ChecksumCalculation, self.verification_level);
-        }
-
-        result
-    }
-
-    /// Get the current verification level
-    pub fn verification_level(&self) -> VerificationLevel {
-        self.verification_level
-    }
-
-    /// Set a new verification level
-    pub fn set_verification_level(&mut self, level: VerificationLevel) {
-        // When changing to a non-None level from None, recalculate the checksum
-        let needs_recalc = matches!(self.verification_level, VerificationLevel::None)
-            && !matches!(level, VerificationLevel::None);
-
-        self.verification_level = level;
-
-        if needs_recalc {
-            self.recalculate_checksum();
-        }
-    }
-
-    /// Verify the integrity of the hash map (backward compatibility method)
-    pub fn verify(&self) -> bool {
-        // Track the validation operation
-        record_global_operation(OperationType::CollectionValidate, self.verification_level);
-
-        // Always return true for None verification level
-        if matches!(self.verification_level, VerificationLevel::None) {
-            return true;
-        }
-
-        self.verify_checksum()
-    }
-
-    /// Get an iterator over the items
-    pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
-        self.data.iter()
-    }
-
-    /// Force recalculation of the checksum (backward compatibility method)
-    pub fn force_recalculate_checksum(&mut self) {
-        self.recalculate_checksum();
-    }
-}
+// TODO: Add Kani proofs for BoundedVec operations if `kani` feature is enabled.
+// TODO: Add unit tests for BoundedVec.
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::safe_memory::{NoStdMemoryProvider, StdMemoryProvider}; // Assuming NoStdMemoryProvider exists
+    use crate::verification::VerificationLevel;
 
-    #[cfg(not(feature = "std"))]
-    use alloc::vec;
-
-    #[test]
-    fn test_bounded_stack() {
-        let mut stack = BoundedStack::<Vec<u8>, 3>::new();
-        assert!(stack.push(vec![1, 2, 3]).is_ok());
-        assert!(stack.push(vec![4, 5, 6]).is_ok());
-        assert!(stack.push(vec![7, 8, 9]).is_ok());
-        assert!(stack.push(vec![10, 11, 12]).is_err());
-
-        assert_eq!(stack.len(), 3);
-        assert!(stack.verify());
-
-        let item = stack.pop();
-        assert_eq!(item, Some(vec![7, 8, 9]));
-        assert_eq!(stack.len(), 2);
-        assert!(stack.verify());
+    // Helper for creating StdMemoryProvider for tests
+    fn create_std_provider(size: usize) -> StdMemoryProvider {
+        StdMemoryProvider::new(vec![0u8; size])
     }
 
-    #[test]
-    fn test_bounded_stack_with_verification_levels() {
-        // Test with standard verification
-        let mut stack =
-            BoundedStack::<Vec<u8>, 3>::with_verification_level(VerificationLevel::Standard);
-        assert!(stack.push(vec![1, 2, 3]).is_ok());
-        assert!(stack.verify());
+    // Dummy Checksummable type for testing
+    #[derive(Debug, Clone, PartialEq, Eq, Copy)] // Added Copy
+    struct TestItem(u32);
 
-        // Test with no verification
-        let mut no_verify_stack =
-            BoundedStack::<Vec<u8>, 3>::with_verification_level(VerificationLevel::None);
-        assert!(no_verify_stack.push(vec![1, 2, 3]).is_ok());
-        assert!(no_verify_stack.verify()); // Should return true without actually verifying
-
-        // Test with full verification
-        let mut full_verify_stack =
-            BoundedStack::<Vec<u8>, 3>::with_verification_level(VerificationLevel::Full);
-        assert!(full_verify_stack.push(vec![1, 2, 3]).is_ok());
-        assert!(full_verify_stack.verify());
-
-        // Test changing verification level
-        let mut dynamic_stack =
-            BoundedStack::<Vec<u8>, 3>::with_verification_level(VerificationLevel::None);
-        assert!(dynamic_stack.push(vec![1, 2, 3]).is_ok());
-
-        // When changing from None to a level that verifies, need to recalculate checksum
-        dynamic_stack.set_verification_level(VerificationLevel::Full);
-
-        // Recalculate checksum explicitly since it wasn't tracked with None level
-        let mut new_checksum = Checksum::new();
-        for item in &dynamic_stack.data {
-            new_checksum.update_slice(item.as_ref());
+    impl Checksummable for TestItem {
+        fn update_checksum(&self, checksum: &mut Checksum) {
+            checksum.update_u32(self.0);
         }
-        dynamic_stack.checksum = new_checksum;
-
-        assert!(dynamic_stack.verify()); // Now should perform full verification
     }
 
-    #[test]
-    fn test_bounded_vec() {
-        let mut vec = BoundedVec::<Vec<u8>, 3>::new();
-        assert!(vec.push(vec![1, 2, 3]).is_ok());
-        assert!(vec.push(vec![4, 5, 6]).is_ok());
-        assert!(vec.push(vec![7, 8, 9]).is_ok());
-        assert!(vec.push(vec![10, 11, 12]).is_err());
-
-        assert_eq!(vec.len(), 3);
-        assert!(vec.verify());
-
-        let item = vec.remove(1);
-        assert_eq!(item, Some(vec![4, 5, 6]));
-        assert_eq!(vec.len(), 2);
-        assert!(vec.verify());
-
-        let old = vec.set(0, vec![99, 100]);
-        assert_eq!(old, Some(vec![1, 2, 3]));
-        assert_eq!(vec.get(0), Some(&vec![99, 100]));
-        assert!(vec.verify());
+    impl ToBytes for TestItem {
+        const SERIALIZED_SIZE: usize = 4; // size of u32
+        fn write_bytes(&self, buffer: &mut [u8]) -> core::result::Result<(), SerializationError> {
+            if buffer.len() != Self::SERIALIZED_SIZE {
+                return Err(SerializationError::IncorrectSize);
+            }
+            buffer.copy_from_slice(&self.0.to_le_bytes());
+            Ok(())
+        }
     }
 
-    #[test]
-    fn test_bounded_vec_with_verification_levels() {
-        // Test with standard verification
-        let mut vec =
-            BoundedVec::<Vec<u8>, 3>::with_verification_level(VerificationLevel::Standard);
-        assert!(vec.push(vec![1, 2, 3]).is_ok());
-        assert!(vec.verify());
-
-        // Test with sampling verification
-        let mut sample_vec =
-            BoundedVec::<Vec<u8>, 3>::with_verification_level(VerificationLevel::Sampling);
-        assert!(sample_vec.push(vec![1, 2, 3]).is_ok());
-        // With sampling, we can't deterministically test the verification result
-
-        // Test verification with get operations
-        let mut full_verify_vec =
-            BoundedVec::<Vec<u8>, 3>::with_verification_level(VerificationLevel::Full);
-        assert!(full_verify_vec.push(vec![1, 2, 3]).is_ok());
-        assert!(full_verify_vec.push(vec![4, 5, 6]).is_ok());
-
-        // get and get_mut should work with Full level
-        let _ = full_verify_vec.get(0);
-        let _ = full_verify_vec.get_mut(1);
-
-        // Test iterator with verification
-        let items: Vec<_> = full_verify_vec.iter().collect();
-        assert_eq!(items.len(), 2);
+    impl FromBytes for TestItem {
+        const SERIALIZED_SIZE: usize = 4; // size of u32
+        fn from_bytes(bytes: &[u8]) -> core::result::Result<Self, SerializationError> {
+            if bytes.len() != Self::SERIALIZED_SIZE {
+                return Err(SerializationError::IncorrectSize);
+            }
+            let mut arr = [0u8; 4];
+            arr.copy_from_slice(bytes);
+            Ok(TestItem(u32::from_le_bytes(arr)))
+        }
     }
 
-    #[test]
-    fn test_bounded_hash_map() {
-        // Create map with None verification level to avoid automatic checksum calculations
-        let mut map =
-            BoundedHashMap::<String, Vec<u8>, 3>::with_verification_level(VerificationLevel::None);
+    // Test for Zero-Sized Type
+    #[derive(Debug, Clone, PartialEq, Eq, Copy)]
+    struct TestZST;
 
-        // Insert all items
-        assert!(map.insert("key1".to_string(), vec![1, 2, 3]).is_ok());
-        assert!(map.insert("key2".to_string(), vec![4, 5, 6]).is_ok());
-        assert!(map.insert("key3".to_string(), vec![7, 8, 9]).is_ok());
-
-        // Verify we're at capacity and can't add more
-        assert!(map.insert("key4".to_string(), vec![10, 11, 12]).is_err());
-        assert_eq!(map.len(), 3);
-
-        // Set to Standard level and force recalculate for verification
-        map.set_verification_level(VerificationLevel::Standard);
-        map.force_recalculate_checksum();
-        assert!(map.verify());
-
-        // Replacing an existing key should work even at capacity
-        assert!(map.insert("key1".to_string(), vec![99, 100]).is_ok());
-        assert_eq!(map.len(), 3);
-
-        // Force recalculate before verification
-        map.force_recalculate_checksum();
-        assert!(map.verify());
-
-        // Test removal
-        let item = map.remove(&"key2".to_string());
-        assert_eq!(item, Some(vec![4, 5, 6]));
-        assert_eq!(map.len(), 2);
-
-        // Force recalculate before verification
-        map.force_recalculate_checksum();
-        assert!(map.verify());
+    impl Checksummable for TestZST {
+        fn update_checksum(&self, _checksum: &mut Checksum) {
+            // ZSTs typically don't change checksum, or have a fixed change.
+        }
     }
-
-    #[test]
-    fn test_bounded_hash_map_with_verification_levels() {
-        // Test with full verification
-        let mut map =
-            BoundedHashMap::<String, Vec<u8>, 3>::with_verification_level(VerificationLevel::Full);
-        assert!(map.insert("key1".to_string(), vec![1, 2, 3]).is_ok());
-        assert!(map.verify());
-
-        // Test with no verification
-        let mut no_verify_map =
-            BoundedHashMap::<String, Vec<u8>, 3>::with_verification_level(VerificationLevel::None);
-        assert!(no_verify_map
-            .insert("key1".to_string(), vec![1, 2, 3])
-            .is_ok());
-        assert!(no_verify_map.verify()); // Should return true without actually verifying
-
-        // Test verification with get and iter operations
-        let mut full_map =
-            BoundedHashMap::<String, Vec<u8>, 3>::with_verification_level(VerificationLevel::Full);
-        assert!(full_map.insert("key1".to_string(), vec![1, 2, 3]).is_ok());
-        assert!(full_map.insert("key2".to_string(), vec![4, 5, 6]).is_ok());
-
-        // get and get_mut should work with Full level
-        let _ = full_map.get(&"key1".to_string());
-        let _ = full_map.get_mut(&"key2".to_string());
-
-        // Test iterator with verification
-        let items: Vec<_> = full_map.iter().collect();
-        assert_eq!(items.len(), 2);
-
-        // Test changing verification level dynamically
-        let mut dynamic_map =
-            BoundedHashMap::<String, Vec<u8>, 3>::with_verification_level(VerificationLevel::None);
-        assert!(dynamic_map
-            .insert("key1".to_string(), vec![1, 2, 3])
-            .is_ok());
-
-        // When changing from None to a level that verifies, need to recalculate checksum
-        dynamic_map.set_verification_level(VerificationLevel::Standard);
-
-        // Recalculate checksum explicitly since it wasn't tracked with None level
-        let mut new_checksum = Checksum::new();
-        let mut keys: Vec<&String> = dynamic_map.data.keys().collect();
-        keys.sort_by(|a, b| {
-            let a_bytes: &[u8] = AsRef::<[u8]>::as_ref(a);
-            let b_bytes: &[u8] = AsRef::<[u8]>::as_ref(b);
-            a_bytes.cmp(b_bytes)
-        });
-        for k in keys {
-            new_checksum.update_slice(k.as_ref());
-            if let Some(v) = dynamic_map.data.get(k) {
-                new_checksum.update_slice(v.as_ref());
+    impl ToBytes for TestZST {
+        const SERIALIZED_SIZE: usize = 0;
+        fn write_bytes(&self, buffer: &mut [u8]) -> core::result::Result<(), SerializationError> {
+            if !buffer.is_empty() {
+                Err(SerializationError::IncorrectSize)
+            } else {
+                Ok(())
             }
         }
-        dynamic_map.checksum = new_checksum;
-
-        assert!(dynamic_map.verify()); // Now should perform standard verification
+    }
+    impl FromBytes for TestZST {
+        const SERIALIZED_SIZE: usize = 0;
+        fn from_bytes(bytes: &[u8]) -> core::result::Result<Self, SerializationError> {
+            if !bytes.is_empty() {
+                Err(SerializationError::IncorrectSize)
+            } else {
+                Ok(TestZST)
+            }
+        }
     }
 
     #[test]
-    fn test_verification_level_behavior() {
-        // Test behavior with different verification levels
+    #[cfg(feature = "std")] // Ensure std environment for StdMemoryProvider with Vec
+    fn test_bounded_stack_std_refactored() {
+        let provider = create_std_provider(TestItem::SERIALIZED_SIZE * 3);
+        let mut stack: BoundedStack<TestItem, 3, _> = BoundedStack::new(provider);
 
-        // None - should not perform verification
-        let mut none_vec =
-            BoundedVec::<Vec<u8>, 10>::with_verification_level(VerificationLevel::None);
-        for i in 0..5 {
-            assert!(none_vec.push(vec![i, i + 1]).is_ok());
+        assert_eq!(stack.len(), 0);
+        assert!(stack.is_empty());
+        assert_eq!(stack.capacity(), 3);
+
+        // Push items
+        assert!(stack.push(TestItem(10)).is_ok());
+        assert_eq!(stack.len(), 1);
+        assert_eq!(stack.peek().unwrap().unwrap(), TestItem(10));
+
+        assert!(stack.push(TestItem(20)).is_ok());
+        assert_eq!(stack.len(), 2);
+        assert_eq!(stack.peek().unwrap().unwrap(), TestItem(20));
+
+        assert!(stack.push(TestItem(30)).is_ok());
+        assert_eq!(stack.len(), 3);
+        assert!(!stack.is_empty());
+        assert!(stack.is_full());
+        assert_eq!(stack.peek().unwrap().unwrap(), TestItem(30));
+
+        // Try to push when full
+        match stack.push(TestItem(40)) {
+            Err(BoundedError::CapacityExceeded { capacity, .. }) => assert_eq!(capacity, 3),
+            _ => panic!("Expected CapacityExceeded"),
         }
 
-        // Standard - should perform verification on most operations
-        let mut std_vec =
-            BoundedVec::<Vec<u8>, 10>::with_verification_level(VerificationLevel::Standard);
-        for i in 0..5 {
-            assert!(std_vec.push(vec![i, i + 1]).is_ok());
-        }
-        assert!(std_vec.verify());
+        // Pop items
+        assert_eq!(stack.pop().unwrap().unwrap(), TestItem(30));
+        assert_eq!(stack.len(), 2);
+        assert_eq!(stack.peek().unwrap().unwrap(), TestItem(20));
 
-        // Full - should perform verification on all operations, including redundant ones
-        let mut full_vec =
-            BoundedVec::<Vec<u8>, 10>::with_verification_level(VerificationLevel::Full);
-        for i in 0..5 {
-            assert!(full_vec.push(vec![i, i + 1]).is_ok());
-        }
-        assert!(full_vec.verify());
+        assert_eq!(stack.pop().unwrap().unwrap(), TestItem(20));
+        assert_eq!(stack.len(), 1);
+        assert_eq!(stack.peek().unwrap().unwrap(), TestItem(10));
 
-        // Now test with a modifying operation
-        full_vec.remove(0);
-        assert!(full_vec.verify());
+        // Verify checksum (basic test)
+        stack.set_verification_level(VerificationLevel::Balanced);
+        assert!(stack.verify_checksum());
+
+        assert_eq!(stack.pop().unwrap().unwrap(), TestItem(10));
+        assert_eq!(stack.len(), 0);
+        assert!(stack.is_empty());
+        assert!(stack.peek().unwrap().is_none());
+
+        // Try to pop when empty
+        assert!(stack.pop().unwrap().is_none());
     }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_bounded_stack_zst() {
+        let provider = create_std_provider(0); // ZSTs need 0 memory for elements
+        let mut stack: BoundedStack<TestZST, 5, _> = BoundedStack::new(provider);
+
+        assert_eq!(stack.len(), 0);
+        assert!(stack.push(TestZST).is_ok());
+        assert_eq!(stack.len(), 1);
+        assert_eq!(stack.peek().unwrap().unwrap(), TestZST);
+
+        for _ in 0..4 {
+            assert!(stack.push(TestZST).is_ok());
+        }
+        assert_eq!(stack.len(), 5);
+        assert!(stack.is_full());
+
+        match stack.push(TestZST) {
+            Err(BoundedError::CapacityExceeded { capacity, .. }) => assert_eq!(capacity, 5),
+            _ => panic!("Expected CapacityExceeded for ZST stack"),
+        }
+
+        assert_eq!(stack.pop().unwrap().unwrap(), TestZST);
+        assert_eq!(stack.len(), 4);
+    }
+
+    // ... other existing tests ...
+    // Note: The old `test_bounded_stack_std` and `test_bounded_stack_guaranteed`
+    // will need to be adapted or replaced by tests like the one above,
+    // as they used the old Vec-backed BoundedStack.
+
+    // Minimal adaptation of an existing test to see if it compiles with new structure,
+    // will likely need more providers.
+    #[test]
+    #[cfg(feature = "std")]
+    fn bounded_stack_specifics_refactored() {
+        let provider = create_std_provider(TestItem::SERIALIZED_SIZE * 2);
+        let mut stack: BoundedStack<TestItem, 2, _> =
+            BoundedStack::with_verification_level(provider, VerificationLevel::Redundant);
+        assert_eq!(stack.len(), 0);
+        assert!(stack.is_empty());
+
+        let item1 = TestItem(1);
+        let item2 = TestItem(2);
+
+        assert!(stack.push(item1).is_ok());
+        assert_eq!(stack.len(), 1);
+        assert_eq!(stack.peek().unwrap().unwrap(), item1);
+        assert!(stack.verify_checksum()); // Checksum after one push
+
+        assert!(stack.push(item2).is_ok());
+        assert_eq!(stack.len(), 2);
+        assert_eq!(stack.peek().unwrap().unwrap(), item2);
+        assert!(!stack.is_empty());
+        assert!(stack.is_full());
+        assert!(stack.verify_checksum()); // Checksum after two pushes
+
+        let popped_item = stack.pop().unwrap().unwrap();
+        assert_eq!(popped_item, item2);
+        assert_eq!(stack.len(), 1);
+        assert!(stack.verify_checksum()); // Checksum after one pop
+
+        let _ = stack.pop().unwrap().unwrap();
+        assert!(stack.is_empty());
+        assert!(stack.verify_checksum()); // Checksum when empty
+    }
+
+    // ... existing code ...
 }

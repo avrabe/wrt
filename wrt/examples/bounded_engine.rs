@@ -66,10 +66,7 @@ fn main() -> Result<()> {
     // Example of how to modify the verification level after engine creation
     println!("Changing verification level on an existing engine");
     let mut engine = StacklessEngine::new();
-    println!(
-        "Default verification level: {:?}",
-        engine.verification_level
-    );
+    println!("Default verification level: {:?}", engine.verification_level);
 
     // Change to Full verification for maximum safety
     engine.set_verification_level(VerificationLevel::Full);

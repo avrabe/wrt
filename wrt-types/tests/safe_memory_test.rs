@@ -1,7 +1,7 @@
 //! Tests for the safe memory implementation
 
 use wrt_types::{
-    safe_memory::{MemoryProvider, MemorySafety, SafeSlice},
+    safe_memory::{MemoryProvider, SafeSlice},
     verification::VerificationLevel,
 };
 
@@ -17,9 +17,9 @@ fn test_safe_slice_creation() {
     let slice = SafeSlice::new(&data);
 
     // Verify data access works
-    assert_eq!(slice.data().unwrap(), &[1, 2, 3, 4, 5]);
-    assert_eq!(slice.len(), 5);
-    assert!(!slice.is_empty());
+    assert_eq!(slice.as_ref().unwrap().data().unwrap(), &[1, 2, 3, 4, 5]);
+    assert_eq!(slice.as_ref().unwrap().len(), 5);
+    assert!(!slice.as_ref().unwrap().is_empty());
 }
 
 #[test]
@@ -33,10 +33,10 @@ fn test_safe_slice_verification_levels() {
     let slice_full = SafeSlice::with_verification_level(&data, VerificationLevel::Full);
 
     // All should return the same data
-    assert_eq!(slice_none.data().unwrap(), &[1, 2, 3, 4, 5]);
-    assert_eq!(slice_sampling.data().unwrap(), &[1, 2, 3, 4, 5]);
-    assert_eq!(slice_standard.data().unwrap(), &[1, 2, 3, 4, 5]);
-    assert_eq!(slice_full.data().unwrap(), &[1, 2, 3, 4, 5]);
+    assert_eq!(slice_none.as_ref().unwrap().data().unwrap(), &[1, 2, 3, 4, 5]);
+    assert_eq!(slice_sampling.as_ref().unwrap().data().unwrap(), &[1, 2, 3, 4, 5]);
+    assert_eq!(slice_standard.as_ref().unwrap().data().unwrap(), &[1, 2, 3, 4, 5]);
+    assert_eq!(slice_full.as_ref().unwrap().data().unwrap(), &[1, 2, 3, 4, 5]);
 }
 
 #[cfg(feature = "std")]

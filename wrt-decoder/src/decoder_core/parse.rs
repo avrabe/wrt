@@ -10,7 +10,7 @@ use wrt_format::{
     binary::BinaryFormat,
     module::{Function, Global, Memory, Table, Export, ExportKind, Import, ImportDesc},
     CustomSection, Module, 
-    types::{Limits, ValueType, FuncType},
+    types::{Limits, ValueType, FuncType, CoreWasmVersion},
 };
 
 // All collection types are now imported from the prelude
@@ -29,6 +29,7 @@ const ELEMENT_SECTION_ID: u8 = 9;
 const CODE_SECTION_ID: u8 = 10;
 const DATA_SECTION_ID: u8 = 11;
 const DATA_COUNT_SECTION_ID: u8 = 12;
+const TYPE_INFORMATION_SECTION_ID: u8 = 15;
 
 // Custom error codes
 const ERROR_INVALID_LENGTH: u16 = codes::PARSE_ERROR;
@@ -36,6 +37,7 @@ const ERROR_INVALID_MAGIC: u16 = codes::PARSE_ERROR;
 const ERROR_INVALID_VERSION: u16 = codes::PARSE_ERROR;
 const ERROR_INVALID_SECTION: u16 = codes::PARSE_ERROR;
 const ERROR_INVALID_UTF8: u16 = codes::PARSE_ERROR;
+const ERROR_CAPACITY_EXCEEDED: u16 = codes::PARSE_ERROR;
 
 /// Parse a WebAssembly binary module
 ///
@@ -61,6 +63,33 @@ pub fn parse_module(data: &[u8]) -> Result<Module> {
     let mut module = Module::new();
     // Make a copy of the entire binary
     module.binary = Some(data.to_vec());
+
+    // Explicitly parse and set CoreWasmVersion based on hypothetical F1
+    if data.len() >= 8 {
+        let version_bytes = [data[4], data[5], data[6], data[7]];
+        match CoreWasmVersion::from_bytes(version_bytes) {
+            Some(version) => {
+                module.core_version = version;
+            }
+            None => {
+                // If CoreWasmVersion::from_bytes returns None, it's an unknown/unsupported version
+                // according to our defined CoreWasmVersion enum.
+                // We might allow parsing to continue with a default (e.g. V2_0) and warn,
+                // or error out. For now, let's error out for strictness.
+                return Err(Error::new(
+                    ErrorCategory::Parse,
+                    ERROR_INVALID_VERSION, // Use existing error code if suitable
+                    format!("Unsupported WebAssembly version bytes: {:02X?}", version_bytes),
+                ));
+            }
+        }
+    } else {
+        return Err(Error::new(
+            ErrorCategory::Parse,
+            ERROR_INVALID_LENGTH, // Use existing error code if suitable
+            "Data too short for WebAssembly header.".to_string(),
+        ));
+    }
 
     // Parse the binary contents (skip the magic number and version)
     parse_binary_into_module(&data[8..], &mut module)?;
@@ -160,6 +189,20 @@ pub fn parse_binary_into_module(data: &[u8], module: &mut Module) -> Result<()> 
             DATA_COUNT_SECTION_ID => {
                 parse_data_count_section(module, section_data)?;
             },
+            TYPE_INFORMATION_SECTION_ID => {
+                if module.core_version == CoreWasmVersion::V3_0 {
+                    parse_type_information_section(module, section_data)?;
+                } else {
+                    // Section ID 15 is unknown for Wasm 2.0, could warn or treat as custom/skip
+                    // For now, let's be strict and error if it's not a V3_0 module,
+                    // or simply skip if we want to be more lenient with unknown sections.
+                    // Current loop structure implies skipping unknown sections silently.
+                    // If strictness is desired, an error should be returned:
+                    // return Err(Error::new(...));
+                    // To match existing behavior of skipping unknown sections:
+                    // log_warning!("Encountered TypeInformation section (ID 15) in a non-Wasm3.0 module. Skipping.");
+                }
+            },
             _ => {
                 // Unknown section - just skip it
                 // We could log a warning, but for now we'll just ignore it
@@ -258,7 +301,8 @@ fn parse_type_section(module: &mut Module, data: &[u8]) -> Result<()> {
                 ));
             }
             
-            let value_type = match data[offset] {
+            let type_byte = data[offset];
+            let value_type = match type_byte {
                 0x7F => ValueType::I32,
                 0x7E => ValueType::I64,
                 0x7D => ValueType::F32,
@@ -266,11 +310,13 @@ fn parse_type_section(module: &mut Module, data: &[u8]) -> Result<()> {
                 0x7B => ValueType::V128,
                 0x70 => ValueType::FuncRef,
                 0x6F => ValueType::ExternRef,
+                // Hypothetical Finding F2: Allow I16x8 for Wasm 3.0
+                0x79 if module.core_version == CoreWasmVersion::V3_0 => ValueType::I16x8,
                 _ => {
                     return Err(Error::new(
                         ErrorCategory::Parse,
-                        ERROR_INVALID_SECTION,
-                        format!("Invalid value type: 0x{:02x}", data[offset]),
+                        ERROR_INVALID_SECTION, // Consider a more specific error like wrt_error_kinds::unknown_value_type_for_version
+                        format!("Invalid or unsupported value type byte for Wasm version {:?}: 0x{:02x}", module.core_version, type_byte),
                     ));
                 }
             };
@@ -294,7 +340,8 @@ fn parse_type_section(module: &mut Module, data: &[u8]) -> Result<()> {
                 ));
             }
             
-            let value_type = match data[offset] {
+            let type_byte = data[offset];
+            let value_type = match type_byte {
                 0x7F => ValueType::I32,
                 0x7E => ValueType::I64,
                 0x7D => ValueType::F32,
@@ -302,11 +349,13 @@ fn parse_type_section(module: &mut Module, data: &[u8]) -> Result<()> {
                 0x7B => ValueType::V128,
                 0x70 => ValueType::FuncRef,
                 0x6F => ValueType::ExternRef,
+                // Hypothetical Finding F2: Allow I16x8 for Wasm 3.0
+                0x79 if module.core_version == CoreWasmVersion::V3_0 => ValueType::I16x8,
                 _ => {
                     return Err(Error::new(
                         ErrorCategory::Parse,
-                        ERROR_INVALID_SECTION,
-                        format!("Invalid value type: 0x{:02x}", data[offset]),
+                        ERROR_INVALID_SECTION, // Consider a more specific error
+                        format!("Invalid or unsupported value type byte for Wasm version {:?}: 0x{:02x}", module.core_version, type_byte),
                     ));
                 }
             };
@@ -316,7 +365,7 @@ fn parse_type_section(module: &mut Module, data: &[u8]) -> Result<()> {
         }
         
         // Create the function type
-        let func_type = FuncType::new(params, results);
+        let func_type = FuncType::new(params, results)?;
         types.push(func_type);
     }
     
@@ -480,8 +529,8 @@ fn parse_import_section(module: &mut Module, data: &[u8]) -> Result<()> {
                     ));
                 }
                 
-                // Read value type
-                let value_type = match data[offset] {
+                let type_byte = data[offset];
+                let value_type = match type_byte {
                     0x7F => ValueType::I32,
                     0x7E => ValueType::I64,
                     0x7D => ValueType::F32,
@@ -489,43 +538,53 @@ fn parse_import_section(module: &mut Module, data: &[u8]) -> Result<()> {
                     0x7B => ValueType::V128,
                     0x70 => ValueType::FuncRef,
                     0x6F => ValueType::ExternRef,
+                    // Hypothetical Finding F2: Allow I16x8 for Wasm 3.0 globals
+                    0x79 if module.core_version == CoreWasmVersion::V3_0 => ValueType::I16x8,
                     _ => {
                         return Err(Error::new(
                             ErrorCategory::Parse,
-                            ERROR_INVALID_SECTION,
-                            format!("Invalid value type: 0x{:02x}", data[offset]),
+                            ERROR_INVALID_SECTION, // Consider a more specific error
+                            format!("Invalid or unsupported value type byte for Wasm version {:?} in global import: 0x{:02x}", module.core_version, type_byte),
                         ));
                     }
                 };
                 offset += 1;
                 
-                // Read mutability
-                if offset >= data.len() {
+                if offset >= data.len() { // For mutability byte
                     return Err(Error::new(
                         ErrorCategory::Parse,
                         ERROR_INVALID_SECTION,
                         "Unexpected end of data while reading global mutability",
                     ));
                 }
-                
                 let mutable = data[offset] != 0;
                 offset += 1;
                 
-                let global = Global {
-                    global_type: wrt_types::types::GlobalType {
-                        value_type,
-                        mutable,
-                    },
-                    init: Vec::new(), // No init for imports
-                };
-                
-                ImportDesc::Global(global)
+                // The `Global` struct in `wrt-format` currently takes `FormatGlobalType`,
+                // which itself takes a `ValueType`.
+                // The `Global` in `ImportDesc` in `wrt-format` should probably take `FormatGlobalType` too.
+                // For now, assuming ImportDesc::Global needs wrt_types::types::GlobalType or similar that we can construct.
+                // Let's ensure the structure in wrt-format::module::ImportDesc::Global is compatible or adjust here.
+                // From wrt-format/src/module.rs: pub enum ImportDesc { ..., Global(FormatGlobalType), ... }
+                // From wrt-format/src/types.rs: pub struct FormatGlobalType { pub value_type: ValueType, pub mutable: bool }
+                ImportDesc::Global(wrt_format::types::FormatGlobalType {
+                    value_type,
+                    mutable,
+                })
+            },
+            // Hypothetical Finding F6: New import kind for Wasm 3.0 Tag proposal
+            0x04 if module.core_version == CoreWasmVersion::V3_0 => {
+                // Tag import (represents an exception tag)
+                // The proposal typically has a type index associated with a tag, pointing to a function type.
+                let (type_idx, bytes_read) = BinaryFormat::decode_leb_u32(&data[offset..])?;
+                offset += bytes_read;
+                ImportDesc::Tag(type_idx) // Assumes ImportDesc::Tag(u32) was added in wrt-format
             },
             _ => {
                 return Err(Error::new(
                     ErrorCategory::Parse,
-                    ERROR_INVALID_SECTION,
-                    format!("Invalid import kind: 0x{:02x}", kind),
+                    ERROR_INVALID_SECTION, // Consider wrt_error_kinds::invalid_import_export_kind_for_version
+                    format!("Invalid or unsupported import kind for Wasm version {:?}: 0x{:02x}", module.core_version, kind),
                 ));
             }
         };
@@ -755,8 +814,8 @@ fn parse_global_section(module: &mut Module, data: &[u8]) -> Result<()> {
             ));
         }
         
-        // Read value type
-        let value_type = match data[offset] {
+        let type_byte = data[offset];
+        let value_type = match type_byte {
             0x7F => ValueType::I32,
             0x7E => ValueType::I64,
             0x7D => ValueType::F32,
@@ -764,11 +823,13 @@ fn parse_global_section(module: &mut Module, data: &[u8]) -> Result<()> {
             0x7B => ValueType::V128,
             0x70 => ValueType::FuncRef,
             0x6F => ValueType::ExternRef,
+            // Hypothetical Finding F2: Allow I16x8 for Wasm 3.0 globals
+            0x79 if module.core_version == CoreWasmVersion::V3_0 => ValueType::I16x8,
             _ => {
                 return Err(Error::new(
                     ErrorCategory::Parse,
-                    ERROR_INVALID_SECTION,
-                    format!("Invalid value type: 0x{:02x}", data[offset]),
+                    ERROR_INVALID_SECTION, // Consider a more specific error
+                    format!("Invalid or unsupported value type byte for Wasm version {:?} in global section: 0x{:02x}", module.core_version, type_byte),
                 ));
             }
         };
@@ -865,11 +926,13 @@ fn parse_export_section(module: &mut Module, data: &[u8]) -> Result<()> {
             0x01 => ExportKind::Table,
             0x02 => ExportKind::Memory,
             0x03 => ExportKind::Global,
+            // Hypothetical Finding F6: New export kind for Wasm 3.0 Tag proposal
+            0x04 if module.core_version == CoreWasmVersion::V3_0 => ExportKind::Tag, // Assumes ExportKind::Tag was added in wrt-format
             _ => {
                 return Err(Error::new(
                     ErrorCategory::Parse,
-                    ERROR_INVALID_SECTION,
-                    format!("Invalid export kind: 0x{:02x}", kind_byte),
+                    ERROR_INVALID_SECTION, // Consider wrt_error_kinds::invalid_import_export_kind_for_version
+                    format!("Invalid or unsupported export kind for Wasm version {:?}: 0x{:02x}", module.core_version, kind_byte),
                 ));
             }
         };
@@ -1009,4 +1072,44 @@ pub fn parse_binary(data: &[u8]) -> Result<Module> {
     parse_binary_into_module(data, &mut module)?;
     
     Ok(module)
+}
+
+/// Hypothetical Finding F5: Placeholder for parsing the TypeInformation section
+fn parse_type_information_section(module: &mut Module, data: &[u8]) -> Result<()> {
+    // Ensure module.type_info_section is initialized if not already
+    // (it defaults to None, but if this section can appear multiple times,
+    // the behavior would need clarification - Wasm sections usually appear at most once)
+    let type_info_section = module.type_info_section.get_or_insert_with(Default::default);
+    
+    let mut current_offset = 0;
+    let (count, bytes_read) = BinaryFormat::decode_leb_u32(&data[current_offset..])?;
+    current_offset += bytes_read;
+
+    for _ in 0..count {
+        // Parse type_index (varuint32)
+        let (type_idx, bytes_read) = BinaryFormat::decode_leb_u32(&data[current_offset..])?;
+        current_offset += bytes_read;
+
+        // Parse name (string)
+        let (name, bytes_read) = utils::read_name_as_string(&data[current_offset..], current_offset)?; // Assuming read_name_as_string is suitable
+        current_offset += bytes_read;
+        
+        // TODO: Add proper capacity checks for vector and data length checks.
+        // TODO: Validate type_idx against module.types.len() in the validation phase.
+
+        type_info_section.entries.push(wrt_format::module::TypeInformationEntry {
+            type_index: type_idx,
+            name,
+        });
+    }
+    
+    if current_offset != data.len() {
+        return Err(Error::new(
+            ErrorCategory::Parse,
+            ERROR_INVALID_LENGTH, // Or a more specific error
+            "Extra data at end of TypeInformation section".to_string(),
+        ));
+    }
+
+    Ok(())
 }

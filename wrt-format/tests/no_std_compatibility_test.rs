@@ -16,21 +16,19 @@ mod tests {
     use alloc::{format, string::String, vec, vec::Vec};
 
     #[cfg(feature = "std")]
-    use std::{string::String, vec, vec::Vec};
+    use std::{vec, vec::Vec};
 
     // Import from wrt-format
     use wrt_format::{
         binary::{
             read_leb128_u32, read_string, write_leb128_u32, write_string, WASM_MAGIC, WASM_VERSION,
         },
-        component::ValType,
-        module::{Export, ExportKind, Function, Global, Import, ImportDesc, Memory, Table},
-        section::{CustomSection, Section, SectionId},
+        section::{CustomSection, CUSTOM_ID, FUNCTION_ID, IMPORT_ID, TYPE_ID},
         types::{FormatBlockType, Limits},
     };
 
-    // Import from wrt-types for SafeSlice
-    use wrt_types::safe_memory::{SafeSlice, SafeStack};
+    // Import from wrt-types for ValueType and ValType
+    use wrt_types::{component_value::ValType, ValueType};
 
     #[test]
     fn test_binary_constants() {
@@ -40,48 +38,38 @@ mod tests {
 
     #[test]
     fn test_leb128_encoding() {
-        // Test encoding/decoding LEB128
-        let mut buffer = vec![0u8; 8];
+        // Test encoding u32
+        let encoded = write_leb128_u32(624485);
 
-        // Write u32
-        let written = write_leb128_u32(&mut buffer, 624485).unwrap();
-
-        // Read u32
-        let (value, read) = read_leb128_u32(&buffer).unwrap();
+        // Read u32 from position 0
+        let (value, read) = read_leb128_u32(&encoded, 0).unwrap();
 
         // Verify
         assert_eq!(value, 624485);
-        assert_eq!(written, read);
+        assert_eq!(read, encoded.len());
     }
 
     #[test]
     fn test_string_encoding() {
-        // Test encoding/decoding strings
-        let mut buffer = vec![0u8; 20];
+        // Test encoding string
         let test_string = "test_string";
+        let encoded = write_string(test_string);
 
-        // Write string
-        let written = write_string(&mut buffer, test_string).unwrap();
-
-        // Read string
-        let (string, read) = read_string(&buffer).unwrap();
+        // Read string from position 0
+        let (string, read) = read_string(&encoded, 0).unwrap();
 
         // Verify
         assert_eq!(string, test_string);
-        assert_eq!(written, read);
+        assert_eq!(read, encoded.len());
     }
 
     #[test]
     fn test_section_ids() {
-        // Test section IDs
-        assert_eq!(SectionId::Custom.as_u8(), 0);
-        assert_eq!(SectionId::Type.as_u8(), 1);
-        assert_eq!(SectionId::Import.as_u8(), 2);
-        assert_eq!(SectionId::Function.as_u8(), 3);
-
-        // Convert from u8
-        assert_eq!(SectionId::from_u8(0), SectionId::Custom);
-        assert_eq!(SectionId::from_u8(1), SectionId::Type);
+        // Test section ID constants
+        assert_eq!(CUSTOM_ID, 0);
+        assert_eq!(TYPE_ID, 1);
+        assert_eq!(IMPORT_ID, 2);
+        assert_eq!(FUNCTION_ID, 3);
     }
 
     #[test]
@@ -89,37 +77,17 @@ mod tests {
         // Test custom section
         let name = "test_section";
         let data = vec![1, 2, 3, 4];
-        let section = CustomSection::new(name.to_string(), data.clone());
+        let section = CustomSection { name: name.to_string(), data: data.clone() };
 
-        assert_eq!(section.name(), name);
-        assert_eq!(section.data(), &data);
+        assert_eq!(section.name, name);
+        assert_eq!(section.data, data);
     }
 
     #[test]
-    fn test_module_types() {
-        // Test export
-        let export = Export::new("test_func".to_string(), ExportKind::Function, 0);
-        assert_eq!(export.name(), "test_func");
-        assert_eq!(export.kind(), ExportKind::Function);
-        assert_eq!(export.index(), 0);
-
-        // Test import
-        let import_desc = ImportDesc::Function(1);
-        let import = Import::new(
-            "test_module".to_string(),
-            "test_field".to_string(),
-            import_desc,
-        );
-        assert_eq!(import.module(), "test_module");
-        assert_eq!(import.name(), "test_field");
-
-        match import.desc() {
-            ImportDesc::Function(idx) => assert_eq!(*idx, 1),
-            _ => panic!("Wrong import description type"),
-        }
-
+    fn test_limits() {
         // Test limits
-        let limits = Limits::new(1, Some(2), false, false);
+        let limits = Limits { min: 1, max: Some(2), memory64: false, shared: false };
+
         assert_eq!(limits.min, 1);
         assert_eq!(limits.max, Some(2));
         assert_eq!(limits.memory64, false);
@@ -127,9 +95,13 @@ mod tests {
     }
 
     #[test]
-    fn test_format_val_types() {
-        // Test ValType enum
-        assert_ne!(ValType::I32, ValType::I64);
+    fn test_value_types() {
+        // Test ValueType enum from wrt-types
+        assert_ne!(ValueType::I32, ValueType::I64);
+        assert_ne!(ValueType::F32, ValueType::F64);
+
+        // Test component ValType enum
+        assert_ne!(ValType::S32, ValType::S64);
         assert_ne!(ValType::F32, ValType::F64);
     }
 
@@ -137,7 +109,7 @@ mod tests {
     fn test_format_block_type() {
         // Test block types
         let block_empty = FormatBlockType::Empty;
-        let block_value = FormatBlockType::Value(ValType::I32);
+        let block_value = FormatBlockType::ValueType(ValueType::I32);
 
         assert_ne!(block_empty, block_value);
     }

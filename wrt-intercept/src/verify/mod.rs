@@ -50,9 +50,7 @@ pub mod proofs {
         }
 
         fn clone_strategy(&self) -> Arc<dyn LinkInterceptorStrategy> {
-            Arc::new(Self {
-                modify_args: self.modify_args,
-            })
+            Arc::new(Self { modify_args: self.modify_args })
         }
     }
 
@@ -123,9 +121,7 @@ pub mod proofs {
 
         let args = vec![Value::I32(10)];
         let result = interceptor.intercept_call("target", "func", args.clone(), |_| {
-            Err(wrt_error::Error::new(wrt_error::kinds::ExecutionError(
-                "Test error".to_string(),
-            )))
+            Err(wrt_error::Error::new(wrt_error::kinds::ExecutionError("Test error".to_string())))
         });
 
         assert!(result.is_err());

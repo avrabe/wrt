@@ -303,10 +303,7 @@ mod tests {
     fn test_firewall_allow_source() {
         let config = FirewallConfig {
             default_allow: false,
-            rules: vec![FirewallRule::AllowSource(
-                "source".to_string(),
-                "target".to_string(),
-            )],
+            rules: vec![FirewallRule::AllowSource("source".to_string(), "target".to_string())],
             check_parameters: false,
         };
         let strategy = FirewallStrategy::new(config);

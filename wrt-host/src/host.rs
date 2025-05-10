@@ -107,8 +107,7 @@ impl BuiltinHost {
     where
         F: Fn(&mut dyn Any, Vec<Value>) -> Result<Vec<Value>> + Send + Sync + 'static,
     {
-        self.handlers
-            .insert(builtin_type.name().to_string(), Box::new(handler));
+        self.handlers.insert(builtin_type.name().to_string(), Box::new(handler));
     }
 
     /// Register a fallback for a critical built-in function
@@ -121,8 +120,7 @@ impl BuiltinHost {
     where
         F: Fn(&mut dyn Any, Vec<Value>) -> Result<Vec<Value>> + Send + Sync + 'static,
     {
-        self.critical_builtins
-            .insert(builtin_type, Box::new(handler));
+        self.critical_builtins.insert(builtin_type, Box::new(handler));
     }
 
     /// Check if a built-in type is implemented

@@ -15,9 +15,7 @@ pub struct ComponentRegistry {
 impl ComponentRegistry {
     /// Create a new empty registry
     pub fn new() -> Self {
-        Self {
-            components: HashMap::new(),
-        }
+        Self { components: HashMap::new() }
     }
 
     /// Register a component by name

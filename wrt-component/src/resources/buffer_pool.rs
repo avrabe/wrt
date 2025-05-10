@@ -22,11 +22,7 @@ impl BufferPool {
 
     /// Create a new buffer pool with custom max buffer size
     pub fn new_with_config(max_buffer_size: usize, max_buffers_per_size: usize) -> Self {
-        Self {
-            pools: HashMap::new(),
-            max_buffer_size,
-            max_buffers_per_size,
-        }
+        Self { pools: HashMap::new(), max_buffer_size, max_buffers_per_size }
     }
 
     /// Allocate a buffer of at least the specified size
@@ -74,11 +70,7 @@ impl BufferPool {
             total_capacity += size * buffers.len();
         }
 
-        BufferPoolStats {
-            total_buffers,
-            total_capacity,
-            size_count: self.pools.len(),
-        }
+        BufferPoolStats { total_buffers, total_capacity, size_count: self.pools.len() }
     }
 }
 

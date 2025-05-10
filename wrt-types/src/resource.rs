@@ -1,33 +1,31 @@
-//! Resource type definitions for the Component Model
-//!
-//! This module provides types for working with WebAssembly Component Model resources.
-//! Resources in the Component Model are handles to external entities or capabilities.
+// WRT - wrt-types
+// Module: WebAssembly Component Model Resources
+// SW-REQ-ID: REQ_WASM_COMPONENT_003 (Example: Relates to component model resources)
+//
+// Copyright (c) 2024 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
 
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
-use alloc::format;
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
-use alloc::string::String;
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
-use alloc::vec::Vec;
+//! Resource types for WebAssembly Component Model
+//!
+//! This module defines types for working with WebAssembly Component Model resources.
+//! Resources are first-class values that can represent external entities like files,
+//! network connections, or other system resources.
+
+#[cfg(feature = "alloc")]
+use alloc::{format, vec::Vec};
 use core::fmt;
-#[cfg(feature = "std")]
-#[cfg(feature = "std")]
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
-use core::fmt::{Debug, Write};
-#[cfg(not(feature = "std"))]
-use core::str::FromStr;
+use core::fmt::Debug;
 #[cfg(feature = "std")]
-#[allow(unused_imports)]
-use std::fmt::{Debug, Write};
-#[cfg(feature = "std")]
-use std::string::String;
+use std::fmt::Debug;
 
 // optional imports
-#[cfg(feature = "component-model-resources")]
-use crate::bounded::BoundedVec;
+// #[cfg(feature = "component-model-resources")]
+// use crate::bounded::BoundedVec;
 
-use wrt_error::Result;
+use crate::prelude::*;
 
 /// Resource identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -125,9 +123,9 @@ impl fmt::Display for ResourceOperation {
 }
 
 impl core::str::FromStr for ResourceOperation {
-    type Err = String;
+    type Err = wrt_error::String;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
         match s {
             "read" => Ok(ResourceOperation::Read),
             "write" => Ok(ResourceOperation::Write),
@@ -136,14 +134,7 @@ impl core::str::FromStr for ResourceOperation {
             "delete" => Ok(ResourceOperation::Delete),
             "reference" => Ok(ResourceOperation::Reference),
             "dereference" => Ok(ResourceOperation::Dereference),
-            #[cfg(feature = "alloc")]
             _ => Err(format!("Unknown resource operation: {}", s)),
-            #[cfg(not(feature = "alloc"))]
-            _ => {
-                let mut message = String::new();
-                let _ = write!(message, "Unknown resource operation: {}", s);
-                Err(message)
-            }
         }
     }
 }
@@ -187,24 +178,34 @@ impl fmt::Display for ResourceRepresentation {
         write!(f, "{}", self.as_str())
     }
 }
-
 impl core::str::FromStr for ResourceRepresentation {
-    type Err = String;
+    type Err = wrt_error::String;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
         match s {
             "handle32" => Ok(ResourceRepresentation::Handle32),
             "handle64" => Ok(ResourceRepresentation::Handle64),
-            #[cfg(feature = "alloc")]
-            "record" => Ok(ResourceRepresentation::Record(Vec::new())),
-            #[cfg(feature = "alloc")]
-            "aggregate" => Ok(ResourceRepresentation::Aggregate(Vec::new())),
-            #[cfg(not(feature = "alloc"))]
-            "record" => Ok(ResourceRepresentation::Record),
-            #[cfg(feature = "alloc")]
+            "record" => {
+                #[cfg(feature = "alloc")]
+                {
+                    Ok(ResourceRepresentation::Record(Vec::new()))
+                }
+                #[cfg(not(feature = "alloc"))]
+                {
+                    Ok(ResourceRepresentation::Record)
+                }
+            }
+            "aggregate" => {
+                #[cfg(feature = "alloc")]
+                {
+                    Ok(ResourceRepresentation::Aggregate(Vec::new()))
+                }
+                #[cfg(not(feature = "alloc"))]
+                {
+                    Err(format!("Unknown resource representation: {}", s))
+                }
+            }
             _ => Err(format!("Unknown resource representation: {}", s)),
-            #[cfg(not(feature = "alloc"))]
-            _ => Ok(ResourceRepresentation::Record),
         }
     }
 }

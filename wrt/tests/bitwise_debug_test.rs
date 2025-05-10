@@ -65,10 +65,7 @@ fn test_bitwise_operations() -> Result<()> {
         // Test OR
         let result = engine.execute(0usize, 1, args.clone())?;
         let expected_or = a | b;
-        println!(
-            "OR: {:#b} | {:#b} = {:#b} (Expected) | Result: {:?}",
-            a, b, expected_or, result
-        );
+        println!("OR: {:#b} | {:#b} = {:#b} (Expected) | Result: {:?}", a, b, expected_or, result);
 
         // Test XOR
         let result = engine.execute(0usize, 2, args.clone())?;

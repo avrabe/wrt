@@ -1,3 +1,12 @@
+// WRT - wrt-error
+// SW-REQ-ID: [SW-REQ-ID-wrt-error]
+//
+// Copyright (c) 2024 [Your Name/Organization]
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+#![forbid(unsafe_code)] // Rule 2
+
 //! WRT Error handling library
 //!
 //! This library provides a comprehensive error handling system for the WRT runtime.
@@ -36,36 +45,58 @@
 //!
 //! The library provides both low-level error types and high-level helper functions:
 //!
-//! ```rust
-//! use wrt_error::{Error, helpers};
+//! ```
+//! # #[cfg(feature = "alloc")]
+//! # {
+//! use wrt_error::{Error, kinds};
 //!
 //! // Using helper functions for common errors
-//! let error = helpers::create_index_error("function", 42);
-//! let error = helpers::create_memory_access_error(100, 32, 64, "load");
+//! let error = Error::new(
+//!     wrt_error::ErrorCategory::Core,
+//!     wrt_error::codes::INVALID_FUNCTION_INDEX,
+//!     "Invalid function index: 42".to_string()
+//! );
 //!
-//! // Direct error creation
-//! let error = Error::runtime_error("Failed to execute instruction");
+//! // Using kind functions for common errors
+//! let index_error = kinds::invalid_index_error("function");
+//! let memory_error = kinds::memory_access_error("Memory access out of bounds");
+//! # }
 //! ```
 
-// Enable no_std when std feature is not enabled
 #![cfg_attr(not(feature = "std"), no_std)]
+#![deny(clippy::all)]
+#![deny(clippy::perf)]
+#![deny(clippy::nursery)]
+#![deny(clippy::cargo)]
+#![warn(clippy::pedantic)]
 #![warn(clippy::missing_panics_doc)]
+#![deny(missing_docs)]
+#![allow(clippy::negative_feature_names)]
+#![allow(clippy::module_name_repetitions)]
 
-// Import std when available
+//! Core error types for WRT
+
+// Import external crates when std feature is enabled
 #[cfg(feature = "std")]
 extern crate std;
 
-// Import alloc when needed for no_std with allocation
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
+// Always import core
+extern crate core;
+
+// Import alloc when either std or alloc is enabled
+#[cfg(any(feature = "std", feature = "alloc"))]
 extern crate alloc;
 
-// Core imports from errors.rs will handle needed imports
+/// Error codes for wrt
+pub mod codes;
+/// Error and error handling types
+pub mod errors;
+/// Error kind definitions
+pub mod kinds;
 
 // Modules
 pub mod context;
-pub mod errors;
 pub mod helpers;
-pub mod kinds;
 pub mod prelude;
 
 // Include verification module conditionally, but exclude during coverage builds
@@ -74,15 +105,16 @@ pub mod verify;
 
 // Re-export key types
 pub use errors::Error;
-pub use errors::{codes, ErrorCategory, ErrorSource};
+pub use errors::{ErrorCategory, ErrorSource};
 
 #[cfg(feature = "alloc")]
 pub use context::ResultExt;
 
 /// A specialized `Result` type for WRT operations.
+///
 /// When the `alloc` feature is enabled, this defaults to using `wrt_error::Error` as the error type.
 /// When `alloc` is not available, the specific error type must be provided.
-pub type Result<T, E = Error> = core::result::Result<T, E>;
+pub type Result<T> = core::result::Result<T, Error>;
 
 // Re-export error kinds for convenience
 pub use kinds::{
@@ -122,7 +154,7 @@ mod tests {
 
         let memory_err = Error::memory_error("Memory access out of bounds");
         assert!(memory_err.is_memory_error());
-        assert!(!resource_err.is_resource_error());
+        assert!(!memory_err.is_resource_error());
     }
 
     #[test]

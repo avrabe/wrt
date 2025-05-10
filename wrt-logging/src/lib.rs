@@ -1,3 +1,12 @@
+// WRT - wrt-logging
+// SW-REQ-ID: [SW-REQ-ID-wrt-logging]
+//
+// Copyright (c) 2025 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+#![forbid(unsafe_code)] // Rule 2
+
 //! # WRT Logging
 //!
 //! Logging infrastructure for the WebAssembly Runtime (WRT).

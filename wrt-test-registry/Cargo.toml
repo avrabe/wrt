@@ -2,43 +2,114 @@
 name = "wrt-test-registry"
 version.workspace = true
 edition.workspace = true
-description = "Unified test registry for WebAssembly Runtime (WRT)"
-license = "MIT"
+authors = ["WRT Team"]
+description = "Test Framework for the WebAssembly Runtime (WRT)"
+license.workspace = true
 repository = "https://github.com/avrabe/wrt"
-
-[dependencies]
-# For alloc support in no_std
-alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-alloc" }
-# For registering tests at runtime
-lazy_static = { version = "1.4.0", optional = true }
-# For ensuring tests are registered only once
-once_cell = { version = "1.18.0", features = ["critical-section"] }
-# For CLI argument parsing for the test runner
-clap = { version = "4.4.7", features = ["derive"], optional = true }
-# For colored output in terminal
-colored = { version = "2.0.4", optional = true }
-# For linking with static initializers
-ctor = "0.2.5"
-
-# Add missing workspace dependencies
-wrt = { workspace = true }
-wrt-error = { workspace = true }
-wrt-types = { workspace = true }
-wrt-decoder = { workspace = true }
-wrt-runtime = { workspace = true }
-wrt-format = { workspace = true }
+readme = "README.md"
+keywords = ["webassembly", "wasm", "testing", "no_std", "wrt"]
+categories = ["wasm", "no-std", "development-tools::testing"]
 
 [features]
 default = ["std"]
-std = ["lazy_static", "clap", "colored"]
-no_std = ["alloc"]
-alloc = ["dep:alloc"]
-runner = ["std"] # CLI test runner requires std
+std = [
+    "wrt-error/std",
+    "wrt-types/std",
+    "wrt-format/std",
+    "wrt-decoder/std",
+    "wrt-instructions/std",
+    "wrt-sync/std",
+    "wrt-intercept/std",
+    "wrt-host/std",
+    "wrt-component/std",
+    "wrt-runtime/std",
+    "wrt/std",
+    "once_cell/std",
+    "clap",
+    "colored",
+]
+alloc = [
+    "wrt-error/alloc",
+    "wrt-types/alloc",
+    "wrt-format/alloc",
+    "wrt-decoder/alloc",
+    "wrt-instructions/alloc",
+    "wrt-sync/alloc",
+    "wrt-intercept/alloc",
+    "wrt-host/alloc",
+    "wrt-component/alloc",
+    "wrt-runtime/alloc",
+    "wrt/alloc",
+]
+runner = ["std"]
+no_std = []
 
-[[bin]]
-name = "wrt-test-runner"
-path = "src/runner.rs"
-required-features = ["runner"]
+[dependencies]
+# Core crates
+wrt-error = { path = "../wrt-error", default-features = false }
+wrt-types = { path = "../wrt-types", default-features = false }
+wrt-format = { path = "../wrt-format", default-features = false }
+wrt-decoder = { path = "../wrt-decoder", default-features = false }
+wrt-sync = { path = "../wrt-sync", default-features = false }
+wrt-instructions = { path = "../wrt-instructions", default-features = false }
+wrt-intercept = { path = "../wrt-intercept", default-features = false }
+wrt-host = { path = "../wrt-host", default-features = false }
+wrt-component = { path = "../wrt-component", default-features = false }
+wrt-runtime = { path = "../wrt-runtime", default-features = false }
+wrt = { path = "../wrt", default-features = false }
+
+# Dependencies with features
+once_cell = { version = "1.8", default-features = false }
+
+# Optional dependencies
+clap = { version = "4.1", features = ["derive"], optional = true }
+colored = { version = "2.0", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "registry_benchmark"
+harness = false
+required-features = ["std"]
+
+[profile.release]
+panic = "abort"
+
+[profile.test]
+panic = "abort"
 
 [lints.rust]
-unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] } 
+# Rule 1
+pointer_cast = "deny"
+# Rule 9
+missing_docs = "deny"
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Rule 1: Language subset
+inline_asm_x86_att_syntax = "warn"
+transmute_ptr_to_ref = "deny"
+type_id = "deny"
+dyn_trait = "warn"
+float_arithmetic = "warn"
+# Rule 2: Unsafe usage
+ptr_offset_with_cast = "warn"
+# Rule 3: Error handling & panics
+unwrap_used = "warn"
+panic = "warn" # Also covers Rule 4
+result_unit_err = "warn"
+let_underscore_drop = "warn"
+must_use_candidate = "warn"
+must_use_unit = "warn"
+# Rule 4: Control-flow soundness
+match_wildcard_for_single_variants = "warn"
+never_loop = "warn"
+unreachable = "warn" # Also related to Rule 4
+# Rule 5: Memory & concurrency safety
+static_mut_reference = "deny"
+arc_mutate = "deny"
+# Rule 8: Static analysis gates (CI)
+pedantic = "warn"
+# Rule 9: Documentation
+debug_assert_with_mut_call = "warn" 

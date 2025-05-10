@@ -11,19 +11,9 @@ fn create_test_component() -> Result<wrt_format::component::Component> {
     // Add test values
     component.values = vec![
         // Boolean value (true)
-        Value {
-            ty: FormatValType::Bool,
-            data: vec![0x01],
-            expression: None,
-            name: None,
-        },
+        Value { ty: FormatValType::Bool, data: vec![0x01], expression: None, name: None },
         // Boolean value (false)
-        Value {
-            ty: FormatValType::Bool,
-            data: vec![0x00],
-            expression: None,
-            name: None,
-        },
+        Value { ty: FormatValType::Bool, data: vec![0x00], expression: None, name: None },
         // S32 value (42)
         Value {
             ty: FormatValType::S32,

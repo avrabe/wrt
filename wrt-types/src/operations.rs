@@ -1,84 +1,44 @@
+// WRT - wrt-types
+// Module: Operation Tracking and Fuel Metering
+// SW-REQ-ID: REQ_RUNTIME_SECURITY_003 (Example: Relates to resource consumption control)
+//
+// Copyright (c) 2024 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+// #![allow(unsafe_code)] // unsafe_code is no longer directly in this file for OnceCell
+
 //! Operation tracking for bounded collections and memory operations
 //!
 //! This module provides infrastructure for tracking operations performed
 //! on bounded collections and memory, supporting WCET analysis and fuel
 //! consumption calculations.
 
-use crate::verification::VerificationLevel;
+#[cfg(not(feature = "std"))]
+use core::primitive::f64; // Added for explicit f64 import in no_std
 
-#[cfg(feature = "std")]
-use std::sync::atomic::{AtomicU64, Ordering};
+use crate::values::FloatBits64; // Added for FloatBits64::new()
+use crate::verification::VerificationLevel;
+use wrt_error::Error as WrtError; // Added for the Result return type
 
 #[cfg(not(feature = "std"))]
 use core::sync::atomic::{AtomicU64, Ordering};
-
 #[cfg(feature = "std")]
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-#[cfg(not(feature = "std"))]
-mod once_cell {
-    use core::cell::UnsafeCell;
-    use core::sync::atomic::{AtomicBool, Ordering};
+// Use WrtOnce from wrt-sync crate
+use wrt_sync::once::WrtOnce;
 
-    /// A cell that can be initialized only once with thread-safety guarantees.
-    ///
-    /// This provides similar functionality to std::sync::OnceLock but for no_std environments.
-    pub struct OnceCell<T> {
-        is_initialized: AtomicBool,
-        value: UnsafeCell<Option<T>>,
-    }
-
-    impl<T> OnceCell<T> {
-        /// Creates a new empty OnceCell.
-        pub const fn new() -> Self {
-            Self {
-                is_initialized: AtomicBool::new(false),
-                value: UnsafeCell::new(None),
-            }
-        }
-
-        /// Gets the value if initialized, or initializes it with the provided function.
-        ///
-        /// If multiple threads call this method with the same cell, only one will execute
-        /// the initialization function. All other threads will block until initialization completes.
-        pub fn get_or_init<F>(&self, f: F) -> &T
-        where
-            F: FnOnce() -> T,
-        {
-            if !self.is_initialized.load(Ordering::Acquire) {
-                // Only one thread will be able to store true here
-                if !self.is_initialized.swap(true, Ordering::AcqRel) {
-                    unsafe {
-                        *self.value.get() = Some(f());
-                    }
-                } else {
-                    // Wait for the other thread to finish initialization
-                    while !self.is_initialized.load(Ordering::Acquire) {
-                        core::hint::spin_loop();
-                    }
-                }
-            }
-
-            unsafe {
-                match &*self.value.get() {
-                    Some(value) => value,
-                    None => unreachable!("Value should be initialized"),
-                }
-            }
-        }
-    }
-
-    // This is safe because we handle synchronization with AtomicBool
-    unsafe impl<T: Send + Sync> Sync for OnceCell<T> {}
-    unsafe impl<T: Send> Send for OnceCell<T> {}
-}
-
-#[cfg(not(feature = "std"))]
-pub use self::once_cell::OnceCell;
+// Global operation counter for use when a local counter isn't available
+static GLOBAL_OPERATIONS_COUNTER: WrtOnce<OperationCounter> = WrtOnce::new();
 
 /// Operation types that can be tracked for fuel consumption
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperationType {
+    /// Memory allocation operation
+    MemoryAllocation,
+    /// Memory deallocation operation
+    MemoryDeallocation,
     /// Memory read operation
     MemoryRead,
     /// Memory write operation
@@ -95,7 +55,7 @@ pub enum OperationType {
     CollectionInsert,
     /// Collection remove operation
     CollectionRemove,
-    /// Collection validation operation
+    /// Collection validate operation
     CollectionValidate,
     /// Collection mutation operation
     CollectionMutate,
@@ -109,49 +69,101 @@ pub enum OperationType {
     Arithmetic,
     /// Other operation type
     Other,
+    /// Collection create operation
+    CollectionCreate,
+    /// Collection clear operation
+    CollectionClear,
+    /// Collection truncate operation
+    CollectionTruncate,
+    /// Collection iterate operation
+    CollectionIterate,
+    /// A full recalculation of a checksum (potentially more expensive)
+    ChecksumFullRecalculation,
+    /// Collection element read operation
+    CollectionRead,
+    /// Collection element write operation
+    CollectionWrite,
+    /// Collection peek operation
+    CollectionPeek,
 }
 
 impl OperationType {
-    /// Get the fuel cost for this operation type
-    pub fn fuel_cost(&self) -> u64 {
+    /// Returns the base cost of the operation.
+    pub fn cost(self) -> u32 {
         match self {
-            Self::MemoryRead => 1,
-            Self::MemoryWrite => 1,
-            Self::MemoryGrow => 10,
-            Self::CollectionPush => 2,
-            Self::CollectionPop => 2,
-            Self::CollectionLookup => 1,
-            Self::CollectionInsert => 3,
-            Self::CollectionRemove => 3,
-            Self::CollectionValidate => 5,
-            Self::CollectionMutate => 4,
-            Self::ChecksumCalculation => 10,
-            Self::FunctionCall => 5,
-            Self::ControlFlow => 2,
-            Self::Arithmetic => 1,
-            Self::Other => 1,
+            OperationType::MemoryAllocation => 10,
+            OperationType::MemoryDeallocation => 10,
+            OperationType::MemoryRead => 1,
+            OperationType::MemoryWrite => 2,
+            OperationType::MemoryGrow => 10,
+            OperationType::CollectionPush => 2,
+            OperationType::CollectionPop => 2,
+            OperationType::CollectionLookup => 1,
+            OperationType::CollectionInsert => 3,
+            OperationType::CollectionRemove => 3,
+            OperationType::CollectionValidate => 5,
+            OperationType::CollectionMutate => 4,
+            OperationType::ChecksumCalculation => 10,
+            OperationType::ChecksumFullRecalculation => 15,
+            OperationType::FunctionCall => 5,
+            OperationType::ControlFlow => 2,
+            OperationType::Arithmetic => 1,
+            OperationType::Other => 1,
+            OperationType::CollectionCreate => 5,
+            OperationType::CollectionClear => 5,
+            OperationType::CollectionTruncate => 3,
+            OperationType::CollectionIterate => 1,
+            OperationType::CollectionRead => 1,
+            OperationType::CollectionWrite => 2,
+            OperationType::CollectionPeek => 1,
         }
     }
 
-    /// Get the importance level for verification purposes
-    pub fn importance(&self) -> u8 {
+    /// Returns the inherent importance of the operation (0-255).
+    pub fn importance(self) -> u8 {
         match self {
-            Self::MemoryRead => 100,
-            Self::MemoryWrite => 150,
-            Self::MemoryGrow => 200,
-            Self::CollectionPush => 150,
-            Self::CollectionPop => 150,
-            Self::CollectionLookup => 100,
-            Self::CollectionInsert => 150,
-            Self::CollectionRemove => 150,
-            Self::CollectionValidate => 200,
-            Self::CollectionMutate => 150,
-            Self::ChecksumCalculation => 180,
-            Self::FunctionCall => 150,
-            Self::ControlFlow => 120,
-            Self::Arithmetic => 100,
-            Self::Other => 100,
+            OperationType::MemoryAllocation => 50,
+            OperationType::MemoryDeallocation => 50,
+            OperationType::MemoryRead => 100,
+            OperationType::MemoryWrite => 150,
+            OperationType::MemoryGrow => 200,
+            OperationType::CollectionPush => 150,
+            OperationType::CollectionPop => 150,
+            OperationType::CollectionLookup => 100,
+            OperationType::CollectionInsert => 150,
+            OperationType::CollectionRemove => 150,
+            OperationType::CollectionValidate => 200,
+            OperationType::CollectionMutate => 150,
+            OperationType::ChecksumCalculation => 180,
+            OperationType::ChecksumFullRecalculation => 190,
+            OperationType::FunctionCall => 150,
+            OperationType::ControlFlow => 120,
+            OperationType::Arithmetic => 100,
+            OperationType::Other => 100,
+            OperationType::CollectionCreate => 150,
+            OperationType::CollectionClear => 150,
+            OperationType::CollectionTruncate => 150,
+            OperationType::CollectionIterate => 100,
+            OperationType::CollectionRead => importance::MEDIUM,
+            OperationType::CollectionWrite => importance::HIGH,
+            OperationType::CollectionPeek => importance::LOW,
         }
+    }
+
+    /// Calculate fuel cost for an operation, considering verification level
+    pub fn fuel_cost_for_operation(
+        op_type: OperationType,
+        verification_level: VerificationLevel,
+    ) -> Result<u64, WrtError> {
+        let base_cost = op_type.cost() as u64;
+
+        // Adjust cost based on verification level
+        let verification_multiplier = verification_cost_multiplier(verification_level);
+
+        let cost_f64 = base_cost as f64 * verification_multiplier;
+        // Use Wasm-compliant nearest (round ties to even) from math_ops
+        // cost_f64 is always finite and non-NaN here, so wasm_f64_nearest will not error.
+        Ok(crate::math_ops::wasm_f64_nearest(FloatBits64::from_float(cost_f64))?.value() as u64)
     }
 }
 
@@ -188,6 +200,11 @@ pub struct OperationCounter {
     arithmetic_ops: AtomicU64,
     /// Counter for other operations
     other_ops: AtomicU64,
+    /// New counters
+    collection_creates: AtomicU64,
+    collection_clears: AtomicU64,
+    collection_truncates: AtomicU64,
+    collection_iterates: AtomicU64,
     /// Total fuel consumed by operations
     fuel_consumed: AtomicU64,
 }
@@ -213,6 +230,10 @@ impl Clone for OperationCounter {
             control_flows: AtomicU64::new(self.control_flows.load(Ordering::Relaxed)),
             arithmetic_ops: AtomicU64::new(self.arithmetic_ops.load(Ordering::Relaxed)),
             other_ops: AtomicU64::new(self.other_ops.load(Ordering::Relaxed)),
+            collection_creates: AtomicU64::new(self.collection_creates.load(Ordering::Relaxed)),
+            collection_clears: AtomicU64::new(self.collection_clears.load(Ordering::Relaxed)),
+            collection_truncates: AtomicU64::new(self.collection_truncates.load(Ordering::Relaxed)),
+            collection_iterates: AtomicU64::new(self.collection_iterates.load(Ordering::Relaxed)),
             fuel_consumed: AtomicU64::new(self.fuel_consumed.load(Ordering::Relaxed)),
         }
     }
@@ -243,6 +264,10 @@ impl OperationCounter {
             control_flows: AtomicU64::new(0),
             arithmetic_ops: AtomicU64::new(0),
             other_ops: AtomicU64::new(0),
+            collection_creates: AtomicU64::new(0),
+            collection_clears: AtomicU64::new(0),
+            collection_truncates: AtomicU64::new(0),
+            collection_iterates: AtomicU64::new(0),
             fuel_consumed: AtomicU64::new(0),
         }
     }
@@ -278,21 +303,44 @@ impl OperationCounter {
             OperationType::ControlFlow => self.control_flows.fetch_add(1, Ordering::Relaxed),
             OperationType::Arithmetic => self.arithmetic_ops.fetch_add(1, Ordering::Relaxed),
             OperationType::Other => self.other_ops.fetch_add(1, Ordering::Relaxed),
+            OperationType::CollectionCreate => {
+                self.collection_creates.fetch_add(1, Ordering::Relaxed)
+            }
+            OperationType::CollectionClear => {
+                self.collection_clears.fetch_add(1, Ordering::Relaxed)
+            }
+            OperationType::CollectionTruncate => {
+                self.collection_truncates.fetch_add(1, Ordering::Relaxed)
+            }
+            OperationType::CollectionIterate => {
+                self.collection_iterates.fetch_add(1, Ordering::Relaxed)
+            }
+            OperationType::ChecksumFullRecalculation => {
+                self.checksum_calculations.fetch_add(1, Ordering::Relaxed)
+            }
+            OperationType::CollectionRead => {
+                self.collection_lookups.fetch_add(1, Ordering::Relaxed)
+            }
+            OperationType::CollectionWrite => {
+                self.collection_inserts.fetch_add(1, Ordering::Relaxed)
+            }
+            OperationType::CollectionPeek => {
+                self.collection_lookups.fetch_add(1, Ordering::Relaxed)
+            }
         };
 
         // Calculate base fuel cost
-        let base_cost = op_type.fuel_cost();
+        let base_cost = op_type.cost() as u64;
 
         // Adjust cost based on verification level
-        let verification_multiplier = match verification_level {
-            VerificationLevel::None => 1.0,
-            VerificationLevel::Sampling => 1.2,
-            VerificationLevel::Standard => 1.5,
-            VerificationLevel::Full => 2.0,
-        };
+        let verification_multiplier = verification_cost_multiplier(verification_level);
 
-        // Convert to integer with rounding
-        let total_cost = (base_cost as f64 * verification_multiplier).round() as u64;
+        // Use Wasm-compliant nearest (round ties to even) from math_ops
+        let cost_f64 = base_cost as f64 * verification_multiplier;
+        // cost_f64 is always finite and non-NaN here, so wasm_f64_nearest will not error.
+        let total_cost: u64 = crate::math_ops::wasm_f64_nearest(FloatBits64::from_float(cost_f64))
+            .expect("cost_f64 is finite, nearest op should not fail")
+            .value() as u64;
 
         // Update fuel consumed
         self.fuel_consumed.fetch_add(total_cost, Ordering::Relaxed);
@@ -320,6 +368,10 @@ impl OperationCounter {
         self.control_flows.store(0, Ordering::Relaxed);
         self.arithmetic_ops.store(0, Ordering::Relaxed);
         self.other_ops.store(0, Ordering::Relaxed);
+        self.collection_creates.store(0, Ordering::Relaxed);
+        self.collection_clears.store(0, Ordering::Relaxed);
+        self.collection_truncates.store(0, Ordering::Relaxed);
+        self.collection_iterates.store(0, Ordering::Relaxed);
         self.fuel_consumed.store(0, Ordering::Relaxed);
     }
 
@@ -341,6 +393,10 @@ impl OperationCounter {
             control_flows: self.control_flows.load(Ordering::Relaxed),
             arithmetic_ops: self.arithmetic_ops.load(Ordering::Relaxed),
             other_ops: self.other_ops.load(Ordering::Relaxed),
+            collection_creates: self.collection_creates.load(Ordering::Relaxed),
+            collection_clears: self.collection_clears.load(Ordering::Relaxed),
+            collection_truncates: self.collection_truncates.load(Ordering::Relaxed),
+            collection_iterates: self.collection_iterates.load(Ordering::Relaxed),
             fuel_consumed: self.fuel_consumed.load(Ordering::Relaxed),
         }
     }
@@ -379,6 +435,14 @@ pub struct OperationSummary {
     pub arithmetic_ops: u64,
     /// Number of other operations
     pub other_ops: u64,
+    /// Number of collection create operations
+    pub collection_creates: u64,
+    /// Number of collection clear operations
+    pub collection_clears: u64,
+    /// Number of collection truncate operations
+    pub collection_truncates: u64,
+    /// Number of collection iterate operations
+    pub collection_iterates: u64,
     /// Total fuel consumed by operations
     pub fuel_consumed: u64,
 }
@@ -395,136 +459,39 @@ pub trait OperationTracking {
     fn reset_operation_stats(&self);
 }
 
-// Global operation counter for use when a local counter isn't available
-#[cfg(feature = "std")]
-static GLOBAL_COUNTER: OnceLock<OperationCounter> = OnceLock::new();
-
-// For no_std environment, we'll use a safer approach with atomic flags for initialization
-#[cfg(not(feature = "std"))]
-mod global_counter {
-    use super::*;
-    use alloc::boxed::Box;
-    use core::sync::atomic::{AtomicBool, Ordering};
-
-    // Storage for our global counter
-    static mut COUNTER_STORAGE: Option<Box<OperationCounter>> = None;
-    // Flag to track initialization
-    static INITIALIZED: AtomicBool = AtomicBool::new(false);
-    // Flag to track if initialization is in progress to avoid reentrancy issues
-    static INITIALIZING: AtomicBool = AtomicBool::new(false);
-
-    /// Get or initialize the counter with proper synchronization
-    pub fn get_counter() -> &'static OperationCounter {
-        if !INITIALIZED.load(Ordering::Acquire) {
-            // Use compare_exchange to ensure only one thread initializes
-            if INITIALIZING
-                .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-                .is_err()
-            {
-                // Another thread is initializing - spin wait
-                while !INITIALIZED.load(Ordering::Acquire) && INITIALIZING.load(Ordering::Relaxed) {
-                    core::hint::spin_loop();
-                }
-            } else {
-                // We're the initializing thread
-                let counter = Box::new(OperationCounter::new());
-                unsafe {
-                    COUNTER_STORAGE = Some(counter);
-                    // Before marking as initialized, ensure all writes are visible
-                    core::sync::atomic::fence(Ordering::Release);
-                    INITIALIZED.store(true, Ordering::Release);
-                    INITIALIZING.store(false, Ordering::Release);
-                }
-            }
-        }
-
-        // Counter is now guaranteed to be initialized
-        unsafe {
-            // This is safe because we've guaranteed initialization
-            // and we never modify or drop the Box after initialization
-            COUNTER_STORAGE.as_ref().unwrap()
-        }
-    }
-
-    /// Get a mutable reference to the counter - only used for reset operations
-    pub fn get_counter_mut() -> &'static mut OperationCounter {
-        if !INITIALIZED.load(Ordering::Acquire) {
-            // Initialize if not already done
-            let _ = get_counter();
-        }
-
-        unsafe {
-            // This is safe because we've guaranteed initialization,
-            // and we use appropriate atomic operations to ensure synchronization
-            // for mutation operations
-            COUNTER_STORAGE.as_mut().unwrap()
-        }
-    }
-}
-
 /// Get the global counter instance, initializing it if necessary
-#[cfg(feature = "std")]
 fn global_counter() -> &'static OperationCounter {
-    // Compatibility implementation for MSRV < 1.86.0
-    // This manually checks and initializes if not already set
-    if let Some(counter) = GLOBAL_COUNTER.get() {
-        counter
-    } else {
-        // This has a race condition, but OnceLock ensures only the first setter wins
-        let _ = GLOBAL_COUNTER.set(OperationCounter::new());
-        // This is now guaranteed to return Some
-        GLOBAL_COUNTER.get().unwrap()
-    }
+    GLOBAL_OPERATIONS_COUNTER.get_or_init(OperationCounter::new)
 }
 
 /// Record an operation in the global counter
-#[cfg(feature = "std")]
 pub fn record_global_operation(op_type: OperationType, level: VerificationLevel) {
     global_counter().record_operation(op_type, level);
 }
 
-/// Record an operation in the global counter
-#[cfg(not(feature = "std"))]
-pub fn record_global_operation(op_type: OperationType, level: VerificationLevel) {
-    global_counter::get_counter().record_operation(op_type, level);
-}
-
 /// Get the summary from the global counter
-#[cfg(feature = "std")]
 pub fn global_operation_summary() -> OperationSummary {
     global_counter().get_summary()
 }
 
-/// Get the summary from the global counter
-#[cfg(not(feature = "std"))]
-pub fn global_operation_summary() -> OperationSummary {
-    global_counter::get_counter().get_summary()
-}
-
 /// Reset the global counter
-#[cfg(feature = "std")]
 pub fn reset_global_operations() {
     global_counter().reset();
 }
 
-/// Reset the global counter
-#[cfg(not(feature = "std"))]
-pub fn reset_global_operations() {
-    // For reset, we need to call an atomic method of OperationCounter
-    // which is safe because OperationCounter uses atomics internally
-    global_counter::get_counter().reset();
-}
-
 /// Get the total fuel consumed from the global counter
-#[cfg(feature = "std")]
 pub fn global_fuel_consumed() -> u64 {
     global_counter().get_fuel_consumed()
 }
 
-/// Get the total fuel consumed from the global counter
-#[cfg(not(feature = "std"))]
-pub fn global_fuel_consumed() -> u64 {
-    global_counter::get_counter().get_fuel_consumed()
+fn verification_cost_multiplier(level: VerificationLevel) -> f64 {
+    match level {
+        VerificationLevel::Off => 1.0,     // Changed from None
+        VerificationLevel::Basic => 1.1,   // Small overhead for basic checks
+        VerificationLevel::Sampling => 1.25, // Moderate overhead for sampling (was Standard)
+        VerificationLevel::Full => 2.0,    // Higher overhead for full checks
+        VerificationLevel::Redundant => 2.5, // Highest for redundant checks
+    }
 }
 
 #[cfg(test)]
@@ -534,81 +501,77 @@ mod tests {
     #[test]
     fn test_operation_counter() {
         let counter = OperationCounter::new();
-
-        // Record some operations
         counter.record_operation(OperationType::MemoryRead, VerificationLevel::Standard);
-        counter.record_operation(OperationType::MemoryWrite, VerificationLevel::Standard);
-        counter.record_operation(OperationType::CollectionPush, VerificationLevel::Standard);
+        assert_eq!(counter.memory_reads.load(Ordering::Relaxed), 1);
+        // Fuel cost for MemoryRead (1) * Standard (1.5) = 1.5. wasm_f64_nearest(1.5) = 2.0
+        assert_eq!(counter.get_fuel_consumed(), 2);
 
-        // Get the summary
-        let summary = counter.get_summary();
+        counter.record_operation(OperationType::MemoryGrow, VerificationLevel::Full);
+        assert_eq!(counter.memory_grows.load(Ordering::Relaxed), 1);
+        // Prev fuel: 2. New Fuel: MemoryGrow (10) * Full (2.0) = 20.0. wasm_f64_nearest(20.0) = 20.0. Total = 2+20=22
+        assert_eq!(counter.get_fuel_consumed(), 22);
 
-        // Check individual counts
-        assert_eq!(summary.memory_reads, 1);
-        assert_eq!(summary.memory_writes, 1);
-        assert_eq!(summary.collection_pushes, 1);
-
-        // Fuel consumed should be sum of operations with verification multiplier
-        let expected_fuel = (OperationType::MemoryRead.fuel_cost() as f64 * 1.5).round() as u64
-            + (OperationType::MemoryWrite.fuel_cost() as f64 * 1.5).round() as u64
-            + (OperationType::CollectionPush.fuel_cost() as f64 * 1.5).round() as u64;
-
-        assert_eq!(summary.fuel_consumed, expected_fuel);
-
-        // Test reset
         counter.reset();
-        let summary_after_reset = counter.get_summary();
-        assert_eq!(summary_after_reset.memory_reads, 0);
-        assert_eq!(summary_after_reset.fuel_consumed, 0);
+        assert_eq!(counter.get_fuel_consumed(), 0);
     }
 
     #[test]
     fn test_verification_level_impact() {
-        let counter = OperationCounter::new();
+        let op = OperationType::ChecksumCalculation; // base_cost = 10
 
-        // Same operation with different verification levels
-        counter.record_operation(OperationType::MemoryRead, VerificationLevel::None);
-        counter.record_operation(OperationType::MemoryRead, VerificationLevel::Standard);
-        counter.record_operation(OperationType::MemoryRead, VerificationLevel::Full);
+        // None: 10 * 1.0 = 10.0. nearest(10.0) = 10
+        let cost_none =
+            OperationType::fuel_cost_for_operation(op, VerificationLevel::None).unwrap();
+        assert_eq!(cost_none, 10);
 
-        // The fuel cost should reflect the different verification levels
-        let summary = counter.get_summary();
+        // Sampling: 10 * 1.2 = 12.0. nearest(12.0) = 12
+        let cost_sampling =
+            OperationType::fuel_cost_for_operation(op, VerificationLevel::Sampling).unwrap();
+        assert_eq!(cost_sampling, 12);
 
-        // Memory reads should be 3
-        assert_eq!(summary.memory_reads, 3);
+        // Standard: 10 * 1.5 = 15.0. nearest(15.0) = 15
+        let cost_standard =
+            OperationType::fuel_cost_for_operation(op, VerificationLevel::Standard).unwrap();
+        assert_eq!(cost_standard, 15);
 
-        // Expected fuel: 1*1.0 + 1*1.5 + 1*2.0 = 4.5 -> 5 (rounded)
-        let expected_fuel = (OperationType::MemoryRead.fuel_cost() as f64 * 1.0).round() as u64
-            + (OperationType::MemoryRead.fuel_cost() as f64 * 1.5).round() as u64
-            + (OperationType::MemoryRead.fuel_cost() as f64 * 2.0).round() as u64;
+        // Full: 10 * 2.0 = 20.0. nearest(20.0) = 20
+        let cost_full =
+            OperationType::fuel_cost_for_operation(op, VerificationLevel::Full).unwrap();
+        assert_eq!(cost_full, 20);
 
-        assert_eq!(summary.fuel_consumed, expected_fuel);
+        // Test a case that would have rounded differently with round_half_away_from_zero
+        // Base cost 2, multiplier 1.2 => 2.4. nearest(2.4) = 2.
+        // (Old round_half_away_from_zero would also be 2)
+        let op2 = OperationType::CollectionPop; // base_cost = 2
+        let cost_sampling_op2 =
+            OperationType::fuel_cost_for_operation(op2, VerificationLevel::Sampling).unwrap();
+        assert_eq!(cost_sampling_op2, 2);
+
+        // Base cost 2, multiplier 1.5 => 3.0. nearest(3.0) = 3.
+        let cost_standard_op2 =
+            OperationType::fuel_cost_for_operation(op2, VerificationLevel::Standard).unwrap();
+        assert_eq!(cost_standard_op2, 3);
+
+        // Base cost 3, multiplier 1.5 => 4.5. nearest(4.5) = 4.0 (ties to even)
+        // Old round_half_away_from_zero(4.5) would be 5.0.
+        let op3 = OperationType::CollectionInsert; // base_cost = 3
+        let cost_standard_op3 =
+            OperationType::fuel_cost_for_operation(op3, VerificationLevel::Standard).unwrap();
+        assert_eq!(cost_standard_op3, 4);
     }
 
+    #[cfg(feature = "std")] // These tests involve global state, run with std feature
     #[test]
     fn test_global_counter() {
-        // Reset global counter
         reset_global_operations();
+        record_global_operation(OperationType::FunctionCall, VerificationLevel::None);
+        // FunctionCall (5) * None (1.0) = 5.0. nearest(5.0) = 5
+        assert_eq!(global_fuel_consumed(), 5);
 
-        // Record some operations
-        record_global_operation(OperationType::FunctionCall, VerificationLevel::Standard);
-        record_global_operation(
-            OperationType::CollectionValidate,
-            VerificationLevel::Standard,
-        );
-
-        // Get global summary
         let summary = global_operation_summary();
-
-        // Check counts
         assert_eq!(summary.function_calls, 1);
-        assert_eq!(summary.collection_validates, 1);
+        assert_eq!(summary.fuel_consumed, 5);
 
-        // Check global fuel consumed
-        let fuel = global_fuel_consumed();
-        assert_eq!(fuel, summary.fuel_consumed);
-
-        // Reset and check again
         reset_global_operations();
         assert_eq!(global_fuel_consumed(), 0);
     }

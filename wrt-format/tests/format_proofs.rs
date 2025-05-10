@@ -18,10 +18,7 @@ fn test_basic_serialization() {
     assert!(!module.has_state_sections());
 
     // Create a non-state custom section
-    let section1 = CustomSection {
-        name: "test-section".to_string(),
-        data: vec![1, 2, 3, 4],
-    };
+    let section1 = CustomSection { name: "test-section".to_string(), data: vec![1, 2, 3, 4] };
 
     module.add_custom_section(section1);
 

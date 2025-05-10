@@ -21,10 +21,7 @@ impl Module {
 
     /// Create a new named module from binary data
     pub fn with_name(binary: Vec<u8>, name: &str) -> Self {
-        Self {
-            binary,
-            name: Some(name.to_string()),
-        }
+        Self { binary, name: Some(name.to_string()) }
     }
 
     /// Get the module binary data

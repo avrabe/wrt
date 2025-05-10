@@ -61,9 +61,7 @@ impl fmt::Display for ConversionError {
 #[cfg(feature = "std")]
 impl std::error::Error for ConversionError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.source
-            .as_ref()
-            .map(|e| e.as_ref() as &(dyn std::error::Error + 'static))
+        self.source.as_ref().map(|e| e.as_ref() as &(dyn std::error::Error + 'static))
     }
 }
 
@@ -198,19 +196,13 @@ impl TypeConversionRegistry {
     /// Create a new, empty type conversion registry
     #[cfg(feature = "std")]
     pub fn new() -> Self {
-        Self {
-            conversions: HashMap::new(),
-            std_enabled: true,
-        }
+        Self { conversions: HashMap::new(), std_enabled: true }
     }
 
     /// Create a new, empty type conversion registry (no_std version)
     #[cfg(all(not(feature = "std"), feature = "alloc"))]
     pub fn new() -> Self {
-        Self {
-            conversions: HashMap::new(),
-            alloc_enabled: true,
-        }
+        Self { conversions: HashMap::new(), alloc_enabled: true }
     }
 
     /// Register a conversion function from type From to type To
@@ -300,18 +292,12 @@ impl TypeConversionRegistry {
     pub fn new_empty(&self) -> Self {
         #[cfg(feature = "std")]
         {
-            Self {
-                conversions: HashMap::new(),
-                std_enabled: self.std_enabled,
-            }
+            Self { conversions: HashMap::new(), std_enabled: self.std_enabled }
         }
 
         #[cfg(all(not(feature = "std"), feature = "alloc"))]
         {
-            Self {
-                conversions: HashMap::new(),
-                alloc_enabled: self.alloc_enabled,
-            }
+            Self { conversions: HashMap::new(), alloc_enabled: self.alloc_enabled }
         }
     }
 }
@@ -333,17 +319,13 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a simple conversion function
-        registry.register(
-            |src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
-                Ok(TestTargetType(src.0 * 2))
-            },
-        );
+        registry.register(|src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
+            Ok(TestTargetType(src.0 * 2))
+        });
 
         // Test the conversion
         let source = TestSourceType(21);
-        let target = registry
-            .convert::<TestSourceType, TestTargetType>(&source)
-            .unwrap();
+        let target = registry.convert::<TestSourceType, TestTargetType>(&source).unwrap();
 
         assert_eq!(target, TestTargetType(42));
     }
@@ -370,11 +352,9 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a conversion
-        registry.register(
-            |src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
-                Ok(TestTargetType(src.0))
-            },
-        );
+        registry.register(|src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
+            Ok(TestTargetType(src.0))
+        });
 
         // Check conversions
         assert!(registry.can_convert::<TestSourceType, TestTargetType>());
@@ -386,26 +366,22 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a conversion that may fail
-        registry.register(
-            |src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
-                if src.0 < 0 {
-                    return Err(ConversionError {
-                        kind: ConversionErrorKind::OutOfRange,
-                        source_type: std::any::type_name::<TestSourceType>(),
-                        target_type: std::any::type_name::<TestTargetType>(),
-                        context: Some("Value must be non-negative".to_string()),
-                        source: None,
-                    });
-                }
-                Ok(TestTargetType(src.0))
-            },
-        );
+        registry.register(|src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
+            if src.0 < 0 {
+                return Err(ConversionError {
+                    kind: ConversionErrorKind::OutOfRange,
+                    source_type: std::any::type_name::<TestSourceType>(),
+                    target_type: std::any::type_name::<TestTargetType>(),
+                    context: Some("Value must be non-negative".to_string()),
+                    source: None,
+                });
+            }
+            Ok(TestTargetType(src.0))
+        });
 
         // Test successful conversion
         let good_source = TestSourceType(42);
-        assert!(registry
-            .convert::<TestSourceType, TestTargetType>(&good_source)
-            .is_ok());
+        assert!(registry.convert::<TestSourceType, TestTargetType>(&good_source).is_ok());
 
         // Test failed conversion
         let bad_source = TestSourceType(-1);

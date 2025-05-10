@@ -21,10 +21,7 @@ fn test_operation_tracking_in_fuel_system() {
     let mut module = Module::new().unwrap();
 
     // Create a function type
-    let func_type = FuncType {
-        params: vec![ValueType::I32],
-        results: vec![ValueType::I32],
-    };
+    let func_type = FuncType { params: vec![ValueType::I32], results: vec![ValueType::I32] };
     module.types.push(func_type);
 
     // Create a function with many instructions to consume fuel
@@ -36,11 +33,7 @@ fn test_operation_tracking_in_fuel_system() {
         Instruction::I32Mul,        // Multiply - another arithmetic op
         Instruction::End,           // End function
     ];
-    let function = wrt::module::Function {
-        type_idx: 0,
-        locals: vec![],
-        code,
-    };
+    let function = wrt::module::Function { type_idx: 0, locals: vec![], code };
     module.functions.push(function);
 
     // Create an export entry for the function
@@ -75,14 +68,8 @@ fn test_operation_tracking_in_fuel_system() {
     let stats = global_operation_summary();
 
     // We should have at least some operations recorded
-    assert!(
-        stats.function_calls > 0,
-        "Should have recorded function calls"
-    );
-    assert!(
-        stats.arithmetic_ops > 0,
-        "Should have recorded arithmetic operations"
-    );
+    assert!(stats.function_calls > 0, "Should have recorded function calls");
+    assert!(stats.arithmetic_ops > 0, "Should have recorded arithmetic operations");
 
     // Check that fuel was consumed
     assert!(stats.fuel_consumed > 0, "Should have consumed fuel");
@@ -137,11 +124,7 @@ fn test_fuel_exhaustion_from_operations() {
         Instruction::End,
     ];
 
-    let function = wrt::module::Function {
-        type_idx: 0,
-        locals: vec![],
-        code,
-    };
+    let function = wrt::module::Function { type_idx: 0, locals: vec![], code };
     module.functions.push(function);
 
     // Create an export entry for the function
@@ -176,14 +159,8 @@ fn test_fuel_exhaustion_from_operations() {
 
     // Check engine stats
     let engine_stats = engine.stats();
-    assert!(
-        engine_stats.fuel_exhausted_count > 0,
-        "Should record fuel exhaustion"
-    );
-    assert!(
-        engine_stats.fuel_consumed > 0,
-        "Should record fuel consumption"
-    );
+    assert!(engine_stats.fuel_exhausted_count > 0, "Should record fuel exhaustion");
+    assert!(engine_stats.fuel_consumed > 0, "Should record fuel consumption");
 }
 
 #[test]

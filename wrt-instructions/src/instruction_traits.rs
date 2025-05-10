@@ -3,8 +3,6 @@
 //! This module provides traits that define the interfaces for pure instruction implementations.
 //! These traits establish a clear boundary between instruction implementations and runtime details.
 
-use crate::prelude::*;
-
 /// Trait for pure instruction execution.
 ///
 /// This trait defines the interface for executing a pure instruction with a given context.
@@ -20,7 +18,7 @@ pub trait PureInstruction<T, E> {
     ///
     /// * `Ok(())` - If the instruction executed successfully
     /// * `Err(E)` - If an error occurred during execution
-    fn execute(&self, context: &mut T) -> Result<(), E>;
+    fn execute(&self, context: &mut T) -> core::result::Result<(), E>;
 }
 
 /// Trait for pure memory instructions.
@@ -38,7 +36,7 @@ pub trait PureMemoryInstruction<T, E> {
     ///
     /// * `Ok(())` - If the instruction executed successfully
     /// * `Err(E)` - If an error occurred during execution
-    fn execute_memory(&self, memory: &mut T) -> Result<(), E>;
+    fn execute_memory(&self, memory: &mut T) -> core::result::Result<(), E>;
 }
 
 #[cfg(test)]
@@ -55,7 +53,7 @@ mod tests {
         struct TestInstruction;
 
         impl PureInstruction<TestContext, Error> for TestInstruction {
-            fn execute(&self, context: &mut TestContext) -> Result<(), Error> {
+            fn execute(&self, context: &mut TestContext) -> core::result::Result<(), Error> {
                 context.value += 1;
                 Ok(())
             }

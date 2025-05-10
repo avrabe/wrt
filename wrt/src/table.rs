@@ -43,7 +43,7 @@ pub fn create_table(table_type: TableType) -> Result<Table> {
 /// # Arguments
 ///
 /// * `table_type` - The table type
-/// * `name` - The debug name for the table
+/// * `name` - The debug name for the table (currently not used)
 ///
 /// # Returns
 ///
@@ -52,9 +52,10 @@ pub fn create_table(table_type: TableType) -> Result<Table> {
 /// # Errors
 ///
 /// Returns an error if the table cannot be created
-pub fn create_table_with_name(table_type: TableType, name: &str) -> Result<Table> {
-    let mut table = create_table(table_type)?;
-    table.set_debug_name(name);
+pub fn create_table_with_name(table_type: TableType, _name: &str) -> Result<Table> {
+    // Note: set_debug_name is not currently available in the Table implementation
+    // TODO: Add debug name support when available
+    let table = create_table(table_type)?;
     Ok(table)
 }
 

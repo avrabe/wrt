@@ -113,10 +113,8 @@ impl App {
         // Create static strings first
         let component_title = format!("Component: {}", self.component_summary.name);
         let modules_title = format!("Modules ({})", self.component_summary.core_modules_count);
-        let instances_title = format!(
-            "Instances ({})",
-            self.component_summary.core_instances_count
-        );
+        let instances_title =
+            format!("Instances ({})", self.component_summary.core_instances_count);
         let imports_title = format!("Imports ({})", self.component_summary.imports_count);
         let exports_title = format!("Exports ({})", self.component_summary.exports_count);
         let aliases_title = format!("Aliases ({})", self.component_summary.aliases_count);
@@ -246,16 +244,10 @@ impl App {
             let static_title = Box::leak(module_title.into_boxed_str());
 
             // Create a content string with module information
-            let import_count = self
-                .module_imports
-                .iter()
-                .filter(|imp| imp.module_idx == module.idx)
-                .count();
-            let export_count = self
-                .module_exports
-                .iter()
-                .filter(|exp| exp.module_idx == module.idx)
-                .count();
+            let import_count =
+                self.module_imports.iter().filter(|imp| imp.module_idx == module.idx).count();
+            let export_count =
+                self.module_exports.iter().filter(|exp| exp.module_idx == module.idx).count();
             let content = format!(
                 "Size: {} bytes\nImports: {}\nExports: {}",
                 module.size, import_count, export_count
@@ -275,18 +267,12 @@ impl App {
                 && self.focused_node.unwrap() == idx
             {
                 // Find all imports for this module
-                let module_imports: Vec<_> = self
-                    .module_imports
-                    .iter()
-                    .filter(|imp| imp.module_idx == module.idx)
-                    .collect();
+                let module_imports: Vec<_> =
+                    self.module_imports.iter().filter(|imp| imp.module_idx == module.idx).collect();
 
                 // Find all exports for this module
-                let module_exports: Vec<_> = self
-                    .module_exports
-                    .iter()
-                    .filter(|exp| exp.module_idx == module.idx)
-                    .collect();
+                let module_exports: Vec<_> =
+                    self.module_exports.iter().filter(|exp| exp.module_idx == module.idx).collect();
 
                 // Add import nodes
                 for (i, import) in module_imports.iter().enumerate() {
@@ -824,17 +810,11 @@ impl App {
                 let static_module_title = Box::leak(module_title.into_boxed_str());
 
                 // Find imports and exports for this module
-                let import_count = self
-                    .module_imports
-                    .iter()
-                    .filter(|imp| imp.module_idx == module.idx)
-                    .count();
+                let import_count =
+                    self.module_imports.iter().filter(|imp| imp.module_idx == module.idx).count();
 
-                let export_count = self
-                    .module_exports
-                    .iter()
-                    .filter(|exp| exp.module_idx == module.idx)
-                    .count();
+                let export_count =
+                    self.module_exports.iter().filter(|exp| exp.module_idx == module.idx).count();
 
                 let module_content = format!(
                     "Size: {} bytes\nImports: {}\nExports: {}",
@@ -858,10 +838,8 @@ impl App {
 
         // Add instance nodes
         if !self.component_summary.core_instances.is_empty() {
-            let instances_title = format!(
-                "Instances ({})",
-                self.component_summary.core_instances_count
-            );
+            let instances_title =
+                format!("Instances ({})", self.component_summary.core_instances_count);
             let static_instances_title = Box::leak(instances_title.into_boxed_str());
 
             let instances_node = nodes.len();
@@ -994,13 +972,7 @@ impl App {
 
             // Create content with module details
             let mut modules_content = String::new();
-            for (i, module) in self
-                .component_summary
-                .core_modules
-                .iter()
-                .enumerate()
-                .take(5)
-            {
+            for (i, module) in self.component_summary.core_modules.iter().enumerate().take(5) {
                 modules_content.push_str(&format!(
                     "Module #{}: idx={}, size={}b\n",
                     i, module.idx, module.size
@@ -1035,10 +1007,8 @@ impl App {
             // Create content with import details
             let mut imports_content = String::new();
             for (i, import) in self.imports.iter().enumerate().take(5) {
-                imports_content.push_str(&format!(
-                    "Import #{}: {} ({})\n",
-                    i, import.name, import.kind
-                ));
+                imports_content
+                    .push_str(&format!("Import #{}: {} ({})\n", i, import.name, import.kind));
             }
             if self.imports.len() > 5 {
                 imports_content
@@ -1067,10 +1037,8 @@ impl App {
             // Create content with export details
             let mut exports_content = String::new();
             for (i, export) in self.exports.iter().enumerate().take(5) {
-                exports_content.push_str(&format!(
-                    "Export #{}: {} ({})\n",
-                    i, export.name, export.kind
-                ));
+                exports_content
+                    .push_str(&format!("Export #{}: {} ({})\n", i, export.name, export.kind));
             }
             if self.exports.len() > 5 {
                 exports_content
@@ -1157,11 +1125,7 @@ impl App {
                 } else {
                     SelectedView::iter().count() - 1 // Skip Debug view when not in debug mode
                 };
-                let prev_idx = if current_idx == 0 {
-                    max_idx - 1
-                } else {
-                    current_idx - 1
-                };
+                let prev_idx = if current_idx == 0 { max_idx - 1 } else { current_idx - 1 };
                 self.selected_view =
                     SelectedView::from_repr(prev_idx).unwrap_or(self.selected_view);
             }
@@ -1202,11 +1166,8 @@ impl App {
                     };
 
                     if max_idx > 0 {
-                        self.focused_node = Some(if current == 0 {
-                            max_idx - 1
-                        } else {
-                            current - 1
-                        });
+                        self.focused_node =
+                            Some(if current == 0 { max_idx - 1 } else { current - 1 });
                     }
                 } else if match self.selected_view {
                     SelectedView::Modules => !self.component_summary.core_modules.is_empty(),
@@ -1274,11 +1235,7 @@ impl App {
         // Render title
         let title_text = format!("WASM Component Graph View - {}", self.selected_view);
         let title = Paragraph::new(title_text)
-            .style(
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            )
+            .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
             .block(Block::default().borders(Borders::ALL))
             .alignment(Alignment::Center);
 
@@ -1473,10 +1430,7 @@ fn main() -> io::Result<()> {
             } else if version == [0x0D, 0x00, 0x01, 0x00] {
                 println!("Detected WebAssembly Component (version 1)");
             } else {
-                println!(
-                    "Detected WebAssembly binary with unknown version: {:?}",
-                    version
-                );
+                println!("Detected WebAssembly binary with unknown version: {:?}", version);
             }
         } else {
             println!("Warning: File does not have WebAssembly magic bytes");
@@ -1595,10 +1549,7 @@ fn main() -> io::Result<()> {
                 if producers_info.is_empty() {
                     println!("No producer information found in any module");
                 } else {
-                    println!(
-                        "Found producer information in {} module(s)",
-                        producers_info.len()
-                    );
+                    println!("Found producer information in {} module(s)", producers_info.len());
                 }
             }
 

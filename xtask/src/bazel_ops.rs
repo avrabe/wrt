@@ -69,10 +69,7 @@ pub fn generate_build_file(_sh: &Shell, directory: &Path) -> Result<()> {
     let mut file = File::create(&build_file)?;
     file.write_all(content.as_bytes())?;
 
-    println!(
-        "Successfully generated BUILD file at {}",
-        build_file.display()
-    );
+    println!("Successfully generated BUILD file at {}", build_file.display());
 
     Ok(())
 }
@@ -134,11 +131,7 @@ pub fn migrate_just_command(_sh: &Shell, command: &str) -> Result<()> {
     let mut file = File::create(&bazel_file)?;
     file.write_all(bazel_rule.as_bytes())?;
 
-    println!(
-        "Successfully migrated command '{}' to {}",
-        command,
-        bazel_file.display()
-    );
+    println!("Successfully migrated command '{}' to {}", command, bazel_file.display());
     println!("You can now use this rule in your BUILD files or update the root BUILD.");
 
     Ok(())
@@ -195,10 +188,7 @@ fn create_build_file_content(package_name: &str, src_files: &[PathBuf]) -> Strin
 
     if has_lib {
         // Create library target
-        content.push_str(&format!(
-            "rust_library(\n    name = \"{}\",\n",
-            package_name
-        ));
+        content.push_str(&format!("rust_library(\n    name = \"{}\",\n", package_name));
         content.push_str("    srcs = glob([\"src/**/*.rs\"]),\n");
         content.push_str("    edition = \"2021\",\n");
         content.push_str("    deps = all_crate_deps(\n        normal = True,\n    ),\n");
@@ -223,10 +213,7 @@ fn create_build_file_content(package_name: &str, src_files: &[PathBuf]) -> Strin
     }
 
     // Add test target
-    content.push_str(&format!(
-        "rust_test(\n    name = \"{}_test\",\n",
-        package_name
-    ));
+    content.push_str(&format!("rust_test(\n    name = \"{}_test\",\n", package_name));
     content.push_str("    srcs = glob([\"src/**/*.rs\"]),\n");
     content.push_str("    edition = \"2021\",\n");
     content.push_str("    deps = all_crate_deps(\n        normal = True,\n    ),\n");

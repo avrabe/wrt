@@ -118,10 +118,7 @@ impl BuiltinRegistry {
         // Define a default function executor for threading that just returns an error
         #[cfg(feature = "component-model-threading")]
         let function_executor: FunctionExecutor = Arc::new(|function_id, _args| {
-            Err(Error::new(format!(
-                "No executor registered for function ID: {}",
-                function_id
-            )))
+            Err(Error::new(format!("No executor registered for function ID: {}", function_id)))
         });
 
         let mut registry = Self {
@@ -182,17 +179,9 @@ impl BuiltinRegistry {
     pub fn register_handler(&mut self, handler: Box<dyn BuiltinHandler>) {
         // Check if we already have a handler for this built-in type
         let builtin_type = handler.builtin_type();
-        if self
-            .handlers
-            .iter()
-            .any(|h| h.builtin_type() == builtin_type)
-        {
+        if self.handlers.iter().any(|h| h.builtin_type() == builtin_type) {
             // Replace the existing handler
-            let idx = self
-                .handlers
-                .iter()
-                .position(|h| h.builtin_type() == builtin_type)
-                .unwrap();
+            let idx = self.handlers.iter().position(|h| h.builtin_type() == builtin_type).unwrap();
             self.handlers[idx] = handler;
         } else {
             // Add a new handler
@@ -219,9 +208,7 @@ impl BuiltinRegistry {
     ///
     /// `true` if the built-in is supported, `false` otherwise
     pub fn supports_builtin(&self, builtin_type: BuiltinType) -> bool {
-        self.handlers
-            .iter()
-            .any(|h| h.builtin_type() == builtin_type)
+        self.handlers.iter().any(|h| h.builtin_type() == builtin_type)
     }
 
     /// Call a built-in function
@@ -334,9 +321,7 @@ mod tests {
         }
 
         fn clone_handler(&self) -> Box<dyn BuiltinHandler> {
-            Box::new(TestHandler {
-                builtin_type: self.builtin_type,
-            })
+            Box::new(TestHandler { builtin_type: self.builtin_type })
         }
     }
 
@@ -352,9 +337,8 @@ mod tests {
         assert!(!registry.supports_builtin(BuiltinType::ResourceCreate));
 
         // Register a handler
-        registry.register_handler(Box::new(TestHandler {
-            builtin_type: BuiltinType::ResourceCreate,
-        }));
+        registry
+            .register_handler(Box::new(TestHandler { builtin_type: BuiltinType::ResourceCreate }));
 
         // Now it should be supported
         assert!(registry.supports_builtin(BuiltinType::ResourceCreate));
@@ -370,9 +354,8 @@ mod tests {
         );
 
         // Register handlers
-        registry.register_handler(Box::new(TestHandler {
-            builtin_type: BuiltinType::ResourceCreate,
-        }));
+        registry
+            .register_handler(Box::new(TestHandler { builtin_type: BuiltinType::ResourceCreate }));
 
         // Call the built-in
         let args = vec![ComponentValue::S32(42)];
@@ -396,9 +379,8 @@ mod tests {
         );
 
         // Register a handler
-        registry.register_handler(Box::new(TestHandler {
-            builtin_type: BuiltinType::ResourceCreate,
-        }));
+        registry
+            .register_handler(Box::new(TestHandler { builtin_type: BuiltinType::ResourceCreate }));
 
         // Clone the registry
         let cloned = registry.clone();
@@ -441,28 +423,23 @@ mod tests {
         match &result[0] {
             ComponentValue::U32(id) => {
                 // Test polling it (should be pending)
-                let poll_result = registry
-                    .call(BuiltinType::AsyncPoll, &[ComponentValue::U32(*id)])
-                    .unwrap();
+                let poll_result =
+                    registry.call(BuiltinType::AsyncPoll, &[ComponentValue::U32(*id)]).unwrap();
                 assert_eq!(poll_result, vec![ComponentValue::U32(0)]);
 
                 // Complete the async value
                 let store = registry.async_store();
                 let mut async_store = store.lock().unwrap();
-                async_store
-                    .set_result(*id, vec![ComponentValue::U32(42)])
-                    .unwrap();
+                async_store.set_result(*id, vec![ComponentValue::U32(42)]).unwrap();
 
                 // Test polling again (should be ready)
-                let poll_result = registry
-                    .call(BuiltinType::AsyncPoll, &[ComponentValue::U32(*id)])
-                    .unwrap();
+                let poll_result =
+                    registry.call(BuiltinType::AsyncPoll, &[ComponentValue::U32(*id)]).unwrap();
                 assert_eq!(poll_result, vec![ComponentValue::U32(1)]);
 
                 // Test getting the result
-                let get_result = registry
-                    .call(BuiltinType::AsyncGet, &[ComponentValue::U32(*id)])
-                    .unwrap();
+                let get_result =
+                    registry.call(BuiltinType::AsyncGet, &[ComponentValue::U32(*id)]).unwrap();
                 assert_eq!(get_result, vec![ComponentValue::U32(42)]);
             }
             _ => panic!("Expected U32 result"),

@@ -5,30 +5,30 @@ edition.workspace = true
 description = "WebAssembly instruction implementations for the WRT runtime"
 license.workspace = true
 repository = "https://github.com/avrabe/wrt"
+readme = "README.md"
+keywords = ["wasm", "webassembly", "instructions", "interpreter", "no-std"]
+categories = ["wasm", "emulators", "no-std", "embedded"]
 
 [features]
 default = ["std"]
 std = [
     "wrt-error/std", 
     "wrt-types/std",
-    "wrt-runtime/std",
     "wrt-sync/std",
 ]
 no_std = [
     "wrt-error/no_std", 
     "wrt-types/no_std",
-    "wrt-runtime/no_std",
     "wrt-sync/no_std",
     "alloc",
 ]
-alloc = ["wrt-error/alloc", "wrt-types/alloc", "wrt-runtime/alloc", "wrt-sync/alloc", "dep:alloc"]
-optimize = ["wrt-types/optimize", "wrt-runtime/optimize"]
-safety = ["wrt-types/safety", "wrt-runtime/safety"]
+alloc = ["wrt-error/alloc", "wrt-types/alloc", "wrt-sync/alloc", "dep:alloc"]
+optimize = ["wrt-types/optimize"]
+safety = ["wrt-types/safety"]
 
 [dependencies]
 wrt-error = { path = "../wrt-error", version = "0.2.0" }
 wrt-types = { path = "../wrt-types", version = "0.2.0" }
-wrt-runtime = { path = "../wrt-runtime", version = "0.2.0" }
 wrt-sync = { path = "../wrt-sync", version = "0.2.0" }
 
 # No-std support
@@ -37,7 +37,35 @@ alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-all
 [dev-dependencies]
 proptest = "1.4.0"
 
+[profile.release]
+panic = "abort"
+
+[profile.test]
+panic = "abort"
+
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] }
-unsafe_code = "warn"
-missing_docs = "warn" 
+unsafe_code = "forbid"
+missing_docs = "deny"
+pointer_cast = "deny"
+
+[lints.clippy]
+inline_asm_x86_att_syntax = "warn"
+transmute_ptr_to_ref = "deny"
+type_id = "deny"
+dyn_trait = "warn"
+float_arithmetic = "warn"
+ptr_offset_with_cast = "warn"
+unwrap_used = "warn"
+panic = "warn"
+result_unit_err = "warn"
+let_underscore_drop = "warn"
+must_use_candidate = "warn"
+must_use_unit = "warn"
+match_wildcard_for_single_variants = "warn"
+never_loop = "warn"
+unreachable = "warn"
+static_mut_reference = "deny"
+arc_mutate = "deny"
+pedantic = "warn"
+debug_assert_with_mut_call = "warn" 

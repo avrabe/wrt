@@ -1,0 +1,22 @@
+# Lines starting with '#' are comments.
+# Each line is a file pattern followed by one or more owners.
+
+# Global owner for all files
+# * @global-owner1 @global-owner2
+
+# Order is important; the last matching pattern takes the most precedence.
+
+# Specify owners for all Rust files
+# *.rs @rust-team
+
+# Specify owners for specific crates
+# wrt/src/ @wrt-core-team
+# wrt-component/src/ @wrt-component-team
+
+# Documentation files
+# docs/ @docs-team
+
+# GitHub Actions workflows
+# .github/workflows/ @cicd-team
+
+# TODO: Define actual code owners and patterns according to project structure and teams. 

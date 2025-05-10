@@ -14,12 +14,7 @@ use wrt_types::verification::VerificationLevel;
 #[test]
 fn test_memory_with_safe_memory_handler() -> Result<()> {
     // Create a memory type with 1 page (64KB)
-    let mem_type = MemoryType {
-        limits: Limits {
-            min: 1,
-            max: Some(2),
-        },
-    };
+    let mem_type = MemoryType { limits: Limits { min: 1, max: Some(2) } };
 
     // Create a memory instance
     let mut memory = Memory::new(mem_type)?;
@@ -55,13 +50,8 @@ fn test_memory_with_safe_memory_handler() -> Result<()> {
 #[test]
 fn test_table_safe_operations() -> Result<()> {
     // Create a table type
-    let table_type = TableType {
-        element_type: ValueType::FuncRef,
-        limits: Limits {
-            min: 5,
-            max: Some(10),
-        },
-    };
+    let table_type =
+        TableType { element_type: ValueType::FuncRef, limits: Limits { min: 5, max: Some(10) } };
 
     // Create a table
     let mut table = Table::new(table_type, Value::func_ref(None))?;
@@ -97,12 +87,7 @@ fn test_table_safe_operations() -> Result<()> {
 #[test]
 fn test_memory_read_write_large_buffer() -> Result<()> {
     // Create a memory type with 2 pages (128KB)
-    let mem_type = MemoryType {
-        limits: Limits {
-            min: 2,
-            max: Some(4),
-        },
-    };
+    let mem_type = MemoryType { limits: Limits { min: 2, max: Some(4) } };
 
     // Create a memory instance
     let mut memory = Memory::new(mem_type)?;
@@ -139,12 +124,7 @@ fn test_memory_read_write_large_buffer() -> Result<()> {
 #[test]
 fn test_memory_copy_within() -> Result<()> {
     // Create a memory type with 1 page (64KB)
-    let mem_type = MemoryType {
-        limits: Limits {
-            min: 1,
-            max: Some(2),
-        },
-    };
+    let mem_type = MemoryType { limits: Limits { min: 1, max: Some(2) } };
 
     // Create a memory instance
     let mut memory = Memory::new(mem_type)?;
@@ -180,12 +160,7 @@ fn test_memory_copy_within() -> Result<()> {
 #[test]
 fn test_memory_fill() -> Result<()> {
     // Create a memory type with 1 page (64KB)
-    let mem_type = MemoryType {
-        limits: Limits {
-            min: 1,
-            max: Some(2),
-        },
-    };
+    let mem_type = MemoryType { limits: Limits { min: 1, max: Some(2) } };
 
     // Create a memory instance
     let mut memory = Memory::new(mem_type)?;

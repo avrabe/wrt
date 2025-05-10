@@ -4,6 +4,7 @@
 //! operations, specifically supporting the start function requirements.
 
 use crate::prelude::*;
+use wrt_error::kinds::{ExecutionLimitExceeded, ExecutionTimeoutError};
 
 /// Represents the outcome of a time-bounded execution
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,11 +32,7 @@ pub struct TimeBoundedConfig {
 
 impl Default for TimeBoundedConfig {
     fn default() -> Self {
-        Self {
-            time_limit_ms: None,
-            allow_extension: false,
-            fuel_limit: None,
-        }
+        Self { time_limit_ms: None, allow_extension: false, fuel_limit: None }
     }
 }
 
@@ -59,19 +56,11 @@ impl TimeBoundedContext {
     pub fn new(config: TimeBoundedConfig) -> Self {
         #[cfg(feature = "std")]
         {
-            Self {
-                start_time: Instant::now(),
-                config,
-                terminated: false,
-            }
+            Self { start_time: Instant::now(), config, terminated: false }
         }
         #[cfg(not(feature = "std"))]
         {
-            Self {
-                config,
-                terminated: false,
-                elapsed_fuel: 0,
-            }
+            Self { config, terminated: false, elapsed_fuel: 0 }
         }
     }
 
@@ -81,7 +70,7 @@ impl TimeBoundedContext {
             return Err(Error::new(
                 ErrorCategory::Runtime,
                 codes::EXECUTION_LIMIT_EXCEEDED,
-                kinds::ExecutionLimitExceeded("Execution was terminated".to_string()),
+                ExecutionLimitExceeded("Execution was terminated".to_string()),
             ));
         }
 
@@ -94,7 +83,7 @@ impl TimeBoundedContext {
                 return Err(Error::new(
                     ErrorCategory::Runtime,
                     codes::EXECUTION_TIMEOUT,
-                    kinds::ExecutionTimeoutError(format!(
+                    ExecutionTimeoutError(format!(
                         "Execution time limit exceeded: {} ms (limit: {} ms)",
                         elapsed_ms, time_limit_ms
                     )),
@@ -108,7 +97,7 @@ impl TimeBoundedContext {
                 return Err(Error::new(
                     ErrorCategory::Runtime,
                     codes::EXECUTION_LIMIT_EXCEEDED,
-                    kinds::ExecutionLimitExceeded(format!(
+                    ExecutionLimitExceeded(format!(
                         "Execution fuel limit exceeded: {} (limit: {})",
                         self.elapsed_fuel, fuel_limit
                     )),
@@ -125,7 +114,7 @@ impl TimeBoundedContext {
             return Err(Error::new(
                 ErrorCategory::Runtime,
                 codes::EXECUTION_TIMEOUT,
-                kinds::ExecutionTimeoutError("Time limit extension not allowed".to_string()),
+                "Time limit extension not allowed".to_string(),
             ));
         }
 
@@ -137,7 +126,7 @@ impl TimeBoundedContext {
             Err(Error::new(
                 ErrorCategory::Runtime,
                 codes::EXECUTION_TIMEOUT,
-                kinds::ExecutionTimeoutError("Cannot extend unlimited time".to_string()),
+                "Cannot extend unlimited time".to_string(),
             ))
         }
     }

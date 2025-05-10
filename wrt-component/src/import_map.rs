@@ -23,9 +23,7 @@ pub struct SafeImportMap {
 impl ImportMap {
     /// Create a new empty import map
     pub fn new() -> Self {
-        Self {
-            imports: HashMap::new(),
-        }
+        Self { imports: HashMap::new() }
     }
 
     /// Add an import to the map
@@ -56,10 +54,7 @@ impl ImportMap {
 
     /// Get all imports as a Vec of (name, import) pairs
     pub fn get_all(&self) -> Vec<(String, Arc<Import>)> {
-        self.imports
-            .iter()
-            .map(|(name, import)| (name.clone(), import.clone()))
-            .collect()
+        self.imports.iter().map(|(name, import)| (name.clone(), import.clone())).collect()
     }
 
     /// Convert this import map to one using SafeMemory containers
@@ -77,9 +72,7 @@ impl ImportMap {
 impl SafeImportMap {
     /// Create a new empty import map
     pub fn new() -> Self {
-        Self {
-            imports: wrt_types::safe_memory::SafeStack::new(),
-        }
+        Self { imports: wrt_types::safe_memory::SafeStack::new() }
     }
 
     /// Add an import to the map

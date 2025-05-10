@@ -1,3 +1,14 @@
+// WRT - wrt-types
+// Module: WebAssembly Component Model Core Types
+// SW-REQ-ID: REQ_WASM_COMPONENT_001 (Example: Relates to core component structures)
+//
+// Copyright (c) 2024 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
+//! Defines the core types for the WebAssembly Component Model such as
+//! ComponentType, InstanceType, ExternType, etc.
+
 use crate::types::FuncType;
 use crate::types::ValueType;
 use crate::{String, Vec};
@@ -21,20 +32,12 @@ impl ComponentType {
         imports: Vec<(String, String, ExternType)>,
         exports: Vec<(String, ExternType)>,
     ) -> Self {
-        Self {
-            imports,
-            exports,
-            instances: Vec::new(),
-        }
+        Self { imports, exports, instances: Vec::new() }
     }
 
     /// Creates an empty component type
     pub fn empty() -> Self {
-        Self {
-            imports: Vec::new(),
-            exports: Vec::new(),
-            instances: Vec::new(),
-        }
+        Self { imports: Vec::new(), exports: Vec::new(), instances: Vec::new() }
     }
 }
 
@@ -120,11 +123,8 @@ impl Namespace {
     /// Creates a namespace from a string
     #[must_use]
     pub fn from_string(s: &str) -> Self {
-        let elements = s
-            .split('.')
-            .filter(|part| !part.is_empty())
-            .map(ToString::to_string)
-            .collect();
+        let elements =
+            s.split('.').filter(|part| !part.is_empty()).map(ToString::to_string).collect();
         Self { elements }
     }
 
@@ -135,10 +135,7 @@ impl Namespace {
             return false;
         }
 
-        self.elements
-            .iter()
-            .zip(other.elements.iter())
-            .all(|(a, b)| a == b)
+        self.elements.iter().zip(other.elements.iter()).all(|(a, b)| a == b)
     }
 
     /// Checks if this namespace is empty

@@ -30,11 +30,7 @@ impl ArithmeticContext for SimpleContext {
 
     fn pop_arithmetic_value(&mut self) -> crate::Result<Value> {
         self.stack.pop().ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::STACK_UNDERFLOW,
-                "Stack underflow",
-            )
+            Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
         })
     }
 }

@@ -265,10 +265,7 @@ impl RuntimeInstance {
                 // This interface will be extended as needed
 
                 #[cfg(feature = "std")]
-                debug!(
-                    "Module instance execution not yet implemented for function: {}",
-                    name
-                );
+                debug!("Module instance execution not yet implemented for function: {}", name);
 
                 // For MVP, we need to return that execution isn't implemented
                 // without hard-coding specific function behavior
@@ -356,7 +353,7 @@ pub enum ExternValue {
 #[derive(Debug, Clone)]
 pub struct FunctionValue {
     /// Function type
-    pub ty: wrt_runtime::func::FuncType,
+    pub ty: crate::runtime::FuncType,
     /// Export name that this function refers to
     pub export_name: String,
 }
@@ -395,10 +392,7 @@ impl MemoryValue {
     /// Returns an error if the memory cannot be created
     pub fn new(ty: MemoryType) -> Result<Self> {
         let memory = Memory::new(ty.clone())?;
-        Ok(Self {
-            ty,
-            memory: Arc::new(RwLock::new(memory)),
-        })
+        Ok(Self { ty, memory: Arc::new(RwLock::new(memory)) })
     }
 
     /// Creates a new memory value with a debug name
@@ -417,10 +411,7 @@ impl MemoryValue {
     /// Returns an error if the memory cannot be created
     pub fn new_with_name(ty: MemoryType, name: &str) -> Result<Self> {
         let memory = Memory::new_with_name(ty.clone(), name)?;
-        Ok(Self {
-            ty,
-            memory: Arc::new(RwLock::new(memory)),
-        })
+        Ok(Self { ty, memory: Arc::new(RwLock::new(memory)) })
     }
 
     /// Reads from memory
@@ -671,9 +662,7 @@ impl Host {
     /// Creates a new empty host
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            functions: HashMap::new(),
-        }
+        Self { functions: HashMap::new() }
     }
 
     /// Adds a host function
@@ -703,11 +692,7 @@ impl Host {
             return Err(Error::new(
                 ErrorCategory::Validation,
                 codes::VALIDATION_ERROR,
-                format!(
-                    "Expected {} arguments, got {}",
-                    function.ty.params.len(),
-                    args.len()
-                ),
+                format!("Expected {} arguments, got {}", function.ty.params.len(), args.len()),
             ));
         }
 
@@ -744,8 +729,7 @@ impl Component {
     pub fn set_verification_level(&mut self, level: wrt_types::verification::VerificationLevel) {
         self.verification_level = level;
         // Propagate to resource table
-        self.resource_table
-            .set_verification_level(convert_verification_level(level));
+        self.resource_table.set_verification_level(convert_verification_level(level));
     }
 
     /// Get the current verification level
@@ -764,9 +748,7 @@ pub struct BuiltinRequirements {
 impl BuiltinRequirements {
     /// Create a new, empty set of built-in requirements
     pub fn new() -> Self {
-        Self {
-            requirements: HashSet::new(),
-        }
+        Self { requirements: HashSet::new() }
     }
 
     /// Add a requirement for a specific built-in type
@@ -894,10 +876,7 @@ fn extract_embedded_modules(bytes: &[u8]) -> Result<Vec<Vec<u8>>> {
             return Err(Error::new(
                 ErrorCategory::Parse,
                 codes::DECODING_ERROR,
-                format!(
-                    "Failed to decode component while extracting modules: {}",
-                    err
-                ),
+                format!("Failed to decode component while extracting modules: {}", err),
             ));
         }
     }
@@ -965,15 +944,10 @@ mod tests {
             params: vec![ValueType::I32, ValueType::I32],
             results: vec![ValueType::I32],
         };
-        let func_value = FunctionValue {
-            ty: func_type,
-            export_name: "test_function".to_string(),
-        };
+        let func_value = FunctionValue { ty: func_type, export_name: "test_function".to_string() };
         let extern_value = ExternValue::Function(func_value);
 
-        assert!(runtime
-            .register_function("test_function".to_string(), extern_value)
-            .is_ok());
+        assert!(runtime.register_function("test_function".to_string(), extern_value).is_ok());
         assert_eq!(runtime.functions.len(), 1);
         assert!(runtime.functions.contains_key("test_function"));
     }
@@ -1006,15 +980,10 @@ mod tests {
             params: vec![ValueType::I32, ValueType::I32],
             results: vec![ValueType::I32],
         };
-        let func_value = FunctionValue {
-            ty: func_type,
-            export_name: "test_func".to_string(),
-        };
+        let func_value = FunctionValue { ty: func_type, export_name: "test_func".to_string() };
         let extern_value = ExternValue::Function(func_value);
 
-        runtime
-            .register_function("test_func".to_string(), extern_value)
-            .unwrap();
+        runtime.register_function("test_func".to_string(), extern_value).unwrap();
 
         // Call with wrong number of arguments
         let args = vec![Value::I32(1)]; // Only one argument
@@ -1040,15 +1009,10 @@ mod tests {
             params: vec![ValueType::I32, ValueType::I32],
             results: vec![ValueType::I32],
         };
-        let func_value = FunctionValue {
-            ty: func_type,
-            export_name: "test_func".to_string(),
-        };
+        let func_value = FunctionValue { ty: func_type, export_name: "test_func".to_string() };
         let extern_value = ExternValue::Function(func_value);
 
-        runtime
-            .register_function("test_func".to_string(), extern_value)
-            .unwrap();
+        runtime.register_function("test_func".to_string(), extern_value).unwrap();
 
         // Call with wrong argument types
         let args = vec![Value::I32(1), Value::F32(2.0)]; // Second arg is F32
@@ -1074,15 +1038,10 @@ mod tests {
             params: vec![ValueType::I32, ValueType::I32],
             results: vec![ValueType::I32],
         };
-        let func_value = FunctionValue {
-            ty: func_type,
-            export_name: "test_func".to_string(),
-        };
+        let func_value = FunctionValue { ty: func_type, export_name: "test_func".to_string() };
         let extern_value = ExternValue::Function(func_value);
 
-        runtime
-            .register_function("test_func".to_string(), extern_value)
-            .unwrap();
+        runtime.register_function("test_func".to_string(), extern_value).unwrap();
 
         // Call with correct arguments
         let args = vec![Value::I32(1), Value::I32(2)];

@@ -1,7 +1,14 @@
 //! Error helper functions for common error patterns.
+//!
+//! This module primarily re-exports functionality from the kinds module
+//! for backward compatibility with existing code.
 
+// Re-export error kind creation functions
+pub use crate::kinds::*;
+
+// Import ErrorCategory and Error for compatibility functions
 #[cfg(feature = "alloc")]
-use super::errors::{codes, Error, ErrorCategory};
+use crate::Error;
 
 #[cfg(feature = "std")]
 extern crate std;
@@ -9,295 +16,123 @@ extern crate std;
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
 extern crate alloc;
 
-// Use alloc for formatting if std is not enabled
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
+#[cfg(feature = "alloc")]
+use alloc::string::ToString;
+
+#[cfg(feature = "alloc")]
 use alloc::format as alloc_format;
 
-// Use std for formatting if std is enabled
-#[cfg(feature = "std")]
-use std::format as std_format;
-
-pub use crate::kinds::*;
-
-/// Helper functions for creating index-related errors with consistent formatting
+// For backward compatibility - simple error creation functions
+/// Creates a simple validation error. Deprecated: use `Error::validation_error` instead.
 #[cfg(feature = "alloc")]
-pub fn create_index_error(index_type: &str, index: usize) -> Error {
-    Error::new(
-        ErrorCategory::Core,
-        codes::INVALID_FUNCTION_INDEX,
-        #[cfg(feature = "std")]
-        std_format!("Invalid {} index: {}", index_type, index),
-        #[cfg(all(not(feature = "std"), feature = "alloc"))]
-        alloc_format!("Invalid {} index: {}", index_type, index),
-    )
+#[deprecated(since = "0.2.0", note = "use Error::validation_error instead")]
+pub fn create_simple_validation_error<T: core::fmt::Display>(message: T) -> Error {
+    Error::validation_error(message.to_string())
 }
 
-/// Helper functions for creating resource limit errors with consistent formatting
+/// Creates a simple type error. Deprecated: use `Error::type_error` instead.
 #[cfg(feature = "alloc")]
+#[deprecated(since = "0.2.0", note = "use Error::type_error instead")]
+pub fn create_simple_type_error<T: core::fmt::Display>(message: T) -> Error {
+    Error::type_error(message.to_string())
+}
+
+/// Creates a simple memory error. Deprecated: use `Error::memory_error` instead.
+#[cfg(feature = "alloc")]
+#[deprecated(since = "0.2.0", note = "use Error::memory_error instead")]
+pub fn create_simple_memory_error<T: core::fmt::Display>(message: T) -> Error {
+    Error::memory_error(message.to_string())
+}
+
+/// Creates a simple resource error. Deprecated: use `Error::resource_error` instead.
+#[cfg(feature = "alloc")]
+#[deprecated(since = "0.2.0", note = "use Error::resource_error instead")]
+pub fn create_simple_resource_error<T: core::fmt::Display>(message: T) -> Error {
+    Error::resource_error(message.to_string())
+}
+
+/// Creates a simple component error. Deprecated: use `Error::component_error` instead.
+#[cfg(feature = "alloc")]
+#[deprecated(since = "0.2.0", note = "use Error::component_error instead")]
+pub fn create_simple_component_error<T: core::fmt::Display>(message: T) -> Error {
+    Error::component_error(message.to_string())
+}
+
+/// Creates a simple runtime error. Deprecated: use `Error::runtime_error` instead.
+#[cfg(feature = "alloc")]
+#[deprecated(since = "0.2.0", note = "use Error::runtime_error instead")]
+pub fn create_simple_runtime_error<T: core::fmt::Display>(message: T) -> Error {
+    Error::runtime_error(message.to_string())
+}
+
+/// Creates a simple system error. Deprecated: use `Error::system_error` instead.
+#[cfg(feature = "alloc")]
+#[deprecated(since = "0.2.0", note = "use Error::system_error instead")]
+pub fn create_simple_system_error<T: core::fmt::Display>(message: T) -> Error {
+    Error::system_error(message.to_string())
+}
+
+/// Creates a resource limit error. Deprecated: use `Error::resource_error` with a formatted message instead.
+#[cfg(feature = "alloc")]
+#[deprecated(since = "0.2.0", note = "use Error::resource_error with formatted message instead")]
+#[must_use]
 pub fn create_resource_limit_error(resource_type: &str, current: usize, limit: usize) -> Error {
-    Error::new(
-        ErrorCategory::Resource,
-        codes::RESOURCE_LIMIT_EXCEEDED,
-        #[cfg(feature = "std")]
-        std_format!(
-            "{} limit exceeded: current={}, limit={}",
-            resource_type,
-            current,
-            limit
-        ),
-        #[cfg(all(not(feature = "std"), feature = "alloc"))]
-        alloc_format!(
-            "{} limit exceeded: current={}, limit={}",
-            resource_type,
-            current,
-            limit
-        ),
-    )
+    Error::resource_error(alloc_format!(
+        "{resource_type} limit exceeded: current={current}, limit={limit}"
+    ))
 }
 
-/// Helper for creating memory access errors with detailed context
+/// Creates a memory access error. Deprecated: use `Error::memory_error` with a formatted message instead.
 #[cfg(feature = "alloc")]
+#[deprecated(since = "0.2.0", note = "use Error::memory_error with formatted message instead")]
+#[must_use]
 pub fn create_memory_access_error(
     address: u64,
     size: u64,
     memory_size: u64,
     operation: &str,
 ) -> Error {
-    Error::new(
-        ErrorCategory::Memory,
-        codes::MEMORY_ACCESS_OUT_OF_BOUNDS,
-        #[cfg(feature = "std")]
-        std_format!(
-            "Memory access out of bounds during {}: address={}, size={}, memory_size={}",
-            operation,
-            address,
-            size,
-            memory_size
-        ),
-        #[cfg(all(not(feature = "std"), feature = "alloc"))]
-        alloc_format!(
-            "Memory access out of bounds during {}: address={}, size={}, memory_size={}",
-            operation,
-            address,
-            size,
-            memory_size
-        ),
-    )
+    Error::memory_error(alloc_format!(
+        "Memory access out of bounds during {operation}: address={address}, size={size}, memory_size={memory_size}"
+    ))
 }
 
-/// Helper for creating type mismatch errors with expected/actual types
+/// Creates a type mismatch error. Deprecated: use `Error::type_error` with a formatted message instead.
 #[cfg(feature = "alloc")]
+#[deprecated(since = "0.2.0", note = "use Error::type_error with formatted message instead")]
+#[must_use]
 pub fn create_type_mismatch_error(expected: &str, actual: &str, context: &str) -> Error {
-    Error::new(
-        ErrorCategory::Type,
-        codes::TYPE_MISMATCH_ERROR,
-        #[cfg(feature = "std")]
-        std_format!(
-            "Type mismatch in {}: expected {}, got {}",
-            context,
-            expected,
-            actual
-        ),
-        #[cfg(all(not(feature = "std"), feature = "alloc"))]
-        alloc_format!(
-            "Type mismatch in {}: expected {}, got {}",
-            context,
-            expected,
-            actual
-        ),
-    )
+    Error::type_error(alloc_format!(
+        "Type mismatch in {context}: expected {expected}, got {actual}"
+    ))
 }
 
-/// Helper for creating validation errors with detailed context
+/// Creates an index error. Deprecated: use `Error::core_error` with a formatted message instead.
 #[cfg(feature = "alloc")]
-pub fn create_validation_error(validation_type: &str, details: &str) -> Error {
-    Error::new(
-        ErrorCategory::Validation,
-        codes::VALIDATION_ERROR,
-        #[cfg(feature = "std")]
-        std_format!("Validation failed ({}): {}", validation_type, details),
-        #[cfg(all(not(feature = "std"), feature = "alloc"))]
-        alloc_format!("Validation failed ({}): {}", validation_type, details),
-    )
+#[deprecated(since = "0.2.0", note = "use Error::core_error with formatted message instead")]
+#[must_use]
+pub fn create_index_error(index_type: &str, index: usize) -> Error {
+    Error::core_error(alloc_format!("Invalid {index_type} index: {index}"))
 }
 
-/// Helper for creating resource access errors with context
+/// Creates a bounded error (capacity exceeded). Deprecated: use `Error::resource_error` with a formatted message instead.
 #[cfg(feature = "alloc")]
-pub fn create_resource_access_error(resource_type: &str, operation: &str, reason: &str) -> Error {
-    Error::new(
-        ErrorCategory::Resource,
-        codes::RESOURCE_ACCESS_ERROR,
-        #[cfg(feature = "std")]
-        std_format!(
-            "Failed to {} {} resource: {}",
-            operation,
-            resource_type,
-            reason
-        ),
-        #[cfg(all(not(feature = "std"), feature = "alloc"))]
-        alloc_format!(
-            "Failed to {} {} resource: {}",
-            operation,
-            resource_type,
-            reason
-        ),
-    )
+#[deprecated(since = "0.2.0", note = "use Error::resource_error with formatted message instead")]
+pub fn convert_bounded_error<E: core::fmt::Display, T: core::fmt::Display>(
+    capacity: E,
+    requested: T,
+) -> Error {
+    Error::resource_error(alloc_format!(
+        "Capacity exceeded: capacity={capacity}, requested={requested}"
+    ))
 }
 
-/// Helper for creating component errors with context
+/// Creates a bounded index error (index out of bounds). Deprecated: use `Error::core_error` with a formatted message instead.
 #[cfg(feature = "alloc")]
-pub fn create_component_error(component_name: &str, operation: &str, details: &str) -> Error {
-    Error::new(
-        ErrorCategory::Component,
-        codes::COMPONENT_INSTANTIATION_ERROR,
-        #[cfg(feature = "std")]
-        std_format!(
-            "Component '{}' {} failed: {}",
-            component_name,
-            operation,
-            details
-        ),
-        #[cfg(all(not(feature = "std"), feature = "alloc"))]
-        alloc_format!(
-            "Component '{}' {} failed: {}",
-            component_name,
-            operation,
-            details
-        ),
-    )
-}
-
-/// Create a parse error with standard error code
-#[cfg(feature = "alloc")]
-pub fn create_simple_parse_error(message: impl Into<String>) -> Error {
-    Error::new(ErrorCategory::Validation, codes::PARSE_ERROR, message)
-}
-
-/// Create a validation error with standard error code
-#[cfg(feature = "alloc")]
-pub fn create_simple_validation_error(message: impl Into<String>) -> Error {
-    Error::new(ErrorCategory::Validation, codes::VALIDATION_ERROR, message)
-}
-
-/// Create a type error with standard error code
-#[cfg(feature = "alloc")]
-pub fn create_simple_type_error(message: impl Into<String>) -> Error {
-    Error::new(ErrorCategory::Type, codes::TYPE_MISMATCH_ERROR, message)
-}
-
-/// Create a memory error with standard error code
-#[cfg(feature = "alloc")]
-pub fn create_simple_memory_error(message: impl Into<String>) -> Error {
-    Error::new(ErrorCategory::Memory, codes::MEMORY_OUT_OF_BOUNDS, message)
-}
-
-/// Create a resource error with standard error code
-#[cfg(feature = "alloc")]
-pub fn create_simple_resource_error(message: impl Into<String>) -> Error {
-    Error::new(ErrorCategory::Resource, codes::RESOURCE_ERROR, message)
-}
-
-/// Create a component error with standard error code
-#[cfg(feature = "alloc")]
-pub fn create_simple_component_error(message: impl Into<String>) -> Error {
-    Error::new(
-        ErrorCategory::Component,
-        codes::COMPONENT_LINKING_ERROR,
-        message,
-    )
-}
-
-/// Create a runtime error with standard error code
-#[cfg(feature = "alloc")]
-pub fn create_simple_runtime_error(message: impl Into<String>) -> Error {
-    Error::new(ErrorCategory::Runtime, codes::RUNTIME_ERROR, message)
-}
-
-/// Create a system error with standard error code
-#[cfg(feature = "alloc")]
-pub fn create_simple_system_error(message: impl Into<String>) -> Error {
-    Error::new(ErrorCategory::System, codes::SYSTEM_ERROR, message)
-}
-
-#[cfg(all(test, feature = "alloc"))]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_index_error() {
-        let error = create_index_error("function", 42);
-        assert_eq!(error.to_string(), "Invalid function index: 42 (code: 2000)");
-    }
-
-    #[test]
-    fn test_resource_limit_error() {
-        let error = create_resource_limit_error("memory", 1024, 1000);
-        assert_eq!(
-            error.to_string(),
-            "memory limit exceeded: current=1024, limit=1000 (code: 3001)"
-        );
-    }
-
-    #[test]
-    fn test_memory_access_error() {
-        let error = create_memory_access_error(100, 32, 64, "load");
-        assert_eq!(
-            error.to_string(),
-            "Memory access out of bounds during load: address=100, size=32, memory_size=64 (code: 4002)"
-        );
-    }
-
-    #[test]
-    fn test_type_mismatch_error() {
-        let error = create_type_mismatch_error("i32", "f64", "function call");
-        assert_eq!(
-            error.to_string(),
-            "Type mismatch in function call: expected i32, got f64 (code: 6001)"
-        );
-    }
-}
-
-// No-std versions
-#[cfg(not(feature = "alloc"))]
-pub fn create_simple_parse_error<T: core::fmt::Display>(message: T) -> Error {
-    Error::new(ErrorCategory::Validation, codes::PARSE_ERROR, message)
-}
-
-#[cfg(not(feature = "alloc"))]
-pub fn create_simple_validation_error<T: core::fmt::Display>(message: T) -> Error {
-    Error::new(ErrorCategory::Validation, codes::VALIDATION_ERROR, message)
-}
-
-#[cfg(not(feature = "alloc"))]
-pub fn create_simple_type_error<T: core::fmt::Display>(message: T) -> Error {
-    Error::new(ErrorCategory::Type, codes::TYPE_MISMATCH_ERROR, message)
-}
-
-#[cfg(not(feature = "alloc"))]
-pub fn create_simple_memory_error<T: core::fmt::Display>(message: T) -> Error {
-    Error::new(ErrorCategory::Memory, codes::MEMORY_OUT_OF_BOUNDS, message)
-}
-
-#[cfg(not(feature = "alloc"))]
-pub fn create_simple_resource_error<T: core::fmt::Display>(message: T) -> Error {
-    Error::new(ErrorCategory::Resource, codes::RESOURCE_ERROR, message)
-}
-
-#[cfg(not(feature = "alloc"))]
-pub fn create_simple_component_error<T: core::fmt::Display>(message: T) -> Error {
-    Error::new(
-        ErrorCategory::Component,
-        codes::COMPONENT_LINKING_ERROR,
-        message,
-    )
-}
-
-#[cfg(not(feature = "alloc"))]
-pub fn create_simple_runtime_error<T: core::fmt::Display>(message: T) -> Error {
-    Error::new(ErrorCategory::Runtime, codes::RUNTIME_ERROR, message)
-}
-
-#[cfg(not(feature = "alloc"))]
-pub fn create_simple_system_error<T: core::fmt::Display>(message: T) -> Error {
-    Error::new(ErrorCategory::System, codes::SYSTEM_ERROR, message)
+#[deprecated(since = "0.2.0", note = "use Error::core_error with formatted message instead")]
+pub fn convert_bounded_index_error<I: core::fmt::Display, M: core::fmt::Display>(
+    index: I,
+    max: M,
+) -> Error {
+    Error::core_error(alloc_format!("Index out of bounds: index={index}, max={max}"))
 }

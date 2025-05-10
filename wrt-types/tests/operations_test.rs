@@ -1,4 +1,4 @@
-/// Tests for operation tracking functionality
+//! Tests for operation tracking functionality in `wrt_types`.
 ///
 /// This module contains tests for the operation tracking features,
 /// including fuel consumption calculation and global operation counter.
@@ -71,10 +71,7 @@ mod tests {
 
         // Record some operations
         record_global_operation(OperationType::FunctionCall, VerificationLevel::Standard);
-        record_global_operation(
-            OperationType::CollectionValidate,
-            VerificationLevel::Standard,
-        );
+        record_global_operation(OperationType::CollectionValidate, VerificationLevel::Standard);
 
         // Get global summary
         let summary = global_operation_summary();

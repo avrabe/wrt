@@ -9,6 +9,11 @@ use crate::prelude::*;
 use wrt_runtime::Memory;
 use wrt_types::resource::ResourceOperation as FormatResourceOperation;
 
+// Import error kinds from wrt-error
+use wrt_error::kinds::{
+    InvalidValue, NotImplementedError, OutOfBoundsAccess, ValueOutOfRangeError,
+};
+
 // Maximum allowed allocation size for safety
 const MAX_BUFFER_SIZE: usize = 10 * 1024 * 1024; // 10MB
 
@@ -144,10 +149,14 @@ impl CanonicalABI {
         } else {
             // For now, return a "not implemented" error
             // This simplified implementation focuses on basic types
-            Err(Error::new(kinds::NotImplementedError(format!(
-                "Lowering value {:?} not implemented in simplified implementation",
-                value
-            ))))
+            Err(Error::new(
+                ErrorCategory::Runtime,
+                codes::NOT_IMPLEMENTED,
+                NotImplementedError(format!(
+                    "Lowering value {:?} not implemented in simplified implementation",
+                    value
+                )),
+            ))
         }
     }
 
@@ -165,9 +174,11 @@ impl CanonicalABI {
                 if let Some(v) = value.as_i32() {
                     return Ok(wrt_types::values::Value::I32(if v != 0 { 1 } else { 0 }));
                 }
-                Err(Error::new(kinds::TypeMismatchError(
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
                     "Expected i32 for bool".to_string(),
-                )))
+                ))
             }
             ValType::S8
             | ValType::U8
@@ -179,10 +190,14 @@ impl CanonicalABI {
             ValType::F32 => self.lift_f32(addr, memory_bytes),
             ValType::F64 => self.lift_f64(addr, memory_bytes),
             // For all other types, return a not implemented error for now
-            _ => Err(Error::new(kinds::NotImplementedError(format!(
-                "Lifting type {:?} is not implemented in simplified version",
-                ty
-            )))),
+            _ => Err(Error::new(
+                ErrorCategory::Runtime,
+                codes::NOT_IMPLEMENTED,
+                NotImplementedError(format!(
+                    "Lifting type {:?} is not implemented in simplified version",
+                    ty
+                )),
+            )),
         }
     }
 
@@ -293,11 +308,11 @@ impl CanonicalABI {
             let v = memory_bytes[addr as usize] != 0;
             Ok(Value::Bool(v))
         } else {
-            Err(Error::new(kinds::OutOfBoundsAccess(format!(
-                "Address {} out of bounds for memory of size {}",
-                addr,
-                memory_bytes.len()
-            ))))
+            Err(Error::new(
+                ErrorCategory::Runtime,
+                codes::OUT_OF_BOUNDS_ERROR,
+                format!("Address {} out of bounds for memory of size {}", addr, memory_bytes.len()),
+            ))
         }
     }
 
@@ -306,11 +321,11 @@ impl CanonicalABI {
             let v = memory_bytes[addr as usize] as i8;
             Ok(Value::S8(v))
         } else {
-            Err(Error::new(kinds::OutOfBoundsAccess(format!(
-                "Address {} out of bounds for memory of size {}",
-                addr,
-                memory_bytes.len()
-            ))))
+            Err(Error::new(
+                ErrorCategory::Runtime,
+                codes::OUT_OF_BOUNDS_ERROR,
+                format!("Address {} out of bounds for memory of size {}", addr, memory_bytes.len()),
+            ))
         }
     }
 
@@ -319,11 +334,11 @@ impl CanonicalABI {
             let v = memory_bytes[addr as usize];
             Ok(Value::U8(v))
         } else {
-            Err(Error::new(kinds::OutOfBoundsAccess(format!(
-                "Address {} out of bounds for memory of size {}",
-                addr,
-                memory_bytes.len()
-            ))))
+            Err(Error::new(
+                ErrorCategory::Runtime,
+                codes::OUT_OF_BOUNDS_ERROR,
+                format!("Address {} out of bounds for memory of size {}", addr, memory_bytes.len()),
+            ))
         }
     }
 
@@ -441,10 +456,11 @@ impl CanonicalABI {
 
         match char::from_u32(code_point) {
             Some(c) => Ok(Value::Char(c)),
-            None => Err(Error::new(kinds::InvalidValue(format!(
-                "Invalid UTF-8 code point: {}",
-                code_point
-            )))),
+            None => Err(Error::new(
+                ErrorCategory::Runtime,
+                codes::INVALID_TYPE,
+                format!("Invalid UTF-8 code point: {}", code_point),
+            )),
         }
     }
 
@@ -470,10 +486,11 @@ impl CanonicalABI {
         // Convert to a Rust string
         match std::str::from_utf8(string_bytes) {
             Ok(s) => Ok(Value::String(s.to_string())),
-            Err(e) => Err(Error::new(kinds::InvalidValue(format!(
-                "Invalid UTF-8 string: {}",
-                e
-            )))),
+            Err(e) => Err(Error::new(
+                ErrorCategory::Runtime,
+                codes::INVALID_TYPE,
+                format!("Invalid UTF-8 string: {}", e),
+            )),
         }
     }
 
@@ -486,9 +503,11 @@ impl CanonicalABI {
         _memory_bytes: &[u8],
     ) -> Result<Value> {
         // Placeholder implementation
-        Err(Error::new(kinds::NotImplementedError(
-            "List lifting not yet implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("List lifting not yet implemented".to_string()),
+        ))
     }
 
     fn lift_record(
@@ -499,9 +518,11 @@ impl CanonicalABI {
         _memory_bytes: &[u8],
     ) -> Result<Value> {
         // Placeholder implementation
-        Err(Error::new(kinds::NotImplementedError(
-            "Record lifting not yet implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Record lifting not yet implemented".to_string()),
+        ))
     }
 
     fn lift_variant(
@@ -519,10 +540,11 @@ impl CanonicalABI {
 
         // Check if the discriminant is valid
         if discriminant as usize >= cases.len() {
-            return Err(Error::new(kinds::InvalidValue(format!(
-                "Invalid variant discriminant: {}",
-                discriminant
-            ))));
+            return Err(Error::new(
+                ErrorCategory::Runtime,
+                codes::INVALID_TYPE,
+                format!("Invalid variant discriminant: {}", discriminant),
+            ));
         }
 
         let case_info = &cases[discriminant as usize];
@@ -534,24 +556,20 @@ impl CanonicalABI {
             let payload =
                 self.lift_value(payload_type, payload_addr, resource_table, memory_bytes)?;
 
-            Ok(Value::Variant {
-                case: discriminant as u32,
-                value: Box::new(payload),
-            })
+            Ok(Value::Variant { case: discriminant as u32, value: Box::new(payload) })
         } else {
             // No payload for this case
-            Ok(Value::Variant {
-                case: discriminant as u32,
-                value: Box::new(Value::Void),
-            })
+            Ok(Value::Variant { case: discriminant as u32, value: Box::new(Value::Void) })
         }
     }
 
     fn lift_enum(&self, _cases: &Vec<String>, _addr: u32, _memory_bytes: &[u8]) -> Result<Value> {
         // Placeholder implementation
-        Err(Error::new(kinds::NotImplementedError(
-            "Enum lifting not yet implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Enum lifting not yet implemented".to_string()),
+        ))
     }
 
     fn lift_option(
@@ -562,9 +580,11 @@ impl CanonicalABI {
         _memory_bytes: &[u8],
     ) -> Result<Value> {
         // Placeholder implementation
-        Err(Error::new(kinds::NotImplementedError(
-            "Option lifting not yet implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Option lifting not yet implemented".to_string()),
+        ))
     }
 
     fn lift_result(
@@ -576,9 +596,11 @@ impl CanonicalABI {
         _memory_bytes: &[u8],
     ) -> Result<Value> {
         // Placeholder implementation
-        Err(Error::new(kinds::NotImplementedError(
-            "Result lifting not yet implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Result lifting not yet implemented".to_string()),
+        ))
     }
 
     // Primitive lowering operations
@@ -587,11 +609,11 @@ impl CanonicalABI {
             memory_bytes[addr as usize] = if value { 1 } else { 0 };
             Ok(())
         } else {
-            Err(Error::new(kinds::OutOfBoundsAccess(format!(
-                "Address {} out of bounds for memory of size {}",
-                addr,
-                memory_bytes.len()
-            ))))
+            Err(Error::new(
+                ErrorCategory::Runtime,
+                codes::OUT_OF_BOUNDS_ERROR,
+                format!("Address {} out of bounds for memory of size {}", addr, memory_bytes.len()),
+            ))
         }
     }
 
@@ -600,11 +622,11 @@ impl CanonicalABI {
             memory_bytes[addr as usize] = value as u8;
             Ok(())
         } else {
-            Err(Error::new(kinds::OutOfBoundsAccess(format!(
-                "Address {} out of bounds for memory of size {}",
-                addr,
-                memory_bytes.len()
-            ))))
+            Err(Error::new(
+                ErrorCategory::Runtime,
+                codes::OUT_OF_BOUNDS_ERROR,
+                format!("Address {} out of bounds for memory of size {}", addr, memory_bytes.len()),
+            ))
         }
     }
 
@@ -613,11 +635,11 @@ impl CanonicalABI {
             memory_bytes[addr as usize] = value;
             Ok(())
         } else {
-            Err(Error::new(kinds::OutOfBoundsAccess(format!(
-                "Address {} out of bounds for memory of size {}",
-                addr,
-                memory_bytes.len()
-            ))))
+            Err(Error::new(
+                ErrorCategory::Runtime,
+                codes::OUT_OF_BOUNDS_ERROR,
+                format!("Address {} out of bounds for memory of size {}", addr, memory_bytes.len()),
+            ))
         }
     }
 
@@ -728,9 +750,11 @@ impl CanonicalABI {
         _memory_bytes: &mut [u8],
     ) -> Result<()> {
         // Implementation details
-        Err(Error::new(kinds::NotImplementedError(
-            "Lower list not implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Lower list not implemented".to_string()),
+        ))
     }
 
     fn lower_record(
@@ -741,9 +765,11 @@ impl CanonicalABI {
         _memory_bytes: &mut [u8],
     ) -> Result<()> {
         // Placeholder implementation
-        Err(Error::new(kinds::NotImplementedError(
-            "Record lowering not yet implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Record lowering not yet implemented".to_string()),
+        ))
     }
 
     fn lower_variant(
@@ -755,16 +781,20 @@ impl CanonicalABI {
         _memory_bytes: &mut [u8],
     ) -> Result<()> {
         // Implementation details
-        Err(Error::new(kinds::NotImplementedError(
-            "Lower variant not implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Lower variant not implemented".to_string()),
+        ))
     }
 
     fn lower_enum(&self, _idx: u32, _addr: u32, _memory_bytes: &mut [u8]) -> Result<()> {
         // Placeholder implementation
-        Err(Error::new(kinds::NotImplementedError(
-            "Enum lowering not yet implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Enum lowering not yet implemented".to_string()),
+        ))
     }
 
     fn lower_option(
@@ -775,9 +805,11 @@ impl CanonicalABI {
         _memory_bytes: &mut [u8],
     ) -> Result<()> {
         // Placeholder implementation
-        Err(Error::new(kinds::NotImplementedError(
-            "Option lowering not yet implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Option lowering not yet implemented".to_string()),
+        ))
     }
 
     fn lower_result(
@@ -788,9 +820,11 @@ impl CanonicalABI {
         _memory_bytes: &mut [u8],
     ) -> Result<()> {
         // Placeholder implementation
-        Err(Error::new(kinds::NotImplementedError(
-            "Result lowering not yet implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Result lowering not yet implemented".to_string()),
+        ))
     }
 
     fn lower_tuple(
@@ -801,9 +835,11 @@ impl CanonicalABI {
         _memory_bytes: &mut [u8],
     ) -> Result<()> {
         // Implementation details
-        Err(Error::new(kinds::NotImplementedError(
-            "Lower tuple not implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Lower tuple not implemented".to_string()),
+        ))
     }
 
     fn lower_flags(
@@ -813,9 +849,11 @@ impl CanonicalABI {
         _memory_bytes: &mut [u8],
     ) -> Result<()> {
         // Placeholder implementation
-        Err(Error::new(kinds::NotImplementedError(
-            "Flags lowering not yet implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Flags lowering not yet implemented".to_string()),
+        ))
     }
 
     fn lower_resource(
@@ -826,9 +864,11 @@ impl CanonicalABI {
         _memory_bytes: &mut [u8],
     ) -> Result<()> {
         // Placeholder implementation
-        Err(Error::new(kinds::NotImplementedError(
-            "Resource lowering not yet implemented".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::NOT_IMPLEMENTED,
+            NotImplementedError("Resource lowering not yet implemented".to_string()),
+        ))
     }
 
     // Utility functions
@@ -953,43 +993,30 @@ mod tests {
             }
 
             fn clone_strategy(&self) -> Arc<dyn wrt_intercept::LinkInterceptorStrategy> {
-                Arc::new(Self {
-                    memory_strategy: self.memory_strategy,
-                })
+                Arc::new(Self { memory_strategy: self.memory_strategy })
             }
         }
 
         // Test with no interceptor
         let abi = CanonicalABI::default().with_memory_strategy(MemoryStrategy::ZeroCopy);
-        assert_eq!(
-            abi.get_strategy_from_interceptor(),
-            MemoryStrategy::ZeroCopy
-        );
+        assert_eq!(abi.get_strategy_from_interceptor(), MemoryStrategy::ZeroCopy);
 
         // Test with interceptor that returns None
         let interceptor = Arc::new(wrt_intercept::LinkInterceptor::new("test"));
         let abi = CanonicalABI::default()
             .with_memory_strategy(MemoryStrategy::ZeroCopy)
             .with_interceptor(interceptor);
-        assert_eq!(
-            abi.get_strategy_from_interceptor(),
-            MemoryStrategy::ZeroCopy
-        );
+        assert_eq!(abi.get_strategy_from_interceptor(), MemoryStrategy::ZeroCopy);
 
         // Test with interceptor that returns Some strategy
-        let strategy = Arc::new(TestStrategy {
-            memory_strategy: Some(1),
-        });
+        let strategy = Arc::new(TestStrategy { memory_strategy: Some(1) });
         let mut interceptor = wrt_intercept::LinkInterceptor::new("test");
         interceptor.add_strategy(strategy);
 
         let abi = CanonicalABI::default()
             .with_memory_strategy(MemoryStrategy::ZeroCopy)
             .with_interceptor(Arc::new(interceptor));
-        assert_eq!(
-            abi.get_strategy_from_interceptor(),
-            MemoryStrategy::BoundedCopy
-        );
+        assert_eq!(abi.get_strategy_from_interceptor(), MemoryStrategy::BoundedCopy);
     }
 }
 
@@ -1018,9 +1045,11 @@ pub fn convert_value_for_canonical_abi(
             if let Some(b) = value.as_bool() {
                 Ok(wrt_types::values::Value::Bool(b))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected boolean value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected boolean value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::S8 => {
@@ -1030,15 +1059,18 @@ pub fn convert_value_for_canonical_abi(
                 if i >= i8::MIN as i32 && i <= i8::MAX as i32 {
                     Ok(wrt_types::values::Value::S8(i as i8))
                 } else {
-                    Err(Error::new(kinds::ValueOutOfRangeError(format!(
-                        "Value {} is out of range for i8",
-                        i
-                    ))))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::VALUE_OUT_OF_RANGE,
+                        ValueOutOfRangeError(format!("Value {} is out of range for i8", i)),
+                    ))
                 }
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected i8-compatible value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected i8-compatible value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::U8 => {
@@ -1048,15 +1080,18 @@ pub fn convert_value_for_canonical_abi(
                 if i >= 0 && i <= u8::MAX as i32 {
                     Ok(wrt_types::values::Value::U8(i as u8))
                 } else {
-                    Err(Error::new(kinds::ValueOutOfRangeError(format!(
-                        "Value {} is out of range for u8",
-                        i
-                    ))))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::VALUE_OUT_OF_RANGE,
+                        ValueOutOfRangeError(format!("Value {} is out of range for u8", i)),
+                    ))
                 }
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected u8-compatible value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected u8-compatible value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::S16 => {
@@ -1066,15 +1101,18 @@ pub fn convert_value_for_canonical_abi(
                 if i >= i16::MIN as i32 && i <= i16::MAX as i32 {
                     Ok(wrt_types::values::Value::S16(i as i16))
                 } else {
-                    Err(Error::new(kinds::ValueOutOfRangeError(format!(
-                        "Value {} is out of range for i16",
-                        i
-                    ))))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::VALUE_OUT_OF_RANGE,
+                        ValueOutOfRangeError(format!("Value {} is out of range for i16", i)),
+                    ))
                 }
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected i16-compatible value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected i16-compatible value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::U16 => {
@@ -1084,15 +1122,18 @@ pub fn convert_value_for_canonical_abi(
                 if i >= 0 && i <= u16::MAX as i32 {
                     Ok(wrt_types::values::Value::U16(i as u16))
                 } else {
-                    Err(Error::new(kinds::ValueOutOfRangeError(format!(
-                        "Value {} is out of range for u16",
-                        i
-                    ))))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::VALUE_OUT_OF_RANGE,
+                        ValueOutOfRangeError(format!("Value {} is out of range for u16", i)),
+                    ))
                 }
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected u16-compatible value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected u16-compatible value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::S32 => {
@@ -1102,15 +1143,18 @@ pub fn convert_value_for_canonical_abi(
                 if v >= i32::MIN as i64 && v <= i32::MAX as i64 {
                     Ok(wrt_types::values::Value::S32(v as i32))
                 } else {
-                    Err(Error::new(kinds::ValueOutOfRangeError(format!(
-                        "Value {} is out of range for i32",
-                        v
-                    ))))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::VALUE_OUT_OF_RANGE,
+                        ValueOutOfRangeError(format!("Value {} is out of range for i32", v)),
+                    ))
                 }
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected i32-compatible value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected i32-compatible value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::U32 => {
@@ -1120,15 +1164,18 @@ pub fn convert_value_for_canonical_abi(
                 if i >= 0 && i <= u32::MAX as i64 {
                     Ok(wrt_types::values::Value::U32(i as u32))
                 } else {
-                    Err(Error::new(kinds::ValueOutOfRangeError(format!(
-                        "Value {} is out of range for u32",
-                        i
-                    ))))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::VALUE_OUT_OF_RANGE,
+                        ValueOutOfRangeError(format!("Value {} is out of range for u32", i)),
+                    ))
                 }
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected u32-compatible value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected u32-compatible value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::S64 => {
@@ -1137,9 +1184,11 @@ pub fn convert_value_for_canonical_abi(
             } else if let Some(v) = value.as_i32() {
                 Ok(wrt_types::values::Value::S64(v as i64))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected i64-compatible value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected i64-compatible value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::U64 => {
@@ -1149,15 +1198,18 @@ pub fn convert_value_for_canonical_abi(
                 if i >= 0 {
                     Ok(wrt_types::values::Value::U64(i as u64))
                 } else {
-                    Err(Error::new(kinds::ValueOutOfRangeError(format!(
-                        "Value {} is out of range for u64",
-                        i
-                    ))))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::VALUE_OUT_OF_RANGE,
+                        ValueOutOfRangeError(format!("Value {} is out of range for u64", i)),
+                    ))
                 }
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected u64-compatible value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected u64-compatible value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::F32 => {
@@ -1170,9 +1222,11 @@ pub fn convert_value_for_canonical_abi(
             } else if let Some(v) = value.as_i64() {
                 Ok(wrt_types::values::Value::F32(v as f32))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Cannot convert to f32".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Cannot convert to f32".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::F64 => {
@@ -1185,9 +1239,11 @@ pub fn convert_value_for_canonical_abi(
             } else if let Some(v) = value.as_i64() {
                 Ok(wrt_types::values::Value::F64(v as f64))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Cannot convert to f64".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Cannot convert to f64".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::Char => {
@@ -1197,24 +1253,32 @@ pub fn convert_value_for_canonical_abi(
                 if let Some(c) = char::from_u32(i as u32) {
                     Ok(wrt_types::values::Value::Char(c))
                 } else {
-                    Err(Error::new(kinds::ValueOutOfRangeError(format!(
-                        "Value {} is not a valid Unicode scalar value",
-                        i
-                    ))))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::VALUE_OUT_OF_RANGE,
+                        ValueOutOfRangeError(format!(
+                            "Value {} is not a valid Unicode scalar value",
+                            i
+                        )),
+                    ))
                 }
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected char-compatible value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected char-compatible value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::String => {
             if let Some(s) = value.as_str() {
                 Ok(wrt_types::values::Value::String(s.to_string()))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected string value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected string value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::List(inner_type) => {
@@ -1226,9 +1290,11 @@ pub fn convert_value_for_canonical_abi(
                 }
                 Ok(wrt_types::values::Value::List(converted_list))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected list value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected list value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::Record(fields) => {
@@ -1240,27 +1306,34 @@ pub fn convert_value_for_canonical_abi(
                             convert_value_for_canonical_abi(field_value, field_type)?;
                         converted_record.insert(field_name.clone(), converted_field);
                     } else {
-                        return Err(Error::new(kinds::TypeMismatchError(format!(
-                            "Missing required field '{}'",
-                            field_name
-                        ))));
+                        return Err(Error::new(
+                            ErrorCategory::Runtime,
+                            codes::TYPE_MISMATCH,
+                            NotImplementedError(format!("Missing required field '{}'", field_name)),
+                        ));
                     }
                 }
                 Ok(wrt_types::values::Value::Record(converted_record))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected record value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected record value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::Tuple(types) => {
             if let Some(tuple) = value.as_tuple() {
                 if tuple.len() != types.len() {
-                    return Err(Error::new(kinds::TypeMismatchError(format!(
-                        "Expected tuple of length {}, got length {}",
-                        types.len(),
-                        tuple.len()
-                    ))));
+                    return Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::TYPE_MISMATCH,
+                        NotImplementedError(format!(
+                            "Expected tuple of length {}, got length {}",
+                            types.len(),
+                            tuple.len()
+                        )),
+                    ));
                 }
                 let mut converted_tuple = Vec::new();
                 for (item, item_type) in tuple.iter().zip(types.iter()) {
@@ -1269,9 +1342,11 @@ pub fn convert_value_for_canonical_abi(
                 }
                 Ok(wrt_types::values::Value::Tuple(converted_tuple))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected tuple value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected tuple value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::Flags(names) => {
@@ -1279,19 +1354,21 @@ pub fn convert_value_for_canonical_abi(
                 // Verify all required flags are present
                 for name in names {
                     if !flags.contains_key(name) {
-                        return Err(Error::new(kinds::TypeMismatchError(format!(
-                            "Missing required flag '{}'",
-                            name
-                        ))));
+                        return Err(Error::new(
+                            ErrorCategory::Runtime,
+                            codes::TYPE_MISMATCH,
+                            NotImplementedError(format!("Missing required flag '{}'", name)),
+                        ));
                     }
                 }
                 // Verify no extra flags are present
                 for name in flags.keys() {
                     if !names.contains(name) {
-                        return Err(Error::new(kinds::TypeMismatchError(format!(
-                            "Unexpected flag '{}'",
-                            name
-                        ))));
+                        return Err(Error::new(
+                            ErrorCategory::Runtime,
+                            codes::TYPE_MISMATCH,
+                            NotImplementedError(format!("Unexpected flag '{}'", name)),
+                        ));
                     }
                 }
                 // Convert all flag values to booleans
@@ -1300,36 +1377,42 @@ pub fn convert_value_for_canonical_abi(
                     if let Some(b) = value.as_bool() {
                         converted_flags.insert(name.clone(), b);
                     } else {
-                        return Err(Error::new(kinds::TypeMismatchError(format!(
-                            "Flag '{}' must be a boolean value",
-                            name
-                        ))));
+                        return Err(Error::new(
+                            ErrorCategory::Runtime,
+                            codes::TYPE_MISMATCH,
+                            NotImplementedError("Flag '{}' must be a boolean value".to_string()),
+                        ));
                     }
                 }
                 Ok(wrt_types::values::Value::Flags(converted_flags))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected flags value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected flags value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::Variant(cases) => {
             if let Some((discriminant, payload)) = value.as_variant() {
                 if discriminant < cases.len() as u32 {
-                    Ok(wrt_types::values::Value::Variant(
-                        discriminant,
-                        payload.map(Box::new),
-                    ))
+                    Ok(wrt_types::values::Value::Variant(discriminant, payload.map(Box::new)))
                 } else {
-                    Err(Error::new(kinds::ValueOutOfRangeError(format!(
-                        "Invalid variant discriminant: {}",
-                        discriminant
-                    ))))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::VALUE_OUT_OF_RANGE,
+                        ValueOutOfRangeError(format!(
+                            "Invalid variant discriminant: {}",
+                            discriminant
+                        )),
+                    ))
                 }
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Expected variant value".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Expected variant value".to_string()),
+                ))
             }
         }
         wrt_types::component_value::ValType::Void => Ok(wrt_types::values::Value::Void),
@@ -1347,9 +1430,11 @@ fn get_number_value(value: &wrt_types::values::Value) -> Result<i64> {
     } else if let Some(v) = value.as_u32() {
         Ok(v as i64)
     } else {
-        Err(Error::new(kinds::TypeMismatchError(
-            "Expected a numeric value".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::TYPE_MISMATCH,
+            NotImplementedError("Expected a numeric value".to_string()),
+        ))
     }
 }
 
@@ -1364,9 +1449,11 @@ fn get_float_value(value: &wrt_types::values::Value) -> Result<f64> {
     } else if let Some(v) = value.as_i64() {
         Ok(v as f64)
     } else {
-        Err(Error::new(kinds::TypeMismatchError(
-            "Expected a numeric or float value".to_string(),
-        )))
+        Err(Error::new(
+            ErrorCategory::Runtime,
+            codes::TYPE_MISMATCH,
+            NotImplementedError("Expected a numeric or float value".to_string()),
+        ))
     }
 }
 
@@ -1382,9 +1469,11 @@ pub fn convert_value_for_type(
             } else if let Ok(num) = get_number_value(value) {
                 Ok(wrt_types::values::Value::I32(if num != 0 { 1 } else { 0 }))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Cannot convert to bool".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Cannot convert to bool".to_string()),
+                ))
             }
         }
         ValType::S8 | ValType::U8 | ValType::S16 | ValType::U16 | ValType::S32 | ValType::U32 => {
@@ -1394,30 +1483,38 @@ pub fn convert_value_for_type(
                 if v >= i32::MIN as i64 && v <= i32::MAX as i64 {
                     Ok(wrt_types::values::Value::I32(v as i32))
                 } else {
-                    Err(Error::new(kinds::OutOfBoundsError(
-                        "Value out of range for i32".to_string(),
-                    )))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::OUT_OF_BOUNDS_ERROR,
+                        OutOfBoundsAccess(format!("Value out of range for i32")),
+                    ))
                 }
             } else if let Some(v) = value.as_f32() {
                 if v >= i32::MIN as f32 && v <= i32::MAX as f32 {
                     Ok(wrt_types::values::Value::I32(v as i32))
                 } else {
-                    Err(Error::new(kinds::OutOfBoundsError(
-                        "Value out of range for i32".to_string(),
-                    )))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::OUT_OF_BOUNDS_ERROR,
+                        OutOfBoundsAccess(format!("Value out of range for i32")),
+                    ))
                 }
             } else if let Some(v) = value.as_f64() {
                 if v >= i32::MIN as f64 && v <= i32::MAX as f64 {
                     Ok(wrt_types::values::Value::I32(v as i32))
                 } else {
-                    Err(Error::new(kinds::OutOfBoundsError(
-                        "Value out of range for i32".to_string(),
-                    )))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::OUT_OF_BOUNDS_ERROR,
+                        OutOfBoundsAccess(format!("Value out of range for i32")),
+                    ))
                 }
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Cannot convert to i32".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Cannot convert to i32".to_string()),
+                ))
             }
         }
         ValType::S64 | ValType::U64 => {
@@ -1429,22 +1526,28 @@ pub fn convert_value_for_type(
                 if v >= i64::MIN as f32 && v <= i64::MAX as f32 {
                     Ok(wrt_types::values::Value::I64(v as i64))
                 } else {
-                    Err(Error::new(kinds::OutOfBoundsError(
-                        "Value out of range for i64".to_string(),
-                    )))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::OUT_OF_BOUNDS_ERROR,
+                        OutOfBoundsAccess(format!("Value out of range for i64")),
+                    ))
                 }
             } else if let Some(v) = value.as_f64() {
                 if v >= i64::MIN as f64 && v <= i64::MAX as f64 {
                     Ok(wrt_types::values::Value::I64(v as i64))
                 } else {
-                    Err(Error::new(kinds::OutOfBoundsError(
-                        "Value out of range for i64".to_string(),
-                    )))
+                    Err(Error::new(
+                        ErrorCategory::Runtime,
+                        codes::OUT_OF_BOUNDS_ERROR,
+                        OutOfBoundsAccess(format!("Value out of range for i64")),
+                    ))
                 }
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Cannot convert to i64".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Cannot convert to i64".to_string()),
+                ))
             }
         }
         ValType::F32 => {
@@ -1458,9 +1561,11 @@ pub fn convert_value_for_type(
             } else if let Some(v) = value.as_i64() {
                 Ok(wrt_types::values::Value::F32(v as f32))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Cannot convert to f32".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Cannot convert to f32".to_string()),
+                ))
             }
         }
         ValType::F64 => {
@@ -1473,9 +1578,11 @@ pub fn convert_value_for_type(
             } else if let Some(v) = value.as_i64() {
                 Ok(wrt_types::values::Value::F64(v as f64))
             } else {
-                Err(Error::new(kinds::TypeMismatchError(
-                    "Cannot convert to f64".to_string(),
-                )))
+                Err(Error::new(
+                    ErrorCategory::Runtime,
+                    codes::TYPE_MISMATCH,
+                    NotImplementedError("Cannot convert to f64".to_string()),
+                ))
             }
         }
         // For all other types, just return the original value for now

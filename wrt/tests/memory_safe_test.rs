@@ -13,12 +13,7 @@ use wrt_types::{types::Limits, verification::VerificationLevel};
 #[test]
 fn test_safe_memory_adapter() {
     // Create a memory instance
-    let memory_type = MemoryType {
-        limits: Limits {
-            min: 1,
-            max: Some(2),
-        },
-    };
+    let memory_type = MemoryType { limits: Limits { min: 1, max: Some(2) } };
     let memory = Arc::new(Memory::new(memory_type).unwrap());
 
     // Create a SafeMemoryAdapter
@@ -42,12 +37,7 @@ fn test_safe_memory_adapter() {
 #[test]
 fn test_safe_memory_adapter_verification_levels() {
     // Create a memory instance
-    let memory_type = MemoryType {
-        limits: Limits {
-            min: 1,
-            max: Some(2),
-        },
-    };
+    let memory_type = MemoryType { limits: Limits { min: 1, max: Some(2) } };
     let memory = Arc::new(Memory::new(memory_type).unwrap());
 
     // Create adapters with different verification levels
@@ -83,9 +73,7 @@ fn test_stackless_engine_memory_validation() {
     assert!(engine.check_memory_bounds(instance_idx, 0, 0, 100).is_ok());
 
     // Out of bounds access should fail
-    assert!(engine
-        .check_memory_bounds(instance_idx, 0, 65536, 100)
-        .is_err());
+    assert!(engine.check_memory_bounds(instance_idx, 0, 65536, 100).is_err());
 }
 
 #[test]

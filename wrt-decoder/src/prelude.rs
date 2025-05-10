@@ -52,8 +52,8 @@ pub use alloc::{
 pub use core::result::Result as StdResult;
 
 // Import synchronization primitives for no_std
-#[cfg(not(feature = "std"))]
-pub use wrt_sync::{Mutex, RwLock};
+//#[cfg(not(feature = "std"))]
+//pub use wrt_sync::{Mutex, RwLock};
 
 // Re-export from wrt-error
 pub use wrt_error::{codes, kinds, Error, ErrorCategory, Result};
@@ -66,6 +66,7 @@ pub use wrt_types::{
     safe_memory::{SafeMemoryHandler, SafeSlice, SafeStack},
     // Types
     types::{BlockType, FuncType, GlobalType, MemoryType, RefType, TableType, ValueType},
+    values::Value,
 };
 
 // Re-export from wrt-format
@@ -79,7 +80,7 @@ pub use wrt_format::{
     // Conversion utilities
     conversion::{
         block_type_to_format_block_type, format_block_type_to_block_type, parse_value_type,
-        value_type_to_byte,
+        format_value_type as value_type_to_byte,
     },
     // Module types
     module::{
@@ -94,9 +95,7 @@ pub use wrt_format::{
 
 // Conversion utilities from wrt-types
 #[cfg(feature = "conversion")]
-pub use wrt_types::conversion::{
-    binary_to_val_type, ref_type_to_val_type, val_type_to_binary, val_type_to_ref_type,
-};
+pub use wrt_types::conversion::{ref_type_to_val_type, val_type_to_ref_type};
 
 // Re-export from this crate
 pub use crate::{

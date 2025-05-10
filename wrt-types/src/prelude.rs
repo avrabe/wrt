@@ -1,3 +1,11 @@
+// WRT - wrt-types
+// Module: Prelude for Common Imports
+// SW-REQ-ID: N/A (Prelude, not directly implementing a specific requirement)
+//
+// Copyright (c) 2024 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
 //! Prelude module for wrt-types
 //!
 //! This module provides a unified set of imports for both std and no_std environments.
@@ -42,29 +50,36 @@ pub use alloc::{
     vec::Vec,
 };
 
-// Import synchronization primitives for no_std
-#[cfg(not(feature = "std"))]
-pub use wrt_sync::{Mutex, RwLock};
-
 // Re-export from wrt-error
 pub use wrt_error::{codes, kinds, Error, ErrorCategory, Result};
 
 // Re-export from this crate
 pub use crate::{
     // Bounded collections
-    bounded::{BoundedStack, BoundedVec},
+    bounded::{BoundedStack, BoundedVec, CapacityError},
+    // Builtin types
+    builtin::BuiltinType,
     // Component model types
+    component::{ComponentType, ExternType, InstanceType, Limits, Namespace, ResourceType},
     component_value::{ComponentValue, ValType},
+    // Conversion utilities
+    conversion::{ref_type_to_val_type, val_type_to_ref_type},
     // Resource types
     resource::ResourceOperation,
-    // Common types
-    types::{BlockType, FuncType, GlobalType, MemoryType, TableType, ValueType},
-    values::Value,
+    // Safe memory types (SafeMemoryHandler, SafeSlice, SafeStack are already here from direct re-exports)
+    // Sections (SectionId, SectionType, Section are usually handled by decoder)
+    // Traits
+    traits::{FromFormat, ToFormat},
+    // Common types (BlockType, FuncType, GlobalType, MemoryType, TableType, ValueType are already here)
+    types::{BlockType, FuncType, GlobalType, MemoryType, RefType, TableType, ValueType},
+    // Validation traits
+    validation::{BoundedCapacity, Checksummed, Validatable},
+    // Value representations
+    values::{FloatBits32, FloatBits64, Value},
     // Verification types
-    verification::VerificationLevel,
-    ResourceType,
+    verification::{Checksum, VerificationLevel},
+    // Direct re-exports for convenience (original list)
+    // ResourceType, // Already covered by component::* above
     SafeMemoryHandler,
     SafeSlice,
-    // Direct re-exports
-    SafeStack,
 };

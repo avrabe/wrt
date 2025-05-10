@@ -62,10 +62,7 @@ pub mod kani_verification {
     #[cfg_attr(kani, kani::proof)]
     pub fn verify_memory_limits() {
         // Create valid limits
-        let limits = Limits {
-            min: 1,
-            max: Some(2),
-        };
+        let limits = Limits { min: 1, max: Some(2) };
 
         // Basic validation
         assert!(limits.max.unwrap() >= limits.min);

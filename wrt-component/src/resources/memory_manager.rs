@@ -15,10 +15,7 @@ pub struct MemoryManager {
 impl MemoryManager {
     /// Create a new memory manager with the specified default strategy
     pub fn new(default_strategy: MemoryStrategy) -> Self {
-        Self {
-            default_strategy,
-            resource_strategies: HashMap::new(),
-        }
+        Self { default_strategy, resource_strategies: HashMap::new() }
     }
 
     /// Register a resource with a specific memory strategy
@@ -29,10 +26,7 @@ impl MemoryManager {
     ) -> Result<()> {
         // Verify the resource exists
         if !resource_manager.has_resource(id) {
-            return Err(Error::new(format!(
-                "Cannot register non-existent resource: {:?}",
-                id
-            )));
+            return Err(Error::new(format!("Cannot register non-existent resource: {:?}", id)));
         }
 
         // Register with the default strategy
@@ -50,10 +44,7 @@ impl MemoryManager {
     ) -> Result<()> {
         // Verify the resource exists
         if !resource_manager.has_resource(id) {
-            return Err(Error::new(format!(
-                "Cannot register non-existent resource: {:?}",
-                id
-            )));
+            return Err(Error::new(format!("Cannot register non-existent resource: {:?}", id)));
         }
 
         // Register with the specified strategy
@@ -65,11 +56,7 @@ impl MemoryManager {
     /// Get access to memory for a resource
     pub fn get_memory(&self, id: ResourceId, operation: ResourceOperation) -> Result<Vec<u8>> {
         // Get the strategy for this resource
-        let strategy = self
-            .resource_strategies
-            .get(&id)
-            .copied()
-            .unwrap_or(self.default_strategy);
+        let strategy = self.resource_strategies.get(&id).copied().unwrap_or(self.default_strategy);
 
         // For the test implementation, we'll just create some dummy data
         // In a real implementation, we would access the actual resource data
@@ -108,19 +95,14 @@ mod tests {
         let id = resource_manager.add_host_resource(vec![1, 2, 3, 4, 5]);
 
         // Register with memory manager
-        memory_manager
-            .register_resource(id, &resource_manager)
-            .unwrap();
+        memory_manager.register_resource(id, &resource_manager).unwrap();
 
         // Check strategy
         assert_eq!(memory_manager.get_strategy(id), Some(MemoryStrategy::Copy));
 
         // Change strategy
         memory_manager.set_strategy(id, MemoryStrategy::Reference);
-        assert_eq!(
-            memory_manager.get_strategy(id),
-            Some(MemoryStrategy::Reference)
-        );
+        assert_eq!(memory_manager.get_strategy(id), Some(MemoryStrategy::Reference));
     }
 
     #[test]

@@ -1,3 +1,11 @@
+// WRT - wrt-types
+// Module: WebAssembly Section Definitions
+// SW-REQ-ID: REQ_WASM_CORE_003 (Example: Relates to Wasm binary format structure)
+//
+// Copyright (c) 2024 Ralf Anton Beier
+// Licensed under the MIT license.
+// SPDX-License-Identifier: MIT
+
 //! Module representing WASM module sections with built-in
 //! safety verification built in.
 
@@ -54,23 +62,17 @@ impl SectionId {
             11 => Ok(Self::Data),
             12 => Ok(Self::DataCount),
             #[cfg(feature = "std")]
-            _ => Err(Error::new(
-                ErrorCategory::Validation,
-                codes::PARSE_ERROR,
-                "Invalid section id",
-            )),
+            _ => {
+                Err(Error::new(ErrorCategory::Validation, codes::PARSE_ERROR, "Invalid section id"))
+            }
             #[cfg(all(not(feature = "std"), feature = "alloc"))]
-            _ => Err(Error::new(
-                ErrorCategory::Validation,
-                codes::PARSE_ERROR,
-                "Invalid section id",
-            )),
+            _ => {
+                Err(Error::new(ErrorCategory::Validation, codes::PARSE_ERROR, "Invalid section id"))
+            }
             #[cfg(not(any(feature = "std", feature = "alloc")))]
-            _ => Err(Error::new(
-                ErrorCategory::Validation,
-                codes::PARSE_ERROR,
-                "Invalid section id",
-            )),
+            _ => {
+                Err(Error::new(ErrorCategory::Validation, codes::PARSE_ERROR, "Invalid section id"))
+            }
         }
     }
 }
@@ -162,12 +164,7 @@ pub struct Section<'a> {
 impl<'a> Section<'a> {
     /// Create a new section
     pub fn new(id: SectionId, data: SafeSlice<'a>, size: u32, offset: u32) -> Self {
-        Self {
-            id,
-            data,
-            size,
-            offset,
-        }
+        Self { id, data, size, offset }
     }
 
     /// Verify the section's integrity

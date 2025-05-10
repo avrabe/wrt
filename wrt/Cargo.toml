@@ -5,26 +5,35 @@ edition.workspace = true
 description = "Pure Rust WebAssembly runtime supporting Core and Component Model specs"
 license.workspace = true
 repository = "https://github.com/avrabe/wrt"
+readme = "../README.md"
+keywords = ["webassembly", "wasm", "runtime", "no_std", "component-model"]
+categories = ["wasm", "no-std", "embedded", "web-programming"]
 
 [dependencies]
 # Core allowed/necessary dependencies
 log = { version = "0.4", optional = true }
 # Error handling
 wrt-error = { path = "../wrt-error", version = "0.2.0" }
-# Synchronization primitives
-wrt-sync = { path = "../wrt-sync", version = "0.2.0", features = ["std"] }
-# Format handling (no longer optional)
-wrt-format = { path = "../wrt-format", version = "0.2.0" }
-# Shared type definitions
+# Core type definitions
 wrt-types = { path = "../wrt-types", version = "0.2.0" }
-# WebAssembly decoding
+# Format specifications
+wrt-format = { path = "../wrt-format", version = "0.2.0" }
+# Binary parsing
 wrt-decoder = { path = "../wrt-decoder", version = "0.2.0" }
-# Runtime implementation
+# Instruction encoding/decoding
+wrt-instructions = { path = "../wrt-instructions", version = "0.2.0" }
+# Synchronization primitives
+wrt-sync = { path = "../wrt-sync", version = "0.2.0" }
+# Function interception
+wrt-intercept = { path = "../wrt-intercept", version = "0.2.0" }
+# Host interface
+wrt-host = { path = "../wrt-host", version = "0.2.0" }
+# Component model
+wrt-component = { path = "../wrt-component", version = "0.2.0" }
+# Runtime execution
 wrt-runtime = { path = "../wrt-runtime", version = "0.2.0" }
 # Logging functionality
 wrt-logging = { path = "../wrt-logging", version = "0.2.0" }
-# Instruction implementations
-wrt-instructions = { path = "../wrt-instructions", version = "0.2.0" }
 
 [lib]
 name = "wrt"
@@ -53,8 +62,47 @@ harness = false
 [package.metadata.cargo-udeps.ignore]
 dev-dependencies = ["criterion"]
 
+[profile.release]
+panic = "abort"
+
+[profile.test]
+panic = "abort"
+
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] }
+# Rule 1
+pointer_cast = "deny"
+# Rule 9
+missing_docs = "deny"
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Rule 1: Language subset
+inline_asm_x86_att_syntax = "warn"
+transmute_ptr_to_ref = "deny"
+type_id = "deny"
+dyn_trait = "warn"
+float_arithmetic = "warn"
+# Rule 2: Unsafe usage
+ptr_offset_with_cast = "warn"
+# Rule 3: Error handling & panics
+unwrap_used = "warn"
+panic = "warn" # Also covers Rule 4
+result_unit_err = "warn"
+let_underscore_drop = "warn"
+must_use_candidate = "warn"
+must_use_unit = "warn"
+# Rule 4: Control-flow soundness
+match_wildcard_for_single_variants = "warn"
+never_loop = "warn"
+unreachable = "warn" # Also related to Rule 4
+# Rule 5: Memory & concurrency safety
+static_mut_reference = "deny"
+arc_mutate = "deny"
+# Rule 8: Static analysis gates (CI)
+pedantic = "warn"
+# Rule 9: Documentation
+debug_assert_with_mut_call = "warn"
 
 [features]
 # Core features
@@ -70,7 +118,10 @@ std = ["minimal", "alloc",
        "wrt-decoder/std", 
        "wrt-runtime/std", 
        "wrt-logging/std", 
-       "wrt-instructions/std"]
+       "wrt-instructions/std",
+       "wrt-intercept/std",
+       "wrt-host/std",
+       "wrt-component/std"]
 # alloc feature for heap allocation
 alloc = ["wrt-error/alloc", 
          "wrt-sync/alloc", 
@@ -79,7 +130,10 @@ alloc = ["wrt-error/alloc",
          "wrt-decoder/alloc", 
          "wrt-runtime/alloc", 
          "wrt-logging/alloc", 
-         "wrt-instructions/alloc"]
+         "wrt-instructions/alloc",
+         "wrt-intercept/alloc",
+         "wrt-host/alloc",
+         "wrt-component/alloc"]
 # no_std support
 no_std = ["wrt-error/no_std", 
           "wrt-sync/no_std", 
@@ -88,19 +142,28 @@ no_std = ["wrt-error/no_std",
           "wrt-decoder/no_std", 
           "wrt-runtime/no_std", 
           "wrt-logging/no_std", 
-          "wrt-instructions/no_std"]
+          "wrt-instructions/no_std",
+          "wrt-intercept/no_std",
+          "wrt-host/no_std",
+          "wrt-component/no_std"]
 # Optimization for non-safety-critical paths
 optimize = ["wrt-types/optimize", 
             "wrt-decoder/optimize", 
             "wrt-format/optimize", 
             "wrt-runtime/optimize", 
-            "wrt-instructions/optimize"]
+            "wrt-instructions/optimize",
+            "wrt-intercept/optimize",
+            "wrt-host/optimize",
+            "wrt-component/optimize"]
 # Safety features for ASIL-B compliance
 safety = ["wrt-types/safety", 
           "wrt-decoder/safety", 
           "wrt-format/safety", 
           "wrt-runtime/safety", 
           "wrt-instructions/safety",
+          "wrt-intercept/safety",
+          "wrt-host/safety",
+          "wrt-component/safety",
           "alloc"]
 # Proposal features (mostly placeholders/unused for now)
 relaxed_simd = []
