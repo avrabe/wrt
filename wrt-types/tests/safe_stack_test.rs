@@ -1,15 +1,32 @@
-//! Tests for `SafeStack` functionality in `wrt_types`.
+//! Tests for SafeStack
+
+#![cfg(all(test, feature = "alloc"))] // Only run these tests when alloc is available
+
 #[cfg(feature = "std")]
-use wrt_types::safe_memory::StdMemoryProvider;
 use wrt_types::{
-    bounded::{BoundedStack, CHECKSUM_SIZE},
-    prelude::Checksummed,
-    traits::{Checksummable, FromBytes, SerializationError, ToBytes},
-    validation::BoundedCapacity,
-    verification::{Checksum, VerificationLevel},
+    bounded::{BoundedStack, CapacityError /*, CHECKSUM_SIZE */},
+    safe_memory::MemoryProvider,
+    WrtResult,
 };
 
-const U32_SIZE: usize = core::mem::size_of::<u32>();
+// Imports presumably used by TestValue impls (Checksummable, ToBytes, FromBytes) which are not std-gated
+use wrt_types::{
+    traits::{Checksummable, FromBytes, SerializationError, ToBytes},
+    verification::Checksum,
+};
+
+// Commented out unused imports from original warnings
+// use wrt_types::prelude::Checksummed;
+// use wrt_types::validation::BoundedCapacity;
+// use wrt_types::verification::VerificationLevel; // Was part of verification::{Checksum, VerificationLevel}
+// const U32_SIZE: usize = core::mem::size_of::<u32>();
+
+#[cfg(feature = "std")]
+use wrt_types::safe_memory::StdMemoryProvider;
+
+// This import is for no_std, but if no no_std tests use it from this file, it might still be warned.
+#[cfg(not(feature = "std"))]
+use wrt_types::safe_memory::NoStdMemoryProvider;
 
 #[derive(Debug, Clone, PartialEq)]
 struct TestValue {

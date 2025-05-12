@@ -1,3 +1,7 @@
+"""
+Validate Node: Runs build, test, and lint commands for wrt automation.
+Logs results and returns pass/fail status for each validation step.
+"""
 import subprocess, shlex, pathlib, os, json
 from typing import Dict, List
 

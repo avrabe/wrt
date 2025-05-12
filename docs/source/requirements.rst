@@ -6,6 +6,15 @@ This section contains the requirements for the WRT project.
 Functional Requirements
 -----------------------
 
+.. req:: Platform Abstraction Layer
+   :id: REQ_PLATFORM_001
+   :status: new
+
+   The runtime shall provide a platform abstraction layer (PAL) with distinct backends 
+   for target operating systems (macOS, Linux, QNX, Zephyr) and bare-metal environments, 
+   selectable via compile-time features. The PAL shall abstract OS-specific APIs for 
+   memory allocation/protection and synchronization primitives (futex-like operations).
+
 .. req:: Resumable Interpreter
    :id: REQ_001
    :status: implemented
@@ -91,6 +100,15 @@ Functional Requirements
 
 Low-Level Functional Requirements
 ---------------------------------
+
+.. req:: Helper Runtime C ABI Exports
+   :id: REQ_HELPER_ABI_001
+   :status: new
+
+   The AOT helper runtime (`libwrt_helper`) shall export a stable C ABI including 
+   functions for Wasm operations not efficiently inlined by the AOT compiler. 
+   This shall include `wrt_memory_copy`, `wrt_memory_fill`, `wrt_memory_grow`, 
+   `wrt_atomic_wait`, and `wrt_atomic_notify`.
 
 .. req:: Stackless Implementation
    :id: REQ_005

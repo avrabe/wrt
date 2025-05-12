@@ -10,15 +10,12 @@ extern crate std;
 
 extern crate wrt_types;
 
-use std::hint::black_box;
-
 #[cfg(feature = "std")]
 use wrt_types::safe_memory::StdMemoryProvider;
 // Common imports
-use wrt_types::WrtResult as Result;
 use wrt_types::{
     prelude::*,
-    safe_memory::{MemoryProvider, SafeMemoryHandler, SafeSlice, SafeSliceMut},
+    safe_memory::{MemoryProvider, SafeSlice, SafeSliceMut},
     verification::VerificationLevel,
 };
 

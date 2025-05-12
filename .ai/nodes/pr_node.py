@@ -1,3 +1,7 @@
+"""
+PR Node: Creates or updates GitHub pull requests for wrt automation.
+Summarizes validation results and attaches logs to the PR body.
+"""
 import os
 import json
 from ghapi.actions import gh_action

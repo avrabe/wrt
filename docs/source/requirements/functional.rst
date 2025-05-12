@@ -33,6 +33,9 @@ WebAssembly Core Requirements
 ..    :style: table
 ..    :columns: id, title, status
 
+Platform Requirements
+---------------------
+
 Component Model Requirements
 ----------------------------
 

@@ -1,9 +1,16 @@
-FROM rust:1.78-slim
+FROM rust:1.86-slim
 
-RUN apt-get update && apt-get install -y git patch build-essential curl && \
-    pip install --no-cache-dir langgraph==0.4.0 openai==1.25 ghapi tomli==2.0 gitpython unidiff markdown
+# ---- system deps ----
+RUN apt-get update && \
+    apt-get install -y git patch build-essential curl nodejs npm && \
+    npm install -g @modelcontextprotocol/server-filesystem@latest && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install headless Cursor CLI (assumes binary release URL)
+# ---- python deps ----
+COPY .ai/requirements.txt /workspace/.ai/requirements.txt
+RUN pip install --no-cache-dir -r /workspace/.ai/requirements.txt
+
+# ---- cursor CLI ----
 RUN curl -L https://cursor.sh/cli/latest/cursor-linux-x64.tgz | tar -xz -C /usr/local/bin
 
 ENV PYTHONUNBUFFERED=1 \
@@ -13,4 +20,6 @@ ENV PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /workspace
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint
+ENTRYPOINT ["/usr/local/bin/entrypoint"]
 CMD ["bash"] 

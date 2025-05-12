@@ -57,7 +57,7 @@ alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-all
 log = { version = "0.4", optional = true }
 
 [dev-dependencies]
-proptest = "1.4.0"
+proptest = { version = "1.4.0", default-features = false, features = ["alloc"] }
 proptest-derive = "0.4.0"
 criterion = { version = "0.5", features = ["html_reports"] }
 
@@ -89,20 +89,7 @@ never_loop = "deny"
 unreachable = "deny"
 pedantic = "deny"
 debug_assert_with_mut_call = "warn"
-dyn_trait = "deny"
-arc_get_mut_unchecked = "deny"
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
-
-[profile.test]
-panic = "abort"
-
-[profile.bench]
-panic = "abort"
+arc_with_non_send_sync = "deny"
 
 [[bench]]
 name = "safe_memory_benchmarks"

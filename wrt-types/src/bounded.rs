@@ -13,7 +13,6 @@
 ///
 /// This module provides bounded collection types that are designed for
 /// functional safety with built-in size limits and verification features.
-
 /// Size of the checksum in bytes, typically the size of a u32.
 pub const CHECKSUM_SIZE: usize = core::mem::size_of::<u32>();
 
@@ -35,6 +34,8 @@ use std::{
     // vec::Vec, // Removed
 };
 
+use crate::MemoryProvider; // Added import for the MemoryProvider trait alias
+
 // Use the HashMap that's re-exported in lib.rs - works for both std and no_std
 #[allow(unused_imports)]
 use crate::operations;
@@ -45,15 +46,16 @@ use crate::prelude::ToString;
 // use crate::prelude::Vec; // This was added in a previous step for owned Vec, keep it. <--
 // Removing as per unused_import warning
 #[cfg(not(feature = "std"))]
-use crate::safe_memory::NoStdMemoryProvider;
-use crate::safe_memory::{MemoryProvider, SafeMemoryHandler, SafeSlice}; /* Removed SafeSliceMut */
-use crate::traits::{FromBytes, ToBytes}; /* Removed SerializationError */
+use crate::safe_memory::NoStdProvider;
+use crate::safe_memory::{SafeMemoryHandler, SafeSlice}; // Removed MemoryProvider, Stats as MemoryStats
+use crate::traits::{FromBytes, ToBytes, SerializationError}; // Added SerializationError
 use crate::validation::{importance, BoundedCapacity, Checksummed}; // Removed Validatable
 use crate::{
-    operations::{record_global_operation, OperationType},
+    operations::{record_global_operation, Type as OperationType},
     prelude::{format, Debug, Eq, PartialEq, String},
     traits::Checksummable,
     verification::{Checksum, VerificationLevel},
+    WrtResult, // Import WrtResult for the crate
 }; // Added ToBytes, FromBytes, SerializationError
    // use core::hash::{BuildHasher, Hasher}; // Removed BuildHasher, Hasher
    // use std::collections::hash_map::RandomState; // For a default hasher -
@@ -695,7 +697,7 @@ where
 {
     /// Creates a new `BoundedVec` with the given memory provider and default
     /// verification level.
-    pub fn new(provider: P) -> crate::WrtResult<Self> {
+    pub fn new(provider: P) -> WrtResult<Self> {
         Self::with_verification_level(provider, VerificationLevel::default())
     }
 
@@ -708,7 +710,7 @@ where
     pub fn with_verification_level(
         provider: P,
         verification_level: VerificationLevel,
-    ) -> crate::WrtResult<Self> {
+    ) -> WrtResult<Self> {
         let elem_size = <T as FromBytes>::SERIALIZED_SIZE;
         let required_capacity_bytes = N_ELEMENTS.saturating_mul(elem_size);
 
@@ -1057,14 +1059,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    // use crate::verification::VerificationLevel; // Removed as unused in this
-    // module's tests
-    use wrt_error::Error as WrtError;
-
     use super::*;
-    #[cfg(not(feature = "std"))]
-    use crate::safe_memory::NoStdMemoryProvider;
-    use crate::traits::SerializationError;
+    use crate::safe_memory::{MemoryStats, NoStdProvider, StdProvider};
 
     // TestItem definition
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1108,22 +1104,22 @@ mod tests {
 
     // Helper to create NoStdMemoryProvider (always available)
     #[cfg(not(feature = "std"))] // Gate this helper
-    fn no_std_provider() -> NoStdMemoryProvider<MEM_CAPACITY_BYTES> {
-        NoStdMemoryProvider::new()
+    fn no_std_provider() -> NoStdProvider<MEM_CAPACITY_BYTES> {
+        NoStdProvider::new()
     }
 
     #[cfg(feature = "std")]
-    fn std_provider() -> crate::safe_memory::StdMemoryProvider {
-        // vec! macro and StdMemoryProvider are only available with "std" feature
-        crate::safe_memory::StdMemoryProvider::new(alloc::vec![0u8; MEM_CAPACITY_BYTES])
+    fn std_provider() -> crate::safe_memory::StdProvider {
+        crate::safe_memory::StdProvider::new(alloc::vec![0u8; MEM_CAPACITY_BYTES])
     }
 
     // --- BoundedVec Tests ---
 
     #[test]
     #[cfg(feature = "std")]
-    fn bounded_vec_new_empty_std() -> Result<(), WrtError> {
-        let vec: BoundedVec<TestItem, TEST_CAPACITY, _> = BoundedVec::new(std_provider())?;
+    fn bounded_vec_new_empty_std() -> WrtResult<()> {
+        let provider = std_provider();
+        let vec: BoundedVec<TestItem, TEST_CAPACITY, _> = BoundedVec::new(provider)?;
         assert_eq!(vec.len(), 0);
         assert!(vec.is_empty());
         assert_eq!(vec.capacity(), TEST_CAPACITY);
@@ -1131,9 +1127,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "std"))] // Gate this test
-    fn bounded_vec_new_empty_no_std() -> Result<(), WrtError> {
-        let vec: BoundedVec<TestItem, TEST_CAPACITY, _> = BoundedVec::new(no_std_provider())?;
+    #[cfg(not(feature = "std"))]
+    fn bounded_vec_new_empty_no_std() -> WrtResult<()> {
+        let provider = no_std_provider();
+        let vec: BoundedVec<TestItem, TEST_CAPACITY, _> = BoundedVec::new(provider)?;
         assert_eq!(vec.len(), 0);
         assert!(vec.is_empty());
         assert_eq!(vec.capacity(), TEST_CAPACITY);
@@ -1143,8 +1140,8 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn bounded_vec_push_pop_std() -> Result<(), BoundedError> {
-        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> =
-            BoundedVec::new(std_provider()).map_err(BoundedError::from)?;
+        let provider = std_provider();
+        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> = BoundedVec::new(provider)?;
 
         vec.push(TestItem(1))?;
         assert_eq!(vec.len(), 1);
@@ -1158,10 +1155,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "std"))] // Gate this test
+    #[cfg(not(feature = "std"))]
     fn bounded_vec_push_pop_no_std() -> Result<(), BoundedError> {
-        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> =
-            BoundedVec::new(no_std_provider()).map_err(BoundedError::from)?;
+        let provider = no_std_provider();
+        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> = BoundedVec::new(provider)?;
 
         vec.push(TestItem(1))?;
         assert_eq!(vec.len(), 1);
@@ -1175,8 +1172,8 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn bounded_vec_push_to_capacity_std() -> Result<(), BoundedError> {
-        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> =
-            BoundedVec::new(std_provider()).map_err(BoundedError::from)?;
+        let provider = std_provider();
+        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> = BoundedVec::new(provider)?;
         for i in 0..TEST_CAPACITY {
             vec.push(TestItem(i as u32))?;
         }
@@ -1191,10 +1188,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "std"))] // Gate this test
+    #[cfg(not(feature = "std"))]
     fn bounded_vec_push_to_capacity_no_std() -> Result<(), BoundedError> {
-        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> =
-            BoundedVec::new(no_std_provider()).map_err(BoundedError::from)?;
+        let provider = no_std_provider();
+        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> = BoundedVec::new(provider)?;
         for i in 0..TEST_CAPACITY {
             vec.push(TestItem(i as u32))?;
         }
@@ -1211,8 +1208,8 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn bounded_vec_get_std() -> Result<(), BoundedError> {
-        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> =
-            BoundedVec::new(std_provider()).map_err(BoundedError::from)?;
+        let provider = std_provider();
+        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> = BoundedVec::new(provider)?;
         vec.push(TestItem(10))?;
         vec.push(TestItem(20))?;
 
@@ -1223,10 +1220,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "std"))] // Gate this test
+    #[cfg(not(feature = "std"))]
     fn bounded_vec_get_no_std() -> Result<(), BoundedError> {
-        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> =
-            BoundedVec::new(no_std_provider()).map_err(BoundedError::from)?;
+        let provider = no_std_provider();
+        let mut vec: BoundedVec<TestItem, TEST_CAPACITY, _> = BoundedVec::new(provider)?;
         vec.push(TestItem(10))?;
         vec.push(TestItem(20))?;
 
@@ -1240,8 +1237,9 @@ mod tests {
 
     #[test]
     #[cfg(feature = "std")]
-    fn bounded_stack_new_empty_std() -> Result<(), WrtError> {
-        let stack: BoundedStack<TestItem, TEST_CAPACITY, _> = BoundedStack::new(std_provider())?;
+    fn bounded_stack_new_empty_std() -> WrtResult<()> {
+        let provider = std_provider();
+        let stack: BoundedStack<TestItem, TEST_CAPACITY, _> = BoundedStack::new(provider)?;
         assert_eq!(stack.len(), 0);
         assert!(stack.is_empty());
         assert_eq!(stack.capacity(), TEST_CAPACITY);
@@ -1249,9 +1247,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "std"))] // Gate this test
-    fn bounded_stack_new_empty_no_std() -> Result<(), WrtError> {
-        let stack: BoundedStack<TestItem, TEST_CAPACITY, _> = BoundedStack::new(no_std_provider())?;
+    #[cfg(not(feature = "std"))]
+    fn bounded_stack_new_empty_no_std() -> WrtResult<()> {
+        let provider = no_std_provider();
+        let stack: BoundedStack<TestItem, TEST_CAPACITY, _> = BoundedStack::new(provider)?;
         assert_eq!(stack.len(), 0);
         assert!(stack.is_empty());
         assert_eq!(stack.capacity(), TEST_CAPACITY);
@@ -1261,8 +1260,8 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn bounded_stack_push_pop_std() -> Result<(), BoundedError> {
-        let mut stack: BoundedStack<TestItem, TEST_CAPACITY, _> =
-            BoundedStack::new(std_provider()).map_err(BoundedError::from)?;
+        let provider = std_provider();
+        let mut stack: BoundedStack<TestItem, TEST_CAPACITY, _> = BoundedStack::new(provider)?;
 
         stack.push(TestItem(100))?;
         assert_eq!(stack.len(), 1);
@@ -1276,10 +1275,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "std"))] // Gate this test
+    #[cfg(not(feature = "std"))]
     fn bounded_stack_push_pop_no_std() -> Result<(), BoundedError> {
-        let mut stack: BoundedStack<TestItem, TEST_CAPACITY, _> =
-            BoundedStack::new(no_std_provider()).map_err(BoundedError::from)?;
+        let provider = no_std_provider();
+        let mut stack: BoundedStack<TestItem, TEST_CAPACITY, _> = BoundedStack::new(provider)?;
 
         stack.push(TestItem(100))?;
         assert_eq!(stack.len(), 1);
@@ -1295,8 +1294,8 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn bounded_stack_push_to_capacity_std() -> Result<(), BoundedError> {
-        let mut stack: BoundedStack<TestItem, TEST_CAPACITY, _> =
-            BoundedStack::new(std_provider()).map_err(BoundedError::from)?;
+        let provider = std_provider();
+        let mut stack: BoundedStack<TestItem, TEST_CAPACITY, _> = BoundedStack::new(provider)?;
         for i in 0..TEST_CAPACITY {
             stack.push(TestItem(i as u32))?;
         }
@@ -1311,10 +1310,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "std"))] // Gate this test
+    #[cfg(not(feature = "std"))]
     fn bounded_stack_push_to_capacity_no_std() -> Result<(), BoundedError> {
-        let mut stack: BoundedStack<TestItem, TEST_CAPACITY, _> =
-            BoundedStack::new(no_std_provider()).map_err(BoundedError::from)?;
+        let provider = no_std_provider();
+        let mut stack: BoundedStack<TestItem, TEST_CAPACITY, _> = BoundedStack::new(provider)?;
         for i in 0..TEST_CAPACITY {
             stack.push(TestItem(i as u32))?;
         }

@@ -31,6 +31,16 @@ Safety Requirements
 Memory Safety Requirements
 --------------------------
 
+.. req:: Platform-Managed Linear Memory
+   :id: REQ_MEMORY_001
+   :status: new
+
+   The WebAssembly linear memory implementation shall delegate memory allocation, 
+   growth, and protection management to the Platform Abstraction Layer (`PageAllocator` trait). 
+   It shall support 64 KiB Wasm pages and accommodate platform-specific features 
+   like Memory Tagging Extension (MTE) or guard pages when enabled and supported 
+   by the active platform backend.
+
 .. req:: Memory Bounds Checking
    :id: REQ_MEM_SAFETY_001
    :status: active
@@ -159,6 +169,17 @@ WebAssembly Requirements
 
 Build and Environment Requirements
 ----------------------------------
+
+.. req:: Optional Arm Hardening Features
+   :id: REQ_SECURITY_001
+   :status: new
+
+   The build system shall provide an optional compile-time feature (`arm-hardening`) 
+   to enable Arm security hardening mechanisms. When enabled, this feature shall 
+   configure the build to use Pointer Authentication/Branch Target Identification 
+   (`-mbranch-protection=standard`) and Memory Tagging Extension (`-fsanitize=memtag`), 
+   including requesting MTE-enabled memory mappings via the PAL where supported by 
+   the platform backend. The feature shall remain compatible with `no-std` environments.
 
 .. req:: Clean Build Environment
    :id: REQ_BUILD_001

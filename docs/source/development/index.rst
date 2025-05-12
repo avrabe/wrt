@@ -33,6 +33,7 @@ Development Guidelines
 - Add comprehensive tests for all new functionality
 - Document safety impacts of all panic conditions
 - Use the safety mechanisms documented in the safety manual
+- Adhere to the :ref:`comprehensive Rust safety checklist <comprehensive-rust-safety-checklist>` for all safety-critical code.
 
 Contributing
 ------------

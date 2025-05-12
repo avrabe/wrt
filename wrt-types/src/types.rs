@@ -109,7 +109,6 @@ impl Hasher {
 
 /// WebAssembly value types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub enum ValueType {
     /// 32-bit integer
     I32,
@@ -1448,6 +1447,31 @@ pub struct Module {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
+    use alloc::{boxed::Box, vec};
+    #[cfg(feature = "std")]
+    use std::boxed::Box;
+
+    impl Arbitrary for ValueType {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            prop_oneof![
+                Just(ValueType::I32),
+                Just(ValueType::I64),
+                Just(ValueType::F32),
+                Just(ValueType::F64),
+                Just(ValueType::V128),
+                Just(ValueType::I16x8),
+                Just(ValueType::FuncRef),
+                Just(ValueType::ExternRef),
+            ]
+            .boxed()
+        }
+    }
 
     #[test]
     fn test_value_type_conversions() {

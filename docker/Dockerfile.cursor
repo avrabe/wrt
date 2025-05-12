@@ -1,0 +1,10 @@
+FROM rust:1.78-slim
+RUN apt-get update && apt-get install -y git patch build-essential curl nodejs npm python3 python3-pip python3-venv && \
+    npm install -g @modelcontextprotocol/server-filesystem@latest && rm -rf /var/lib/apt/lists/*
+COPY .ai/requirements.txt /workspace/.ai/requirements.txt
+RUN python3 -m venv /venv && /venv/bin/pip install --no-cache-dir -r /workspace/.ai/requirements.txt
+WORKDIR /workspace
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint
+ENV PATH="/venv/bin:$PATH"
+ENTRYPOINT ["/usr/local/bin/entrypoint"]
+CMD ["bash"] 

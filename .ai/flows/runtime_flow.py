@@ -1,10 +1,7 @@
 import os, tomli, pathlib
 from .base_dag import workflow
 
-HERE = pathlib.Path(__file__).resolve().parent
-CFG  = tomli.loads((HERE.parent / "config/ai.toml").read_text())
-PROFILE = "runtime"  # change in the other flow files
-cfg = CFG[PROFILE]
-
-state = {"ticket": os.getenv("TICKET", "local"), **cfg}
+CFG = tomli.loads((pathlib.Path(__file__).parent.parent / "config/ai.toml").read_text())
+PROFILE = "runtime"
+state = {"ticket": os.getenv("TICKET", "local"), **CFG[PROFILE]}
 workflow.invoke(state) 

@@ -28,15 +28,14 @@ use wrt_error::Error as WrtError; // Added for the Result return type
 use wrt_sync::once::WrtOnce;
 
 use crate::validation::importance; // Added this import
-use crate::values::FloatBits64; // Added for FloatBits64::new()
 use crate::verification::VerificationLevel;
 
 // Global operation counter for use when a local counter isn't available
-static GLOBAL_OPERATIONS_COUNTER: WrtOnce<OperationCounter> = WrtOnce::new();
+static GLOBAL_COUNTER: WrtOnce<Counter> = WrtOnce::new();
 
-/// Operation types that can be tracked for fuel consumption
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OperationType {
+/// Enum representing different types of operations that can be tracked
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Type {
     /// Memory allocation operation
     MemoryAllocation,
     /// Memory deallocation operation
@@ -89,92 +88,96 @@ pub enum OperationType {
     CollectionPeek,
 }
 
-impl OperationType {
-    /// Returns the base cost of the operation.
+impl Type {
+    /// Get the base cost for an operation
     #[must_use]
     pub fn cost(self) -> u32 {
         match self {
-            OperationType::MemoryAllocation => 10,
-            OperationType::MemoryDeallocation => 10,
-            OperationType::MemoryRead => 1,
-            OperationType::MemoryWrite => 2,
-            OperationType::MemoryGrow => 10,
-            OperationType::CollectionPush => 2,
-            OperationType::CollectionPop => 2,
-            OperationType::CollectionLookup => 1,
-            OperationType::CollectionInsert => 3,
-            OperationType::CollectionRemove => 3,
-            OperationType::CollectionValidate => 5,
-            OperationType::CollectionMutate => 4,
-            OperationType::ChecksumCalculation => 10,
-            OperationType::ChecksumFullRecalculation => 15,
-            OperationType::FunctionCall => 5,
-            OperationType::ControlFlow => 2,
-            OperationType::Arithmetic => 1,
-            OperationType::Other => 1,
-            OperationType::CollectionCreate => 5,
-            OperationType::CollectionClear => 5,
-            OperationType::CollectionTruncate => 3,
-            OperationType::CollectionIterate => 1,
-            OperationType::CollectionRead => 1,
-            OperationType::CollectionWrite => 2,
-            OperationType::CollectionPeek => 1,
+            Type::MemoryAllocation => 10,
+            Type::MemoryDeallocation => 8,
+            Type::MemoryRead => 1,
+            Type::MemoryWrite => 2,
+            Type::MemoryGrow => 50,
+            Type::CollectionPush => 5,
+            Type::CollectionPop => 5,
+            Type::CollectionLookup => 3,
+            Type::CollectionInsert => 7,
+            Type::CollectionRemove => 6,
+            Type::CollectionValidate => 15,
+            Type::CollectionMutate => 4,
+            Type::ChecksumCalculation => 20,
+            Type::ChecksumFullRecalculation => 100,
+            Type::FunctionCall => 5,
+            Type::ControlFlow => 1,
+            Type::Arithmetic => 1,
+            Type::Other => 1,
+            Type::CollectionCreate => 12,
+            Type::CollectionClear => 10,
+            Type::CollectionTruncate => 8,
+            Type::CollectionIterate => 1,
+            Type::CollectionRead => 3,
+            Type::CollectionWrite => 7,
+            Type::CollectionPeek => 3,
         }
     }
 
-    /// Returns the inherent importance of the operation (0-255).
+    /// Get the importance level for validation checks
     #[must_use]
     pub fn importance(self) -> u8 {
         match self {
-            OperationType::MemoryAllocation => 50,
-            OperationType::MemoryDeallocation => 50,
-            OperationType::MemoryRead => 100,
-            OperationType::MemoryWrite => 150,
-            OperationType::MemoryGrow => 200,
-            OperationType::CollectionPush => 150,
-            OperationType::CollectionPop => 150,
-            OperationType::CollectionLookup => 100,
-            OperationType::CollectionInsert => 150,
-            OperationType::CollectionRemove => 150,
-            OperationType::CollectionValidate => 200,
-            OperationType::CollectionMutate => 150,
-            OperationType::ChecksumCalculation => 180,
-            OperationType::ChecksumFullRecalculation => 190,
-            OperationType::FunctionCall => 150,
-            OperationType::ControlFlow => 120,
-            OperationType::Arithmetic => 100,
-            OperationType::Other => 100,
-            OperationType::CollectionCreate => 150,
-            OperationType::CollectionClear => 150,
-            OperationType::CollectionTruncate => 150,
-            OperationType::CollectionIterate => 100,
-            OperationType::CollectionRead => importance::READ,
-            OperationType::CollectionWrite => importance::MUTATION,
-            OperationType::CollectionPeek => importance::READ,
+            Type::MemoryAllocation
+            | Type::MemoryDeallocation
+            | Type::MemoryGrow
+            | Type::CollectionValidate => importance::CRITICAL,
+            Type::MemoryWrite
+            | Type::CollectionPush
+            | Type::CollectionPop
+            | Type::CollectionInsert
+            | Type::CollectionRemove
+            | Type::CollectionMutate
+            | Type::CollectionCreate
+            | Type::CollectionClear
+            | Type::CollectionTruncate
+            | Type::ChecksumCalculation
+            | Type::ChecksumFullRecalculation => importance::MUTATION,
+            Type::MemoryRead
+            | Type::CollectionLookup
+            | Type::CollectionIterate
+            | Type::FunctionCall
+            | Type::ControlFlow
+            | Type::Arithmetic
+            | Type::Other => importance::READ,
+            Type::CollectionRead | Type::CollectionPeek => importance::READ,
+            Type::CollectionWrite => importance::MUTATION,
         }
     }
 
-    /// Calculate fuel cost for an operation, considering verification level
+    /// Calculate fuel cost for an operation, considering verification level.
+    ///
+    /// # Errors
+    ///
+    /// This function currently does not return errors but is prepared for future
+    /// extensions where cost calculation might fail (e.g., invalid inputs).
     pub fn fuel_cost_for_operation(
-        op_type: OperationType,
+        op_type: Type,
         verification_level: VerificationLevel,
     ) -> Result<u64, WrtError> {
         let base_cost = u64::from(op_type.cost());
 
-        // Adjust cost based on verification level
-        let verification_multiplier = verification_cost_multiplier(verification_level);
+        // Adjust cost based on verification level using scaled integer math
+        // Multiplier is scaled by 100 (e.g., 1.25 becomes 125)
+        let scaled_multiplier = verification_cost_multiplier_scaled(&verification_level);
 
-        let cost_f64 = base_cost as f64 * verification_multiplier;
-        // Use Wasm-compliant nearest (round ties to even) from math_ops
-        // cost_f64 is always finite and non-NaN here, so wasm_f64_nearest will not
-        // error.
-        Ok(crate::math_ops::wasm_f64_nearest(FloatBits64::from_float(cost_f64))?.value() as u64)
+        // Calculate cost with rounding: (base * multiplier + 50) / 100
+        let total_cost = (base_cost * scaled_multiplier + 50) / 100;
+
+        Ok(total_cost)
     }
 }
 
 /// A counter for tracking operation counts
 #[derive(Debug)]
-pub struct OperationCounter {
+pub struct Counter {
     /// Counter for memory read operations
     memory_reads: AtomicU64,
     /// Counter for memory write operations
@@ -218,9 +221,9 @@ pub struct OperationCounter {
     fuel_consumed: AtomicU64,
 }
 
-// Manual implementation of Clone for OperationCounter since AtomicU64 doesn't
+// Manual implementation of Clone for Counter since AtomicU64 doesn't
 // implement Clone
-impl Clone for OperationCounter {
+impl Clone for Counter {
     fn clone(&self) -> Self {
         Self {
             memory_reads: AtomicU64::new(self.memory_reads.load(Ordering::Relaxed)),
@@ -251,13 +254,13 @@ impl Clone for OperationCounter {
     }
 }
 
-impl Default for OperationCounter {
+impl Default for Counter {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl OperationCounter {
+impl Counter {
     /// Create a new operation counter with all counts at zero
     #[must_use]
     pub fn new() -> Self {
@@ -287,93 +290,108 @@ impl OperationCounter {
         }
     }
 
-    /// Record an operation and update fuel consumption
-    pub fn record_operation(&self, op_type: OperationType, verification_level: VerificationLevel) {
+    /// Record an operation and update fuel consumption.
+    ///
+    /// Note: This function calculates fuel cost internally. If the cost
+    /// calculation fails (which is currently impossible but might change),
+    /// the error is logged, and fuel is not updated.
+    pub fn record_operation(&self, op_type: Type, verification_level: VerificationLevel) {
         // Record the specific operation
         match op_type {
-            OperationType::MemoryAllocation => {
-                self.memory_allocations.fetch_add(1, Ordering::Relaxed)
+            Type::MemoryAllocation => {
+                self.memory_allocations.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::MemoryDeallocation => {
-                self.memory_deallocations.fetch_add(1, Ordering::Relaxed)
+            Type::MemoryDeallocation => {
+                self.memory_deallocations.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::MemoryRead => self.memory_reads.fetch_add(1, Ordering::Relaxed),
-            OperationType::MemoryWrite => self.memory_writes.fetch_add(1, Ordering::Relaxed),
-            OperationType::MemoryGrow => self.memory_grows.fetch_add(1, Ordering::Relaxed),
-            OperationType::CollectionPush => self.collection_pushes.fetch_add(1, Ordering::Relaxed),
-            OperationType::CollectionPop => self.collection_pops.fetch_add(1, Ordering::Relaxed),
-            OperationType::CollectionLookup => {
-                self.collection_lookups.fetch_add(1, Ordering::Relaxed)
+            Type::MemoryRead => {
+                self.memory_reads.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::CollectionInsert => {
-                self.collection_inserts.fetch_add(1, Ordering::Relaxed)
+            Type::MemoryWrite => {
+                self.memory_writes.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::CollectionRemove => {
-                self.collection_removes.fetch_add(1, Ordering::Relaxed)
+            Type::MemoryGrow => {
+                self.memory_grows.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::CollectionValidate => {
-                self.collection_validates.fetch_add(1, Ordering::Relaxed)
+            Type::CollectionPush => {
+                self.collection_pushes.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::CollectionMutate => {
-                self.collection_mutates.fetch_add(1, Ordering::Relaxed)
+            Type::CollectionPop => {
+                self.collection_pops.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::ChecksumCalculation => {
-                self.checksum_calculations.fetch_add(1, Ordering::Relaxed)
+            // Merged CollectionLookup, CollectionRead, CollectionPeek
+            Type::CollectionLookup
+            | Type::CollectionRead
+            | Type::CollectionPeek => {
+                self.collection_lookups.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::FunctionCall => self.function_calls.fetch_add(1, Ordering::Relaxed),
-            OperationType::ControlFlow => self.control_flows.fetch_add(1, Ordering::Relaxed),
-            OperationType::Arithmetic => self.arithmetic_ops.fetch_add(1, Ordering::Relaxed),
-            OperationType::Other => self.other_ops.fetch_add(1, Ordering::Relaxed),
-            OperationType::CollectionCreate => {
-                self.collection_creates.fetch_add(1, Ordering::Relaxed)
+            // Merged CollectionInsert, CollectionWrite
+            Type::CollectionInsert | Type::CollectionWrite => {
+                self.collection_inserts.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::CollectionClear => {
-                self.collection_clears.fetch_add(1, Ordering::Relaxed)
+            Type::CollectionRemove => {
+                self.collection_removes.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::CollectionTruncate => {
-                self.collection_truncates.fetch_add(1, Ordering::Relaxed)
+            Type::CollectionValidate => {
+                self.collection_validates.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::CollectionIterate => {
-                self.collection_iterates.fetch_add(1, Ordering::Relaxed)
+            Type::CollectionMutate => {
+                self.collection_mutates.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::ChecksumFullRecalculation => {
-                self.checksum_calculations.fetch_add(1, Ordering::Relaxed)
+            // Merged ChecksumCalculation, ChecksumFullRecalculation
+            Type::ChecksumCalculation | Type::ChecksumFullRecalculation => {
+                self.checksum_calculations.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::CollectionRead => {
-                self.collection_lookups.fetch_add(1, Ordering::Relaxed)
+            Type::FunctionCall => {
+                self.function_calls.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::CollectionWrite => {
-                self.collection_inserts.fetch_add(1, Ordering::Relaxed)
+            Type::ControlFlow => {
+                self.control_flows.fetch_add(1, Ordering::Relaxed);
             }
-            OperationType::CollectionPeek => {
-                self.collection_lookups.fetch_add(1, Ordering::Relaxed)
+            Type::Arithmetic => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::Other => {
+                self.other_ops.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::CollectionCreate => {
+                self.collection_creates.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::CollectionClear => {
+                self.collection_clears.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::CollectionTruncate => {
+                self.collection_truncates.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::CollectionIterate => {
+                self.collection_iterates.fetch_add(1, Ordering::Relaxed);
             }
         };
 
-        // Calculate base fuel cost
-        let base_cost = u64::from(op_type.cost());
-
-        // Adjust cost based on verification level
-        let verification_multiplier = verification_cost_multiplier(verification_level);
-
-        // Use Wasm-compliant nearest (round ties to even) from math_ops
-        let cost_f64 = base_cost as f64 * verification_multiplier;
-        // cost_f64 is always finite and non-NaN here, so wasm_f64_nearest will not
-        // error.
-        let total_cost: u64 = crate::math_ops::wasm_f64_nearest(FloatBits64::from_float(cost_f64))
-            .expect("cost_f64 is finite, nearest op should not fail")
-            .value() as u64;
-
-        // Update fuel consumed
-        self.fuel_consumed.fetch_add(total_cost, Ordering::Relaxed);
+        // Calculate and add fuel cost
+        // Use unwrap_or_else to handle potential errors gracefully, though current
+        // fuel_cost_for_operation is infallible in its Result signature.
+        match Type::fuel_cost_for_operation(op_type, verification_level) {
+            Ok(cost) => {
+                self.fuel_consumed.fetch_add(cost, Ordering::Relaxed);
+            }
+            Err(_e) => {
+                // Log error if fuel calculation fails (should not happen currently)
+                // Consider using a proper logging facade if available
+                // eprintln!("Error calculating fuel cost: {}", e);
+                // Or use log crate if enabled:
+                // log::error!("Error calculating fuel cost: {}", e);
+            }
+        }
     }
 
-    /// Get the total fuel consumed by all operations
+    /// Get the current total fuel consumed.
+    #[must_use]
     pub fn get_fuel_consumed(&self) -> u64 {
         self.fuel_consumed.load(Ordering::Relaxed)
     }
 
-    /// Reset all counters to zero
+    /// Reset all operation counters and fuel consumed to zero.
     pub fn reset(&self) {
         self.memory_reads.store(0, Ordering::Relaxed);
         self.memory_writes.store(0, Ordering::Relaxed);
@@ -399,9 +417,10 @@ impl OperationCounter {
         self.fuel_consumed.store(0, Ordering::Relaxed);
     }
 
-    /// Get a summary of all operations recorded.
-    pub fn get_summary(&self) -> OperationSummary {
-        OperationSummary {
+    /// Get a summary of all operation counts.
+    #[must_use]
+    pub fn get_summary(&self) -> Summary {
+        Summary {
             memory_reads: self.memory_reads.load(Ordering::Relaxed),
             memory_writes: self.memory_writes.load(Ordering::Relaxed),
             memory_grows: self.memory_grows.load(Ordering::Relaxed),
@@ -428,9 +447,9 @@ impl OperationCounter {
     }
 }
 
-/// A snapshot of operation counts
-#[derive(Debug, Clone, Copy)]
-pub struct OperationSummary {
+/// A summary snapshot of operation counts
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Summary {
     /// Number of memory read operations
     pub memory_reads: u64,
     /// Number of memory write operations
@@ -477,52 +496,57 @@ pub struct OperationSummary {
     pub fuel_consumed: u64,
 }
 
-/// Trait for types that need to track operation counts
-pub trait OperationTracking {
+/// Trait for objects that can track operations
+pub trait Tracking {
     /// Record an operation occurred
-    fn record_operation(&self, op_type: OperationType);
+    fn record_operation(&self, op_type: Type);
 
     /// Get the current operation statistics
-    fn operation_stats(&self) -> OperationSummary;
+    fn operation_stats(&self) -> Summary;
 
     /// Reset operation counters
     fn reset_operation_stats(&self);
 }
 
-/// Get the global counter instance, initializing it if necessary
-fn global_counter() -> &'static OperationCounter {
-    GLOBAL_OPERATIONS_COUNTER.get_or_init(OperationCounter::new)
+// Helper function to get or initialize the global counter
+fn global_counter() -> &'static Counter {
+    GLOBAL_COUNTER.get_or_init(Counter::new)
 }
 
-/// Record an operation in the global counter
-pub fn record_global_operation(op_type: OperationType, level: VerificationLevel) {
+/// Record an operation using the global counter.
+pub fn record_global_operation(op_type: Type, level: VerificationLevel) {
     global_counter().record_operation(op_type, level);
 }
 
-/// Get the summary from the global counter
-#[must_use]
-pub fn global_operation_summary() -> OperationSummary {
+/// Get a summary from the global operation counter.
+pub fn global_operation_summary() -> Summary {
     global_counter().get_summary()
 }
 
-/// Reset the global counter
+/// Reset the global operation counter.
 pub fn reset_global_operations() {
     global_counter().reset();
 }
 
-/// Get the total fuel consumed from the global counter
-#[must_use]
+/// Get the global fuel consumed count.
 pub fn global_fuel_consumed() -> u64 {
     global_counter().get_fuel_consumed()
 }
 
-fn verification_cost_multiplier(level: VerificationLevel) -> f64 {
+/// Get the scaled cost multiplier for a given verification level.
+///
+/// Multipliers are scaled by 100 (e.g., 1.25 becomes 125) to allow integer arithmetic.
+///
+/// # Errors
+///
+/// This function is infallible.
+fn verification_cost_multiplier_scaled(level: &VerificationLevel) -> u64 {
     match level {
-        VerificationLevel::Off => 1.0,
-        VerificationLevel::Basic => 1.1,
-        VerificationLevel::Sampling => 1.25, // Sampling is the default
-        VerificationLevel::Full => 2.0,
-        VerificationLevel::Redundant => 2.5,
+        VerificationLevel::Off => 100,        // 1.00 * 100
+        VerificationLevel::Basic => 110,      // 1.10 * 100
+        VerificationLevel::Sampling => 125,  // 1.25 * 100
+        VerificationLevel::Full => 200,       // 2.00 * 100
+        VerificationLevel::Redundant => 250, // 2.50 * 100
     }
 }
 
@@ -533,12 +557,12 @@ mod tests {
 
     #[test]
     fn test_operation_counter() {
-        let counter = OperationCounter::new();
+        let counter = Counter::new();
         let vl_full = VerificationLevel::Full;
 
-        counter.record_operation(OperationType::MemoryRead, vl_full);
-        counter.record_operation(OperationType::MemoryWrite, vl_full);
-        counter.record_operation(OperationType::CollectionPush, vl_full);
+        counter.record_operation(Type::MemoryRead, vl_full);
+        counter.record_operation(Type::MemoryWrite, vl_full);
+        counter.record_operation(Type::CollectionPush, vl_full);
 
         let summary = counter.get_summary();
         assert_eq!(summary.memory_reads, 1);
@@ -546,10 +570,10 @@ mod tests {
         assert_eq!(summary.collection_pushes, 1);
 
         let expected_fuel =
-            OperationType::fuel_cost_for_operation(OperationType::MemoryRead, vl_full).unwrap()
-                + OperationType::fuel_cost_for_operation(OperationType::MemoryWrite, vl_full)
+            Type::fuel_cost_for_operation(Type::MemoryRead, vl_full).unwrap()
+                + Type::fuel_cost_for_operation(Type::MemoryWrite, vl_full)
                     .unwrap()
-                + OperationType::fuel_cost_for_operation(OperationType::CollectionPush, vl_full)
+                + Type::fuel_cost_for_operation(Type::CollectionPush, vl_full)
                     .unwrap();
         assert_eq!(summary.fuel_consumed, expected_fuel);
 
@@ -561,23 +585,23 @@ mod tests {
 
     #[test]
     fn test_verification_level_impact() {
-        let counter = OperationCounter::new();
+        let counter = Counter::new();
         let vl_off = VerificationLevel::Off;
         let vl_sampling = VerificationLevel::default(); // Sampling
         let vl_full = VerificationLevel::Full;
 
-        counter.record_operation(OperationType::MemoryRead, vl_off);
-        counter.record_operation(OperationType::MemoryRead, vl_sampling);
-        counter.record_operation(OperationType::MemoryRead, vl_full);
+        counter.record_operation(Type::MemoryRead, vl_off);
+        counter.record_operation(Type::MemoryRead, vl_sampling);
+        counter.record_operation(Type::MemoryRead, vl_full);
 
         let summary = counter.get_summary();
         assert_eq!(summary.memory_reads, 3);
 
         let expected_fuel =
-            OperationType::fuel_cost_for_operation(OperationType::MemoryRead, vl_off).unwrap()
-                + OperationType::fuel_cost_for_operation(OperationType::MemoryRead, vl_sampling)
+            Type::fuel_cost_for_operation(Type::MemoryRead, vl_off).unwrap()
+                + Type::fuel_cost_for_operation(Type::MemoryRead, vl_sampling)
                     .unwrap()
-                + OperationType::fuel_cost_for_operation(OperationType::MemoryRead, vl_full)
+                + Type::fuel_cost_for_operation(Type::MemoryRead, vl_full)
                     .unwrap();
         assert_eq!(summary.fuel_consumed, expected_fuel);
     }
@@ -587,8 +611,8 @@ mod tests {
         reset_global_operations();
         let vl_full = VerificationLevel::Full;
 
-        record_global_operation(OperationType::FunctionCall, vl_full); // Was Standard
-        record_global_operation(OperationType::CollectionValidate, vl_full); // Was Standard
+        record_global_operation(Type::FunctionCall, vl_full); // Was Standard
+        record_global_operation(Type::CollectionValidate, vl_full); // Was Standard
 
         let summary = global_operation_summary();
         assert_eq!(summary.function_calls, 1);

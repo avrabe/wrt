@@ -85,13 +85,13 @@ pub use component_value_store::ComponentValueStore;
 pub use conversion::{ref_type_to_val_type, val_type_to_ref_type};
 pub use operations::{
     global_fuel_consumed, global_operation_summary, record_global_operation,
-    reset_global_operations, OperationSummary, OperationTracking, OperationType,
+    reset_global_operations, Summary as OperationSummary, Tracking as OperationTracking, Type as OperationType,
 };
 #[cfg(not(feature = "std"))]
-pub use safe_memory::NoStdMemoryProvider;
+pub use safe_memory::NoStdProvider;
 #[cfg(feature = "std")]
-pub use safe_memory::StdMemoryProvider;
-pub use safe_memory::{MemoryProvider, SafeMemoryHandler, SafeSlice};
+pub use safe_memory::StdProvider;
+pub use safe_memory::{Handler as SafeMemoryHandler, Provider as MemoryProvider, Slice as SafeSlice, SliceMut as SafeSliceMut, Stats as MemoryStats};
 pub use traits::{FromFormat, ToFormat};
 pub use types::{BlockType, FuncType, RefType, ValueType};
 pub use validation::{BoundedCapacity, Checksummed, Validatable};

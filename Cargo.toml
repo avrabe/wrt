@@ -53,12 +53,22 @@ unused_variables = "allow"
 unused_mut = "allow"
 unused_macros = "allow"
 
-# Add workspace-level profiles
-[profile.release]
+# Workspace-level profiles inherit by members unless overridden.
+# Setting panic=abort globally for safety.
+[workspace.profile.dev]
 panic = "abort"
-strip = true
-lto = true
-codegen-units = 1
+# Inherits other settings from Cargo's defaults
 
-[profile.test]
+[workspace.profile.release]
 panic = "abort"
+strip = true  # Reduce binary size
+lto = true    # Link-Time Optimization
+codegen-units = 1 # Maximize optimization opportunities
+
+[workspace.profile.test]
+panic = "abort"
+# Inherits other settings from Cargo's defaults (e.g., debug assertions enabled)
+
+[workspace.profile.bench]
+panic = "abort"
+# Inherits from release profile by default, but we ensure panic=abort here too.

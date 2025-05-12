@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------------
 **WRT AI Flow** is a self‑contained LangGraph workflow that lets AI coding agents
 (Claude, Cursor, etc.) iterate safely on the `wrt` WebAssembly runtime.  It
-ensures every automated patch passes the repo’s own success matrix:
+ensures every automated patch passes the repo's own success matrix:
 
 * `cargo build` with **std** features
 * `cargo build` with **no_std + alloc** features
@@ -33,11 +33,16 @@ Dockerfile.claude / Dockerfile.cursor  # reproducible agent images
 
 ---
 ## Prerequisites
-* Docker 24+
+* Docker 24+ (with [Buildx](https://docs.docker.com/buildx/working-with-buildx/) enabled)
 * Python 3.10+ (inside Docker is fine)
-* Rust 1.78 (inside Docker image)
+* Rust 1.86 (inside Docker image)
 * An API key for **Anthropic Claude** *or* **Cursor CLI**
 * (Optional) GitHub token with `repo` scope – enables PR creation
+
+> **Note:** If using Colima or a non-default Docker socket, set:
+> ```bash
+> export DOCKER_HOST=unix:///Users/r/.colima/default/docker.sock
+> ```
 
 ---
 ## One‑time setup
@@ -46,9 +51,9 @@ Dockerfile.claude / Dockerfile.cursor  # reproducible agent images
 $ git clone https://github.com/avrabe/wrt && cd wrt
 
 # build the Claude image (≈2 min on x86‑64)
-$ docker build -f docker/Dockerfile.claude -t wrt-agent-claude .
+$ docker buildx build --load -f docker/Dockerfile.claude -t wrt-agent-claude .
 # or build the Cursor variant
-$ docker build -f docker/Dockerfile.cursor -t wrt-agent-cursor .
+$ docker buildx build --load -f docker/Dockerfile.cursor -t wrt-agent-cursor .
 ```
 
 ---
@@ -60,13 +65,16 @@ export GH_TOKEN="ghp_…"             # optional
 export GITHUB_REPOSITORY="avrabe/wrt"
 export TICKET=42
 
+# If using Colima, ensure DOCKER_HOST is set:
+export DOCKER_HOST=unix:///Users/r/.colima/default/docker.sock
+
 docker run --rm -it \
   -e CLAUDE_KEY -e GH_TOKEN -e GITHUB_REPOSITORY -e TICKET \
   -v "$(pwd)":/workspace \
   wrt-agent-claude \
   python .ai/flows/runtime_flow.py
 ```
-You’ll see LangGraph steps stream; logs are saved under `.ai_runs/`.
+You'll see LangGraph steps stream; logs are saved under `.ai_runs/`.
 
 Switch crates by launching a different flow script, e.g.:
 ```bash
@@ -82,6 +90,21 @@ exporting `CURSOR_API_KEY` instead of `CLAUDE_KEY`.
 rm -rf .ai_runs/               # delete logs & checkpoints
 docker rmi wrt-agent-claude    # free disk space
 ```
+
+---
+### Troubleshooting & Checks
+- **Check Buildx:**
+  ```bash
+  docker buildx version
+  docker buildx ls
+  ```
+  If not available, see [Docker Buildx docs](https://docs.docker.com/buildx/working-with-buildx/).
+- **Check Docker Host:**
+  ```bash
+  echo $DOCKER_HOST
+  docker info
+  ```
+  Make sure it matches your Colima or Docker Desktop socket.
 
 ---
 ### FAQ
