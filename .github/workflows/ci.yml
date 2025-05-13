@@ -100,7 +100,7 @@ jobs:
       - name: Run Coverage Tests (Daggerized)
         run: cargo xtask Coverage # This xtask should produce lcov.info and junit.xml
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: |
