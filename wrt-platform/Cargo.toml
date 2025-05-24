@@ -27,7 +27,7 @@ libc = { version = "0.2", optional = true }
 heapless = { version = "0.8", optional = true }
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.6", features = ["html_reports"] }
 
 [features]
 default = [] # No std/alloc by default

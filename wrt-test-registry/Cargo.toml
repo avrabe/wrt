@@ -73,7 +73,7 @@ clap = { version = "4.1", features = ["derive"], optional = true }
 colored = { version = "3.0", optional = true }
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.6", features = ["html_reports"] }
 
 [[bench]]
 name = "registry_benchmark"

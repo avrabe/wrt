@@ -50,7 +50,7 @@ path = "src/lib.rs"
 bench = false
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.6"
 wast = { version = "230.0.0" }
 tempfile = "3.8"
 tracing = "0.1"
