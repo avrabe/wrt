@@ -57,7 +57,7 @@ once_cell = { version = "1.8", default-features = false }
 ctor = { version = "0.4", optional = true }
 inventory = { version = "0.3", optional = true }
 serde_json = { version = "1.0", optional = true }
-clap = { version = "4.1", features = ["derive"], optional = true }
+clap = { version = "4.5", features = ["derive"], optional = true }
 colored = { version = "3.0", optional = true }
 
 [dev-dependencies]

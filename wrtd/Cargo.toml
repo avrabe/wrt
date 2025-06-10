@@ -25,8 +25,13 @@ wrt-panic = { workspace = true, default-features = false }
 wrt = { workspace = true, default-features = false, optional = true }
 wrt-runtime = { workspace = true, default-features = false, optional = true }
 
-# Global allocator for no_std mode
-linked_list_allocator = { version = "0.10", optional = true }
+# Standard library dependencies (std-runtime only)
+clap = { version = "4.5.39", features = ["derive"], optional = true }
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", features = ["json"], optional = true }
+anyhow = { workspace = true, optional = true }
+once_cell = { version = "1.18", optional = true }
+
 
 # No external dependencies - use internal capabilities only
 

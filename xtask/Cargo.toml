@@ -15,7 +15,7 @@ xshell = "0.2.5"
 
 # Additions for symbols task
 anyhow = "1.0.82"
-clap = { version = "4.5.4", features = ["derive", "env"] }
+clap = { version = "4.5.39", features = ["derive", "env"] }
 rustc-demangle = "0.1"
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0"
