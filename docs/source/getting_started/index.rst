@@ -13,42 +13,21 @@ Welcome to WRT (WebAssembly Runtime)! This guide will help you install and set u
    :local:
    :depth: 2
 
-Prerequisites
-=============
-
-WRT requires the following to build and run:
-
-* **Rust**: Version 1.86.0 or newer (stable channel)
-* **just**: Command runner for build automation
-* **Git**: For source code management
-* **Platform-specific tools**: Varies by target platform
-
 Quick Start
 ===========
 
-For most development scenarios, follow these steps:
+For comprehensive installation instructions including prerequisites, platform-specific notes, and troubleshooting, see the :doc:`installation` guide.
 
-1. **Install Rust** (if not already installed):
+For most development scenarios, follow these quick steps:
 
-   .. code-block:: bash
-
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-      source ~/.cargo/env
-
-2. **Install just** (build tool):
-
-   .. code-block:: bash
-
-      cargo install just
-
-3. **Clone the repository**:
+1. **Clone the repository**:
 
    .. code-block:: bash
 
       git clone https://github.com/pulseengine/wrt.git
       cd wrt
 
-4. **Build and test**:
+2. **Build and test** (requires Rust 1.86.0+ and just):
 
    .. code-block:: bash
 

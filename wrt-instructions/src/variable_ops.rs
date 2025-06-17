@@ -7,7 +7,7 @@
 //! This module provides pure implementations for WebAssembly variable access
 //! instructions, including local and global variable operations.
 
-use crate::prelude::{ConstExprContext, Debug, Error, PureInstruction, Result, Value};
+use crate::prelude::{Debug, Error, PureInstruction, Result, Value};
 
 // ToString is brought in through the prelude for both std and no_std
 // configurations so we don't need explicit imports

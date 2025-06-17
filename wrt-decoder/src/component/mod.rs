@@ -47,12 +47,11 @@ pub use component_name_section::{
 pub use name_section::{NameMap, NameMapEntry, SortIdentifier};
 
 pub use types::{
-    ComponentAnalyzer, ComponentMetadata, ComponentType, CoreExternType, CoreInstance,
-    CoreType, ExportInfo, ExternType, ImportInfo, Instance, ModuleInfo, Start,
-    ValType,
+    ComponentAnalyzer, ComponentMetadata, ComponentType, CoreExternType, CoreInstance, CoreType,
+    ExportInfo, ExternType, ImportInfo, Instance, ModuleInfo, Start, ValType,
 };
 
-#[cfg(feature = "std")]  
+#[cfg(feature = "std")]
 pub use types::{Component, Export, Import};
 
 #[cfg(feature = "std")]
@@ -63,7 +62,7 @@ pub use validation::{validate_component, validate_component_with_config, Validat
 use wrt_error::{codes, Error, ErrorCategory, Result};
 
 #[cfg(feature = "std")]
-use crate::{prelude::*, utils::BinaryType};
+use crate::utils::BinaryType;
 
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
@@ -81,9 +80,9 @@ pub enum BinaryType {
 mod no_std_utils {
     use super::*;
     use wrt_foundation::BoundedString;
-    
+
     /// Detect binary type with safety bounds for no_std
-    /// 
+    ///
     /// # Safety Requirements
     /// - Only reads fixed-size magic bytes
     /// - No dynamic allocation
@@ -93,10 +92,10 @@ mod no_std_utils {
             return Err(Error::new(
                 ErrorCategory::Parse,
                 codes::PARSE_ERROR,
-                "Binary too short for WASM header"
+                "Binary too short for WASM header",
             ));
         }
-        
+
         // Check for WASM magic number (fixed 4 bytes)
         if &binary[0..4] == b"\0asm" {
             // Check version to determine module vs component
@@ -107,61 +106,55 @@ mod no_std_utils {
                 Ok(BinaryType::Component)
             }
         } else {
-            Err(Error::new(
-                ErrorCategory::Parse,
-                codes::PARSE_ERROR,
-                "Invalid WASM magic number"
-            ))
+            Err(Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Invalid WASM magic number"))
         }
     }
-    
+
     /// Read name as bounded string with safety constraints
     ///
     /// # Safety Requirements  
     /// - Uses bounded string with compile-time limit
     /// - Validates UTF-8 without dynamic allocation
     /// - Fails gracefully on oversized strings
-    pub fn read_name_as_string(data: &[u8], offset: usize) -> Result<(BoundedString<256, wrt_foundation::safe_memory::NoStdProvider<512>>, usize)> {
+    pub fn read_name_as_string(
+        data: &[u8],
+        offset: usize,
+    ) -> Result<(BoundedString<256, wrt_foundation::safe_memory::NoStdProvider<512>>, usize)> {
         if offset >= data.len() {
             return Err(Error::new(
                 ErrorCategory::Parse,
                 codes::PARSE_ERROR,
-                "Offset beyond data length"
+                "Offset beyond data length",
             ));
         }
-        
+
         // Read length (LEB128 - simplified to single byte for safety)
         let length = data[offset] as usize;
         let name_start = offset + 1;
-        
+
         if name_start + length > data.len() {
             return Err(Error::new(
                 ErrorCategory::Parse,
                 codes::PARSE_ERROR,
-                "Name length exceeds data"
+                "Name length exceeds data",
             ));
         }
-        
+
         // Validate UTF-8 and create bounded string
         let name_bytes = &data[name_start..name_start + length];
-        let name_str = core::str::from_utf8(name_bytes).map_err(|_| Error::new(
-            ErrorCategory::Parse,
-            codes::PARSE_ERROR,
-            "Invalid UTF-8 in name"
-        ))?;
-        
-        let bounded_name = BoundedString::from_str(name_str, wrt_foundation::NoStdProvider::new()).map_err(|_| Error::new(
-            ErrorCategory::Parse,
-            codes::PARSE_ERROR,
-            "Name too long for bounded storage"
-        ))?;
-        
-        Ok((bounded_name, length + 1))
+        let name_str = core::str::from_utf8(name_bytes).map_err(|_| {
+            Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Invalid UTF-8 in name")
+        })?;
+
+        // Create the properly sized bounded string for the return type
+        #[allow(deprecated)] // Using deprecated API to avoid unsafe code
+        let provider = crate::prelude::create_decoder_provider::<512>()
+            .unwrap_or_else(|_| wrt_foundation::safe_memory::NoStdProvider::<512>::default());
+        let name_string = BoundedString::<256, _>::from_str(name_str, provider).unwrap_or_default();
+
+        Ok((name_string, length + 1))
     }
 }
-
-#[cfg(not(feature = "std"))]
-use no_std_utils::{detect_binary_type, read_name_as_string};
 
 /// Decode a component from binary data
 ///
@@ -198,7 +191,7 @@ pub fn decode_component(binary: &[u8]) -> Result<Component> {
     let binary_type = crate::utils::detect_binary_type(binary)?;
     #[cfg(not(feature = "std"))]
     let binary_type = detect_binary_type(binary)?;
-    
+
     match binary_type {
         BinaryType::CoreModule => {
             // Can't decode a core module as a component
@@ -268,7 +261,7 @@ fn parse_component_sections(data: &[u8], component: &mut Component) -> Result<()
             return Err(Error::new(
                 ErrorCategory::Parse,
                 codes::PARSE_ERROR,
-"Section size exceeds remaining data size",
+                "Section size exceeds remaining data size",
             ));
         }
 

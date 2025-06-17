@@ -511,6 +511,32 @@ dependencies = [
 
 [[package]]
 name = "criterion"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
+dependencies = [
+ "anes",
+ "cast",
+ "ciborium",
+ "clap",
+ "criterion-plot",
+ "is-terminal",
+ "itertools 0.10.5",
+ "num-traits",
+ "once_cell",
+ "oorandom",
+ "plotters",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tinytemplate",
+ "walkdir",
+]
+
+[[package]]
+name = "criterion"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bf7af66b0989381bd0be551bd7cc91912a655a58c6918420c9527b1fd8b4679"
@@ -841,18 +867,6 @@ checksum = "cea14ef9355e3beab063703aa9dab15afd25f0667c341310c1e5274bb1d0da18"
 dependencies = [
  "libc",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "example"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "wit-bindgen",
- "wrt-debug",
- "wrt-format",
- "wrt-foundation",
- "wrt-runtime",
 ]
 
 [[package]]
@@ -1216,6 +1230,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "hermit-abi"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc0fef456e4baa96da950455cd02c081ca953b141298e41db3fc7e36b1da849c"
+
+[[package]]
 name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1542,6 +1562,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "469fb0b9cefa57e3ef31275ee7cacb78f2fdca44e4765491884a2b119d4eb130"
 
 [[package]]
+name = "is-terminal"
+version = "0.4.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e04d7f318608d35d4b61ddd75cbdaee86b023ebe2bd5a66ee0915f0bf93095a9"
+dependencies = [
+ "hermit-abi",
+ "libc",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "is_executable"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1612,6 +1643,17 @@ checksum = "1cfaf33c695fc6e08064efbc1f72ec937429614f25eef83af942d0e227c3a28f"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "kani-verifier"
+version = "0.54.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f73c2e368ff80d8036986070843216b93c4e2973d1347d65ef45162fd364bc6"
+dependencies = [
+ "anyhow",
+ "home",
+ "os_info",
 ]
 
 [[package]]
@@ -2092,16 +2134,6 @@ checksum = "3ae130e2f271fbc2ac3a40fb1d07180839cdbbe443c7a27e1e3c13c5cac0116d"
 dependencies = [
  "diff",
  "yansi",
-]
-
-[[package]]
-name = "prettyplease"
-version = "0.2.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "664ec5419c51e34154eec046ebcba56312d5a2fc3b09a06da188e1ad21afadf6"
-dependencies = [
- "proc-macro2",
- "syn 2.0.101",
 ]
 
 [[package]]
@@ -3277,7 +3309,7 @@ version = "0.14.2+wasi-0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9683f9a5a998d873c0d21fcbe3c083009670149a8fab228644b8bd36b2c48cb3"
 dependencies = [
- "wit-bindgen-rt 0.39.0",
+ "wit-bindgen-rt",
 ]
 
 [[package]]
@@ -3374,16 +3406,6 @@ dependencies = [
 
 [[package]]
 name = "wasm-encoder"
-version = "0.227.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80bb72f02e7fbf07183443b27b0f3d4144abf8c114189f2e088ed95b696a7822"
-dependencies = [
- "leb128fmt",
- "wasmparser 0.227.1",
-]
-
-[[package]]
-name = "wasm-encoder"
 version = "0.231.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e62baf58bc14f219d1d12d082ea99860acb479b582e8f3d292d8a7c8f756091c"
@@ -3400,25 +3422,6 @@ checksum = "a447e61e38d1226b57e4628edadff36d16760be24a343712ba236b5106c95156"
 dependencies = [
  "leb128fmt",
  "wasmparser 0.232.0",
-]
-
-[[package]]
-name = "wasm-metadata"
-version = "0.227.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce1ef0faabbbba6674e97a56bee857ccddf942785a336c8b47b42373c922a91d"
-dependencies = [
- "anyhow",
- "auditable-serde",
- "flate2",
- "indexmap 2.9.0",
- "serde",
- "serde_derive",
- "serde_json",
- "spdx",
- "url",
- "wasm-encoder 0.227.1",
- "wasmparser 0.227.1",
 ]
 
 [[package]]
@@ -3531,7 +3534,7 @@ dependencies = [
  "termcolor",
  "wasm-compose",
  "wasm-encoder 0.231.0",
- "wasm-metadata 0.231.0",
+ "wasm-metadata",
  "wasm-mutate",
  "wasm-shrink",
  "wasm-smith",
@@ -3539,22 +3542,10 @@ dependencies = [
  "wasmprinter",
  "wast 231.0.0",
  "wat",
- "wit-component 0.231.0",
+ "wit-component",
  "wit-encoder",
- "wit-parser 0.231.0",
+ "wit-parser",
  "wit-smith",
-]
-
-[[package]]
-name = "wasmparser"
-version = "0.227.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f51cad774fb3c9461ab9bccc9c62dfb7388397b5deda31bf40e8108ccd678b2"
-dependencies = [
- "bitflags 2.9.1",
- "hashbrown 0.15.3",
- "indexmap 2.9.0",
- "semver",
 ]
 
 [[package]]
@@ -3901,94 +3892,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "wit-bindgen"
-version = "0.41.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10fb6648689b3929d56bbc7eb1acf70c9a42a29eb5358c67c10f54dbd5d695de"
-dependencies = [
- "wit-bindgen-rt 0.41.0",
- "wit-bindgen-rust-macro",
-]
-
-[[package]]
-name = "wit-bindgen-core"
-version = "0.41.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92fa781d4f2ff6d3f27f3cc9b74a73327b31ca0dc4a3ef25a0ce2983e0e5af9b"
-dependencies = [
- "anyhow",
- "heck 0.5.0",
- "wit-parser 0.227.1",
-]
-
-[[package]]
 name = "wit-bindgen-rt"
 version = "0.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
 dependencies = [
  "bitflags 2.9.1",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.41.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4db52a11d4dfb0a59f194c064055794ee6564eb1ced88c25da2cf76e50c5621"
-dependencies = [
- "bitflags 2.9.1",
- "futures",
- "once_cell",
-]
-
-[[package]]
-name = "wit-bindgen-rust"
-version = "0.41.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d0809dc5ba19e2e98661bf32fc0addc5a3ca5bf3a6a7083aa6ba484085ff3ce"
-dependencies = [
- "anyhow",
- "heck 0.5.0",
- "indexmap 2.9.0",
- "prettyplease",
- "syn 2.0.101",
- "wasm-metadata 0.227.1",
- "wit-bindgen-core",
- "wit-component 0.227.1",
-]
-
-[[package]]
-name = "wit-bindgen-rust-macro"
-version = "0.41.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad19eec017904e04c60719592a803ee5da76cb51c81e3f6fbf9457f59db49799"
-dependencies = [
- "anyhow",
- "prettyplease",
- "proc-macro2",
- "quote",
- "syn 2.0.101",
- "wit-bindgen-core",
- "wit-bindgen-rust",
-]
-
-[[package]]
-name = "wit-component"
-version = "0.227.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "635c3adc595422cbf2341a17fb73a319669cc8d33deed3a48368a841df86b676"
-dependencies = [
- "anyhow",
- "bitflags 2.9.1",
- "indexmap 2.9.0",
- "log",
- "serde",
- "serde_derive",
- "serde_json",
- "wasm-encoder 0.227.1",
- "wasm-metadata 0.227.1",
- "wasmparser 0.227.1",
- "wit-parser 0.227.1",
 ]
 
 [[package]]
@@ -4005,11 +3914,11 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "wasm-encoder 0.231.0",
- "wasm-metadata 0.231.0",
+ "wasm-metadata",
  "wasmparser 0.231.0",
  "wast 231.0.0",
  "wat",
- "wit-parser 0.231.0",
+ "wit-parser",
 ]
 
 [[package]]
@@ -4022,25 +3931,7 @@ dependencies = [
  "pretty_assertions",
  "semver",
  "serde",
- "wit-parser 0.231.0",
-]
-
-[[package]]
-name = "wit-parser"
-version = "0.227.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddf445ed5157046e4baf56f9138c124a0824d4d1657e7204d71886ad8ce2fc11"
-dependencies = [
- "anyhow",
- "id-arena",
- "indexmap 2.9.0",
- "log",
- "semver",
- "serde",
- "serde_derive",
- "serde_json",
- "unicode-xid",
- "wasmparser 0.227.1",
+ "wit-parser",
 ]
 
 [[package]]
@@ -4073,8 +3964,8 @@ dependencies = [
  "indexmap 2.9.0",
  "log",
  "semver",
- "wit-component 0.231.0",
- "wit-parser 0.231.0",
+ "wit-component",
+ "wit-parser",
 ]
 
 [[package]]
@@ -4088,7 +3979,7 @@ name = "wrt"
 version = "0.2.0"
 dependencies = [
  "anyhow",
- "criterion",
+ "criterion 0.6.0",
  "hex",
  "lazy_static",
  "rayon",
@@ -4116,6 +4007,7 @@ dependencies = [
 name = "wrt-component"
 version = "0.2.0"
 dependencies = [
+ "criterion 0.5.1",
  "log",
  "wrt-decoder",
  "wrt-error",
@@ -4140,7 +4032,7 @@ dependencies = [
 name = "wrt-decoder"
 version = "0.2.0"
 dependencies = [
- "criterion",
+ "criterion 0.6.0",
  "hex",
  "log",
  "proptest",
@@ -4159,7 +4051,7 @@ version = "0.2.0"
 name = "wrt-format"
 version = "0.2.0"
 dependencies = [
- "kani-verifier",
+ "kani-verifier 0.62.0",
  "proptest",
  "wrt-error",
  "wrt-foundation",
@@ -4169,9 +4061,9 @@ dependencies = [
 name = "wrt-foundation"
 version = "0.2.0"
 dependencies = [
- "criterion",
+ "criterion 0.6.0",
  "hashbrown 0.15.3",
- "kani-verifier",
+ "kani-verifier 0.62.0",
  "log",
  "proptest",
  "proptest-derive",
@@ -4214,6 +4106,7 @@ dependencies = [
 name = "wrt-integration-tests"
 version = "0.1.0"
 dependencies = [
+ "kani-verifier 0.54.0",
  "tempfile",
  "wrt",
  "wrt-component",
@@ -4233,7 +4126,7 @@ name = "wrt-intercept"
 version = "0.2.0"
 dependencies = [
  "chrono",
- "kani-verifier",
+ "kani-verifier 0.62.0",
  "log",
  "pretty_assertions",
  "wrt-error",
@@ -4255,6 +4148,7 @@ dependencies = [
 name = "wrt-math"
 version = "0.2.0"
 dependencies = [
+ "libm",
  "wrt-error",
  "wrt-platform",
 ]
@@ -4262,16 +4156,14 @@ dependencies = [
 [[package]]
 name = "wrt-panic"
 version = "0.2.0"
-dependencies = [
- "wrt-foundation",
-]
 
 [[package]]
 name = "wrt-platform"
 version = "0.2.0"
 dependencies = [
- "criterion",
+ "criterion 0.6.0",
  "wrt-error",
+ "wrt-panic",
  "wrt-sync",
 ]
 
@@ -4279,7 +4171,6 @@ dependencies = [
 name = "wrt-runtime"
 version = "0.2.0"
 dependencies = [
- "proptest",
  "wrt-debug",
  "wrt-error",
  "wrt-format",
@@ -4295,7 +4186,7 @@ dependencies = [
 name = "wrt-sync"
 version = "0.2.0"
 dependencies = [
- "kani-verifier",
+ "kani-verifier 0.62.0",
  "parking_lot",
  "wrt-error",
 ]
@@ -4306,7 +4197,7 @@ version = "0.2.0"
 dependencies = [
  "clap",
  "colored",
- "criterion",
+ "criterion 0.6.0",
  "ctor",
  "inventory",
  "once_cell",
@@ -4337,15 +4228,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "wrt-wasi"
+version = "0.2.0"
+dependencies = [
+ "wrt-component",
+ "wrt-error",
+ "wrt-format",
+ "wrt-foundation",
+ "wrt-host",
+ "wrt-platform",
+]
+
+[[package]]
 name = "wrtd"
 version = "0.2.0"
 dependencies = [
  "linked_list_allocator",
  "wrt",
+ "wrt-component",
  "wrt-error",
+ "wrt-foundation",
+ "wrt-host",
  "wrt-logging",
  "wrt-panic",
+ "wrt-platform",
  "wrt-runtime",
+ "wrt-wasi",
 ]
 
 [[package]]

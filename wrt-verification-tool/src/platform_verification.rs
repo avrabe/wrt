@@ -3,7 +3,6 @@
 //! Provides verification capabilities that integrate with CLI args, environment variables,
 //! configuration files, and container discovery.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 use wrt_error::{Error, ErrorCategory, codes};
 
@@ -13,7 +12,7 @@ extern crate std;
 #[cfg(feature = "std")]
 use std::{collections::HashMap, env, fs, path::Path, string::String, vec::Vec};
 
-// Stub imports for Agent B's platform work - will be replaced during integration
+// Stub imports for platform module - will be replaced during integration
 mod platform_stubs {
     pub struct ComprehensivePlatformLimits {
         pub max_total_memory: usize,

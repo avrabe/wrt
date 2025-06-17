@@ -18,7 +18,7 @@ use std::{string::String, vec, vec::Vec};
 
 use wrt_error::{codes, Error, ErrorCategory, Result};
 
-use wrt_foundation::{RefType, ValueType};
+use wrt_foundation::{RefType, ValueType, types::{TableType as WrtTableType, MemoryType as WrtMemoryType, Import as WrtImport, ImportDesc as WrtImportDesc}};
 
 #[cfg(not(any(feature = "std")))]
 use wrt_foundation::traits::BoundedCapacity;
@@ -29,77 +29,80 @@ use crate::{
     validation::Validatable,
 };
 
-/// WebAssembly function definition - Pure No_std Version
-#[cfg(not(any(feature = "std")))]
+/// WebAssembly function definition - Clean architecture version
+/// Uses clean types (Vec in std, internal factory for no_std) 
+#[cfg(not(feature = "std"))]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Function<
-    P: wrt_foundation::MemoryProvider + Clone + Default + Eq = wrt_foundation::NoStdProvider<1024>,
-> {
+pub struct Function {
     /// Type index referring to function signature
     pub type_idx: u32,
-    /// Local variables (types and counts)
-    pub locals: crate::WasmVec<ValueType, P>,
-    /// Function body (WebAssembly bytecode instructions)
-    pub code: crate::WasmVec<u8, P>,
+    /// Local variables (types and counts) - clean type
+    pub locals: alloc::vec::Vec<ValueType>,
+    /// Function body (WebAssembly bytecode instructions) - clean type  
+    pub code: alloc::vec::Vec<u8>,
 }
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> Function<P> {
-    fn new() -> wrt_foundation::Result<Self> {
-        Ok(Function { 
+#[cfg(not(feature = "std"))]
+impl Function {
+    fn new() -> Self {
+        Function { 
             type_idx: 0, 
-            locals: crate::WasmVec::new(P::default())?, 
-            code: crate::WasmVec::new(P::default())? 
-        })
+            locals: alloc::vec::Vec::new(), 
+            code: alloc::vec::Vec::new() 
+        }
     }
 }
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> Default for Function<P> {
+#[cfg(not(feature = "std"))]
+impl Default for Function {
     fn default() -> Self {
         Function { 
             type_idx: 0, 
-            locals: Default::default(),
-            code: Default::default(),
+            locals: alloc::vec::Vec::new(),
+            code: alloc::vec::Vec::new(),
         }
     }
 }
 
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::traits::Checksummable
-    for Function<P>
-{
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::Checksummable for Function {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
         checksum.update_slice(&self.type_idx.to_le_bytes());
-        self.locals.update_checksum(checksum);
-        self.code.update_checksum(checksum);
+        // For Vec<ValueType>, we need to checksum each element  
+        for local in &self.locals {
+            local.update_checksum(checksum);
+        }
+        // For Vec<u8>, checksum the slice
+        checksum.update_slice(&self.code);
     }
 }
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::traits::ToBytes
-    for Function<P>
-{
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::ToBytes for Function {
     fn to_bytes_with_provider<PStream>(
         &self,
         stream: &mut wrt_foundation::traits::WriteStream,
-        provider: &PStream,
+        _provider: &PStream,
     ) -> Result<()>
     where
         PStream: wrt_foundation::MemoryProvider,
     {
         stream.write_all(&self.type_idx.to_le_bytes())?;
-        self.locals.to_bytes_with_provider(stream, provider)?;
-        self.code.to_bytes_with_provider(stream, provider)?;
+        // Write locals count and then each local
+        stream.write_all(&(self.locals.len() as u32).to_le_bytes())?;
+        for local in &self.locals {
+            local.to_bytes_with_provider(stream, _provider)?;
+        }
+        // Write code length and then code
+        stream.write_all(&(self.code.len() as u32).to_le_bytes())?;
+        stream.write_all(&self.code)?;
         Ok(())
     }
 }
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::traits::FromBytes
-    for Function<P>
-{
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::FromBytes for Function {
     fn from_bytes_with_provider<PStream>(
         stream: &mut wrt_foundation::traits::ReadStream,
         provider: &PStream,
@@ -110,8 +113,23 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::t
         let mut idx_bytes = [0u8; 4];
         stream.read_exact(&mut idx_bytes)?;
         let type_idx = u32::from_le_bytes(idx_bytes);
-        let locals = crate::WasmVec::from_bytes_with_provider(stream, provider)?;
-        let code = crate::WasmVec::from_bytes_with_provider(stream, provider)?;
+        
+        // Read locals count and locals
+        let mut count_bytes = [0u8; 4];
+        stream.read_exact(&mut count_bytes)?;
+        let locals_count = u32::from_le_bytes(count_bytes) as usize;
+        let mut locals = alloc::vec::Vec::with_capacity(locals_count);
+        for _ in 0..locals_count {
+            locals.push(ValueType::from_bytes_with_provider(stream, provider)?);
+        }
+        
+        // Read code length and code
+        let mut code_len_bytes = [0u8; 4];
+        stream.read_exact(&mut code_len_bytes)?;
+        let code_len = u32::from_le_bytes(code_len_bytes) as usize;
+        let mut code = alloc::vec::Vec::with_capacity(code_len);
+        code.resize(code_len, 0);
+        stream.read_exact(&mut code)?;
 
         Ok(Function { type_idx, locals, code })
     }
@@ -137,24 +155,10 @@ pub struct Function {
 ///
 /// WebAssembly 1.0 allows at most one memory per module.
 /// Memory64 extension allows memories with 64-bit addressing.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Memory {
-    /// Memory limits (minimum and optional maximum size in pages)
-    /// Each page is 64KiB (65536 bytes)
-    pub limits: Limits,
-    /// Whether this memory is shared between threads
-    /// Shared memory must have a maximum size specified
-    pub shared: bool,
-}
+pub type Memory = WrtMemoryType;
 
-/// WebAssembly table definition
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Table {
-    /// Element type
-    pub element_type: ValueType,
-    /// Table limits
-    pub limits: Limits,
-}
+/// WebAssembly table definition  
+pub type Table = WrtTableType;
 
 /// WebAssembly global definition - Pure No_std Version
 #[cfg(not(any(feature = "std")))]
@@ -1429,7 +1433,7 @@ pub struct Module<
     /// Function type signatures
     pub types: crate::WasmVec<ValueType, P>,
     /// Function definitions (code)
-    pub functions: crate::WasmVec<Function<P>, P>,
+    pub functions: crate::WasmVec<Function, P>,
     /// Table definitions
     pub tables: crate::WasmVec<Table, P>,
     /// Memory definitions  
@@ -1447,7 +1451,7 @@ pub struct Module<
     /// Start function index (entry point)
     pub start: Option<u32>,
     /// Custom sections (metadata)
-    pub custom_sections: crate::WasmVec<CustomSection<P>, P>,
+    pub custom_sections: crate::WasmVec<CustomSection, P>,
     /// Original binary data (for round-trip preservation)
     pub binary: Option<crate::WasmVec<u8, P>>,
     /// WebAssembly core version
@@ -1653,140 +1657,9 @@ impl Validatable for Module {
     }
 }
 
-// Serialization helpers for Table
-impl Table {
-    /// Serialize to bytes
-    #[cfg(feature = "std")]
-    pub fn to_bytes(&self) -> wrt_foundation::Result<Vec<u8>> {
-        let mut bytes = Vec::new();
-        bytes.push(self.element_type.to_binary());
-        bytes.extend(self.limits.to_bytes()?);
-        Ok(bytes)
-    }
+// Table serialization methods are inherited from wrt_foundation::types::TableType
 
-    /// Deserialize from bytes
-    pub fn from_bytes(bytes: &[u8]) -> wrt_foundation::Result<Self> {
-        if bytes.len() < 2 {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Insufficient bytes for Table",
-            ));
-        }
-
-        let element_type = ValueType::from_binary(bytes[0]).map_err(|_| wrt_error::Error::new(
-            wrt_error::ErrorCategory::Validation,
-            wrt_error::codes::PARSE_ERROR,
-            "Invalid element type",
-        ))?;
-        let limits = Limits::from_bytes(&bytes[1..])?;
-
-        Ok(Self { element_type, limits })
-    }
-}
-
-// Implement Checksummable trait for Table
-impl wrt_foundation::traits::Checksummable for Table {
-    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.element_type.update_checksum(checksum);
-        self.limits.update_checksum(checksum);
-    }
-}
-
-// Implement ToBytes trait for Table
-impl wrt_foundation::traits::ToBytes for Table {
-    fn serialized_size(&self) -> usize {
-        self.element_type.serialized_size() + self.limits.serialized_size()
-    }
-
-    fn to_bytes_with_provider<PStream: wrt_foundation::MemoryProvider>(
-        &self,
-        stream: &mut wrt_foundation::traits::WriteStream,
-        provider: &PStream,
-    ) -> wrt_foundation::Result<()> {
-        self.element_type.to_bytes_with_provider(stream, provider)?;
-        self.limits.to_bytes_with_provider(stream, provider)?;
-        Ok(())
-    }
-}
-
-// Implement FromBytes trait for Table
-impl wrt_foundation::traits::FromBytes for Table {
-    fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
-        reader: &mut wrt_foundation::traits::ReadStream<'a>,
-        provider: &PStream,
-    ) -> wrt_foundation::Result<Self> {
-        let element_type = ValueType::from_bytes_with_provider(reader, provider)?;
-        let limits = Limits::from_bytes_with_provider(reader, provider)?;
-        Ok(Self { element_type, limits })
-    }
-}
-
-// Serialization helpers for Memory
-impl Memory {
-    /// Serialize to bytes
-    #[cfg(feature = "std")]
-    pub fn to_bytes(&self) -> wrt_foundation::Result<Vec<u8>> {
-        let mut bytes = Vec::new();
-        bytes.extend(self.limits.to_bytes()?);
-        bytes.push(self.shared as u8);
-        Ok(bytes)
-    }
-
-    /// Deserialize from bytes
-    pub fn from_bytes(bytes: &[u8]) -> wrt_foundation::Result<Self> {
-        if bytes.len() < 2 {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Insufficient bytes for Memory",
-            ));
-        }
-
-        let limits = Limits::from_bytes(&bytes[..bytes.len() - 1])?;
-        let shared = bytes[bytes.len() - 1] != 0;
-
-        Ok(Self { limits, shared })
-    }
-}
-
-// Implement Checksummable trait for Memory
-impl wrt_foundation::traits::Checksummable for Memory {
-    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.limits.update_checksum(checksum);
-        checksum.update_slice(&[self.shared as u8]);
-    }
-}
-
-// Implement ToBytes trait for Memory
-impl wrt_foundation::traits::ToBytes for Memory {
-    fn serialized_size(&self) -> usize {
-        self.limits.serialized_size() + 1  // +1 for shared flag
-    }
-
-    fn to_bytes_with_provider<PStream: wrt_foundation::MemoryProvider>(
-        &self,
-        stream: &mut wrt_foundation::traits::WriteStream,
-        provider: &PStream,
-    ) -> wrt_foundation::Result<()> {
-        self.limits.to_bytes_with_provider(stream, provider)?;
-        stream.write_u8(self.shared as u8)?;
-        Ok(())
-    }
-}
-
-// Implement FromBytes trait for Memory
-impl wrt_foundation::traits::FromBytes for Memory {
-    fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
-        reader: &mut wrt_foundation::traits::ReadStream<'a>,
-        provider: &PStream,
-    ) -> wrt_foundation::Result<Self> {
-        let limits = Limits::from_bytes_with_provider(reader, provider)?;
-        let shared_byte = reader.read_u8()?;
-        let shared = shared_byte != 0;
-        Ok(Self { limits, shared })
-    }
-}
+// Memory serialization methods are inherited from wrt_foundation::types::MemoryType
 
 #[cfg(test)]
 mod tests {

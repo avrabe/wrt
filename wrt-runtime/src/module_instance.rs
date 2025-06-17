@@ -13,13 +13,11 @@ use wrt_debug::{DwarfDebugInfo, LineInfo};
 
 use crate::{global::Global, memory::Memory, module::{Module, MemoryWrapper, TableWrapper, GlobalWrapper}, prelude::{Debug, DefaultProvider, Error, ErrorCategory, FuncType, Result, codes}, table::Table};
 
-// Platform sync primitives
-#[cfg(not(feature = "std"))]
-use wrt_platform::sync::Mutex;
+// Platform sync primitives - use prelude imports for consistency
 #[cfg(feature = "std")]
 use std::sync::{Arc, Mutex};
 #[cfg(not(feature = "std"))]
-use alloc::sync::Arc;
+use crate::prelude::{Arc, Mutex};
 
 // Import format! macro for string formatting
 #[cfg(feature = "std")]
@@ -119,7 +117,8 @@ impl ModuleInstance {
     }
 
     /// Get the function type for a function
-    pub fn function_type(&self, idx: u32) -> Result<FuncType> {
+    #[cfg(any(feature = "std", feature = "alloc"))]
+    pub fn function_type(&self, idx: u32) -> Result<crate::prelude::CoreFuncType> {
         let function = self.module.functions.get(idx as usize).map_err(|_| {
             Error::new(ErrorCategory::Runtime, codes::FUNCTION_NOT_FOUND, "Function index not found")
         })?;
@@ -128,23 +127,25 @@ impl ModuleInstance {
             Error::new(ErrorCategory::Validation, codes::TYPE_MISMATCH, "Type index not found")
         })?;
 
-        // Convert from module's PlatformProvider (8192) to runtime's DefaultProvider (65536)
-        // Since FuncType has a provider parameter, we need to construct a new one with the correct provider
-        let default_provider = DefaultProvider::default();
-        let mut converted_params = wrt_foundation::bounded::BoundedVec::new(default_provider.clone())?;
-        for param in &ty.params {
-            converted_params.push(param)?;
-        }
-        let mut converted_results = wrt_foundation::bounded::BoundedVec::new(default_provider.clone())?;
-        for result in &ty.results {
-            converted_results.push(result)?;
-        }
-        let converted_ty = wrt_foundation::types::FuncType {
-            params: converted_params,
-            results: converted_results,
-        };
+        // Convert from provider-aware FuncType to clean CoreFuncType
+        Ok(crate::prelude::CoreFuncType {
+            params: ty.params.iter().collect(),
+            results: ty.results.iter().collect(),
+        })
+    }
 
-        Ok(converted_ty)
+    /// Get the function type for a function (no_std version)
+    #[cfg(not(any(feature = "std", feature = "alloc")))]
+    pub fn function_type(&self, idx: u32) -> Result<wrt_foundation::types::FuncType> {
+        let function = self.module.functions.get(idx as usize).map_err(|_| {
+            Error::new(ErrorCategory::Runtime, codes::FUNCTION_NOT_FOUND, "Function index not found")
+        })?;
+
+        let ty = self.module.types.get(function.type_idx as usize).map_err(|_| {
+            Error::new(ErrorCategory::Validation, codes::TYPE_MISMATCH, "Type index not found")
+        })?;
+
+        Ok(ty.clone())
     }
 
     /// Add a memory to this instance

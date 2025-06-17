@@ -105,6 +105,11 @@ ci-main: default ci-integrity-checks fmt-check ci-static-analysis ci-test ci-doc
 # Full CI suite - includes longer running checks
 ci-full: ci-main ci-advanced-tests
 
+# Comprehensive build matrix verification with architectural analysis
+verify-build-matrix:
+	@echo "Running comprehensive build matrix verification..."
+	./scripts/verify-build-matrix.sh
+
 # ----------------- Specific Test Runners & Dev Utilities -----------------
 
 # Test wrtd with the example component (release mode)

@@ -5,7 +5,6 @@ mod arithmetic_tests {
     use wrt_error::{codes, ErrorCategory};
     use crate::{
         arithmetic_ops::{ArithmeticContext, ArithmeticOp},
-        instruction_traits::PureInstruction,
         Error, Value,
     };
 

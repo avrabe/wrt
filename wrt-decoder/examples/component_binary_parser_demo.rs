@@ -104,7 +104,8 @@ fn demo_error_handling() {
     }
 
     // Test invalid magic
-    let invalid_magic = vec![0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00];
+    let invalid_magic =
+        vec![0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00];
     match parse_component_binary(&invalid_magic) {
         Ok(_) => println!("❌ Unexpected success with invalid magic"),
         Err(e) => println!("✅ Invalid magic error: {}", e.message()),
@@ -133,7 +134,7 @@ fn demo_cross_environment_compatibility() -> Result<()> {
     #[cfg(all(not(feature = "std")))]
     println!("✅ Running in no_std+alloc environment");
 
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(any(feature = "std",)))]
     println!("✅ Running in pure no_std environment");
 
     println!("   Component parsing successful in current environment");

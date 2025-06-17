@@ -1,11 +1,3 @@
-use std::{
-    any::{Any, TypeId},
-    boxed::Box,
-    collections::BTreeMap as HashMap,
-    fmt,
-    marker::PhantomData,
-    sync::Arc,
-};
 /// Type Conversion Registry
 ///
 /// This module implements a central registry for type conversions between
@@ -19,6 +11,19 @@ use std::{
     fmt,
     marker::PhantomData,
     sync::Arc,
+};
+
+#[cfg(not(feature = "std"))]
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap as HashMap,
+    sync::Arc,
+};
+#[cfg(not(feature = "std"))]
+use core::{
+    any::{Any, TypeId},
+    fmt,
+    marker::PhantomData,
 };
 
 /// Error type for conversion operations
@@ -99,7 +104,7 @@ where
     From: Convertible,
     To: Convertible,
 {
-    fn convert(&self, from: &From) -> Result<To, ConversionError>;
+    fn convert(&self, from: &From) -> core::result::Result<To, ConversionError>;
 }
 
 /// Implementation for function-based converters
@@ -107,16 +112,16 @@ impl<From, To, F> Conversion<From, To> for F
 where
     From: Convertible,
     To: Convertible,
-    F: Fn(&From) -> Result<To, ConversionError> + Send + Sync,
+    F: Fn(&From) -> core::result::Result<To, ConversionError> + Send + Sync,
 {
-    fn convert(&self, from: &From) -> Result<To, ConversionError> {
+    fn convert(&self, from: &From) -> core::result::Result<To, ConversionError> {
         self(from)
     }
 }
 
 /// Type-erased conversion trait object
 trait AnyConversion: Send + Sync {
-    fn convert_any(&self, from: &dyn Any) -> Result<Box<dyn Any>, ConversionError>;
+    fn convert_any(&self, from: &dyn Any) -> core::result::Result<Box<dyn Any>, ConversionError>;
     fn source_type_id(&self) -> TypeId;
     fn target_type_id(&self) -> TypeId;
     fn source_type_name(&self) -> &'static str;
@@ -143,7 +148,7 @@ where
     To: Convertible + 'static,
     C: Conversion<From, To> + 'static,
 {
-    fn convert_any(&self, from: &dyn Any) -> Result<Box<dyn Any>, ConversionError> {
+    fn convert_any(&self, from: &dyn Any) -> core::result::Result<Box<dyn Any>, ConversionError> {
         // Try to downcast to the expected input type
         let from = from.downcast_ref::<From>().ok_or_else(|| ConversionError {
             kind: ConversionErrorKind::InvalidArgument,
@@ -206,7 +211,7 @@ impl TypeConversionRegistry {
     where
         From: Convertible + 'static,
         To: Convertible + 'static,
-        F: Fn(&From) -> Result<To, ConversionError> + Send + Sync + 'static,
+        F: Fn(&From) -> core::result::Result<To, ConversionError> + Send + Sync + 'static,
     {
         let adapter = ConversionAdapter {
             converter,
@@ -232,7 +237,7 @@ impl TypeConversionRegistry {
     }
 
     /// Convert from one type to another
-    pub fn convert<From, To>(&self, from: &From) -> Result<To, ConversionError>
+    pub fn convert<From, To>(&self, from: &From) -> core::result::Result<To, ConversionError>
     where
         From: Convertible + 'static,
         To: Convertible + 'static,
@@ -314,7 +319,7 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a simple conversion function
-        registry.register(|src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
+        registry.register(|src: &TestSourceType| -> core::result::Result<TestTargetType, ConversionError> {
             Ok(TestTargetType(src.0 * 2))
         });
 
@@ -347,7 +352,7 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a conversion
-        registry.register(|src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
+        registry.register(|src: &TestSourceType| -> core::result::Result<TestTargetType, ConversionError> {
             Ok(TestTargetType(src.0))
         });
 
@@ -361,7 +366,7 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a conversion that may fail
-        registry.register(|src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
+        registry.register(|src: &TestSourceType| -> core::result::Result<TestTargetType, ConversionError> {
             if src.0 < 0 {
                 return Err(ConversionError {
                     kind: ConversionErrorKind::OutOfRange,

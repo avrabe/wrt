@@ -8,6 +8,10 @@ use wrt::{stackless::StacklessEngine, values::Value, Module, Result};
 use wrt_foundation::VerificationLevel;
 
 fn main() -> Result<()> {
+    // Initialize global memory system for examples
+    wrt_foundation::memory_system_initializer::presets::development()
+        .map_err(|e| wrt::Error::Instantiation(format!("Memory system init failed: {}", e)))?;
+
     println!("Bounded Collections Example");
     println!("==========================\n");
 

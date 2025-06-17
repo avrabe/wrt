@@ -336,12 +336,12 @@ impl AsyncExecutionEngine {
             #[cfg(feature = "std")]
             executions: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            executions: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            executions: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             
             #[cfg(feature = "std")]
             context_pool: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            context_pool: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            context_pool: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             
             next_execution_id: 1,
             stats: ExecutionStats::new(),
@@ -372,7 +372,7 @@ impl AsyncExecutionEngine {
             #[cfg(feature = "std")]
             children: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            children: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            children: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
         };
         
         self.executions.push(execution).map_err(|_| {
@@ -782,11 +782,11 @@ impl ExecutionContext {
             #[cfg(feature = "std")]
             call_stack: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            call_stack: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            call_stack: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             locals: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            locals: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            locals: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             memory_views: MemoryViews::new(),
         }
     }
@@ -981,7 +981,7 @@ mod tests {
             futures: vec![FutureHandle(1), FutureHandle(2)],
             #[cfg(not(any(feature = "std", )))]
             futures: {
-                let mut futures = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+                let mut futures = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
                 futures.push(FutureHandle(1)).unwrap();
                 futures.push(FutureHandle(2)).unwrap();
                 futures
@@ -990,7 +990,7 @@ mod tests {
             streams: vec![StreamHandle(3)],
             #[cfg(not(any(feature = "std", )))]
             streams: {
-                let mut streams = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+                let mut streams = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
                 streams.push(StreamHandle(3)).unwrap();
                 streams
             },

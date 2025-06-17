@@ -4,7 +4,6 @@
 //! environments, particularly in pure no_std without allocation.
 
 // For testing in a no_std environment
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Binary std/no_std choice
 #[cfg(test)]

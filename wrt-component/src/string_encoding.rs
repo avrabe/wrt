@@ -3,7 +3,6 @@
 //! This module provides encoding and decoding support for various string
 //! encodings used in the WebAssembly Component Model canonical ABI.
 
-use crate::prelude::*;
 
 /// Supported string encodings in the Component Model
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

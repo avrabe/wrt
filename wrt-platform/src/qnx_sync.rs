@@ -6,6 +6,7 @@
 //! This module implements futex-like primitives using QNX's pulse-based
 //! synchronization mechanisms, suitable for real-time, safety-critical systems.
 
+
 use core::{
     fmt::{self, Debug},
     sync::atomic::{AtomicU32, Ordering},

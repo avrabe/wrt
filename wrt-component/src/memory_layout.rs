@@ -313,7 +313,7 @@ impl CanonicalMemoryPool {
     pub fn new() -> Self {
         Self {
             #[cfg(not(any(feature = "std", )))]
-            pools: [BoundedVec::new(DefaultMemoryProvider::default()).unwrap(), BoundedVec::new(DefaultMemoryProvider::default()).unwrap(), BoundedVec::new(DefaultMemoryProvider::default()).unwrap(), BoundedVec::new(DefaultMemoryProvider::default()).unwrap()],
+            pools: [BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(), BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(), BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(), BoundedVec::new(NoStdProvider::<65536>::default()).unwrap()],
             #[cfg(feature = "std")]
             pools: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
             size_classes: [64, 256, 1024, 4096],

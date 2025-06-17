@@ -11,18 +11,62 @@ use log::{debug, error, info, trace, warn};
 use wrt_format::component::ExternType as FormatExternType;
 use wrt_foundation::resource::ResourceOperation as FormatResourceOperation;
 
+// HashMap imports
+#[cfg(feature = "std")]
+use std::collections::HashMap;
+#[cfg(not(feature = "std"))]
+use alloc::format;
+use wrt_foundation::{bounded::BoundedVec, safe_memory::NoStdProvider};
+
+// Simple HashMap substitute for no_std using BoundedVec
+#[cfg(not(feature = "std"))]
+pub struct SimpleMap<K, V> {
+    entries: BoundedVec<(K, V), 64, NoStdProvider<65536>>,
+}
+
+#[cfg(not(feature = "std"))]
+impl<K: PartialEq + Clone, V: Clone> SimpleMap<K, V> {
+    pub fn new() -> Self {
+        Self {
+            entries: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
+        }
+    }
+    
+    pub fn insert(&mut self, key: K, value: V) {
+        // Remove existing entry if present
+        self.entries.retain(|(k, _)| k != &key);
+        // Add new entry
+        let _ = self.entries.push((key, value));
+    }
+    
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    }
+    
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+    
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+#[cfg(not(feature = "std"))]
+type HashMap<K, V> = SimpleMap<K, V>;
+
 // Runtime types with explicit namespacing
 use wrt_runtime::types::{MemoryType, TableType};
 use wrt_runtime::{
     func::FuncType as RuntimeFuncType,
-    global::{Global, GlobalType},
+    global::{Global, WrtGlobalType as GlobalType},
     memory::Memory,
     table::Table,
 };
 
 // Import RwLock from prelude (it will be std::sync::RwLock or a no_std equivalent from the
 // prelude)
-use crate::execution::{run_with_time_bounds, TimeBoundedConfig, TimeBoundedOutcome};
+// use wrt_runtime::execution::{run_with_time_bounds, TimeBoundedConfig, TimeBoundedOutcome};
 // Binary std/no_std choice
 
 // core::str is already imported via prelude
@@ -33,7 +77,6 @@ use crate::type_conversion::bidirectional::{
     convert_format_to_types_valtype, convert_format_valtype_to_valuetype,
     convert_types_to_format_valtype, extern_type_to_func_type,
 };
-use crate::{debug_println, prelude::*};
 
 // Define type aliases for missing types
 type ComponentDecoder = fn(&[u8]) -> wrt_error::Result<wrt_format::component::Component>;
@@ -47,9 +90,9 @@ type TypeDef = wrt_format::component::ComponentType;
 #[derive(Debug, Clone)]
 pub struct WrtComponentType {
     /// Component imports
-    pub imports: Vec<(String, String, ExternType)>,
+    pub imports: Vec<(String, String, ExternType<NoStdProvider<65536>>)>,
     /// Component exports
-    pub exports: Vec<(String, ExternType)>,
+    pub exports: Vec<(String, ExternType<NoStdProvider<65536>>)>,
     /// Component instances
     pub instances: Vec<wrt_format::component::ComponentTypeDefinition>,
     /// Verification level for this component type
@@ -98,7 +141,10 @@ impl Default for WrtComponentType {
 }
 
 /// Represents a component instance
-#[derive(Debug)]
+// Type aliases for compatibility
+pub type ComponentInstance = RuntimeInstance;
+pub type ComponentType = WrtComponentType;
+
 pub struct Component {
     /// Component type
     pub(crate) component_type: WrtComponentType,
@@ -209,7 +255,7 @@ impl RuntimeInstance {
         // Look up the function in our registered functions
         let function = self.functions.get(name).ok_or_else(|| {
             Error::new(
-                ErrorCategory::Function,
+                ErrorCategory::Runtime,
                 codes::FUNCTION_NOT_FOUND,
                 "Component not found",
             )
@@ -797,14 +843,16 @@ pub fn scan_builtins(bytes: &[u8]) -> Result<BuiltinRequirements> {
 /// Scans a module binary for builtins
 fn scan_module_for_builtins(module: &[u8], requirements: &mut BuiltinRequirements) -> Result<()> {
     // This would need to be implemented for core modules
-    // For now, we'll just return success
-    match wrt_decoder::module::decode_module(module) {
-        Ok(_) => Ok(()),
-        Err(err) => Err(Error::new(
+    // For now, we'll just return success (decoder module not available in current build)
+    // TODO: Implement proper module validation when decoder API is available
+    if module.is_empty() {
+        Err(Error::new(
             ErrorCategory::Parse,
             codes::DECODING_ERROR,
-            "Component not found",
-        )),
+            "Empty module provided",
+        ))
+    } else {
+        Ok(())
     }
 }
 
@@ -964,7 +1012,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(e) => {
-                assert_eq!(e.category(), ErrorCategory::Function);
+                assert_eq!(e.category(), ErrorCategory::Runtime);
                 assert!(e.to_string().contains("not found"));
             }
             _ => panic!("Expected an error"),

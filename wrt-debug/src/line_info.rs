@@ -104,7 +104,9 @@ mod opcodes {
 
     pub const DW_LNE_END_SEQUENCE: u8 = 1;
     pub const DW_LNE_SET_ADDRESS: u8 = 2;
+    #[allow(dead_code)]
     pub const DW_LNE_DEFINE_FILE: u8 = 3;
+    #[allow(dead_code)]
     pub const DW_LNE_SET_DISCRIMINATOR: u8 = 4;
 }
 

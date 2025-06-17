@@ -8,14 +8,17 @@
 //! that can be called from WebAssembly components.
 
 // Use the prelude for consistent imports
-use crate::prelude::{Any, Eq, Error, ErrorCategory, PartialEq, Result, Value};
+use crate::prelude::{Any, Eq, PartialEq, Result, Value, Error, ErrorCategory};
 
 // Value vectors for function parameters/returns
 #[cfg(feature = "std")]
 type ValueVec = Vec<Value>;
 
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
-type ValueVec = wrt_foundation::BoundedVec<Value, 16, wrt_foundation::NoStdProvider<512>>;
+#[cfg(not(feature = "std"))]
+use crate::bounded_host_infra::HostProvider;
+
+#[cfg(not(feature = "std"))]
+type ValueVec = wrt_foundation::BoundedVec<Value, 16, HostProvider>;
 
 /// A trait for functions that can be cloned and operate on value vectors.
 /// This is used for storing host functions that can be called by the Wasm
@@ -30,7 +33,7 @@ pub trait FnWithVecValue: Send + Sync {
 }
 
 /// Simplified trait for `no_std` environments without dynamic dispatch
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 pub trait FnWithVecValue: Send + Sync {
     /// Calls the function with the given target and arguments.
     fn call(&self, target: &mut dyn Any, args: ValueVec) -> Result<ValueVec>;
@@ -52,7 +55,7 @@ where
     }
 }
 
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 impl<F> FnWithVecValue for F
 where
     F: Fn(&mut dyn Any) -> Result<ValueVec> + Send + Sync + Clone + 'static,
@@ -70,7 +73,7 @@ where
 pub struct CloneableFn(Box<dyn FnWithVecValue>);
 
 /// Simplified function wrapper for `no_std` environments
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 pub struct CloneableFn;
 
 #[cfg(feature = "std")]
@@ -91,7 +94,7 @@ impl CloneableFn {
     }
 }
 
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 impl CloneableFn {
     /// Creates a new `CloneableFn` from a closure.
     ///
@@ -122,7 +125,7 @@ impl Clone for CloneableFn {
             Self(self.0.clone_box())
         }
         
-        #[cfg(all(not(feature = "std"), not(feature = "std")))]
+        #[cfg(not(feature = "std"))]
         {
             // In no_std mode, create a default function
             CloneableFn
@@ -143,7 +146,7 @@ impl Eq for CloneableFn {}
 pub type HostFunctionHandler = CloneableFn;
 
 // Implement required traits for CloneableFn to work with BoundedMap in no_std mode
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 impl wrt_foundation::traits::Checksummable for CloneableFn {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
         // Function pointers can't be meaningfully checksummed, use a placeholder
@@ -151,7 +154,7 @@ impl wrt_foundation::traits::Checksummable for CloneableFn {
     }
 }
 
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 impl wrt_foundation::traits::ToBytes for CloneableFn {
     fn serialized_size(&self) -> usize {
         // Function pointers can't be serialized, return 0
@@ -168,7 +171,7 @@ impl wrt_foundation::traits::ToBytes for CloneableFn {
     }
 }
 
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 impl wrt_foundation::traits::FromBytes for CloneableFn {
     fn from_bytes_with_provider<P: wrt_foundation::MemoryProvider>(
         _reader: &mut wrt_foundation::traits::ReadStream<'_>,
@@ -183,7 +186,7 @@ impl wrt_foundation::traits::FromBytes for CloneableFn {
     }
 }
 
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 impl Default for CloneableFn {
     fn default() -> Self {
         CloneableFn::new(|_| Err(wrt_foundation::Error::new(
@@ -197,6 +200,7 @@ impl Default for CloneableFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+use wrt_foundation::safe_managed_alloc;
 
     #[test]
     fn test_cloneable_fn() {
@@ -204,9 +208,13 @@ mod tests {
             #[cfg(feature = "std")]
             return Ok(vec![Value::I32(42)]);
             
-            #[cfg(all(not(feature = "std"), not(feature = "std")))]
+            #[cfg(not(feature = "std"))]
             {
-                let provider = wrt_foundation::NoStdProvider::default();
+                // TODO: Specify appropriate size for this allocation
+
+                let guard = safe_managed_alloc!(8192, CrateId::Host)?;
+
+                let provider = unsafe { guard.release() };
                 let mut vec = ValueVec::new(provider).unwrap();
                 vec.push(Value::I32(42)).unwrap();
                 Ok(vec)
@@ -218,9 +226,13 @@ mod tests {
         
         #[cfg(feature = "std")]
         let empty_args = vec![];
-        #[cfg(all(not(feature = "std"), not(feature = "std")))]
+        #[cfg(not(feature = "std"))]
         let empty_args = {
-            let provider = wrt_foundation::NoStdProvider::default();
+            // TODO: Specify appropriate size for this allocation
+
+            let guard = safe_managed_alloc!(8192, CrateId::Host)?;
+
+            let provider = unsafe { guard.release() };
             ValueVec::new(provider).unwrap()
         };
         
@@ -244,9 +256,13 @@ mod tests {
             #[cfg(feature = "std")]
             return Ok(vec![Value::I32(42)]);
             
-            #[cfg(all(not(feature = "std"), not(feature = "std")))]
+            #[cfg(not(feature = "std"))]
             {
-                let provider = wrt_foundation::NoStdProvider::default();
+                // TODO: Specify appropriate size for this allocation
+
+                let guard = safe_managed_alloc!(8192, CrateId::Host)?;
+
+                let provider = unsafe { guard.release() };
                 let mut vec = ValueVec::new(provider).unwrap();
                 vec.push(Value::I32(42)).unwrap();
                 Ok(vec)
@@ -257,9 +273,13 @@ mod tests {
         
         #[cfg(feature = "std")]
         let empty_args = vec![];
-        #[cfg(all(not(feature = "std"), not(feature = "std")))]
+        #[cfg(not(feature = "std"))]
         let empty_args = {
-            let provider = wrt_foundation::NoStdProvider::default();
+            // TODO: Specify appropriate size for this allocation
+
+            let guard = safe_managed_alloc!(8192, CrateId::Host)?;
+
+            let provider = unsafe { guard.release() };
             ValueVec::new(provider).unwrap()
         };
         

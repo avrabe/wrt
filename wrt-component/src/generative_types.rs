@@ -1,17 +1,19 @@
-#[cfg(not(feature = "std"))]
-use std::{collections::BTreeMap, vec::Vec};
 #[cfg(feature = "std")]
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, vec::Vec};
+#[cfg(not(feature = "std"))]
+use alloc::{collections::BTreeMap, vec::Vec};
 
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use wrt_foundation::{
-    bounded_collections::{BoundedVec, MAX_GENERATIVE_TYPES},
+    bounded::{BoundedVec, MAX_GENERATIVE_TYPES},
     component_value::ComponentValue,
-    resource::{ResourceHandle, ResourceType},
+    resource::{ResourceType},
+    safe_memory::NoStdProvider,
 };
 
 use crate::{
+    resource_management::ResourceHandle,
     type_bounds::{RelationResult, TypeBoundsChecker},
     types::{ComponentError, ComponentInstanceId, ResourceId, TypeId},
 };
@@ -40,8 +42,8 @@ pub enum BoundKind {
 pub struct GenerativeTypeRegistry {
     next_type_id: AtomicU32,
     instance_types:
-        BTreeMap<ComponentInstanceId, BoundedVec<GenerativeResourceType, MAX_GENERATIVE_TYPES>, NoStdProvider<65536>>,
-    type_bounds: BTreeMap<TypeId, BoundedVec<TypeBound, MAX_GENERATIVE_TYPES>, NoStdProvider<65536>>,
+        BTreeMap<ComponentInstanceId, BoundedVec<GenerativeResourceType, MAX_GENERATIVE_TYPES, NoStdProvider<65536>>, NoStdProvider<65536>>,
+    type_bounds: BTreeMap<TypeId, BoundedVec<TypeBound, MAX_GENERATIVE_TYPES, NoStdProvider<65536>>, NoStdProvider<65536>>,
     resource_mappings: BTreeMap<ResourceHandle, GenerativeResourceType>,
     bounds_checker: TypeBoundsChecker,
 }
@@ -61,14 +63,14 @@ impl GenerativeTypeRegistry {
         &mut self,
         base_type: ResourceType,
         instance_id: ComponentInstanceId,
-    ) -> Result<GenerativeResourceType, ComponentError> {
+    ) -> core::result::Result<GenerativeResourceType, ComponentError> {
         let unique_type_id = TypeId(self.next_type_id.fetch_add(1, Ordering::SeqCst));
 
         let generative_type =
             GenerativeResourceType { base_type, instance_id, unique_type_id, generation: 0 };
 
         let instance_types =
-            self.instance_types.entry(instance_id).or_insert_with(|| BoundedVec::new(DefaultMemoryProvider::default()).unwrap());
+            self.instance_types.entry(instance_id).or_insert_with(|| BoundedVec::new(NoStdProvider::<65536>::default()).unwrap());
 
         instance_types
             .push(generative_type.clone())
@@ -89,8 +91,8 @@ impl GenerativeTypeRegistry {
         &mut self,
         type_id: TypeId,
         bound: TypeBound,
-    ) -> Result<(), ComponentError> {
-        let bounds = self.type_bounds.entry(type_id).or_insert_with(|| BoundedVec::new(DefaultMemoryProvider::default()).unwrap());
+    ) -> core::result::Result<(), ComponentError> {
+        let bounds = self.type_bounds.entry(type_id).or_insert_with(|| BoundedVec::new(NoStdProvider::<65536>::default()).unwrap());
 
         bounds.push(bound.clone()).map_err(|_| ComponentError::TooManyTypeBounds)?;
 
@@ -127,7 +129,7 @@ impl GenerativeTypeRegistry {
         &mut self,
         handle: ResourceHandle,
         generative_type: GenerativeResourceType,
-    ) -> Result<(), ComponentError> {
+    ) -> core::result::Result<(), ComponentError> {
         if self.resource_mappings.contains_key(&handle) {
             return Err(ComponentError::ResourceHandleAlreadyExists);
         }
@@ -178,11 +180,11 @@ impl GenerativeTypeRegistry {
         }
     }
 
-    pub fn infer_type_relations(&mut self) -> Result<usize, ComponentError> {
+    pub fn infer_type_relations(&mut self) -> core::result::Result<usize, ComponentError> {
         self.bounds_checker.infer_relations()
     }
 
-    pub fn validate_type_consistency(&self) -> Result<(), ComponentError> {
+    pub fn validate_type_consistency(&self) -> core::result::Result<(), ComponentError> {
         self.bounds_checker.validate_consistency()
     }
 
@@ -195,7 +197,7 @@ impl GenerativeTypeRegistry {
     }
 
     #[cfg(feature = "std")]
-    pub fn validate_type_system(&mut self) -> Result<(), ComponentError> {
+    pub fn validate_type_system(&mut self) -> core::result::Result<(), ComponentError> {
         self.infer_type_relations()?;
         self.validate_type_consistency()?;
 

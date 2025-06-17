@@ -92,6 +92,14 @@ pub mod context;
 pub mod helpers;
 pub mod prelude;
 
+// ASIL safety support (enabled for ASIL-B and above)
+#[cfg(any(feature = "asil-b", feature = "asil-c", feature = "asil-d"))]
+pub mod asil;
+
+// Macros for ASIL-aware error handling
+#[macro_use]
+pub mod macros;
+
 // Include verification module conditionally, but exclude during coverage builds
 #[cfg(all(not(coverage), doc))]
 pub mod verify;
@@ -134,6 +142,16 @@ pub trait ToErrorCategory {
 
 // Re-export additional helpers
 pub use helpers::*;
+
+// Re-export ASIL types when enabled
+#[cfg(any(feature = "asil-b", feature = "asil-c", feature = "asil-d"))]
+pub use asil::{AsilErrorContext, AsilLevel};
+
+#[cfg(any(feature = "asil-c", feature = "asil-d"))]
+pub use asil::SafetyMonitor;
+
+#[cfg(feature = "asil-d")]
+pub use asil::validate_error_consistency;
 
 /// A placeholder function.
 pub const fn placeholder() {}

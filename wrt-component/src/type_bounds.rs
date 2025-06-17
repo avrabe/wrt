@@ -11,7 +11,7 @@ type HashMap<K, V> = BTreeMap<K, V, 64, NoStdProvider<65536>>;
 use core::fmt;
 
 use wrt_foundation::{
-    bounded_collections::{BoundedVec, MAX_GENERATIVE_TYPES},
+    bounded::{BoundedVec, MAX_GENERATIVE_TYPES},
 };
 
 #[cfg(feature = "std")]
@@ -29,7 +29,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeBoundsChecker {
     #[cfg(feature = "std")]
-    type_hierarchy: BTreeMap<TypeId, BoundedVec<TypeRelation, MAX_GENERATIVE_TYPES>>,
+    type_hierarchy: BTreeMap<TypeId, BoundedVec<TypeRelation, MAX_GENERATIVE_TYPES, NoStdProvider<65536>>>,
     #[cfg(not(feature = "std"))]
     type_hierarchy: BTreeMap<TypeId, BoundedVec<TypeRelation, MAX_GENERATIVE_TYPES, NoStdProvider<65536>>, 32, NoStdProvider<65536>>,
     cached_relations: BTreeMap<(TypeId, TypeId), RelationResult>,
@@ -78,7 +78,7 @@ impl TypeBoundsChecker {
         Self { type_hierarchy: BTreeMap::new(), cached_relations: BTreeMap::new() }
     }
 
-    pub fn add_type_bound(&mut self, bound: TypeBound) -> Result<(), ComponentError> {
+    pub fn add_type_bound(&mut self, bound: TypeBound) -> core::result::Result<(), ComponentError> {
         let relation = TypeRelation {
             sub_type: bound.type_id,
             super_type: bound.target_type,
@@ -165,7 +165,7 @@ impl TypeBoundsChecker {
         RelationResult::Violated
     }
 
-    pub fn infer_relations(&mut self) -> Result<usize, ComponentError> {
+    pub fn infer_relations(&mut self) -> core::result::Result<usize, ComponentError> {
         let mut inferred_count = 0;
         let max_iterations = 10;
 
@@ -208,7 +208,7 @@ impl TypeBoundsChecker {
         Ok(inferred_count)
     }
 
-    pub fn validate_consistency(&self) -> Result<(), ComponentError> {
+    pub fn validate_consistency(&self) -> core::result::Result<(), ComponentError> {
         for (type_id, relations) in &self.type_hierarchy {
             for relation in relations.iter() {
                 if *type_id == relation.super_type && relation.relation_kind == RelationKind::Sub {
@@ -252,11 +252,19 @@ impl TypeBoundsChecker {
         subtypes
     }
 
-    fn add_relation(&mut self, relation: TypeRelation) -> Result<(), ComponentError> {
-        let relations =
-            self.type_hierarchy.entry(relation.sub_type).or_insert_with(|| BoundedVec::new(DefaultMemoryProvider::default()).unwrap());
-
-        relations.push(relation).map_err(|_| ComponentError::TooManyTypeBounds)?;
+    fn add_relation(&mut self, relation: TypeRelation) -> core::result::Result<(), ComponentError> {
+        // Check if the key exists, if not insert a new BoundedVec
+        if !self.type_hierarchy.get(&relation.sub_type).is_ok() || self.type_hierarchy.get(&relation.sub_type).unwrap().is_none() {
+            let new_vec = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
+            self.type_hierarchy.insert(relation.sub_type, new_vec).map_err(|_| ComponentError::TooManyTypeBounds)?;
+        }
+        
+        // Now get the existing vector and add to it
+        let relations = self.type_hierarchy.get(&relation.sub_type).unwrap().unwrap();
+        // Note: BoundedMap doesn't support mutable access, so we need to remove, modify, and re-insert
+        let mut updated_relations = relations.clone();
+        updated_relations.push(relation).map_err(|_| ComponentError::TooManyTypeBounds)?;
+        self.type_hierarchy.insert(relation.sub_type, updated_relations).map_err(|_| ComponentError::TooManyTypeBounds)?;
 
         Ok(())
     }

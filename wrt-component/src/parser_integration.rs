@@ -54,7 +54,7 @@ pub enum ValidationLevel {
 pub struct ParsedComponent {
     /// Component type definitions
     #[cfg(feature = "std")]
-    pub types: Vec<ComponentType>,
+    pub types: Vec<ComponentType,
     #[cfg(not(any(feature = "std", )))]
     pub types: BoundedVec<ComponentType, MAX_PARSED_SECTIONS, NoStdProvider<65536>>,
 
@@ -260,17 +260,29 @@ impl ComponentLoader {
     pub fn parse_component(&self, binary_data: &[u8]) -> WrtResult<ParsedComponent> {
         // Validate size
         if binary_data.len() > self.max_component_size {
-            return Err(wrt_foundation::WrtError::invalid_input("Invalid input"));
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ));
         }
 
         // Validate basic structure
         if binary_data.len() < 8 {
-            return Err(wrt_foundation::WrtError::invalid_input("Invalid input"));
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ));
         }
 
         // Check magic bytes (simplified - would check actual WASM component magic)
         if &binary_data[0..4] != b"\x00asm" {
-            return Err(wrt_foundation::WrtError::invalid_input("Invalid input"));
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ));
         }
 
         // Parse sections (simplified implementation)
@@ -300,7 +312,11 @@ impl ComponentLoader {
         let import_name = "default".to_string();
         #[cfg(not(any(feature = "std", )))]
         let import_name = BoundedString::from_str("default")
-            .map_err(|_| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .map_err(|_| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?;
 
         parsed.add_import(ParsedImport {
             name: import_name,
@@ -312,7 +328,11 @@ impl ComponentLoader {
         let export_name = "main".to_string();
         #[cfg(not(any(feature = "std", )))]
         let export_name = BoundedString::from_str("main")
-            .map_err(|_| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .map_err(|_| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?;
 
         parsed.add_export(ParsedExport {
             name: export_name,
@@ -327,8 +347,10 @@ impl ComponentLoader {
         if self.validation_level == ValidationLevel::Basic {
             // Basic validation - check we have at least some content
             if parsed.types.len() == 0 {
-                return Err(wrt_foundation::WrtError::ValidationError(
-                    "Component must have at least one type".into(),
+                return Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::codes::VALIDATION_ERROR,
+                    "Component must have at least one type"
                 ));
             }
         } else if self.validation_level == ValidationLevel::Full {
@@ -430,7 +452,11 @@ impl ComponentLoader {
         let name = "Component not found";
         #[cfg(not(any(feature = "std", )))]
         let name = BoundedString::from_str("module")
-            .map_err(|_| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .map_err(|_| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?;
 
         let adapter = CoreModuleAdapter::new(name);
 
@@ -465,27 +491,27 @@ impl ParsedComponent {
             #[cfg(feature = "std")]
             types: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            types: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            types: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             imports: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            imports: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            imports: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             exports: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            exports: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            exports: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             modules: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            modules: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            modules: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             instances: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            instances: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            instances: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             canonicals: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            canonicals: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            canonicals: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
         }
     }
 
@@ -500,7 +526,11 @@ impl ParsedComponent {
         {
             self.types
                 .push(component_type)
-                .map_err(|_| wrt_foundation::WrtError::ResourceExhausted("Too many types".into()))
+                .map_err(|_| wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many types"
+                ))
         }
     }
 
@@ -515,7 +545,11 @@ impl ParsedComponent {
         {
             self.imports
                 .push(import)
-                .map_err(|_| wrt_foundation::WrtError::ResourceExhausted("Too many imports".into()))
+                .map_err(|_| wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many imports"
+                ))
         }
     }
 
@@ -530,7 +564,11 @@ impl ParsedComponent {
         {
             self.exports
                 .push(export)
-                .map_err(|_| wrt_foundation::WrtError::ResourceExhausted("Too many exports".into()))
+                .map_err(|_| wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many exports"
+                ))
         }
     }
 }

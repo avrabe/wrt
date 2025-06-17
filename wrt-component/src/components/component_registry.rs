@@ -2,7 +2,7 @@
 //!
 //! This module provides registry functionality for components.
 
-use crate::{component::Component, prelude::*};
+use crate::{components::component::Component};
 
 /// Registry for WebAssembly components
 #[derive(Debug, Default)]

@@ -1,16 +1,14 @@
 // WRT - wrt-runtime
-// Module: Foundation Type Stubs (Agent D)
-// TEMPORARY - These stubs will be replaced by Agent A's work
+// Module: Foundation Type Stubs
 //
 // Copyright (c) 2025 The WRT Project Developers
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-//! Temporary stubs for Agent A's foundation types
+//! Foundation type stubs for runtime integration
 //! 
-//! These types allow Agent D to work independently while Agent A
-//! implements the unified type system. They will be removed during
-//! the final integration phase.
+//! These types provide the interface between the runtime
+//! and the unified type system implementation.
 
 #![allow(dead_code)] // Allow during stub phase
 

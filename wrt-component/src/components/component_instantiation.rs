@@ -35,14 +35,19 @@
 //! let instance = linker.instantiate("calculator", &calc_component_binary)?;
 //! ```
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]
 use std::{boxed::Box, collections::HashMap, format, string::String, vec::Vec};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedString as String, BoundedVec as Vec, no_std_hashmap::NoStdHashMap as HashMap, safe_memory::NoStdProvider};
+use wrt_foundation::{bounded::{BoundedString, BoundedVec}, safe_memory::NoStdProvider};
+
+#[cfg(not(feature = "std"))]
+type String = BoundedString<256, NoStdProvider<65536>>;
+
+#[cfg(not(feature = "std"))]
+type Vec<T> = BoundedVec<T, 64, NoStdProvider<65536>>;
 
 // Enable vec! and format! macros for no_std
 #[cfg(not(feature = "std"))]
@@ -51,7 +56,7 @@ extern crate alloc;
 use alloc::{vec, format, boxed::Box};
 
 use crate::canonical_abi::{CanonicalABI, CanonicalMemory, ComponentType, ComponentValue};
-use crate::resources::{
+use crate::resource_management::{
     ResourceData, ResourceHandle, ResourceManager as ComponentResourceManager, ResourceTypeId,
 };
 // use crate::component_communication::{CallRouter, CallContext as CommCallContext};
@@ -122,9 +127,9 @@ pub struct FunctionSignature {
     /// Function name
     pub name: String,
     /// Parameter types
-    pub params: Vec<ComponentType>,
+    pub params: BoundedVec<ComponentType, 16, NoStdProvider<65536>>,
     /// Return types
-    pub returns: Vec<ComponentType>,
+    pub returns: BoundedVec<ComponentType, 16, NoStdProvider<65536>>,
 }
 
 /// Component export definition
@@ -177,33 +182,22 @@ pub enum ImportType {
     Type(ComponentType),
 }
 
-/// Component instance implementation
+/// Component instance implementation (alias to canonical definition)
+pub use crate::types::ComponentInstance;
+
+/// Local instance implementation details
 #[derive(Debug)]
-pub struct ComponentInstance {
-    /// Unique instance identifier
-    pub id: InstanceId,
-    /// Instance name
-    pub name: String,
-    /// Current instance state
-    pub state: InstanceState,
-    /// Instance configuration
-    pub config: InstanceConfig,
-    /// Component exports
-    pub exports: Vec<ComponentExport>,
-    /// Component imports (resolved)
-    pub imports: Vec<ResolvedImport>,
+pub struct ComponentInstanceImpl {
     /// Instance memory
     pub memory: Option<ComponentMemory>,
     /// Canonical ABI for value conversion
     abi: CanonicalABI,
     /// Function table
-    functions: Vec<ComponentFunction>,
+    functions: BoundedVec<ComponentFunction, 128, NoStdProvider<65536>>,
     /// Instance metadata
     metadata: InstanceMetadata,
     /// Resource manager for this instance
     resource_manager: Option<ComponentResourceManager>,
-    // /// Call context manager for cross-component calls
-    // call_context_manager: Option<CallContextManager>,
 }
 
 /// Resolved import with actual provider
@@ -262,7 +256,7 @@ pub struct ComponentMemory {
     /// Current memory size in bytes
     pub current_size: u32,
     /// Memory data (simplified for this implementation)
-    pub data: Vec<u8>,
+    pub data: BoundedVec<u8, 65536, NoStdProvider<65536>>,
 }
 
 /// Instance metadata for debugging and introspection
@@ -513,7 +507,7 @@ impl ComponentInstance {
             } else {
                 Err(Error::new(
                     ErrorCategory::Runtime,
-                    codes::INSTANCE_NOT_FOUND,
+                    codes::VALIDATION_EXPORT_NOT_FOUND,
                     "Instance table not found",
                 ))
             }

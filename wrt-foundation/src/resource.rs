@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 #[cfg(all(not(feature = "std")))]
+use crate::safe_managed_alloc;
 extern crate alloc;
 
 #[cfg(all(not(feature = "std")))]
@@ -162,14 +163,14 @@ pub enum ResourceRepresentation {
     #[cfg(feature = "std")]
     Record(
         BoundedVec<
-            BoundedString<MAX_RESOURCE_FIELD_NAME_LEN, NoStdProvider<0>>,
+            BoundedString<MAX_RESOURCE_FIELD_NAME_LEN, crate::safe_memory::NoStdProvider<4096>>,
             MAX_RESOURCE_FIELDS,
-            NoStdProvider<0>,
+            crate::safe_memory::NoStdProvider<4096>,
         >,
     ),
     /// Aggregate representation with type indices
     #[cfg(feature = "std")]
-    Aggregate(BoundedVec<u32, MAX_RESOURCE_AGGREGATE_IDS, NoStdProvider<0>>),
+    Aggregate(BoundedVec<u32, MAX_RESOURCE_AGGREGATE_IDS, crate::safe_memory::NoStdProvider<4096>>),
     /// Binary std/no_std choice
     #[cfg(not(feature = "std"))]
     Record,
@@ -208,15 +209,18 @@ impl core::str::FromStr for ResourceRepresentation {
             "record" => {
                 #[cfg(feature = "std")]
                 {
-                    Ok(ResourceRepresentation::Record(
-                        BoundedVec::new(NoStdProvider::default()).map_err(|_e| {
-                            wrt_error::Error::new(
-                                wrt_error::ErrorCategory::Memory,
-                                wrt_error::codes::MEMORY_ALLOCATION_ERROR,
-                                "Failed to create BoundedVec for ResourceRepresentation::Record",
-                            )
-                        })?,
-                    ))
+                    use crate::budget_aware_provider::CrateId;
+                    use crate::safe_managed_alloc;
+
+                    let provider = safe_managed_alloc!(4096, CrateId::Foundation)?;
+
+                    Ok(ResourceRepresentation::Record(BoundedVec::new(provider).map_err(|_e| {
+                        wrt_error::Error::new(
+                            wrt_error::ErrorCategory::Memory,
+                            wrt_error::codes::MEMORY_ALLOCATION_ERROR,
+                            "Failed to create BoundedVec for ResourceRepresentation::Record",
+                        )
+                    })?))
                 }
                 #[cfg(not(feature = "std"))]
                 {
@@ -226,15 +230,20 @@ impl core::str::FromStr for ResourceRepresentation {
             "aggregate" => {
                 #[cfg(feature = "std")]
                 {
-                    Ok(ResourceRepresentation::Aggregate(
-                        BoundedVec::new(NoStdProvider::default()).map_err(|_e| {
+                    use crate::budget_aware_provider::CrateId;
+                    use crate::safe_managed_alloc;
+
+                    let provider = safe_managed_alloc!(4096, CrateId::Foundation)?;
+
+                    Ok(ResourceRepresentation::Aggregate(BoundedVec::new(provider).map_err(
+                        |_e| {
                             wrt_error::Error::new(
                                 wrt_error::ErrorCategory::Memory,
                                 wrt_error::codes::MEMORY_ALLOCATION_ERROR,
                                 "Failed to create BoundedVec for ResourceRepresentation::Aggregate",
                             )
-                        })?,
-                    ))
+                        },
+                    )?))
                 }
                 #[cfg(not(feature = "std"))]
                 {

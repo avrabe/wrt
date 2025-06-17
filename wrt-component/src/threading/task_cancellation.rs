@@ -274,7 +274,7 @@ impl CancellationToken {
                 #[cfg(feature = "std")]
                 handlers: Arc::new(std::sync::RwLock::new(Vec::new())),
                 #[cfg(not(any(feature = "std", )))]
-                handlers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                handlers: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             }),
         }
     }
@@ -289,7 +289,7 @@ impl CancellationToken {
                 #[cfg(feature = "std")]
                 handlers: Arc::new(std::sync::RwLock::new(Vec::new())),
                 #[cfg(not(any(feature = "std", )))]
-                handlers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                handlers: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             }),
         }
     }
@@ -432,11 +432,11 @@ impl SubtaskManager {
             #[cfg(feature = "std")]
             subtasks: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            subtasks: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            subtasks: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             completion_handlers: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            completion_handlers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            completion_handlers: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             next_handler_id: 1,
             stats: SubtaskStats::new(),
         }
@@ -612,7 +612,7 @@ impl SubtaskManager {
     }
     
     /// Wait for any subtask to complete
-    pub fn wait_any(&self) -> Result<Option<(ExecutionId, SubtaskResult)>> {
+    pub fn wait_any(&self) -> core::result::Result<Option<(ExecutionId, SubtaskResult)>> {
         // In a real implementation, this would block until any subtask completes
         // For now, we return the first completed result
         for subtask in &self.subtasks {

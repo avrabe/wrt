@@ -266,7 +266,7 @@ Working with WebAssembly names? There's a type for that:
 Real-World Pattern: Ring Buffer 🔄
 ----------------------------------
 
-Here's a production-ready ring buffer using bounded collections:
+Here's an example ring buffer implementation using bounded collections:
 
 .. code-block:: rust
    :caption: Ring buffer for sensor data

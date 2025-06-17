@@ -80,6 +80,9 @@ extern crate alloc;
 // Include prelude for unified imports
 pub mod prelude;
 
+// Bounded infrastructure for intercept collections
+pub mod bounded_intercept;
+
 // Include built-in interception module
 pub mod builtins;
 
@@ -532,7 +535,10 @@ impl LinkInterceptor {
     ///
     /// * `&str` - The interceptor name
     #[must_use] pub fn name(&self) -> &str {
-        self.name
+        #[cfg(feature = "std")]
+        return &self.name;
+        #[cfg(not(feature = "std"))]
+        return self.name;
     }
 
     /// Gets the first strategy in this interceptor

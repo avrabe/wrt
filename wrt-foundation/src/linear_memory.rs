@@ -46,8 +46,13 @@ impl<A: PageAllocator + Send + Sync + Clone + 'static> Allocator for PageAllocat
         // Convert the layout to pages (rounded up)
         let size_pages = (layout.size() + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
         let mut allocator = self.allocator.clone();
-        let (ptr, _size) = allocator.allocate(size_pages as u32, None)
-            .map_err(|_| Error::new(ErrorCategory::Memory, codes::MEMORY_OUT_OF_BOUNDS, "Failed to allocate memory"))?;
+        let (ptr, _size) = allocator.allocate(size_pages as u32, None).map_err(|_| {
+            Error::new(
+                ErrorCategory::Memory,
+                codes::MEMORY_OUT_OF_BOUNDS,
+                "Failed to allocate memory",
+            )
+        })?;
         Ok(ptr.as_ptr())
     }
 

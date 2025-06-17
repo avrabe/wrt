@@ -206,19 +206,19 @@ pub struct AsyncCanonicalAbi {
     #[cfg(feature = "std")]
     streams: BTreeMap<StreamHandle, Box<dyn StreamValue>>,
     #[cfg(not(any(feature = "std", )))]
-    streams: BoundedVec<(StreamHandle, StreamValueEnum), MAX_ASYNC_RESOURCES>,
+    streams: BoundedVec<(StreamHandle, StreamValueEnum), MAX_ASYNC_RESOURCES, NoStdProvider<65536>>,
 
     /// Future registry
     #[cfg(feature = "std")]
     futures: BTreeMap<FutureHandle, Box<dyn FutureValue>>,
     #[cfg(not(any(feature = "std", )))]
-    futures: BoundedVec<(FutureHandle, FutureValueEnum), MAX_ASYNC_RESOURCES>,
+    futures: BoundedVec<(FutureHandle, FutureValueEnum), MAX_ASYNC_RESOURCES, NoStdProvider<65536>>,
 
     /// Error context registry
     #[cfg(feature = "std")]
     error_contexts: BTreeMap<ErrorContextHandle, ErrorContext>,
     #[cfg(not(any(feature = "std", )))]
-    error_contexts: BoundedVec<(ErrorContextHandle, ErrorContext), MAX_ASYNC_RESOURCES>,
+    error_contexts: BoundedVec<(ErrorContextHandle, ErrorContext), MAX_ASYNC_RESOURCES, NoStdProvider<65536>>,
 
     /// Next handle IDs
     next_stream_handle: u32,
@@ -291,15 +291,15 @@ impl AsyncCanonicalAbi {
             #[cfg(feature = "std")]
             streams: BTreeMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            streams: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            streams: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             futures: BTreeMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            futures: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            futures: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             error_contexts: BTreeMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            error_contexts: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            error_contexts: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             next_stream_handle: 0,
             next_future_handle: 0,
             next_error_context_handle: 0,
@@ -322,7 +322,11 @@ impl AsyncCanonicalAbi {
         {
             let stream_enum = StreamValueEnum::Values(stream);
             self.streams.push((handle, stream_enum)).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many streams".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many streams"
+                )
             })?;
         }
 
@@ -336,7 +340,11 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.read()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -360,8 +368,12 @@ impl AsyncCanonicalAbi {
                                 }
                                 #[cfg(not(feature = "std"))]
                                 {
-                                    let mut values = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-                                    values.push(value).map_err(|_| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+                                    let mut values = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
+                                    values.push(value).map_err(|_| wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))?;
                                     Ok(AsyncReadResult::Values(values))
                                 }
                             }
@@ -369,7 +381,11 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
         }
     }
 
@@ -380,7 +396,11 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.write(values)
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -390,14 +410,18 @@ impl AsyncCanonicalAbi {
                     return match stream {
                         StreamValueEnum::Values(ref mut s) => {
                             if s.writable_closed {
-                                return Err(wrt_foundation::WrtError::InvalidState(
-                                    "Stream write end is closed".into(),
+                                return Err(wrt_foundation::Error::new(
+                                    wrt_foundation::ErrorCategory::Runtime,
+                                    wrt_error::codes::RUNTIME_ERROR,
+                                    "Stream write end is closed"
                                 ));
                             }
                             for value in values {
                                 s.buffer.push(value.clone()).map_err(|_| {
-                                    wrt_foundation::WrtError::ResourceExhausted(
-                                        "Stream buffer full".into(),
+                                    wrt_foundation::Error::new(
+                                        wrt_foundation::ErrorCategory::Resource,
+                                        wrt_error::codes::RESOURCE_EXHAUSTED,
+                                        "Stream buffer full"
                                     )
                                 })?;
                             }
@@ -407,7 +431,11 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
         }
     }
 
@@ -418,7 +446,11 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.cancel_read()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -433,7 +465,11 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
         }
     }
 
@@ -444,7 +480,11 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.cancel_write()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -459,7 +499,11 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
         }
     }
 
@@ -470,7 +514,11 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.close_readable()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -485,7 +533,11 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
         }
     }
 
@@ -496,7 +548,11 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.close_writable()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -511,7 +567,11 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
         }
     }
 
@@ -531,7 +591,11 @@ impl AsyncCanonicalAbi {
         {
             let future_enum = FutureValueEnum::Value(future);
             self.futures.push((handle, future_enum)).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many futures".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many futures"
+                )
             })?;
         }
 
@@ -545,7 +609,11 @@ impl AsyncCanonicalAbi {
             if let Some(future) = self.futures.get_mut(&future_handle) {
                 future.read()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -562,8 +630,12 @@ impl AsyncCanonicalAbi {
                                     }
                                     #[cfg(not(feature = "std"))]
                                     {
-                                        let mut values = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-                                        values.push(value).map_err(|_| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+                                        let mut values = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
+                                        values.push(value).map_err(|_| wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))?;
                                         Ok(AsyncReadResult::Values(values))
                                     }
                                 } else {
@@ -577,7 +649,11 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
         }
     }
 
@@ -588,7 +664,11 @@ impl AsyncCanonicalAbi {
             if let Some(future) = self.futures.get_mut(&future_handle) {
                 future.write(value)
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -600,7 +680,11 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
         }
     }
 
@@ -622,7 +706,11 @@ impl AsyncCanonicalAbi {
         #[cfg(not(any(feature = "std", )))]
         {
             self.error_contexts.push((handle, error_context)).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many error contexts".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many error contexts"
+                )
             })?;
         }
 
@@ -633,13 +721,17 @@ impl AsyncCanonicalAbi {
     pub fn error_context_debug_string(
         &self,
         handle: ErrorContextHandle,
-    ) -> WrtResult<BoundedString<2048, NoStdProvider<65536>>> {
+    ) -> Wrtcore::result::Result<BoundedString<2048, NoStdProvider<65536>>> {
         #[cfg(feature = "std")]
         {
             if let Some(error_context) = self.error_contexts.get(&handle) {
                 Ok(error_context.debug_string())
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -649,7 +741,11 @@ impl AsyncCanonicalAbi {
                     return Ok(error_context.debug_string());
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
         }
     }
 
@@ -796,7 +892,7 @@ impl AsyncCanonicalAbi {
             #[cfg(feature = "std")]
             context: Vec::new(), // Values will be serialized separately
             #[cfg(not(any(feature = "std", )))]
-            context: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            context: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             task_handle: None,
         };
 
@@ -860,8 +956,10 @@ where
 
     fn write(&mut self, values: &[Value]) -> WrtResult<()> {
         if self.inner.writable_closed {
-            return Err(wrt_foundation::WrtError::InvalidState(
-                "Stream write end is closed".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Runtime,
+                wrt_error::codes::RUNTIME_ERROR,
+                "Stream write end is closed"
             ));
         }
 
@@ -869,8 +967,10 @@ where
             if let Ok(typed_value) = T::try_from(value.clone()) {
                 self.inner.buffer.push(typed_value);
             } else {
-                return Err(wrt_foundation::WrtError::TypeError(
-                    "Value type mismatch for stream".into(),
+                return Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Type,
+                    wrt_error::codes::TYPE_MISMATCH_ERROR,
+                    "Value type mismatch for stream"
                 ));
             }
         }
@@ -935,7 +1035,11 @@ where
         if let Ok(typed_value) = T::try_from(value.clone()) {
             self.inner.set_value(typed_value)
         } else {
-            Err(wrt_foundation::WrtError::TypeError("Value type mismatch for future".into()))
+            Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Type,
+                wrt_error::codes::TYPE_MISMATCH_ERROR,
+                "Value type mismatch for future"
+            ))
         }
     }
 

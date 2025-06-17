@@ -12,6 +12,8 @@ Comprehensive testing strategies and requirements for WRT development.
    wasm_test_suite
    wast_quick_reference
    coverage_reports
+   formal_verification_guide
+   mcdc_coverage
 
 Testing Strategy
 ================
@@ -21,8 +23,9 @@ WRT employs a multi-layered testing approach:
 1. **Unit Tests**: Test individual components in isolation
 2. **Integration Tests**: Test component interactions
 3. **WASM Test Suite**: Validate WebAssembly specification compliance
-4. **Property Tests**: Verify system properties using formal methods
-5. **Performance Tests**: Benchmark critical paths
+4. **Formal Verification**: Mathematical proofs using KANI (29 properties)
+5. **Property Tests**: Verify system properties using formal methods
+6. **Performance Tests**: Benchmark critical paths
 
 Test Categories
 ===============
@@ -100,15 +103,26 @@ Advanced Testing
 Formal Verification
 -------------------
 
-Kani proofs for critical properties:
+KANI formal verification for mathematical proof of safety properties:
 
 .. code-block:: bash
 
-   # Run Kani proofs
-   cargo xtask ci-advanced-tests
+   # Run all formal verification (29 properties)
+   cargo kani -p wrt-integration-tests --features kani
 
-   # Run specific proof
-   cargo kani --harness proof_name
+   # Run with specific ASIL profile
+   ./scripts/kani-verify.sh --profile asil-c
+
+   # Run specific proof harness
+   cargo kani --harness kani_verify_memory_budget_never_exceeded
+
+   # Check verification readiness
+   ./scripts/check-kani-status.sh
+
+   # Simulate CI workflow locally
+   ./scripts/simulate-ci.sh
+
+For complete formal verification documentation, see :doc:`../../safety/formal_verification`.
 
 Memory Safety Testing
 ---------------------

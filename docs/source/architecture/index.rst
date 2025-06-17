@@ -7,7 +7,12 @@ Software Architecture
    :align: right
    :alt: Architecture Icon
 
-This section provides a comprehensive view of the Pulseengine (WRT Edition) software architecture following ASPICE SWE.2 guidelines. The architecture is designed to be teachable, traceable, and suitable for safety-critical systems.
+This section provides a comprehensive view of the PulseEngine (WRT Edition) software architecture following ASPICE SWE.2 guidelines. The architecture is designed to be teachable, traceable, and suitable for safety-critical systems.
+
+.. warning::
+   **Implementation Status**: This section describes both implemented infrastructure and 
+   planned functionality. Component structure exists but core WebAssembly execution is under 
+   development. See :doc:`test_coverage` for actual implementation metrics.
 
 .. admonition:: Architecture Organization
    :class: note
@@ -152,6 +157,8 @@ Key Architectural Decisions
    intercept_system
    logging
    memory_model
+   memory_safety_comparison
+   static_memory_system
    platform_layer
    qnx_platform
    resource_management

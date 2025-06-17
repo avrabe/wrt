@@ -35,17 +35,20 @@
 //! abi.lower_string(&mut memory, 100, "hello")?;
 //! ```
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]
 use std::{collections::HashMap, string::String, vec::Vec};
 
 #[cfg(all(not(feature = "std")))]
-use std::{collections::BTreeMap as HashMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap as HashMap, string::String, vec::Vec};
 
-#[cfg(not(any(feature = "std", )))]
-use wrt_foundation::{BoundedString, BoundedVec, BoundedMap as HashMap};
+#[cfg(not(feature = "std"))]
+use wrt_foundation::safe_memory::NoStdProvider;
+
+// Note: Using alloc for no_std instead of wrt_foundation bounded types for now
+// #[cfg(not(any(feature = "std", )))]
+// use wrt_foundation::{BoundedString, BoundedVec, BoundedMap as HashMap};
 
 use wrt_error::{codes, Error, ErrorCategory, Result};
 
@@ -149,8 +152,8 @@ pub enum ComponentValue {
     Enum(String),
     /// Optional value
     Option(Option<Box<ComponentValue>>),
-    /// Result value
-    Result(Result<Option<Box<ComponentValue>>, Option<Box<ComponentValue>>>),
+    /// Result value  
+    Result(core::result::Result<Option<Box<ComponentValue>>, Option<Box<ComponentValue>>>),
     /// Flags (bitset)
     Flags(Vec<String>),
 }

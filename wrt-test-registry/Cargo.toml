@@ -34,7 +34,10 @@ runner = ["std"]
 no_std = []
 
 # Disable panic handler for library builds to avoid conflicts
-disable-panic-handler = []
+safety-asil-b = []
+safety-asil-c = ["safety-asil-b"]
+safety-asil-d = ["safety-asil-c"]
+
 
 [dependencies]
 # Core crates
@@ -79,7 +82,7 @@ unsafe_code = "forbid"
 # Rule 1: Language subset
 inline_asm_x86_att_syntax = "warn"
 transmute_ptr_to_ref = "deny"
-type_id = "deny"
+# type_id lint removed - not a valid clippy lint
 dyn_trait = "warn"
 float_arithmetic = "warn"
 # Rule 2: Unsafe usage
@@ -96,7 +99,7 @@ match_wildcard_for_single_variants = "warn"
 never_loop = "warn"
 unreachable = "warn" # Also related to Rule 4
 # Rule 5: Memory & concurrency safety
-static_mut_reference = "deny"
+# static_mut_reference renamed to static_mut_refs in newer Rust versions
 arc_mutate = "deny"
 # Rule 8: Static analysis gates (CI)
 pedantic = "warn"

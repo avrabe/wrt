@@ -5,6 +5,7 @@ use wrt_foundation::{
     NoStdProvider,
 };
 
+use crate::bounded_debug_infra;
 /// Runtime breakpoint management implementation
 /// Provides breakpoint setting, hit detection, and condition evaluation
 use crate::{
@@ -18,7 +19,8 @@ use crate::{
 /// Breakpoint manager for runtime debugging
 pub struct BreakpointManager {
     /// Active breakpoints
-    breakpoints: BoundedVec<Breakpoint, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>>,
+    breakpoints:
+        BoundedVec<Breakpoint, MAX_DWARF_FILE_TABLE, crate::bounded_debug_infra::DebugProvider>,
     /// Next breakpoint ID
     next_id: u32,
     /// Global enable/disable

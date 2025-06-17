@@ -7,7 +7,6 @@ use wrt_error::kinds::PoisonedLockError;
 use wrt_foundation::bounded::BoundedVec;
 
 use super::{ResourceId, ResourceTable};
-use crate::prelude::*;
 
 /// Maximum number of resources that can be managed by a ResourceArena
 pub const MAX_ARENA_RESOURCES: usize = 64;
@@ -31,12 +30,12 @@ pub struct ResourceArena<'a> {
 impl<'a> ResourceArena<'a> {
     /// Create a new resource arena with the given resource table
     pub fn new(table: &'a Mutex<ResourceTable>) -> Result<Self> {
-        Ok(Self { resources: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(), table, name: None })
+        Ok(Self { resources: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(), table, name: None })
     }
 
     /// Create a new resource arena with the given name
     pub fn new_with_name(table: &'a Mutex<ResourceTable>, name: &'a str) -> Result<Self> {
-        Ok(Self { resources: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(), table, name: Some(name) })
+        Ok(Self { resources: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(), table, name: Some(name) })
     }
 
     /// Create a resource in this arena

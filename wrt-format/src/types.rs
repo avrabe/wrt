@@ -61,10 +61,8 @@ pub enum FormatBlockType {
     /// Function type reference
     TypeIndex(u32),
     /// Function type (used for complex block types)
-    #[cfg(feature = "std")]
-    FuncType(wrt_foundation::FuncType<wrt_foundation::traits::DefaultMemoryProvider>),
-    #[cfg(not(any(feature = "std")))]
-    FuncType(wrt_foundation::FuncType<wrt_foundation::NoStdProvider<1024>>),
+    #[cfg(any(feature = "std", feature = "alloc"))]
+    FuncType(wrt_foundation::CleanFuncType),
 }
 
 impl From<FormatBlockType> for BlockType {
@@ -73,8 +71,9 @@ impl From<FormatBlockType> for BlockType {
             FormatBlockType::Empty => BlockType::Value(None),
             FormatBlockType::ValueType(vt) => BlockType::Value(Some(vt)),
             FormatBlockType::TypeIndex(idx) => BlockType::FuncType(idx),
+            #[cfg(any(feature = "std", feature = "alloc"))]
             FormatBlockType::FuncType(_func_type) => BlockType::FuncType(0), /* TODO: proper type
-                                                                              * index mapping */
+                                                                              * index mapping with clean types */
         }
     }
 }

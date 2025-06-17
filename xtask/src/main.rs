@@ -37,6 +37,7 @@ mod wrtd_build;
 mod safety_verification;
 mod safety_verification_unified;
 mod generate_safety_summary;
+mod memory_budget_validation;
 
 // Comment out install_ops and its usage due to missing file
 // mod install_ops;
@@ -93,6 +94,11 @@ pub enum Command {
     SafetyDashboard,
     InitRequirements,
     CiSafety(CiSafetyArgs),
+    // Memory budget validation commands
+    MemoryBudgetAnalyze(MemoryBudgetAnalyzeArgs),
+    MemoryBudgetReport(MemoryBudgetReportArgs),
+    MemoryBudgetValidate(MemoryBudgetValidateArgs),
+    CiMemoryBudget(CiMemoryBudgetArgs),
 }
 
 // Args structs for existing commands
@@ -216,6 +222,34 @@ pub struct CiSafetyArgs {
     pub fail_on_safety_issues: bool,
     #[clap(long, help = "Generate JSON output for CI processing")]
     pub json_output: bool,
+}
+
+#[derive(Debug, Parser)]
+pub struct MemoryBudgetAnalyzeArgs {
+    #[clap(long, help = "Output analysis in JSON format")]
+    pub json: bool,
+}
+
+#[derive(Debug, Parser)]
+pub struct MemoryBudgetReportArgs {
+    #[clap(long, default_value = "./target/memory-reports/report.html", help = "Output path for HTML report")]
+    pub output: String,
+}
+
+#[derive(Debug, Parser)]
+pub struct MemoryBudgetValidateArgs {
+    #[clap(long, default_value = "90", help = "Warning threshold percentage")]
+    pub warning_threshold: u32,
+    #[clap(long, default_value = "100", help = "Critical threshold percentage")]
+    pub critical_threshold: u32,
+}
+
+#[derive(Debug, Parser)]
+pub struct CiMemoryBudgetArgs {
+    #[clap(long, help = "Fail on warnings (not just critical)")]
+    pub fail_on_warning: bool,
+    #[clap(long, help = "Platform to validate (embedded, iot, desktop)")]
+    pub platform: Option<String>,
 }
 
 #[derive(Debug, Parser)]
@@ -687,6 +721,29 @@ async fn main() -> Result<()> {
         Command::CiSafety(args) => {
             return run_ci_safety_verification(args).await;
         }
+        // Memory budget commands
+        Command::MemoryBudgetAnalyze(args) => {
+            memory_budget_validation::analyze_memory_budget(&sh, args.json)?;
+            return Ok(());
+        }
+        Command::MemoryBudgetReport(args) => {
+            memory_budget_validation::generate_memory_report(&sh, &args.output)?;
+            return Ok(());
+        }
+        Command::MemoryBudgetValidate(args) => {
+            let passed = memory_budget_validation::validate_memory_thresholds(
+                &sh,
+                args.warning_threshold,
+                args.critical_threshold,
+            )?;
+            if !passed {
+                std::process::exit(1);
+            }
+            return Ok(());
+        }
+        Command::CiMemoryBudget(args) => {
+            // Handle with Dagger below
+        }
         _ => {
             // Continue to Dagger handling
         }
@@ -712,7 +769,8 @@ async fn main() -> Result<()> {
         | Command::CoverageComprehensive
         | Command::CheckDocsStrict
         | Command::FmtCheck
-        | Command::RunTests => {
+        | Command::RunTests
+        | Command::CiMemoryBudget(_) => {
             connect_opts(dagger_cfg, move |query_client: Query| {
                 let command_to_run = opts.command; // This will now use the moved opts.command
                 let workspace_root_for_closure_dagger = workspace_root_for_dagger.clone(); // This will use the moved workspace_root_for_dagger
@@ -767,6 +825,19 @@ async fn main() -> Result<()> {
                             }
                             Command::FmtCheck => fmt_check::run(&query_client).await,
                             Command::RunTests => test_runner::run(&query_client).await,
+                            Command::CiMemoryBudget(args) => {
+                                if let Some(platform) = &args.platform {
+                                    dagger_pipelines::memory_budget_pipeline::run_platform_specific_validation(
+                                        &query_client,
+                                        platform,
+                                    ).await
+                                } else {
+                                    dagger_pipelines::memory_budget_pipeline::run_memory_budget_validation(
+                                        &query_client,
+                                        args.fail_on_warning,
+                                    ).await
+                                }
+                            }
                             // Other Dagger commands would go here
                             _ => Ok(()), // Should not happen if dispatch logic is correct
                         }

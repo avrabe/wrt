@@ -26,7 +26,7 @@ use wrt_foundation::{
 use crate::async_::async_types::{StreamHandle, FutureHandle, ErrorContextHandle};
 use crate::types::{Value};
 // Note: ComponentInstanceId and TypeId may not exist - using placeholders
-pub type ComponentInstanceId = u32;
+pub use crate::types::ComponentInstanceId;
 pub type TypeId = u32;
 
 use wrt_error::{Error, ErrorCategory, Result};
@@ -214,7 +214,7 @@ impl AsyncResourceCleanupManager {
             #[cfg(feature = "std")]
             cleanup_entries: BTreeMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            cleanup_entries: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            cleanup_entries: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             stats: AsyncCleanupStats::default(),
             next_cleanup_id: 1,
         }
@@ -256,7 +256,7 @@ impl AsyncResourceCleanupManager {
         
         #[cfg(not(any(feature = "std", )))]
         let entries = {
-            let mut found_entries = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            let mut found_entries = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
             let mut index_to_remove = None;
             
             for (i, (id, entries)) in self.cleanup_entries.iter().enumerate() {
@@ -416,7 +416,7 @@ impl AsyncResourceCleanupManager {
             }
             
             if !found {
-                let mut new_entries = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+                let mut new_entries = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
                 new_entries.push(entry).map_err(|_| {
                     Error::new(
                         ErrorCategory::Resource,

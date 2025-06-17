@@ -8,7 +8,6 @@
 // SPDX-License-Identifier: MIT
 
 #![forbid(unsafe_code)] // Rule 2
-#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "std")]
 extern crate std;
@@ -471,6 +470,12 @@ fn test_container_detection() -> Result<(), String> {
 fn main() {
     println!("Running wrt-decoder verification tests...");
 
+    // Initialize global memory system first
+    if let Err(e) = wrt_foundation::memory_system_initializer::presets::development() {
+        eprintln!("Failed to initialize memory system: {}", e);
+        process::exit(1);
+    }
+
     // Register all tests with the global registry
     tests::register_decoder_tests();
 
@@ -485,11 +490,24 @@ fn main() {
         println!("\n❌ Some tests FAILED!");
         process::exit(1);
     }
+
+    // Complete memory system cleanup
+    if let Err(e) = wrt_foundation::memory_system_initializer::complete_global_memory_initialization() {
+        eprintln!("Warning: Failed to complete memory system: {}", e);
+    }
 }
 
 // Entry point for no_std environments
 #[cfg(not(feature = "std"))]
 fn main() -> ! {
+    // Initialize global memory system for embedded environment
+    if let Err(_) = wrt_foundation::memory_system_initializer::presets::embedded(32) { // 32KB budget
+        // In no_std, we can't easily print errors, so we enter an error loop
+        loop {
+            core::hint::spin_loop();
+        }
+    }
+
     // Register all tests with the global registry
     tests::register_decoder_tests();
 

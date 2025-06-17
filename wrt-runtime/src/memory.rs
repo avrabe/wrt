@@ -106,6 +106,7 @@ use wrt_foundation::safe_memory::{
     MemoryProvider, SafeMemoryHandler, SafeSlice, SliceMut as SafeSliceMut,
 };
 use wrt_foundation::MemoryStats;
+use wrt_foundation::budget_aware_provider::CrateId;
 
 #[cfg(not(feature = "std"))]
 use wrt_sync::WrtRwLock as RwLock;
@@ -114,6 +115,7 @@ use wrt_sync::WrtRwLock as RwLock;
 // Temporarily disabled - memory_adapter module is disabled
 // use crate::memory_adapter::StdMemoryProvider;
 use crate::prelude::{Arc, BoundedCapacity, CoreMemoryType, Debug, Eq, Error, ErrorCategory, Ord, PartialEq, Result, TryFrom, VerificationLevel, codes, str};
+use wrt_foundation::types::MemoryType;
 #[cfg(not(feature = "std"))]
 use crate::prelude::vec_with_capacity;
 
@@ -134,10 +136,20 @@ pub const PAGE_SIZE: usize = 65536;
 pub const MAX_PAGES: u32 = 65536;
 
 /// The maximum memory size in bytes (4GB)
-const MAX_MEMORY_BYTES: usize = 4 * 1024 * 1024 * 1024;
+// Unused constant
+// const MAX_MEMORY_BYTES: usize = 4 * 1024 * 1024 * 1024;
+
+/// Convert MemoryType to CoreMemoryType
+fn to_core_memory_type(memory_type: &MemoryType) -> CoreMemoryType {
+    CoreMemoryType {
+        limits: memory_type.limits,
+        shared: memory_type.shared,
+    }
+}
 
 /// Memory size error code (must be u16 to match `Error::new`)
-const MEMORY_SIZE_TOO_LARGE: u16 = 4001;
+// Unused constant
+// const MEMORY_SIZE_TOO_LARGE: u16 = 4001;
 /// Invalid offset error code
 const INVALID_OFFSET: u16 = 4002;
 /// Size too large error code  
@@ -179,7 +191,7 @@ fn usize_to_wasm_u32(size: usize) -> Result<u32> {
 
 /// Memory metrics for tracking usage and safety
 #[derive(Debug)]
-struct MemoryMetrics {
+pub struct MemoryMetrics {
     /// Peak memory usage in bytes
     #[cfg(feature = "std")]
     peak_usage: AtomicUsize,
@@ -219,34 +231,33 @@ struct MemoryMetrics {
     last_access_length: usize,
 }
 
-#[cfg(feature = "std")]
 impl Clone for MemoryMetrics {
     fn clone(&self) -> Self {
-        Self {
-            peak_usage: AtomicUsize::new(self.peak_usage.load(Ordering::Relaxed)),
-            access_count: AtomicU64::new(self.access_count.load(Ordering::Relaxed)),
-            max_access_size: AtomicUsize::new(self.max_access_size.load(Ordering::Relaxed)),
-            unique_regions: AtomicUsize::new(self.unique_regions.load(Ordering::Relaxed)),
-            last_access_offset: AtomicUsize::new(self.last_access_offset.load(Ordering::Relaxed)),
-            last_access_length: AtomicUsize::new(self.last_access_length.load(Ordering::Relaxed)),
+        #[cfg(feature = "std")]
+        {
+            Self {
+                peak_usage: AtomicUsize::new(self.peak_usage.load(Ordering::Relaxed)),
+                access_count: AtomicU64::new(self.access_count.load(Ordering::Relaxed)),
+                max_access_size: AtomicUsize::new(self.max_access_size.load(Ordering::Relaxed)),
+                unique_regions: AtomicUsize::new(self.unique_regions.load(Ordering::Relaxed)),
+                last_access_offset: AtomicUsize::new(self.last_access_offset.load(Ordering::Relaxed)),
+                last_access_length: AtomicUsize::new(self.last_access_length.load(Ordering::Relaxed)),
+            }
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            Self {
+                peak_usage: self.peak_usage,
+                access_count: self.access_count,
+                max_access_size: self.max_access_size,
+                unique_regions: self.unique_regions,
+                last_access_offset: self.last_access_offset,
+                last_access_length: self.last_access_length,
+            }
         }
     }
 }
 
-#[cfg(not(feature = "std"))]
-impl Clone for MemoryMetrics {
-    fn clone(&self) -> Self {
-        // For no_std, fields are directly cloneable (usize, u64)
-        Self {
-            peak_usage: self.peak_usage,
-            access_count: self.access_count,
-            max_access_size: self.max_access_size,
-            unique_regions: self.unique_regions,
-            last_access_offset: self.last_access_offset,
-            last_access_length: self.last_access_length,
-        }
-    }
-}
 
 impl MemoryMetrics {
     #[cfg(feature = "std")]
@@ -372,7 +383,7 @@ impl Default for Memory {
             limits: Limits { min: 1, max: Some(1) },
             shared: false,
         };
-        Self::new(memory_type).unwrap()
+        Self::new(to_core_memory_type(&memory_type)).unwrap()
     }
 }
 
@@ -396,7 +407,8 @@ impl wrt_foundation::traits::ToBytes for Memory {
         _provider: &P,
     ) -> wrt_foundation::Result<()> {
         writer.write_all(&self.ty.limits.min.to_le_bytes())?;
-        writer.write_all(&self.ty.limits.max.unwrap_or(0).to_le_bytes())
+        writer.write_all(&self.ty.limits.max.unwrap_or(0).to_le_bytes())?;
+        Ok(())
     }
 }
 
@@ -418,7 +430,7 @@ impl wrt_foundation::traits::FromBytes for Memory {
             limits: Limits { min, max: if max == 0 { None } else { Some(max) } },
             shared: false,
         };
-        Self::new(memory_type)
+        Self::new(to_core_memory_type(&memory_type))
     }
 }
 
@@ -572,12 +584,13 @@ impl Memory {
     ///
     /// For memory-safe access, prefer using `get_safe_slice()` or
     /// `as_safe_slice()` methods instead.
-    pub fn buffer(&self) -> Result<wrt_foundation::budget_types::RuntimeVec<u8, 4096>> {
+    #[cfg(feature = "std")]
+    pub fn buffer(&self) -> Result<std::vec::Vec<u8>> {
         // Use the SafeMemoryHandler to get data through a safe slice to ensure
         // memory integrity is verified during the operation
         let data_size = self.data.size();
         if data_size == 0 {
-            return wrt_foundation::budget_types::RuntimeVec::new(wrt_foundation::safe_memory::NoStdProvider::<131072>::default());
+            return Ok(std::vec::Vec::new());
         }
 
         // Get a safe slice over the entire memory
@@ -587,12 +600,10 @@ impl Memory {
         let memory_data = safe_slice.data()?;
 
         // Create a new RuntimeVec with the data
-        let mut result = wrt_foundation::budget_types::RuntimeVec::new(wrt_foundation::safe_memory::NoStdProvider::<131072>::default())?;
+        let mut result = std::vec::Vec::with_capacity(data_size);
         for &byte in memory_data.iter().take(result.capacity()) {
-            if result.push(byte).is_err() {
-                break;
+            result.push(byte);
             }
-        }
 
         Ok(result)
     }
@@ -1221,8 +1232,8 @@ impl Memory {
         dst_data[dst_addr..dst_addr + size].copy_from_slice(temp_buf.as_slice());
 
         // Update destination memory
-        self.data.clear();
-        self.data.add_data(&dst_data);
+        self.data.clear()?;
+        self.data.add_data(&dst_data)?;
 
         // Update peak memory usage
         self.update_peak_memory();
@@ -1317,8 +1328,8 @@ impl Memory {
                 }
             }
             // Replace data (simplified - in production would need better approach)
-            self.data.clear();
-            self.data.add_data(current_data.as_slice());
+            self.data.clear()?;
+            self.data.add_data(current_data.as_slice())?;
 
             current_dst += chunk_size;
             remaining -= chunk_size;
@@ -1426,8 +1437,8 @@ impl Memory {
                 }
             }
             // Replace data (simplified approach)
-            self.data.clear();
-            self.data.add_data(current_data.as_slice());
+            self.data.clear()?;
+            self.data.add_data(current_data.as_slice())?;
 
             // Update for next chunk
             src_offset += chunk_size;
@@ -1917,24 +1928,25 @@ impl Memory {
     /// # Returns
     ///
     /// A string containing the statistics
-    pub fn safety_stats(&self) -> wrt_foundation::budget_types::RuntimeString<2048> {
+    #[cfg(feature = "std")]
+    pub fn safety_stats(&self) -> std::string::String {
         let memory_stats = self.memory_stats();
         let access_count = self.access_count();
         let peak_memory = self.peak_memory();
         let max_access = self.max_access_size();
         let unique_regions = self.unique_regions();
 
-        // Create a RuntimeString with formatted stats
-        let stats_str = "Memory Safety Stats: [Runtime memory]";
-        wrt_foundation::budget_types::RuntimeString::from_str(
-            stats_str,
-            wrt_foundation::safe_memory::NoStdProvider::<131072>::default()
-        ).unwrap_or_else(|_| {
-            wrt_foundation::budget_types::RuntimeString::from_str(
-                "", 
-                wrt_foundation::safe_memory::NoStdProvider::<131072>::default()
-            ).unwrap_or_default()
-        })
+        // Create a string with formatted stats
+        "Memory Safety Stats: [Runtime memory]".to_string()
+    }
+
+    /// Get safety statistics for this memory instance (no_std version)
+    #[cfg(not(feature = "std"))]
+    pub fn safety_stats(&self) -> crate::prelude::RuntimeString {
+        use crate::prelude::RuntimeString;
+        let provider = wrt_foundation::NoStdProvider::<1024>::default();
+        RuntimeString::from_str_truncate("Memory Safety Stats: [Runtime memory]", provider)
+            .unwrap_or_else(|_| RuntimeString::from_str_truncate("", provider).unwrap())
     }
 
     /// Returns a `SafeSlice` representing the entire memory
@@ -2101,9 +2113,11 @@ impl MemoryProvider for Memory {
 
     #[cfg(feature = "std")]
     fn get_allocator(&self) -> &Self::Allocator {
-        // Can't return reference to temporary, use lazy static approach
+        // Use default provider for static allocation
         use std::sync::LazyLock;
-        static ALLOCATOR: LazyLock<LargeMemoryProvider> = LazyLock::new(|| LargeMemoryProvider::new());
+        static ALLOCATOR: LazyLock<LargeMemoryProvider> = LazyLock::new(|| {
+            LargeMemoryProvider::default()
+        });
         &ALLOCATOR
     }
     
@@ -2127,7 +2141,7 @@ impl MemoryOperations for Memory {
     fn read_bytes(&self, offset: u32, len: u32) -> Result<Vec<u8>> {
         // Handle zero-length reads
         if len == 0 {
-            return Ok(Vec::new());
+            return Ok(std::vec::Vec::new());
         }
 
         // Convert to usize and check for overflow
@@ -2733,8 +2747,10 @@ mod tests {
         use wrt_foundation::verification::VerificationLevel;
 
         // Create a memory with a specific verification level
-        let mem_type =
-            MemoryType { limits: wrt_foundation::types::Limits { min: 1, max: Some(2) } };
+        let mem_type = MemoryType {
+            limits: wrt_foundation::types::Limits { min: 1, max: Some(2) },
+            shared: false,
+        };
         let mut memory = Memory::new(mem_type)?;
         memory.set_verification_level(VerificationLevel::Full);
 

@@ -304,7 +304,7 @@ impl BuiltinHandler for SafeThreadingStatusHandler {
 pub fn create_safe_threading_handlers(
     executor: Arc<dyn Fn(u32, Vec<ComponentValue>) -> Result<Vec<ComponentValue>> + Send + Sync>,
     module_info: WasmModuleInfo,
-) -> Result<(Arc<WasmThreadManager>, Vec<Box<dyn BuiltinHandler>>)> {
+) -> core::result::Result<(Arc<WasmThreadManager>, Vec<Box<dyn BuiltinHandler>>)> {
     // Create thread pool configuration based on module requirements
     let config = ThreadPoolConfig {
         max_threads: module_info.max_threads,
@@ -346,7 +346,7 @@ pub fn create_safe_threading_handlers(
 pub fn create_safe_threading_handlers(
     _executor: Arc<dyn Fn(u32, Vec<ComponentValue>) -> Result<Vec<ComponentValue>> + Send + Sync>,
     _module_info: WasmModuleInfo,
-) -> Result<(Arc<()>, Vec<Box<dyn BuiltinHandler>>)> {
+) -> core::result::Result<(Arc<()>, Vec<Box<dyn BuiltinHandler>>)> {
     // Threading is not supported in no_std mode
     Ok((Arc::new(()), Vec::new()))
 }

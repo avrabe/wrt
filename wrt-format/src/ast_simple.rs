@@ -3,12 +3,12 @@
 //! This module provides basic AST node definitions that work with the current
 //! wrt-foundation constraints while still providing source location tracking.
 
-#[cfg(feature = "std")]
-use std::{vec::Vec, fmt, boxed::Box};
-#[cfg(all(not(feature = "std")))]
-use std::{vec::Vec, boxed::Box};
 #[cfg(not(feature = "std"))]
 use core::fmt;
+#[cfg(feature = "std")]
+use std::{boxed::Box, fmt, vec::Vec};
+#[cfg(all(not(feature = "std")))]
+use std::{boxed::Box, vec::Vec};
 
 use crate::wit_parser::{WitBoundedString, WitBoundedStringSmall};
 
@@ -273,12 +273,11 @@ impl TypeExpr {
             Self::Primitive(p) => p.span,
             Self::Named(n) => n.span,
             #[cfg(feature = "std")]
-            Self::List(_, span) 
-            | Self::Option(_, span) 
-            | Self::Stream(_, span) 
+            Self::List(_, span)
+            | Self::Option(_, span)
+            | Self::Stream(_, span)
             | Self::Future(_, span) => *span,
-            Self::Own(_, span) 
-            | Self::Borrow(_, span) => *span,
+            Self::Own(_, span) | Self::Borrow(_, span) => *span,
             Self::Result(r) => r.span,
             Self::Tuple(t) => t.span,
         }
@@ -287,10 +286,7 @@ impl TypeExpr {
 
 impl Default for TypeExpr {
     fn default() -> Self {
-        Self::Primitive(PrimitiveType {
-            kind: PrimitiveKind::String,
-            span: SourceSpan::empty(),
-        })
+        Self::Primitive(PrimitiveType { kind: PrimitiveKind::String, span: SourceSpan::empty() })
     }
 }
 

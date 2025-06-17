@@ -3,7 +3,8 @@
 //! This module provides unified component types that integrate with the platform-aware
 //! memory system and resolve type conflicts between different runtime components.
 
-use crate::unified_types::*;
+use crate::platform_runtime::{PlatformMemoryAdapter, create_platform_memory_adapter};
+use crate::unified_types::{ExportMap, ImportMap, MemoryBuffer, RuntimeString, DefaultMediumVec, DefaultRuntimeTypes};
 use wrt_foundation::{
     component::{ComponentType, ExternType},
     safe_memory::{MemoryProvider, NoStdProvider},
@@ -54,11 +55,11 @@ where
     
     /// Memory adapter for this component's allocations
     #[cfg(any(feature = "std", feature = "alloc"))]
-    pub memory_adapter: Box<dyn UnifiedMemoryAdapter<Provider = Provider, Error = wrt_error::Error>>,
+    pub memory_adapter: Box<dyn PlatformMemoryAdapter>,
     
     /// Memory adapter for this component's allocations (no_std version)
     #[cfg(not(any(feature = "std", feature = "alloc")))]
-    pub memory_adapter: PlatformMemoryAdapter<Provider>,
+    pub memory_adapter: Box<dyn PlatformMemoryAdapter>,
     
     /// Exported functions and types from this component
     pub exports: ExportMap<ExternType<Provider>>,
@@ -81,12 +82,7 @@ where
     fn clone(&self) -> Self {
         // Note: This creates a placeholder memory adapter since Box<dyn Trait> can't be cloned
         #[cfg(any(feature = "std", feature = "alloc"))]
-        let memory_adapter = {
-            use crate::prelude::Box;
-            Box::new(PlatformMemoryAdapter::new(64 * 1024 * 1024).unwrap())
-        };
-        #[cfg(not(any(feature = "std", feature = "alloc")))]
-        let memory_adapter = PlatformMemoryAdapter::new(64 * 1024 * 1024).unwrap();
+        let memory_adapter = create_platform_memory_adapter(64 * 1024 * 1024)?;
         
         Self {
             id: self.id,
@@ -106,12 +102,7 @@ where
 {
     fn default() -> Self {
         #[cfg(any(feature = "std", feature = "alloc"))]
-        let memory_adapter = {
-            use crate::prelude::Box;
-            Box::new(PlatformMemoryAdapter::new(64 * 1024 * 1024).unwrap())
-        };
-        #[cfg(not(any(feature = "std", feature = "alloc")))]
-        let memory_adapter = PlatformMemoryAdapter::new(64 * 1024 * 1024).unwrap();
+        let memory_adapter = create_platform_memory_adapter(64 * 1024 * 1024)?;
         Self {
             id: ComponentId::default(),
             component_type: ComponentType::default(),
@@ -188,12 +179,7 @@ where
         let imports = ImportMap::from_bytes_with_provider(reader, provider)?;
         
         #[cfg(any(feature = "std", feature = "alloc"))]
-        let memory_adapter = {
-            use crate::prelude::Box;
-            Box::new(PlatformMemoryAdapter::new(64 * 1024 * 1024).unwrap())
-        };
-        #[cfg(not(any(feature = "std", feature = "alloc")))]
-        let memory_adapter = PlatformMemoryAdapter::new(64 * 1024 * 1024).unwrap();
+        let memory_adapter = create_platform_memory_adapter(64 * 1024 * 1024)?;
         
         Ok(Self {
             id,
@@ -232,7 +218,7 @@ where
     #[cfg(any(feature = "std", feature = "alloc"))]
     pub fn new(
         component_type: ComponentType<Provider>,
-        memory_adapter: Box<dyn UnifiedMemoryAdapter<Provider = Provider, Error = wrt_error::Error>>,
+        memory_adapter: Box<dyn PlatformMemoryAdapter>,
     ) -> core::result::Result<Self, wrt_error::Error> {
         let exports = ExportMap::new(Provider::default())?;
         let imports = ImportMap::new(Provider::default())?;
@@ -252,7 +238,7 @@ where
     #[cfg(not(any(feature = "std", feature = "alloc")))]
     pub fn new(
         component_type: ComponentType<Provider>,
-        memory_adapter: PlatformMemoryAdapter<Provider>,
+        memory_adapter: Box<dyn PlatformMemoryAdapter>,
     ) -> core::result::Result<Self, wrt_error::Error> {
         let exports = ExportMap::new(Provider::default())?;
         let imports = ImportMap::new(Provider::default())?;
@@ -328,11 +314,11 @@ where
     
     /// Global memory adapter for cross-component resources
     #[cfg(any(feature = "std", feature = "alloc"))]
-    global_memory_adapter: Box<dyn UnifiedMemoryAdapter<Provider = Provider, Error = wrt_error::Error>>,
+    global_memory_adapter: Box<dyn PlatformMemoryAdapter>,
     
     /// Global memory adapter for cross-component resources (no_std version)
     #[cfg(not(any(feature = "std", feature = "alloc")))]
-    global_memory_adapter: PlatformMemoryAdapter<Provider>,
+    global_memory_adapter: Box<dyn PlatformMemoryAdapter>,
 }
 
 impl<Provider> UnifiedComponentRuntime<Provider>
@@ -346,10 +332,10 @@ where
         #[cfg(any(feature = "std", feature = "alloc"))]
         let global_memory_adapter = {
             use crate::prelude::Box;
-            Box::new(PlatformMemoryAdapter::from_platform_limits(&limits)?)
+            create_platform_memory_adapter(64 * 1024 * 1024)?
         };
         #[cfg(not(any(feature = "std", feature = "alloc")))]
-        let global_memory_adapter = PlatformMemoryAdapter::from_platform_limits(&limits)?;
+        let global_memory_adapter = create_platform_memory_adapter(64 * 1024 * 1024)?;
         
         Ok(Self {
             instances: DefaultRuntimeTypes::MediumVec::new(Provider::default())?,
@@ -366,10 +352,10 @@ where
         #[cfg(any(feature = "std", feature = "alloc"))]
         let global_memory_adapter = {
             use crate::prelude::Box;
-            Box::new(PlatformMemoryAdapter::new(64 * 1024 * 1024)?) // 64MB default
+            create_platform_memory_adapter(64 * 1024 * 1024)? // 64MB default
         };
         #[cfg(not(any(feature = "std", feature = "alloc")))]
-        let global_memory_adapter = PlatformMemoryAdapter::new(64 * 1024 * 1024)?; // 64MB default
+        let global_memory_adapter = create_platform_memory_adapter(64 * 1024 * 1024)?; // 64MB default
         
         Ok(Self {
             instances: DefaultRuntimeTypes::MediumVec::new(Provider::default())?,
@@ -401,10 +387,10 @@ where
         #[cfg(any(feature = "std", feature = "alloc"))]
         let memory_adapter = {
             use crate::prelude::Box;
-            Box::new(PlatformMemoryAdapter::new(component_memory_limit)?)
+            create_platform_memory_adapter(component_memory_limit)?
         };
         #[cfg(not(any(feature = "std", feature = "alloc")))]
-        let memory_adapter = PlatformMemoryAdapter::new(component_memory_limit)?;
+        let memory_adapter = create_platform_memory_adapter(component_memory_limit)?;
         
         // Parse component type from bytes (simplified)
         let component_type = ComponentType::default(); // TODO: Parse from bytes

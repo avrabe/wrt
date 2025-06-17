@@ -30,7 +30,7 @@
 use wrt_error::kinds::{InvalidArgumentError, NotImplementedError};
 use wrt_format::component::{
     ComponentTypeDefinition, ConstValue as FormatConstValue, ExternType as FormatExternType,
-    ResourceOperation as FormatResourceOperation, ResourceRepresentation, ValType as FormatValType,
+    FormatResourceOperation, ResourceRepresentation, ValType as FormatValType,
 };
 use wrt_foundation::{
     component::{ComponentType, FuncType as TypesFuncType, InstanceType},
@@ -456,7 +456,7 @@ pub fn format_to_runtime_extern_type(
         }
         FormatExternType::Instance { exports } => {
             // Convert each export to a TypesExternType
-            let converted_exports: Result<Vec<(String, TypesExternType)>> = exports
+            let converted_exports: core::result::Result<Vec<(String, TypesExternType)>> = exports
                 .iter()
                 .map(|(name, ext_type)| {
                     Ok((name.clone(), format_to_runtime_extern_type(ext_type)?))
@@ -467,7 +467,7 @@ pub fn format_to_runtime_extern_type(
         }
         FormatExternType::Component { imports, exports } => {
             // Convert imports to TypesExternType
-            let converted_imports: Result<Vec<(String, String, TypesExternType)>> = imports
+            let converted_imports: core::result::Result<Vec<(String, String, TypesExternType)>> = imports
                 .iter()
                 .map(|(ns, name, ext_type)| {
                     Ok((ns.clone(), name.clone(), format_to_runtime_extern_type(ext_type)?))
@@ -475,7 +475,7 @@ pub fn format_to_runtime_extern_type(
                 .collect();
 
             // Convert exports to TypesExternType
-            let converted_exports: Result<Vec<(String, TypesExternType)>> = exports
+            let converted_exports: core::result::Result<Vec<(String, TypesExternType)>> = exports
                 .iter()
                 .map(|(name, ext_type)| {
                     Ok((name.clone(), format_to_runtime_extern_type(ext_type)?))
@@ -566,7 +566,7 @@ pub fn runtime_to_format_extern_type(
         )),
         ExternType::Instance(instance_type) => {
             // Convert exports to FormatExternType
-            let exports_format: Result<Vec<(String, FormatExternType)>> = instance_type
+            let exports_format: core::result::Result<Vec<(String, FormatExternType)>> = instance_type
                 .exports
                 .iter()
                 .map(|(name, ext_type)| {
@@ -578,7 +578,7 @@ pub fn runtime_to_format_extern_type(
         }
         ExternType::Component(component_type) => {
             // Convert imports to FormatExternType
-            let imports_format: Result<Vec<(String, String, FormatExternType)>> = component_type
+            let imports_format: core::result::Result<Vec<(String, String, FormatExternType)>> = component_type
                 .imports
                 .iter()
                 .map(|(ns, name, ext_type)| {
@@ -587,7 +587,7 @@ pub fn runtime_to_format_extern_type(
                 .collect();
 
             // Convert exports to FormatExternType
-            let exports_format: Result<Vec<(String, FormatExternType)>> = component_type
+            let exports_format: core::result::Result<Vec<(String, FormatExternType)>> = component_type
                 .exports
                 .iter()
                 .map(|(name, ext_type)| {
@@ -979,7 +979,7 @@ pub fn complete_types_to_format_extern_type(
         }
         wrt_foundation::ExternType::Instance(instance_type) => {
             // Convert instance exports
-            let exports_result: Result<Vec<(String, FormatExternType)>> = instance_type
+            let exports_result: core::result::Result<Vec<(String, FormatExternType)>> = instance_type
                 .exports
                 .iter()
                 .map(|(name, extern_type)| {
@@ -992,7 +992,7 @@ pub fn complete_types_to_format_extern_type(
         }
         wrt_foundation::ExternType::Component(component_type) => {
             // Convert component imports
-            let imports_result: Result<Vec<(String, String, FormatExternType)>> = component_type
+            let imports_result: core::result::Result<Vec<(String, String, FormatExternType)>> = component_type
                 .imports
                 .iter()
                 .map(|(namespace, name, extern_type)| {
@@ -1002,7 +1002,7 @@ pub fn complete_types_to_format_extern_type(
                 .collect();
 
             // Convert component exports
-            let exports_result: Result<Vec<(String, FormatExternType)>> = component_type
+            let exports_result: core::result::Result<Vec<(String, FormatExternType)>> = component_type
                 .exports
                 .iter()
                 .map(|(name, extern_type)| {
@@ -1114,7 +1114,7 @@ pub fn complete_format_to_types_extern_type(
         }
         FormatExternType::Instance { exports } => {
             // Convert instance exports
-            let export_types: Result<Vec<(String, wrt_foundation::ExternType)>> = exports
+            let export_types: core::result::Result<Vec<(String, wrt_foundation::ExternType)>> = exports
                 .iter()
                 .map(|(name, extern_type)| {
                     let types_extern = complete_format_to_types_extern_type(extern_type)?;
@@ -1128,7 +1128,7 @@ pub fn complete_format_to_types_extern_type(
         }
         FormatExternType::Component { imports, exports } => {
             // Convert component imports
-            let import_types: Result<Vec<(String, String, wrt_foundation::ExternType)>> = imports
+            let import_types: core::result::Result<Vec<(String, String, wrt_foundation::ExternType)>> = imports
                 .iter()
                 .map(|(namespace, name, extern_type)| {
                     let types_extern = complete_format_to_types_extern_type(extern_type)?;
@@ -1137,7 +1137,7 @@ pub fn complete_format_to_types_extern_type(
                 .collect();
 
             // Convert component exports
-            let export_types: Result<Vec<(String, wrt_foundation::ExternType)>> = exports
+            let export_types: core::result::Result<Vec<(String, wrt_foundation::ExternType)>> = exports
                 .iter()
                 .map(|(name, extern_type)| {
                     let types_extern = complete_format_to_types_extern_type(extern_type)?;

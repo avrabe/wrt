@@ -4,15 +4,16 @@
 //! the existing thread management infrastructure, enabling efficient
 //! implementation of memory.atomic.wait and memory.atomic.notify.
 
-use core::time::Duration;
-use std::{boxed::Box, collections::BTreeMap, sync::Arc, vec::Vec};
 
-use wrt_sync::{WrtMutex, WrtRwLock};
-use wrt_error::{Result, Error, ErrorCategory, codes};
+use core::time::Duration;
+use std::{collections::BTreeMap, sync::Arc};
+
+use wrt_sync::WrtRwLock;
+use wrt_error::{Result, ErrorCategory, ErrorSource};
 
 use crate::threading::{
     ThreadSpawnRequest, ThreadPriority, WasmTask, ThreadHandle,
-    ThreadingLimits, ThreadPoolConfig, PlatformThreadPool,
+    ThreadingLimits, ThreadPoolConfig,
 };
 use crate::wasm_thread_manager::{WasmThreadManager, WasmModuleInfo};
 use crate::sync::FutexLike;
@@ -21,7 +22,6 @@ use crate::sync::FutexLike;
 use crate::linux_sync::{LinuxFutex, LinuxFutexBuilder};
 
 /// Atomic wait/notify coordinator that manages futex objects per memory address
-#[derive(Debug)]
 pub struct AtomicCoordinator {
     /// Map of memory addresses to futex objects
     futex_map: Arc<WrtRwLock<BTreeMap<u64, Arc<dyn FutexLike + Send + Sync>>>>,
@@ -90,7 +90,7 @@ impl AtomicCoordinator {
         
         match futex.wait(expected, timeout) {
             Ok(()) => Ok(0), // Woken by notify
-            Err(e) if e.category() == ErrorCategory::System => Ok(2), // Timeout
+            Err(e) if e.to_category() == ErrorCategory::System => Ok(2), // Timeout
             Err(e) => Err(e),
         }
     }
@@ -219,7 +219,7 @@ impl AtomicAwareThreadManager {
     }
     
     /// Shutdown the manager
-    pub fn shutdown(&mut self, timeout: Duration) -> Result<()> {
+    pub fn shutdown(&mut self, _timeout: Duration) -> Result<()> {
         // Clean up atomic operations first
         self.atomic_coordinator.cleanup_futexes();
         

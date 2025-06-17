@@ -1,5 +1,3 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-
 use std::boxed::Box;
 
 pub use wrt_error::{Error, ErrorCategory};

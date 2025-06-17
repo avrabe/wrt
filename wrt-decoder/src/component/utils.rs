@@ -19,7 +19,15 @@ pub fn add_section(binary: &mut Vec<u8>, section_id: u8, content: &[u8]) {
 
 /// Add a section to the binary with the given ID and content (no_std version)
 #[cfg(not(feature = "std"))]
-pub fn add_section(binary: &mut wrt_foundation::BoundedVec<u8, 256, wrt_foundation::safe_memory::NoStdProvider<4096>>, section_id: u8, content: &[u8]) {
+pub fn add_section(
+    binary: &mut wrt_foundation::BoundedVec<
+        u8,
+        256,
+        wrt_foundation::safe_memory::NoStdProvider<4096>,
+    >,
+    section_id: u8,
+    content: &[u8],
+) {
     let _ = binary.try_push(section_id);
     let leb_bytes = write_leb128_u32(content.len() as u32);
     for byte in leb_bytes.iter() {
@@ -32,11 +40,11 @@ pub fn add_section(binary: &mut wrt_foundation::BoundedVec<u8, 256, wrt_foundati
 
 /// Check if a given string is a valid semantic version
 pub fn is_valid_semver(version: &str) -> bool {
-    // Simple semver validation (major.minor.patch) 
+    // Simple semver validation (major.minor.patch)
     // Count dots instead of using collect() to avoid Vec allocation
     let mut part_count = 0;
     let mut last_start = 0;
-    
+
     for (i, ch) in version.char_indices() {
         if ch == '.' {
             let part = &version[last_start..i];
@@ -47,7 +55,7 @@ pub fn is_valid_semver(version: &str) -> bool {
             last_start = i + 1;
         }
     }
-    
+
     // Check last part
     if last_start < version.len() {
         let part = &version[last_start..];
@@ -56,7 +64,7 @@ pub fn is_valid_semver(version: &str) -> bool {
         }
         part_count += 1;
     }
-    
+
     part_count == 3
 }
 
@@ -68,7 +76,7 @@ pub fn is_valid_integrity(integrity: &str) -> bool {
         if dash_pos == 0 || dash_pos == integrity.len() - 1 {
             return false;
         }
-        
+
         let algorithm = &integrity[..dash_pos];
         matches!(algorithm, "sha256" | "sha384" | "sha512")
     } else {
@@ -94,9 +102,7 @@ pub fn is_component(bytes: &[u8]) -> Result<bool> {
 #[cfg(feature = "std")]
 pub fn parse_val_type(bytes: &[u8], offset: usize) -> Result<(FormatValType, usize)> {
     if offset >= bytes.len() {
-        return Err(Error::parse_error(
-            "Unexpected end of binary when parsing ValType",
-        ));
+        return Err(Error::parse_error("Unexpected end of binary when parsing ValType"));
     }
 
     let val_type_byte = bytes[offset];
@@ -129,69 +135,41 @@ pub fn parse_val_type(_bytes: &[u8], _offset: usize) -> Result<(u8, usize)> {
     Err(Error::new(
         ErrorCategory::Validation,
         codes::UNSUPPORTED_OPERATION,
-        "ValType parsing requires std feature"
+        "ValType parsing requires std feature",
     ))
 }
 
 pub fn invalid_component_format(_message: &str) -> Error {
     use wrt_error::{codes, ErrorCategory};
-    Error::new(
-        ErrorCategory::Validation,
-        codes::VALIDATION_ERROR,
-        "Invalid component format"
-    )
+    Error::new(ErrorCategory::Validation, codes::VALIDATION_ERROR, "Invalid component format")
 }
 
 pub fn invalid_component_data(_message: &str) -> Error {
     use wrt_error::{codes, ErrorCategory};
-    Error::new(
-        ErrorCategory::Validation,
-        codes::VALIDATION_ERROR,
-        "Invalid component data"
-    )
+    Error::new(ErrorCategory::Validation, codes::VALIDATION_ERROR, "Invalid component data")
 }
 
 pub fn invalid_component_section(_message: &str) -> Error {
     use wrt_error::{codes, ErrorCategory};
-    Error::new(
-        ErrorCategory::Validation,
-        codes::VALIDATION_ERROR,
-        "Invalid component section"
-    )
+    Error::new(ErrorCategory::Validation, codes::VALIDATION_ERROR, "Invalid component section")
 }
 
 pub fn invalid_component_value(_message: &str) -> Error {
     use wrt_error::{codes, ErrorCategory};
-    Error::new(
-        ErrorCategory::Validation,
-        codes::VALIDATION_ERROR,
-        "Invalid component value"
-    )
+    Error::new(ErrorCategory::Validation, codes::VALIDATION_ERROR, "Invalid component value")
 }
 
 pub fn parse_error(_message: &str) -> Error {
     use wrt_error::{codes, ErrorCategory};
-    Error::new(
-        ErrorCategory::Parse,
-        codes::PARSE_ERROR,
-        "Parse error"
-    )
+    Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Parse error")
 }
 
 pub fn parse_error_with_context(_message: &str, _context: &str) -> Error {
     use wrt_error::{codes, ErrorCategory};
-    Error::new(
-        ErrorCategory::Parse,
-        codes::PARSE_ERROR,
-        "Parse error with context"
-    )
+    Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Parse error with context")
 }
 
 pub fn parse_error_with_position(_message: &str, _position: usize) -> Error {
     use wrt_error::{codes, ErrorCategory};
-    Error::new(
-        ErrorCategory::Parse,
-        codes::PARSE_ERROR,
-        "Parse error at position"
-    )
+    Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Parse error at position")
 }

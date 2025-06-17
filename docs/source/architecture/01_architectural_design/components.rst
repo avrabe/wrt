@@ -4,6 +4,10 @@ Component Definitions
 
 **Teaching Point**: Each component has a single, well-defined responsibility. This page shows how the actual implementation is organized into components.
 
+.. note::
+   **Implementation Status**: Component structure is implemented but functionality varies. 
+   See status markers for each component's actual implementation state.
+
 .. contents:: Component Categories
    :local:
    :depth: 2
@@ -15,10 +19,12 @@ Before defining components, we establish the architectural requirements they mus
 
 .. arch_requirement:: Component Independence
    :id: ARCH_REQ_001
-   :status: implemented
+   :status: partial
    :priority: high
    
    Each component shall be independently testable and deployable with well-defined interfaces.
+   
+   **Status**: Structure implemented, some components have interdependencies.
 
 .. arch_requirement::Component Single Responsibility
    :id: ARCH_REQ_002
@@ -60,10 +66,12 @@ Runtime Core
    :implements: REQ_001, REQ_002, REQ_CORE_001, ARCH_REQ_001, ARCH_REQ_002
    :provides: ARCH_IF_001, ARCH_IF_002
    :requires: ARCH_IF_010, ARCH_IF_011
-   :status: implemented
+   :status: partial
    :links: ARCH_DEC_COMP_001
 
 **Purpose**: Executes WebAssembly instructions and manages runtime state.
+
+**Status**: Infrastructure implemented. Instruction execution engine under development.
 
 **Key Types** (from actual implementation):
 

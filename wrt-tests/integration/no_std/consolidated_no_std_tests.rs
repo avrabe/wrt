@@ -3,7 +3,6 @@
 //! This module consolidates all the no_std_compatibility_test.rs files from across all crates
 //! into a single comprehensive test suite. Each crate's no_std functionality is thoroughly tested.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // External crate imports for no_std environment
 extern crate alloc;
@@ -289,7 +288,8 @@ mod tests {
         use super::*;
         use wrt_platform::{PageAllocator, FutexLike, WASM_PAGE_SIZE};
         use wrt_platform::sync::{SpinFutex, SpinFutexBuilder};
-        use wrt_platform::memory::{NoStdProvider, NoStdProviderBuilder, VerificationLevel};
+        use wrt_platform::memory::{NoStdProvider, VerificationLevel};
+        use wrt_foundation::{WrtProviderFactory, budget_aware_provider::CrateId};
         use core::time::Duration;
 
         #[test]
@@ -313,10 +313,11 @@ mod tests {
 
         #[test]
         fn test_nostd_memory_provider() {
-            let provider = NoStdProviderBuilder::new()
-                .with_size(2048)
-                .with_verification_level(VerificationLevel::Standard)
-                .build();
+            let guard = WrtProviderFactory::create_provider_with_verification::<2048>(
+                CrateId::Platform, 
+                VerificationLevel::Standard
+            ).expect("Failed to create provider");
+            let provider = unsafe { guard.release() };
 
             assert_eq!(provider.verification_level(), VerificationLevel::Standard);
             assert!(provider.capacity() <= 4096); // Capped at 4096 in stub implementation

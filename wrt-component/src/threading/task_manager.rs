@@ -193,11 +193,11 @@ impl TaskManager {
             #[cfg(feature = "std")]
             tasks: BTreeMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            tasks: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            tasks: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             ready_queue: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            ready_queue: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            ready_queue: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             current_task: None,
             next_task_id: 0,
             resource_manager: ResourceLifecycleManager::new(),
@@ -219,8 +219,10 @@ impl TaskManager {
     ) -> WrtResult<TaskId> {
         // Check task limit
         if self.tasks.len() >= self.max_concurrent_tasks {
-            return Err(wrt_foundation::WrtError::ResourceExhausted(
-                "Maximum concurrent tasks reached".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Resource,
+                wrt_error::codes::RESOURCE_EXHAUSTED,
+                "Maximum concurrent tasks reached"
             ));
         }
 
@@ -235,22 +237,22 @@ impl TaskManager {
             #[cfg(feature = "std")]
             subtasks: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            subtasks: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            subtasks: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             borrowed_handles: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            borrowed_handles: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            borrowed_handles: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             context: TaskContext {
                 component_instance,
                 function_index,
                 #[cfg(feature = "std")]
                 call_stack: Vec::new(),
                 #[cfg(not(any(feature = "std", )))]
-                call_stack: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                call_stack: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
                 #[cfg(feature = "std")]
                 storage: BTreeMap::new(),
                 #[cfg(not(any(feature = "std", )))]
-                storage: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                storage: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
                 created_at: self.get_current_time(),
                 deadline: None,
             },
@@ -281,7 +283,11 @@ impl TaskManager {
         #[cfg(not(any(feature = "std", )))]
         {
             self.tasks.push((task_id, task)).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Task storage full".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Task storage full"
+                )
             })?;
         }
 
@@ -328,7 +334,11 @@ impl TaskManager {
                 #[cfg(not(any(feature = "std", )))]
                 {
                     self.ready_queue.push(task_id).map_err(|_| {
-                        wrt_foundation::WrtError::ResourceExhausted("Ready queue full".into())
+                        wrt_foundation::Error::new(
+                            wrt_foundation::ErrorCategory::Resource,
+                            wrt_error::codes::RESOURCE_EXHAUSTED,
+                            "Ready queue full"
+                        )
                     })?;
                 }
             }
@@ -370,10 +380,18 @@ impl TaskManager {
                 self.current_task = Some(task_id);
                 Ok(())
             } else {
-                Err(wrt_foundation::WrtError::InvalidState("Task is not ready to run".into()))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Task is not ready to run"
+                ))
             }
         } else {
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))
         }
     }
 
@@ -388,11 +406,13 @@ impl TaskManager {
                 }
                 #[cfg(not(any(feature = "std", )))]
                 {
-                    let mut bounded_values = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+                    let mut bounded_values = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
                     for value in values {
                         bounded_values.push(value).map_err(|_| {
-                            wrt_foundation::WrtError::ResourceExhausted(
-                                "Too many return values".into(),
+                            wrt_foundation::Error::new(
+                                wrt_foundation::ErrorCategory::Resource,
+                                wrt_error::codes::RESOURCE_EXHAUSTED,
+                                "Too many return values"
                             )
                         })?;
                     }
@@ -405,10 +425,18 @@ impl TaskManager {
                 self.current_task = task.parent;
                 Ok(())
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         } else {
-            Err(wrt_foundation::WrtError::InvalidState("No current task".into()))
+            Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "No current task"
+            ))
         }
     }
 
@@ -429,10 +457,18 @@ impl TaskManager {
                 // Return special value indicating we're waiting
                 Ok(u32::MAX) // Convention: MAX means "blocking"
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         } else {
-            Err(wrt_foundation::WrtError::InvalidState("No current task".into()))
+            Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "No current task"
+            ))
         }
     }
 
@@ -460,10 +496,18 @@ impl TaskManager {
                 self.current_task = task.parent;
                 Ok(())
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ))
             }
         } else {
-            Err(wrt_foundation::WrtError::InvalidState("No current task".into()))
+            Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "No current task"
+            ))
         }
     }
 

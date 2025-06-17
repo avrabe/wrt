@@ -60,10 +60,26 @@ pub mod optimized_string;
 pub mod prelude;
 pub mod streaming_validator;
 
+// Bounded infrastructure for static memory allocation
+#[cfg(not(feature = "std"))]
+pub mod bounded_decoder_infra;
+
+// Section parsing - use bounded version in no_std
+#[cfg(feature = "std")]
+pub mod sections;
+#[cfg(not(feature = "std"))]
+pub mod sections_no_std;
+#[cfg(not(feature = "std"))]
+pub use sections_no_std as sections;
+
 // Conditionally include other modules
 pub mod component;
 #[cfg(feature = "std")]
 pub mod utils;
+
+// Safety-critical memory limits
+#[cfg(feature = "safety-critical")]
+pub mod memory_limits;
 
 // Binary std/no_std choice
 pub mod decoder_no_alloc;
@@ -81,8 +97,9 @@ pub use decoder_no_alloc::{
 };
 // Streaming validator exports
 pub use streaming_validator::{
-    StreamingWasmValidator, PlatformWasmValidatorFactory, WasmRequirements, WasmConfiguration,
-    Section, MemorySection, CodeSection, ComprehensivePlatformLimits, PlatformId,
+    CodeSection, ComprehensivePlatformLimits, MemorySection, PlatformId,
+    PlatformWasmValidatorFactory, Section, StreamingWasmValidator, WasmConfiguration,
+    WasmRequirements,
 };
 pub use wrt_error::{codes, kinds, Error, Result};
 // Essential re-exports only

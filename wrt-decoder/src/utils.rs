@@ -27,12 +27,14 @@ pub fn read_name_as_string(data: &[u8], offset: usize) -> Result<(String, usize)
         #[cfg(not(feature = "std"))]
         Ok(s) => {
             use wrt_foundation::BoundedString;
-            BoundedString::from_str(s).map_err(|_| Error::new(
-                ErrorCategory::Parse,
-                codes::PARSE_ERROR,
-                "String too long for bounded storage",
-            ))?
-        },
+            BoundedString::from_str(s).map_err(|_| {
+                Error::new(
+                    ErrorCategory::Parse,
+                    codes::PARSE_ERROR,
+                    "String too long for bounded storage",
+                )
+            })?
+        }
         Err(_) => {
             return Err(Error::new(
                 ErrorCategory::Parse,

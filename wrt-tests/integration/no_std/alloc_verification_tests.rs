@@ -7,7 +7,6 @@
 //! It's specifically designed to catch regressions in the alloc feature set.
 
 // Binary std/no_std choice
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // External crate imports
 extern crate alloc;

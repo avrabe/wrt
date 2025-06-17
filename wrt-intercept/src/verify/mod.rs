@@ -4,6 +4,7 @@
 //! for the Kani model checker to verify the correctness of
 //! the interceptor implementation.
 
+
 // Only compile Kani verification code when documentation is being generated
 // or when explicitly running cargo kani. This prevents interference with
 // coverage testing.

@@ -23,6 +23,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Full CI suite: `just ci-full`
 - Typecheck: `cargo check`
 
+## Build Matrix Verification
+- **Comprehensive verification**: `just verify-build-matrix`
+  - Tests all ASIL-D, ASIL-C, ASIL-B, development, and server configurations
+  - Performs architectural analysis to identify root causes of failures
+  - Generates detailed reports on ASIL compliance issues
+  - CRITICAL: Run this before any architectural changes or feature additions
+  - Required for all PRs that modify core runtime or safety-critical components
+
+When build failures occur, the script will:
+1. Analyze the root cause (not just symptoms)
+2. Identify if issues are architectural problems affecting ASIL levels
+3. Generate reports with specific remediation steps
+4. Classify failures by their impact on safety compliance
+
 ## Code Style Guidelines
 - Use 4-space indentation
 - Follow Rust naming conventions: snake_case for functions/variables, CamelCase for types
@@ -42,5 +56,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Use conventional commits: `type(scope): short summary`
 - Thoroughly document public API with doc comments
 
+## ASIL Compliance Requirements
+When working on safety-critical components (ASIL-D, ASIL-C, ASIL-B):
+1. **Always run `just verify-build-matrix` before committing**
+2. **No unsafe code** in safety-critical configurations
+3. **Deterministic compilation** - all feature combinations must build consistently
+4. **Memory budget compliance** - no dynamic allocation after initialization for ASIL-D
+5. **Module boundaries** - clear separation between safety-critical and non-critical code
+6. **Formal verification** - Kani proofs must pass for safety-critical paths
+
+## Architectural Analysis
+The build matrix verification performs deep architectural analysis:
+- **Dependency cycles** that violate ASIL modular design
+- **Feature flag interactions** that create compilation conflicts
+- **Memory allocation patterns** incompatible with no_std requirements
+- **Trait coherence issues** indicating poor abstraction boundaries
+- **Import/visibility problems** breaking deterministic builds
+
+If architectural issues are detected, they must be resolved before merging, as they directly impact ASIL compliance and safety certification.
+
 ## Memories
 - can you build and test it
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

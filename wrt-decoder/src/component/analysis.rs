@@ -11,13 +11,11 @@ use wrt_format::{
 
 #[cfg(not(feature = "std"))]
 use wrt_format::binary;
+#[cfg(not(feature = "std"))]
+use wrt_foundation::BoundedCapacity;
 
 use super::types::ModuleInfo;
 use crate::prelude::*;
-use wrt_foundation::traits::BoundedCapacity;
-
-#[cfg(not(feature = "std"))]
-use wrt_foundation::unified_types_simple::EmbeddedTypes;
 
 // Compatibility trait to provide as_bytes() for BoundedString
 #[cfg(not(feature = "std"))]
@@ -26,7 +24,9 @@ pub trait BoundedStringExt {
 }
 
 #[cfg(not(feature = "std"))]
-impl<const N: usize, P: wrt_foundation::MemoryProvider + Default + Clone + PartialEq + Eq> BoundedStringExt for wrt_foundation::BoundedString<N, P> {
+impl<const N: usize, P: wrt_foundation::MemoryProvider + Default + Clone + PartialEq + Eq>
+    BoundedStringExt for wrt_foundation::BoundedString<N, P>
+{
     fn as_bytes(&self) -> &[u8] {
         // This is a workaround - BoundedString doesn't have direct byte access
         // We'll return an empty slice for now and implement properly later
@@ -78,15 +78,23 @@ pub fn extract_embedded_modules(bytes: &[u8]) -> Result<Vec<Vec<u8>>> {
 
 /// Extract embedded WebAssembly modules from a component binary (no_std version)
 #[cfg(not(feature = "std"))]
-pub fn extract_embedded_modules(bytes: &[u8]) -> Result<wrt_foundation::BoundedVec<wrt_foundation::BoundedVec<u8, 128, wrt_foundation::safe_memory::NoStdProvider<2048>>, 16, wrt_foundation::safe_memory::NoStdProvider<2048>>> {
+pub fn extract_embedded_modules(
+    bytes: &[u8],
+) -> Result<
+    wrt_foundation::BoundedVec<
+        wrt_foundation::BoundedVec<u8, 128, wrt_foundation::safe_memory::NoStdProvider<2048>>,
+        16,
+        wrt_foundation::safe_memory::NoStdProvider<2048>,
+    >,
+> {
     use wrt_foundation::safe_memory::NoStdProvider;
-    
-    let provider = NoStdProvider::<2048>::new();
+
+    let provider = NoStdProvider::<2048>::default();
     let modules = wrt_foundation::BoundedVec::new(provider)?;
-    
+
     // Simplified no_std implementation
     // TODO: Implement actual parsing when needed
-    
+
     Ok(modules)
 }
 
@@ -154,16 +162,18 @@ pub fn extract_inline_module(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
 
 /// Extract an inline module from a component (no_std version)
 #[cfg(not(feature = "std"))]
-pub fn extract_inline_module(bytes: &[u8]) -> Result<Option<wrt_foundation::BoundedVec<u8, 128, wrt_foundation::safe_memory::NoStdProvider<2048>>>> {
+pub fn extract_inline_module(
+    bytes: &[u8],
+) -> Result<
+    Option<wrt_foundation::BoundedVec<u8, 128, wrt_foundation::safe_memory::NoStdProvider<2048>>>,
+> {
     // This is a simplified version - the real implementation would try to
     // find the first module in the component
 
     match extract_embedded_modules(bytes) {
-        Ok(modules) if modules.len() > 0 => {
-            match modules.get(0) {
-                Ok(first_module) => Ok(Some(first_module.clone())),
-                Err(_) => Ok(None),
-            }
+        Ok(modules) if modules.len() > 0 => match modules.get(0) {
+            Ok(first_module) => Ok(Some(first_module.clone())),
+            Err(_) => Ok(None),
         },
         Ok(_) => Ok(None),
         Err(e) => Err(e),
@@ -188,8 +198,8 @@ pub fn analyze_component(bytes: &[u8]) -> Result<ComponentSummary> {
             exports_count: 0,
             aliases_count: 0,
             module_info: {
-                use wrt_foundation::memory_system::SmallProvider;
-                let provider = SmallProvider::new();
+                use wrt_foundation::safe_memory::NoStdProvider;
+                let provider = NoStdProvider::<8192>::default();
                 wrt_foundation::BoundedVec::new(provider).unwrap_or_default()
             },
             export_info: (),
@@ -321,7 +331,7 @@ pub fn analyze_component_extended(
     #[cfg(not(feature = "std"))]
     {
         use wrt_foundation::safe_memory::NoStdProvider;
-        let provider = NoStdProvider::<4096>::new();
+        let provider = NoStdProvider::<4096>::default();
         Ok((
             summary,
             wrt_foundation::BoundedVec::new(provider.clone()).unwrap_or_default(), // Import info
@@ -402,7 +412,11 @@ pub struct ComponentSummary {
     /// Number of aliases in the component
     pub aliases_count: u32,
     /// Information about modules in the component
-    pub module_info: wrt_foundation::BoundedVec<CoreModuleInfo, 64, wrt_foundation::memory_system::SmallProvider>,
+    pub module_info: wrt_foundation::BoundedVec<
+        CoreModuleInfo,
+        64,
+        wrt_foundation::safe_memory::NoStdProvider<8192>,
+    >,
     /// Extended information disabled in no_std mode
     pub export_info: (),
     /// Extended information disabled in no_std mode
@@ -478,19 +492,19 @@ impl wrt_foundation::traits::FromBytes for ExtendedImportInfo {
         stream.read_exact(&mut namespace_bytes)?;
         let namespace = String::from_utf8(namespace_bytes)
             .map_err(|_| wrt_foundation::traits::SerializationError::InvalidFormat)?;
-        
+
         let name_len = stream.read_u8()? as usize;
         let mut name_bytes = vec![0u8; name_len];
         stream.read_exact(&mut name_bytes)?;
         let name = String::from_utf8(name_bytes)
             .map_err(|_| wrt_foundation::traits::SerializationError::InvalidFormat)?;
-        
+
         let kind_len = stream.read_u8()? as usize;
         let mut kind_bytes = vec![0u8; kind_len];
         stream.read_exact(&mut kind_bytes)?;
         let kind = String::from_utf8(kind_bytes)
             .map_err(|_| wrt_foundation::traits::SerializationError::InvalidFormat)?;
-        
+
         Ok(ExtendedImportInfo { namespace, name, kind })
     }
 }
@@ -535,33 +549,35 @@ impl wrt_foundation::traits::FromBytes for ExtendedExportInfo {
         let mut name_bytes = vec![0u8; name_len];
         #[cfg(not(feature = "std"))]
         let mut name_bytes = {
-            use wrt_foundation::memory_system::SmallProvider;
-            let provider = SmallProvider::new();
-            let mut vec = wrt_foundation::BoundedVec::<u8, 256, SmallProvider>::new(provider).unwrap_or_default();
+            use wrt_foundation::safe_memory::NoStdProvider;
+            let provider = NoStdProvider::<8192>::default();
+            let mut vec = wrt_foundation::BoundedVec::<u8, 256, NoStdProvider<8192>>::new(provider)
+                .unwrap_or_default();
             vec.resize(name_len, 0u8);
             vec
         };
         stream.read_exact(&mut name_bytes)?;
         let name = String::from_utf8(name_bytes.to_vec())
             .map_err(|_| wrt_foundation::traits::SerializationError::InvalidFormat)?;
-        
+
         let kind_len = stream.read_u8()? as usize;
         #[cfg(feature = "std")]
         let mut kind_bytes = vec![0u8; kind_len];
         #[cfg(not(feature = "std"))]
         let mut kind_bytes = {
-            use wrt_foundation::memory_system::SmallProvider;
-            let provider = SmallProvider::new();
-            let mut vec = wrt_foundation::BoundedVec::<u8, 256, SmallProvider>::new(provider).unwrap_or_default();
+            use wrt_foundation::safe_memory::NoStdProvider;
+            let provider = NoStdProvider::<8192>::default();
+            let mut vec = wrt_foundation::BoundedVec::<u8, 256, NoStdProvider<8192>>::new(provider)
+                .unwrap_or_default();
             vec.resize(kind_len, 0u8);
             vec
         };
         stream.read_exact(&mut kind_bytes)?;
         let kind = String::from_utf8(kind_bytes.to_vec())
             .map_err(|_| wrt_foundation::traits::SerializationError::InvalidFormat)?;
-        
+
         let index = stream.read_u32_le()?;
-        
+
         Ok(ExtendedExportInfo { name, kind, index })
     }
 }
@@ -609,8 +625,8 @@ impl wrt_foundation::traits::FromBytes for ModuleImportInfo {
         let mut bytes = Vec::new();
         #[cfg(not(feature = "std"))]
         let mut bytes = {
-            use wrt_foundation::memory_system::SmallProvider;
-            let provider = SmallProvider::new();
+            use wrt_foundation::safe_memory::NoStdProvider;
+            let provider = NoStdProvider::<8192>::default();
             wrt_foundation::BoundedVec::new(provider).unwrap_or_default()
         };
         loop {
@@ -619,16 +635,20 @@ impl wrt_foundation::traits::FromBytes for ModuleImportInfo {
                 Err(_) => break,
             }
         }
-        
+
         let parts: Vec<&[u8]> = bytes.split(|&b| b == 0).collect();
         if parts.len() >= 3 {
             let index = if parts.len() > 3 && parts[3].len() >= 4 {
                 u32::from_le_bytes([parts[3][0], parts[3][1], parts[3][2], parts[3][3]])
-            } else { 0 };
+            } else {
+                0
+            };
             let module_idx = if parts.len() > 3 && parts[3].len() >= 8 {
                 u32::from_le_bytes([parts[3][4], parts[3][5], parts[3][6], parts[3][7]])
-            } else { 0 };
-            
+            } else {
+                0
+            };
+
             Ok(ModuleImportInfo {
                 module: String::from_utf8_lossy(parts[0]).to_string(),
                 name: String::from_utf8_lossy(parts[1]).to_string(),
@@ -685,8 +705,8 @@ impl wrt_foundation::traits::FromBytes for ModuleExportInfo {
         let mut bytes = Vec::new();
         #[cfg(not(feature = "std"))]
         let mut bytes = {
-            use wrt_foundation::memory_system::SmallProvider;
-            let provider = SmallProvider::new();
+            use wrt_foundation::safe_memory::NoStdProvider;
+            let provider = NoStdProvider::<8192>::default();
             wrt_foundation::BoundedVec::new(provider).unwrap_or_default()
         };
         loop {
@@ -695,16 +715,20 @@ impl wrt_foundation::traits::FromBytes for ModuleExportInfo {
                 Err(_) => break,
             }
         }
-        
+
         let parts: Vec<&[u8]> = bytes.split(|&b| b == 0).collect();
         if parts.len() >= 2 {
             let index = if parts.len() > 2 && parts[2].len() >= 4 {
                 u32::from_le_bytes([parts[2][0], parts[2][1], parts[2][2], parts[2][3]])
-            } else { 0 };
+            } else {
+                0
+            };
             let module_idx = if parts.len() > 2 && parts[2].len() >= 8 {
                 u32::from_le_bytes([parts[2][4], parts[2][5], parts[2][6], parts[2][7]])
-            } else { 0 };
-            
+            } else {
+                0
+            };
+
             Ok(ModuleExportInfo {
                 name: String::from_utf8_lossy(parts[0]).to_string(),
                 kind: String::from_utf8_lossy(parts[1]).to_string(),

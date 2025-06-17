@@ -1,37 +1,249 @@
 // WRT - wrt-runtime
-// Module: Platform Type Stubs (Agent D)
-// TEMPORARY - These stubs will be replaced by Agent B's work
+// Module: Platform Abstraction Interface (PAI)
+// SW-REQ-ID: REQ_PLATFORM_ABSTRACTION_001
 //
 // Copyright (c) 2025 The WRT Project Developers
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-//! Temporary stubs for Agent B's platform types
+//! Platform Abstraction Interface (PAI) for ASIL-compliant runtime
 //! 
-//! These types allow Agent D to work independently while Agent B
-//! implements comprehensive platform detection and limits.
-//! They will be removed during the final integration phase.
+//! This module provides a clean abstraction layer between the runtime
+//! and platform-specific implementations. It ensures deterministic
+//! compilation and proper feature gating for safety-critical systems.
+//!
+//! # Design Principles
+//! - Zero-cost abstractions through compile-time dispatch
+//! - Clear separation between platform-dependent and independent code
+//! - Deterministic feature combinations for ASIL compliance
+//! - No implicit dependencies on platform features
 
-#![allow(dead_code)] // Allow during stub phase
+#![forbid(unsafe_code)] // Platform abstractions must be safe
 
+use core::marker::PhantomData;
+use wrt_error::{Error, ErrorCategory, Result, codes};
+
+// Box for trait objects
 #[cfg(feature = "std")]
 use std::boxed::Box;
-#[cfg(not(feature = "std"))]
-extern crate alloc;
-#[cfg(not(feature = "std"))]
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
 use alloc::boxed::Box;
 
+// Re-export ASIL levels from foundation stubs temporarily
 use super::foundation_stubs::AsilLevel;
 
-/// Platform identification enum
+// Platform-agnostic atomic types
+#[cfg(not(feature = "platform-sync"))]
+mod atomic_fallback {
+    use core::cell::UnsafeCell;
+    use core::sync::atomic::{AtomicBool, Ordering};
+    
+    /// Fallback atomic u32 for platforms without native atomics
+    pub struct AtomicU32 {
+        lock: AtomicBool,
+        value: UnsafeCell<u32>,
+    }
+    
+    unsafe impl Sync for AtomicU32 {}
+    unsafe impl Send for AtomicU32 {}
+    
+    impl AtomicU32 {
+        pub const fn new(value: u32) -> Self {
+            Self {
+                lock: AtomicBool::new(false),
+                value: UnsafeCell::new(value),
+            }
+        }
+        
+        pub fn load(&self, _ordering: Ordering) -> u32 {
+            // Spin lock for safety
+            while self.lock.compare_exchange_weak(
+                false, true, Ordering::Acquire, Ordering::Relaxed
+            ).is_err() {
+                core::hint::spin_loop();
+            }
+            let value = unsafe { *self.value.get() };
+            self.lock.store(false, Ordering::Release);
+            value
+        }
+        
+        pub fn store(&self, value: u32, _ordering: Ordering) {
+            while self.lock.compare_exchange_weak(
+                false, true, Ordering::Acquire, Ordering::Relaxed
+            ).is_err() {
+                core::hint::spin_loop();
+            }
+            unsafe { *self.value.get() = value; }
+            self.lock.store(false, Ordering::Release);
+        }
+        
+        pub fn compare_exchange(
+            &self,
+            current: u32,
+            new: u32,
+            _success: Ordering,
+            _failure: Ordering,
+        ) -> core::result::Result<u32, u32> {
+            while self.lock.compare_exchange_weak(
+                false, true, Ordering::Acquire, Ordering::Relaxed
+            ).is_err() {
+                core::hint::spin_loop();
+            }
+            let old_value = unsafe { *self.value.get() };
+            if old_value == current {
+                unsafe { *self.value.get() = new; }
+                self.lock.store(false, Ordering::Release);
+                Ok(old_value)
+            } else {
+                self.lock.store(false, Ordering::Release);
+                Err(old_value)
+            }
+        }
+        
+        pub fn fetch_add(&self, value: u32, _ordering: Ordering) -> u32 {
+            while self.lock.compare_exchange_weak(
+                false, true, Ordering::Acquire, Ordering::Relaxed
+            ).is_err() {
+                core::hint::spin_loop();
+            }
+            let old_value = unsafe { *self.value.get() };
+            unsafe { *self.value.get() = old_value.wrapping_add(value); }
+            self.lock.store(false, Ordering::Release);
+            old_value
+        }
+    }
+    
+    /// Fallback atomic u64 for platforms without native atomics
+    pub struct AtomicU64 {
+        lock: AtomicBool,
+        value: UnsafeCell<u64>,
+    }
+    
+    unsafe impl Sync for AtomicU64 {}
+    unsafe impl Send for AtomicU64 {}
+    
+    impl AtomicU64 {
+        pub const fn new(value: u64) -> Self {
+            Self {
+                lock: AtomicBool::new(false),
+                value: UnsafeCell::new(value),
+            }
+        }
+        
+        pub fn load(&self, _ordering: Ordering) -> u64 {
+            while self.lock.compare_exchange_weak(
+                false, true, Ordering::Acquire, Ordering::Relaxed
+            ).is_err() {
+                core::hint::spin_loop();
+            }
+            let value = unsafe { *self.value.get() };
+            self.lock.store(false, Ordering::Release);
+            value
+        }
+        
+        pub fn store(&self, value: u64, _ordering: Ordering) {
+            while self.lock.compare_exchange_weak(
+                false, true, Ordering::Acquire, Ordering::Relaxed
+            ).is_err() {
+                core::hint::spin_loop();
+            }
+            unsafe { *self.value.get() = value; }
+            self.lock.store(false, Ordering::Release);
+        }
+        
+        pub fn fetch_add(&self, value: u64, _ordering: Ordering) -> u64 {
+            while self.lock.compare_exchange_weak(
+                false, true, Ordering::Acquire, Ordering::Relaxed
+            ).is_err() {
+                core::hint::spin_loop();
+            }
+            let old_value = unsafe { *self.value.get() };
+            unsafe { *self.value.get() = old_value.wrapping_add(value); }
+            self.lock.store(false, Ordering::Release);
+            old_value
+        }
+    }
+    
+    /// Fallback atomic usize
+    pub type AtomicUsize = core::sync::atomic::AtomicUsize;
+    
+    /// Re-export ordering
+    // Ordering is already imported above
+}
+
+// Platform abstraction layer
+#[cfg(feature = "platform-sync")]
+pub use wrt_platform::sync::{AtomicU32, AtomicU64, AtomicUsize, Ordering as PlatformOrdering};
+
+#[cfg(not(feature = "platform-sync"))]
+pub use self::atomic_fallback::{AtomicU32, AtomicU64, AtomicUsize, Ordering as PlatformOrdering};
+
+// Duration abstraction
+#[cfg(feature = "std")]
+pub use std::time::Duration;
+
+#[cfg(all(not(feature = "std"), feature = "platform-sync"))]
+pub use wrt_platform::sync::Duration;
+
+#[cfg(all(not(feature = "std"), not(feature = "platform-sync")))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Duration {
+    secs: u64,
+    nanos: u32,
+}
+
+#[cfg(all(not(feature = "std"), not(feature = "platform-sync")))]
+impl Duration {
+    pub const fn from_millis(millis: u64) -> Self {
+        Self {
+            secs: millis / 1000,
+            nanos: ((millis % 1000) * 1_000_000) as u32,
+        }
+    }
+    
+    pub const fn as_millis(&self) -> u128 {
+        self.secs as u128 * 1000 + self.nanos as u128 / 1_000_000
+    }
+}
+
+/// Platform identification enum with ASIL mapping
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlatformId {
+    /// Linux - General purpose OS (QM)
     Linux,
+    /// QNX - Safety-critical RTOS (ASIL-B)
     QNX,
+    /// Embedded - Bare metal or RTOS (ASIL-D)
     Embedded,
+    /// macOS - Development platform (QM)
     MacOS,
+    /// Windows - Development platform (QM)
     Windows,
+    /// Unknown platform (QM with restrictions)
     Unknown,
+}
+
+impl PlatformId {
+    /// Get the default ASIL level for this platform
+    pub const fn default_asil_level(&self) -> AsilLevel {
+        match self {
+            PlatformId::Linux => AsilLevel::QM,
+            PlatformId::QNX => AsilLevel::AsilB,
+            PlatformId::Embedded => AsilLevel::AsilD,
+            PlatformId::MacOS => AsilLevel::QM,
+            PlatformId::Windows => AsilLevel::QM,
+            PlatformId::Unknown => AsilLevel::QM,
+        }
+    }
+    
+    /// Check if platform supports dynamic allocation
+    pub const fn supports_dynamic_allocation(&self) -> bool {
+        match self {
+            PlatformId::Linux | PlatformId::MacOS | PlatformId::Windows => true,
+            PlatformId::QNX => true, // Limited support
+            PlatformId::Embedded | PlatformId::Unknown => false,
+        }
+    }
 }
 
 impl Default for PlatformId {
@@ -42,8 +254,10 @@ impl Default for PlatformId {
         return PlatformId::MacOS;
         #[cfg(target_os = "windows")]
         return PlatformId::Windows;
-        #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-        return PlatformId::Unknown;
+        #[cfg(target_os = "nto")]
+        return PlatformId::QNX;
+        #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows", target_os = "nto")))]
+        return PlatformId::Embedded;
     }
 }
 
@@ -160,11 +374,151 @@ impl ComprehensiveLimitProvider for QnxLimitProvider {
     }
 }
 
-/// Create platform-appropriate limit provider
+/// Platform abstraction interface for runtime
+pub trait PlatformInterface: Send + Sync {
+    /// Get platform limits
+    fn limits(&self) -> &ComprehensivePlatformLimits;
+    
+    /// Check if a feature is supported
+    fn supports_feature(&self, feature: PlatformFeature) -> bool;
+    
+    /// Get platform-specific configuration
+    fn get_config<T: PlatformConfig>(&self) -> Option<&T>;
+}
+
+/// Platform features that may or may not be available
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlatformFeature {
+    /// Native atomic operations
+    NativeAtomics,
+    /// Memory-mapped files
+    MemoryMappedFiles,
+    /// Guard pages for memory protection
+    GuardPages,
+    /// Hardware memory tagging
+    MemoryTagging,
+    /// Real-time scheduling
+    RealtimeScheduling,
+    /// Formal verification support
+    FormalVerification,
+}
+
+/// Marker trait for platform-specific configurations
+pub trait PlatformConfig: Send + Sync + 'static {}
+
+/// Create platform abstraction based on compile-time features
+#[cfg(any(feature = "std", feature = "alloc"))]
+pub fn create_platform_interface() -> Result<Box<dyn PlatformInterface>> {
+    #[cfg(feature = "platform-sync")]
+    {
+        // Use full platform abstraction from wrt-platform
+        create_full_platform_interface()
+    }
+    
+    #[cfg(not(feature = "platform-sync"))]
+    {
+        // Use minimal fallback implementation
+        Ok(Box::new(MinimalPlatform::new()))
+    }
+}
+
+/// Create platform interface for pure no_std environments
+#[cfg(not(any(feature = "std", feature = "alloc")))]
+pub fn create_platform_interface() -> Result<&'static dyn PlatformInterface> {
+    // In pure no_std, return a static reference
+    static MINIMAL_PLATFORM: MinimalPlatform = MinimalPlatform {
+        limits: ComprehensivePlatformLimits {
+            platform_id: PlatformId::Embedded,
+            max_total_memory: 256 * 1024,
+            max_wasm_linear_memory: 64 * 1024,
+            max_stack_bytes: 16 * 1024,
+            max_components: 8,
+            max_debug_overhead: 0,
+            asil_level: AsilLevel::AsilD,
+        },
+    };
+    Ok(&MINIMAL_PLATFORM)
+}
+
+/// Minimal platform implementation for no_std without platform features
+struct MinimalPlatform {
+    limits: ComprehensivePlatformLimits,
+}
+
+impl MinimalPlatform {
+    fn new() -> Self {
+        Self {
+            limits: ComprehensivePlatformLimits::minimal(),
+        }
+    }
+}
+
+impl PlatformInterface for MinimalPlatform {
+    fn limits(&self) -> &ComprehensivePlatformLimits {
+        &self.limits
+    }
+    
+    fn supports_feature(&self, feature: PlatformFeature) -> bool {
+        match feature {
+            PlatformFeature::NativeAtomics => false, // Using fallback
+            PlatformFeature::FormalVerification => true, // Always support verification
+            _ => false,
+        }
+    }
+    
+    fn get_config<T: PlatformConfig>(&self) -> Option<&T> {
+        None // No platform-specific config in minimal mode
+    }
+}
+
+#[cfg(feature = "platform-sync")]
+fn create_full_platform_interface() -> Result<Box<dyn PlatformInterface>> {
+    // This would integrate with wrt-platform's full abstraction
+    // For now, return error to indicate implementation needed
+    Err(Error::new(
+        ErrorCategory::NotImplemented,
+        codes::NOT_IMPLEMENTED,
+        "Full platform interface integration pending"
+    ))
+}
+
+/// Create platform-appropriate limit provider (legacy compatibility)
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub fn create_limit_provider() -> Box<dyn ComprehensiveLimitProvider> {
     match PlatformId::default() {
         PlatformId::Linux => Box::new(LinuxLimitProvider),
         PlatformId::QNX => Box::new(QnxLimitProvider),
         _ => Box::new(DefaultLimitProvider),
+    }
+}
+
+/// Create platform limit provider for pure no_std
+#[cfg(not(any(feature = "std", feature = "alloc")))]
+pub fn create_limit_provider() -> &'static dyn ComprehensiveLimitProvider {
+    static DEFAULT_PROVIDER: DefaultLimitProvider = DefaultLimitProvider;
+    &DEFAULT_PROVIDER
+}
+
+/// Platform-agnostic time functions
+pub fn current_time_ns() -> u64 {
+    #[cfg(feature = "std")]
+    {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0)
+    }
+    
+    #[cfg(all(not(feature = "std"), feature = "platform-sync"))]
+    {
+        wrt_platform::time::current_time_ns()
+    }
+    
+    #[cfg(all(not(feature = "std"), not(feature = "platform-sync")))]
+    {
+        // Fallback: use a simple counter for no_std environments
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        COUNTER.fetch_add(1, core::sync::atomic::Ordering::Relaxed)
     }
 }

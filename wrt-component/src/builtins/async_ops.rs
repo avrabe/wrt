@@ -6,8 +6,6 @@
 // - async.poll: Poll an async value for completion
 // - async.wait: Wait for an async value to complete
 
-#[cfg(all(feature = "component-model-async", not(feature = "std"), ))]
-use std::{boxed::Box, collections::HashMap, sync::Arc, vec::Vec};
 #[cfg(all(feature = "component-model-async", feature = "std"))]
 use std::{
     boxed::Box,
@@ -16,13 +14,29 @@ use std::{
     vec::Vec,
 };
 
+#[cfg(all(feature = "component-model-async", not(feature = "std")))]
+use alloc::{boxed::Box, vec::Vec};
+
+#[cfg(all(feature = "component-model-async", not(feature = "std")))]
+use wrt_foundation::{bounded::BoundedVec, safe_memory::NoStdProvider};
+
 #[cfg(feature = "component-model-async")]
-use wrt_error::{kinds::AsyncError, Error, Result};
-#[cfg(feature = "component-model-async")]
-use wrt_foundation::builtin::BuiltinType;
-#[cfg(feature = "component-model-async")]
-#[cfg(feature = "std")]
-use wrt_foundation::component_value::ComponentValue;
+use wrt_error::{Error, Result};
+
+#[cfg(all(feature = "component-model-async", feature = "std"))]
+use wrt_foundation::{builtin::BuiltinType, component_value::ComponentValue};
+
+#[cfg(all(feature = "component-model-async", not(feature = "std")))]
+use crate::types::Value as ComponentValue;
+
+#[cfg(all(feature = "component-model-async", not(feature = "std")))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuiltinType {
+    AsyncNew,
+    AsyncGet,
+    AsyncPoll,
+    AsyncWait,
+}
 
 #[cfg(feature = "component-model-async")]
 use crate::builtins::BuiltinHandler;

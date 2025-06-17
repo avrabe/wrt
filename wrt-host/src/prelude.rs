@@ -103,6 +103,7 @@ pub use core::{
 pub use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
+    fmt::Write as FmtWrite,
     format,
     string::{String, ToString},
     sync::{Arc, Mutex, RwLock},
@@ -123,6 +124,10 @@ pub use wrt_foundation::{
     values::Value,
     // Verification types
     verification::VerificationLevel,
+    // Memory allocation
+    safe_managed_alloc,
+    // CrateId for budget allocation
+    CrateId,
 };
 
 // Binary std/no_std choice
@@ -137,6 +142,13 @@ pub use wrt_intercept::{
 // Import synchronization primitives for no_std
 #[cfg(not(feature = "std"))]
 pub use wrt_sync::{Mutex, RwLock};
+
+/// Memory size for host function allocations in no_std mode
+///
+/// This constant defines the memory budget for host functions when running
+/// in no_std environments. It provides 64KB of memory for host function
+/// operations including callback storage and temporary data structures.
+pub const HOST_MEMORY_SIZE: usize = 65536; // 64KB for host functions
 
 // Re-export from this crate
 pub use crate::{

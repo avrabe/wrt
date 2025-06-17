@@ -4,7 +4,7 @@ use crate::prelude::*;
 use wrt_foundation::{BoundedVec, BoundedMap};
 
 /// Platform-aware memory provider for runtime types
-type RuntimeProvider = wrt_foundation::safe_memory::NoStdProvider<8192>;  // 8KB for runtime operations
+pub(crate) type RuntimeProvider = wrt_foundation::safe_memory::NoStdProvider<8192>;  // 8KB for runtime operations
 
 // Runtime execution limits
 /// Maximum recursion depth for function calls

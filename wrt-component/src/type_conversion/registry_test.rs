@@ -15,7 +15,7 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a simple conversion
-        registry.register(|src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
+        registry.register(|src: &SimpleSource| -> core::result::Result<SimpleTarget, ConversionError> {
             Ok(SimpleTarget(src.0 * 2))
         });
 
@@ -48,7 +48,7 @@ mod tests {
         assert!(!registry.can_convert::<SimpleTarget, SimpleSource>());
 
         // Register one conversion
-        registry.register(|src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
+        registry.register(|src: &SimpleSource| -> core::result::Result<SimpleTarget, ConversionError> {
             Ok(SimpleTarget(src.0))
         });
 
@@ -62,7 +62,7 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a conversion that can fail
-        registry.register(|src: &SimpleSource| -> Result<SimpleTarget, ConversionError> {
+        registry.register(|src: &SimpleSource| -> core::result::Result<SimpleTarget, ConversionError> {
             if src.0 < 0 {
                 return Err(ConversionError {
                     kind: ConversionErrorKind::OutOfRange,

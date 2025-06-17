@@ -8,20 +8,19 @@
 //! sections in WebAssembly Component Model binaries.
 
 use wrt_error::{codes, Error, ErrorCategory, Result};
-use wrt_foundation::NoStdProvider;
 
 #[cfg(feature = "std")]
 use wrt_format::component::Sort;
 
 #[cfg(feature = "std")]
-use wrt_format::{write_string, write_leb128_u32};
+use wrt_format::binary::with_alloc::{read_leb128_u32, read_string};
 #[cfg(feature = "std")]
-use wrt_format::binary::with_alloc::{read_string, read_leb128_u32};
+use wrt_format::{write_leb128_u32, write_string};
 
 #[cfg(not(feature = "std"))]
-use wrt_format::binary::{read_leb128_u32};
+use wrt_foundation::bounded::BoundedVec;
 #[cfg(not(feature = "std"))]
-use wrt_foundation::bounded::{BoundedString, BoundedVec};
+use wrt_foundation::safe_memory::NoStdProvider;
 
 use crate::prelude::*;
 
@@ -170,33 +169,38 @@ pub fn generate_component_name_section(section: &ComponentNameSection) -> Result
 }
 
 /// Generate binary data for a component name section (no_std version)
-/// 
+///
 /// # Safety Requirements
 /// - Uses bounded allocation with compile-time limits
 /// - Fails gracefully when limits are exceeded  
 /// - No heap allocation or dynamic memory
 #[cfg(not(feature = "std"))]
-pub fn generate_component_name_section(section: &ComponentNameSection) -> Result<BoundedVec<u8, 1024, NoStdProvider<2048>>> {
-    use wrt_foundation::safe_memory::NoStdProvider;
-    let provider = NoStdProvider::<2048>::new();
-    let mut result = BoundedVec::new(provider).map_err(|_| Error::new(
-        ErrorCategory::Memory,
-        codes::MEMORY_ALLOCATION_FAILED,
-        "Failed to create result buffer"
-    ))?;
+pub fn generate_component_name_section(
+    section: &ComponentNameSection,
+) -> Result<BoundedVec<u8, 1024, NoStdProvider<2048>>> {
+    let provider = NoStdProvider::<2048>::default();
+    let mut result = BoundedVec::new(provider).map_err(|_| {
+        Error::new(
+            ErrorCategory::Memory,
+            codes::MEMORY_ALLOCATION_FAILED,
+            "Failed to create result buffer",
+        )
+    })?;
 
     // Write component name if present (simplified for no_std)
     if let Some(name) = &section.component_name {
-        result.push(subsection::COMPONENT_NAME).map_err(|_| Error::new(
-            ErrorCategory::Memory,
-            codes::MEMORY_ALLOCATION_FAILED,
-            "Name section buffer overflow"
-        ))?;
-        
+        result.push(subsection::COMPONENT_NAME).map_err(|_| {
+            Error::new(
+                ErrorCategory::Memory,
+                codes::MEMORY_ALLOCATION_FAILED,
+                "Name section buffer overflow",
+            )
+        })?;
+
         // In no_std mode, use simplified string writing
         let name_bytes = name.as_bytes();
         let name_len = name_bytes.len() as u32;
-        
+
         // Simple LEB128 encoding for length (simplified for no_std)
         let mut length_data = [0u8; 5]; // Max 5 bytes for u32 LEB128
         let mut len_bytes_count = 0;
@@ -208,23 +212,27 @@ pub fn generate_component_name_section(section: &ComponentNameSection) -> Result
         }
         length_data[len_bytes_count] = value as u8;
         len_bytes_count += 1;
-        
+
         // Write length data
         for i in 0..len_bytes_count {
-            result.push(length_data[i]).map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_FAILED,
-                "Name section buffer overflow"
-            ))?;
+            result.push(length_data[i]).map_err(|_| {
+                Error::new(
+                    ErrorCategory::Memory,
+                    codes::MEMORY_ALLOCATION_FAILED,
+                    "Name section buffer overflow",
+                )
+            })?;
         }
-        
+
         // Write name data
         for byte in name_bytes.iter() {
-            result.push(*byte).map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_FAILED,
-                "Name section buffer overflow"
-            ))?;
+            result.push(*byte).map_err(|_| {
+                Error::new(
+                    ErrorCategory::Memory,
+                    codes::MEMORY_ALLOCATION_FAILED,
+                    "Name section buffer overflow",
+                )
+            })?;
         }
     }
 
@@ -304,13 +312,12 @@ pub fn parse_component_name_section(data: &[u8]) -> Result<ComponentNameSection>
                             return Err(Error::parse_error("Unknown sort ID"));
                         }
                     };
-                    
+
                     #[cfg(not(feature = "std"))]
                     let sort = sort_id; // Just use the raw sort ID for no_std
 
                     // Read number of names
-                    let (num_names, bytes_read) =
-                        read_leb128_u32(&data[subsection_pos..], 0)?;
+                    let (num_names, bytes_read) = read_leb128_u32(&data[subsection_pos..], 0)?;
                     subsection_pos += bytes_read;
 
                     let mut names = Vec::new();
@@ -318,8 +325,7 @@ pub fn parse_component_name_section(data: &[u8]) -> Result<ComponentNameSection>
                     // Read each name
                     for _ in 0..num_names {
                         // Read index
-                        let (idx, bytes_read) =
-                            read_leb128_u32(&data[subsection_pos..], 0)?;
+                        let (idx, bytes_read) = read_leb128_u32(&data[subsection_pos..], 0)?;
                         subsection_pos += bytes_read;
 
                         // Read name

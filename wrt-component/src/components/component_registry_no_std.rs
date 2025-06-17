@@ -10,7 +10,7 @@
 
 use wrt_foundation::bounded::{BoundedVec, MAX_COMPONENT_TYPES};
 
-use crate::{component_no_std::Component, prelude::*};
+use crate::{components::component_no_std::Component};
 
 /// Maximum number of components allowed in the registry
 pub const MAX_COMPONENTS: usize = 32;
@@ -33,9 +33,9 @@ impl ComponentRegistry {
     /// Create a new empty registry
     pub fn new() -> Self {
         Self {
-            names: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-            components: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-            component_store: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            names: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
+            components: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
+            component_store: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
         }
     }
 
@@ -138,8 +138,8 @@ impl ComponentRegistry {
     }
 
     /// Get all component names
-    pub fn names(&self) -> Result<BoundedVec<String, MAX_COMPONENTS>, NoStdProvider<65536>> {
-        let mut result = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+    pub fn names(&self) -> core::result::Result<BoundedVec<String, MAX_COMPONENTS, NoStdProvider<65536>>, NoStdProvider<65536>> {
+        let mut result = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
         for name in self.names.iter() {
             result.push(name.clone()).map_err(|_| {
                 Error::new(

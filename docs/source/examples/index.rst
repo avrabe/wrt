@@ -289,7 +289,7 @@ Ready to level up? These examples show advanced techniques and optimizations.
 Full Examples 🏆
 ----------------
 
-Put it all together with complete, production-ready applications.
+Put it all together with complete example applications demonstrating integrated features.
 
 .. grid:: 1
    :gutter: 3

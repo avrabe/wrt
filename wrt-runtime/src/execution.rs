@@ -139,8 +139,8 @@ impl ExecutionContext {
     }
     
     /// Create execution context from platform limits
-    #[must_use] pub fn from_platform_limits(platform_limits: &crate::platform_stubs::ComprehensivePlatformLimits) -> Self {
-        let max_depth = platform_limits.max_stack_bytes / (8 * 64); // Estimate stack depth
+    #[must_use] pub fn from_platform_limits(platform_limits: &wrt_foundation::PlatformLimits) -> Self {
+        let max_depth = platform_limits.max_stack / (8 * 64); // Estimate stack depth
         Self::new(max_depth.max(16)) // Minimum depth of 16
     }
 

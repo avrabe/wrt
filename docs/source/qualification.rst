@@ -1,13 +1,21 @@
 Qualification Plan
 ==================
 
-This document outlines the plan for creating qualification materials for safety-critical certification of the WRT (WebAssembly Runtime) components. The qualification materials are designed to meet requirements for safety standards such as ISO-26262, IEC-61508, and IEC-62304.
+This document outlines the plan for creating qualification materials for safety-critical certification of PulseEngine (WRT Edition) components. The qualification materials are designed to support preparation for safety standards such as ISO-26262, IEC-61508, and IEC-62304.
 
-The qualification process is important for:
+.. warning::
+   **Certification Status**: PulseEngine is currently NOT certified to any safety standard. 
+   This qualification plan documents preparation activities for future certification efforts.
 
-1. Ensuring that WRT components can be used in safety-critical systems
-2. Providing evidence of reliability and robustness
-3. Supporting certification efforts for systems using WRT
+The qualification preparation process aims to:
+
+1. Establish infrastructure for future safety-critical certification of PulseEngine components
+2. Document evidence of reliability and robustness in preparation
+3. Support future certification efforts for systems planning to use PulseEngine
+
+.. note::
+   **Development Status**: This qualification plan is in preparation phase. Actual certification 
+   activities require completion of the core WebAssembly execution engine.
 
 Current Status
 --------------
@@ -277,7 +285,7 @@ Implementation Schedule
 Crate-Specific Qualification Activities
 ---------------------------------------
 
-Each crate in the WRT ecosystem requires specific qualification activities:
+Each crate in the PulseEngine ecosystem requires specific qualification activities:
 
 wrt-runtime
 ^^^^^^^^^^^
@@ -318,7 +326,11 @@ Command-line interface qualification:
 Conclusion
 ----------
 
-This qualification plan provides a roadmap for implementing the necessary qualification materials to achieve certification alignment with standards like ISO-26262 and IEC-61508. By following this plan, we will systematically extend our existing documentation and testing infrastructure to support formal qualification activities.
+This qualification plan provides a roadmap for implementing the necessary qualification materials to prepare for future certification alignment with standards like ISO-26262 and IEC-61508. By following this plan, we will systematically extend our existing documentation and testing infrastructure to support formal qualification preparation activities.
+
+.. important::
+   **Prerequisites**: Formal certification requires completion of the core WebAssembly execution engine, 
+   control flow operations, and module instantiation components currently under development.
 
 .. needtable::
    :columns: id;title;status

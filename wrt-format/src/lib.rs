@@ -108,7 +108,7 @@ pub type WasmString<P> = BoundedString<MAX_WASM_STRING_SIZE, P>;
 pub type WasmVec<T, P> = BoundedVec<T, 1024, P>; // General purpose bounded vector
                                                  // Module type aliases for pure no_std mode
 #[cfg(not(any(feature = "std")))]
-pub type ModuleFunctions<P> = BoundedVec<crate::module::Function<P>, MAX_MODULE_FUNCTIONS, P>;
+pub type ModuleFunctions<P> = BoundedVec<crate::module::Function, MAX_MODULE_FUNCTIONS, P>;
 #[cfg(not(any(feature = "std")))]
 pub type ModuleImports<P> = BoundedVec<crate::module::Import<P>, MAX_MODULE_IMPORTS, P>;
 #[cfg(not(any(feature = "std")))]
@@ -120,7 +120,7 @@ pub type ModuleElements<P> = BoundedVec<crate::module::Element<P>, MAX_MODULE_EL
 #[cfg(not(any(feature = "std")))]
 pub type ModuleData<P> = BoundedVec<crate::module::Data<P>, MAX_MODULE_DATA, P>;
 #[cfg(not(any(feature = "std")))]
-pub type ModuleCustomSections<P> = BoundedVec<crate::section::CustomSection<P>, 64, P>;
+pub type ModuleCustomSections<P> = BoundedVec<crate::section::CustomSection, 64, P>;
 
 // Type aliases for HashMap
 #[cfg(not(feature = "std"))]
@@ -160,26 +160,26 @@ macro_rules! collection_type {
 
 // Compile-time capacity constants for bounded collections
 // Increased limits for better no_std usability
-pub const MAX_MODULE_TYPES: usize = 512;        // was 256
-pub const MAX_MODULE_FUNCTIONS: usize = 4096;   // was 1024
-pub const MAX_MODULE_IMPORTS: usize = 512;      // was 256
-pub const MAX_MODULE_EXPORTS: usize = 512;      // was 256
-pub const MAX_MODULE_GLOBALS: usize = 512;      // was 256
-pub const MAX_MODULE_TABLES: usize = 128;       // was 64
-pub const MAX_MODULE_MEMORIES: usize = 128;     // was 64
-pub const MAX_MODULE_ELEMENTS: usize = 512;     // was 256
-pub const MAX_MODULE_DATA: usize = 512;         // was 256
-pub const MAX_WASM_STRING_SIZE: usize = 1024;   // was 256
+pub const MAX_MODULE_TYPES: usize = 512; // was 256
+pub const MAX_MODULE_FUNCTIONS: usize = 4096; // was 1024
+pub const MAX_MODULE_IMPORTS: usize = 512; // was 256
+pub const MAX_MODULE_EXPORTS: usize = 512; // was 256
+pub const MAX_MODULE_GLOBALS: usize = 512; // was 256
+pub const MAX_MODULE_TABLES: usize = 128; // was 64
+pub const MAX_MODULE_MEMORIES: usize = 128; // was 64
+pub const MAX_MODULE_ELEMENTS: usize = 512; // was 256
+pub const MAX_MODULE_DATA: usize = 512; // was 256
+pub const MAX_WASM_STRING_SIZE: usize = 1024; // was 256
 pub const MAX_BINARY_SIZE: usize = 4 * 1024 * 1024; // 4MB max module size, was 1MB
 pub const MAX_LEB128_BUFFER: usize = 10; // Max bytes for LEB128 u64
 pub const MAX_INSTRUCTION_OPERANDS: usize = 32; // was 16
-pub const MAX_STACK_DEPTH: usize = 2048;        // was 1024
+pub const MAX_STACK_DEPTH: usize = 2048; // was 1024
 
 // Component model constants (increased for better support)
 pub const MAX_COMPONENT_INSTANCES: usize = 256; // was 128
-pub const MAX_COMPONENT_TYPES: usize = 512;     // was 256
-pub const MAX_COMPONENT_IMPORTS: usize = 512;   // was 256
-pub const MAX_COMPONENT_EXPORTS: usize = 512;   // was 256
+pub const MAX_COMPONENT_TYPES: usize = 512; // was 256
+pub const MAX_COMPONENT_IMPORTS: usize = 512; // was 256
+pub const MAX_COMPONENT_EXPORTS: usize = 512; // was 256
 
 // Additional no_std specific constants
 pub const MAX_SECTION_SIZE_NO_STD: usize = 256 * 1024; // 256KB, was 64KB
@@ -206,14 +206,11 @@ macro_rules! format {
 pub mod ast_simple;
 #[cfg(feature = "std")]
 pub use ast_simple as ast;
-/// Incremental parser for efficient WIT re-parsing
-#[cfg(feature = "std")]
-pub mod incremental_parser;
-/// Basic LSP (Language Server Protocol) infrastructure
-#[cfg(all(any(feature = "std"), feature = "lsp"))]
-pub mod lsp_server;
 /// WebAssembly binary format parsing and access
 pub mod binary;
+/// Bounded infrastructure for static memory allocation
+#[cfg(not(feature = "std"))]
+pub mod bounded_format_infra;
 /// WebAssembly canonical format
 #[cfg(feature = "std")]
 pub mod canonical;
@@ -229,6 +226,15 @@ pub mod compression;
 pub mod conversion;
 /// Error utilities for working with wrt-error types
 pub mod error;
+/// Incremental parser for efficient WIT re-parsing
+#[cfg(feature = "std")]
+pub mod incremental_parser;
+/// Basic LSP (Language Server Protocol) infrastructure
+#[cfg(all(any(feature = "std"), feature = "lsp"))]
+pub mod lsp_server;
+/// Safety-critical memory limits
+#[cfg(feature = "safety-critical")]
+pub mod memory_limits;
 /// WebAssembly module format
 pub mod module;
 /// Common imports for convenience
@@ -294,7 +300,8 @@ pub use binary::{
 // Binary std/no_std choice
 #[cfg(feature = "std")]
 pub use binary::with_alloc::{
-    read_name, read_string,
+    read_name,
+    read_string,
     // is_valid_wasm_header, parse_block_type,
     // read_vector, validate_utf8, BinaryFormat,
 };
@@ -355,16 +362,15 @@ pub use wit_parser::{
 // Re-export bounded WIT parser (for no_std environments)
 #[cfg(feature = "wit-parsing")]
 pub use wit_parser_bounded::{
-    BoundedWitParser, BoundedWitWorld, BoundedWitInterface, BoundedWitFunction, 
-    BoundedWitType, BoundedWitImport, BoundedWitExport, parse_wit_bounded,
-    HAS_BOUNDED_WIT_PARSING_NO_STD,
+    parse_wit_bounded, BoundedWitExport, BoundedWitFunction, BoundedWitImport, BoundedWitInterface,
+    BoundedWitParser, BoundedWitType, BoundedWitWorld, HAS_BOUNDED_WIT_PARSING_NO_STD,
 };
 
 // Re-export enhanced bounded WIT parser (Agent C)
 pub use bounded_wit_parser::{
-    BoundedWitParser as EnhancedBoundedWitParser, WitParsingLimits, WitParseResult,
-    WitParseMetadata, WitParseWarning, WarningSeverity, parse_wit_with_limits,
-    parse_wit_embedded, parse_wit_qnx, parse_wit_linux,
+    parse_wit_embedded, parse_wit_linux, parse_wit_qnx, parse_wit_with_limits,
+    BoundedWitParser as EnhancedBoundedWitParser, WarningSeverity, WitParseMetadata,
+    WitParseResult, WitParseWarning, WitParsingLimits,
 };
 
 // Public functions for feature detection
@@ -389,18 +395,6 @@ pub fn uses_experimental_features(binary: &[u8]) -> bool {
     let mut info = VersionInfo::from_version_bytes(version_bytes);
     info.detect_experimental_features(binary)
 }
-
-// Deprecated: use conversion utilities instead
-#[deprecated(
-    since = "0.2.0",
-    note = "Use conversion::parse_value_type instead for better type conversion"
-)]
-pub use types::parse_value_type;
-#[deprecated(
-    since = "0.2.0",
-    note = "Use conversion::value_type_to_byte instead for better type conversion"
-)]
-pub use types::value_type_to_byte;
 
 // For formal verification when the 'kani' feature is enabled
 #[cfg(feature = "kani")]

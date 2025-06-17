@@ -38,6 +38,13 @@ pub struct MacOsAllocator {
     max_capacity_bytes: usize,      // Maximum bytes this instance can manage
 }
 
+// Safety: MacOsAllocator can be shared between threads safely because:
+// 1. All operations use atomic syscalls
+// 2. Memory is properly synchronized through the OS
+// 3. NonNull is used safely for owned memory regions
+unsafe impl Send for MacOsAllocator {}
+unsafe impl Sync for MacOsAllocator {}
+
 impl MacOsAllocator {
     const DEFAULT_MAX_PAGES: u32 = 65536; // Corresponds to 4GiB, a common Wasm limit
 
@@ -258,10 +265,10 @@ impl PageAllocator for MacOsAllocator {
     }
 
     fn grow(&mut self, current_pages: u32, additional_pages: u32) -> Result<()> {
-        let Some(base_ptr) = self.base_ptr else {
+        let Some(_base_ptr) = self.base_ptr else {
             return Err(Error::new(
-                ErrorCategory::System, 1,
-                
+                ErrorCategory::System,
+                1,
                 "No memory allocated to grow",
             ));
         };

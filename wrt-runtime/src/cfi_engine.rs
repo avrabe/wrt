@@ -445,20 +445,31 @@ impl CfiExecutionEngine {
 
         // Execute instruction with CFI protection
         let result = match instruction {
-            wrt_foundation::types::Instruction::CallIndirect(type_idx, table_idx) => {
-                self.execute_call_indirect_with_cfi(*type_idx, *table_idx, execution_context)
-            }
-
-            wrt_foundation::types::Instruction::Return => {
-                self.execute_return_with_cfi(execution_context)
-            }
-
-            wrt_foundation::types::Instruction::Br(label_idx) => {
-                self.execute_branch_with_cfi(*label_idx, false, execution_context)
-            }
-
-            wrt_foundation::types::Instruction::BrIf(label_idx) => {
-                self.execute_branch_with_cfi(*label_idx, true, execution_context)
+            crate::prelude::Instruction::Control(control_op) => {
+                match control_op {
+                    crate::prelude::ControlOp::CallIndirect { table_idx, type_idx } => {
+                        self.execute_call_indirect_with_cfi(*type_idx, *table_idx, execution_context)
+                    }
+                    crate::prelude::ControlOp::Return => {
+                        self.execute_return_with_cfi(execution_context)
+                    }
+                    crate::prelude::ControlOp::Br(label_idx) => {
+                        self.execute_branch_with_cfi(*label_idx, false, execution_context)
+                    }
+                    crate::prelude::ControlOp::BrIf(label_idx) => {
+                        self.execute_branch_with_cfi(*label_idx, true, execution_context)
+                    }
+                    crate::prelude::ControlOp::Call(func_idx) => {
+                        self.execute_call_with_cfi(*func_idx, execution_context)
+                    }
+                    _ => {
+                        // Other control operations get basic CFI tracking
+                        self.track_control_flow_change(execution_context)?;
+                        Ok(CfiExecutionResult::Regular { 
+                            result: ExecutionResult::Continue 
+                        })
+                    }
+                }
             }
 
             _ => {
@@ -479,6 +490,28 @@ impl CfiExecutionEngine {
     }
 
     /// Execute indirect call with CFI protection
+    fn execute_call_with_cfi(
+        &mut self,
+        func_idx: u32,
+        execution_context: &mut ExecutionContext,
+    ) -> Result<CfiExecutionResult> {
+        // Simplified CFI validation for direct call
+        // In a full implementation, this would validate the call target
+        execution_context.stats.increment_instructions(1);
+        
+        // Execute the call (simplified for this implementation)
+        Ok(CfiExecutionResult::Regular { 
+            result: ExecutionResult::Continue 
+        })
+    }
+
+    fn track_control_flow_change(&mut self, _execution_context: &ExecutionContext) -> Result<()> {
+        // Track control flow changes for CFI protection
+        // In a full implementation, this would update CFI state
+        // For now, just succeed
+        Ok(())
+    }
+
     fn execute_call_indirect_with_cfi(
         &mut self,
         type_idx: u32,
@@ -620,7 +653,7 @@ impl CfiExecutionEngine {
         let mut violations_detected = false;
         let mut metrics_landing_pads_validated = 0;
         
-        self.cfi_context.landing_pad_expectations.retain(|expectation| {
+        let _ = self.cfi_context.landing_pad_expectations.retain(|expectation| {
             let matches_location = expectation.function_index == current_location.0
                 && expectation.instruction_offset == current_location.1;
 

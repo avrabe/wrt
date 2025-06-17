@@ -29,34 +29,29 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-// Panic handler disabled to avoid conflicts with wrt-platform
-// #[cfg(all(not(feature = "std"), not(test), not(feature = "disable-panic-handler")))]
-// #[panic_handler]
-// fn panic(_info: &core::panic::PanicInfo) -> ! {
-//     // For safety-critical systems, enter infinite loop to maintain known safe state
-//     loop {
-//         core::hint::spin_loop();
-//     }
-// }
-
 // Binary std/no_std choice
 #[cfg(any(feature = "std", feature = "alloc"))]
 extern crate alloc;
 
-// Panic handler is provided by wrt-platform when needed
-
 // Re-export prelude module publicly
 pub use prelude::*;
 
+// Test module for clean architecture migration
+pub mod clean_runtime_test;
+
 // Core modules
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub mod atomic_execution;
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub mod atomic_memory_model;
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub mod branch_prediction;
 pub mod cfi_engine;
 pub mod core_types;
 pub mod execution;
 pub mod func;
 pub mod global;
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub mod interpreter_optimization;
 pub mod memory;
 
@@ -64,38 +59,50 @@ pub mod memory;
 pub mod simple_types;
 pub mod unified_types;
 
-// Component model integration - temporarily disabled for compilation
-// pub mod component_unified;
-// pub mod memory_adapter;
-// pub mod memory_config_adapter;
-// pub mod memory_helpers;
+// Component model integration
+pub mod component_unified;
+pub mod memory_adapter;
+#[cfg(test)]
+mod memory_adapter_test;
+pub mod memory_config_adapter;
+pub mod memory_helpers;
 /// WebAssembly module representation and management
 pub mod module;
-// pub mod module_builder; // Temporarily disabled due to compilation issues
+pub mod module_builder;
 pub mod module_instance;
 pub mod prelude;
-// pub mod stackless; // Temporarily disabled due to compilation issues
+pub mod stackless;
 pub mod table;
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub mod thread_manager;
 pub mod types;
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub mod wait_queue;
-// pub mod wit_debugger_integration; // Temporarily disabled
+pub mod wit_debugger_integration;
 
-// Agent D: Platform-aware runtime and unified memory management - temporarily disabled
-// pub mod platform_runtime;
+// Platform-aware runtime and unified memory management
+pub mod platform_runtime;
+
+// Bounded infrastructure for static memory allocation
+pub mod bounded_runtime_infra;
 
 // Temporary stub modules for parallel development
 mod foundation_stubs;
-mod platform_stubs;
 mod component_stubs;
 
+// Import platform abstractions from wrt-foundation
+pub use wrt_foundation::platform_abstraction;
+
 // Re-export commonly used types
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub use atomic_execution::{AtomicMemoryContext, AtomicExecutionStats};
 pub use core_types::{CallFrame, ComponentExecutionState, ExecutionContext};
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub use atomic_memory_model::{
     AtomicMemoryModel, MemoryOrderingPolicy, ConsistencyValidationResult,
     MemoryModelPerformanceMetrics, DataRaceReport, OrderingViolationReport,
 };
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub use branch_prediction::{
     BranchLikelihood, BranchPrediction, FunctionBranchPredictor, ModuleBranchPredictor,
     PredictiveExecutionContext, PredictionStats,
@@ -106,6 +113,7 @@ pub use cfi_engine::{
 };
 pub use execution::ExecutionStats;
 // Note: ExecutionContext is defined in core_types, not execution
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub use interpreter_optimization::{
     OptimizedInterpreter, OptimizationStrategy, OptimizationMetrics, 
     BranchOptimizationResult, ExecutionPath,
@@ -129,9 +137,10 @@ pub use interpreter_optimization::{
 pub use func::Function as RuntimeFunction;
 pub use prelude::FuncType;
 pub use global::Global;
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub use memory::Memory;
-// pub use memory_adapter::{MemoryAdapter, SafeMemoryAdapter, StdMemoryProvider};
-// pub use memory_helpers::ArcMemoryExt;
+pub use memory_adapter::{MemoryAdapter, SafeMemoryAdapter, StdMemoryProvider};
+pub use memory_helpers::ArcMemoryExt;
 // pub use module::{
 //     Data, Element, Export, ExportItem, ExportKind, Function, Import, Module, OtherExport,
 // };
@@ -142,7 +151,7 @@ pub use memory::Memory;
 // }; // Temporarily disabled due to compilation issues
 pub use table::Table;
 
-// Agent D: Re-export platform-aware runtime types - temporarily disabled
+// Re-export platform-aware runtime types - temporarily disabled
 // pub use platform_runtime::{PlatformAwareRuntime, PlatformMemoryAdapter, RuntimeMetrics};
 
 /// The WebAssembly memory page size (64KiB)

@@ -29,12 +29,12 @@ use crate::{
 extern crate alloc; // Binary std/no_std choice
 
 // Binary std/no_std choice
-#[cfg(feature = "std")]
-use std::borrow::ToOwned;
 use core::{
     fmt,
     hash::{Hash, Hasher as CoreHasher},
 };
+#[cfg(feature = "std")]
+use std::borrow::ToOwned;
 
 // Use constants from bounded.rs
 use crate::bounded::{

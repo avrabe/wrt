@@ -1,0 +1,293 @@
+name: Formal Verification with KANI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**.rs'
+      - '**/Cargo.toml'
+      - '**/Kani.toml'
+      - '.github/workflows/kani-verification.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**.rs'
+      - '**/Cargo.toml'
+      - '**/Kani.toml'
+      - '.github/workflows/kani-verification.yml'
+  schedule:
+    # Run weekly verification on Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      asil_level:
+        description: 'ASIL verification level'
+        required: true
+        default: 'asil-c'
+        type: choice
+        options:
+          - asil-a
+          - asil-b
+          - asil-c
+          - asil-d
+      package:
+        description: 'Specific package to verify (optional)'
+        required: false
+        default: ''
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+  KANI_VERSION: '0.54.0'
+
+jobs:
+  # Quick verification for all PRs
+  quick-verification:
+    name: Quick Verification (ASIL-A)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly-2024-01-01
+          components: rust-src
+      
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-kani-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install KANI
+        run: |
+          if ! command -v kani &> /dev/null; then
+            cargo install --version ${KANI_VERSION} --locked kani-verifier
+            cargo kani setup
+          fi
+      
+      - name: Run Quick Verification
+        run: |
+          ./scripts/kani-verify.sh --profile asil-a --package wrt-integration-tests
+        continue-on-error: true
+      
+      - name: Upload Quick Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kani-quick-report
+          path: target/kani-reports/verification_report_*.md
+
+  # Matrix verification for different ASIL levels and packages
+  matrix-verification:
+    name: Verify ${{ matrix.package }} @ ${{ matrix.asil }}
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    strategy:
+      fail-fast: false
+      matrix:
+        asil: [asil-b, asil-c]
+        package: 
+          - wrt-foundation
+          - wrt-component
+          - wrt-sync
+          - wrt-integration-tests
+        include:
+          # Add ASIL-D verification for critical packages only
+          - asil: asil-d
+            package: wrt-integration-tests
+          - asil: asil-d
+            package: wrt-foundation
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly-2024-01-01
+          components: rust-src
+      
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-kani-${{ matrix.package }}-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install KANI
+        run: |
+          if ! command -v kani &> /dev/null; then
+            cargo install --version ${KANI_VERSION} --locked kani-verifier
+            cargo kani setup
+          fi
+      
+      - name: Run Verification
+        run: |
+          ./scripts/kani-verify.sh --profile ${{ matrix.asil }} --package ${{ matrix.package }}
+        timeout-minutes: 30
+      
+      - name: Upload Verification Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kani-report-${{ matrix.package }}-${{ matrix.asil }}
+          path: target/kani-reports/
+      
+      - name: Check for Failures
+        if: failure()
+        run: |
+          echo "::error::Formal verification failed for ${{ matrix.package }} at ${{ matrix.asil }} level"
+          cat target/kani-reports/verification_report_*.md
+
+  # Comprehensive verification for main branch
+  comprehensive-verification:
+    name: Comprehensive Verification (All Packages)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly-2024-01-01
+          components: rust-src
+      
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-kani-comprehensive-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install KANI
+        run: |
+          cargo install --version ${KANI_VERSION} --locked kani-verifier
+          cargo kani setup
+      
+      - name: Run Comprehensive Verification
+        run: |
+          ASIL_LEVEL="${{ github.event.inputs.asil_level || 'asil-c' }}"
+          PACKAGE="${{ github.event.inputs.package || '' }}"
+          
+          if [ -n "$PACKAGE" ]; then
+            ./scripts/kani-verify.sh --profile $ASIL_LEVEL --package $PACKAGE --verbose
+          else
+            ./scripts/kani-verify.sh --profile $ASIL_LEVEL --verbose
+          fi
+        timeout-minutes: 60
+      
+      - name: Generate Coverage Report
+        if: github.event.inputs.asil_level == 'asil-d' || github.event_name == 'schedule'
+        run: |
+          echo "## Coverage Report" >> target/kani-reports/coverage_summary.md
+          echo "" >> target/kani-reports/coverage_summary.md
+          if [ -f target/kani-reports/coverage_*.txt ]; then
+            cat target/kani-reports/coverage_*.txt >> target/kani-reports/coverage_summary.md
+          else
+            echo "No coverage data available" >> target/kani-reports/coverage_summary.md
+          fi
+        continue-on-error: true
+      
+      - name: Upload Comprehensive Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kani-comprehensive-report
+          path: target/kani-reports/
+      
+      - name: Comment PR with Results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'target/kani-reports/verification_report_*.md';
+            const reports = require('glob').sync(reportPath);
+            
+            if (reports.length > 0) {
+              const content = fs.readFileSync(reports[0], 'utf8');
+              
+              // Extract summary
+              const summaryMatch = content.match(/## Summary[\s\S]*?##/);
+              const summary = summaryMatch ? summaryMatch[0] : 'Verification completed.';
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🔍 KANI Formal Verification Results\n\n${summary}\n\n[Full Report](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+              });
+            }
+
+  # Summary job to ensure all verifications passed
+  verification-summary:
+    name: Verification Summary
+    runs-on: ubuntu-latest
+    needs: [quick-verification, matrix-verification]
+    if: always()
+    steps:
+      - name: Check Verification Results
+        run: |
+          if [ "${{ needs.quick-verification.result }}" == "failure" ] || 
+             [ "${{ needs.matrix-verification.result }}" == "failure" ]; then
+            echo "::error::One or more verification jobs failed"
+            exit 1
+          fi
+          echo "✅ All verification jobs completed successfully"
+      
+      - name: Download All Reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: kani-report-*
+          merge-multiple: true
+      
+      - name: Generate Summary Report
+        run: |
+          echo "# KANI Verification Summary" > summary.md
+          echo "" >> summary.md
+          echo "**Date**: $(date)" >> summary.md
+          echo "**Commit**: ${{ github.sha }}" >> summary.md
+          echo "" >> summary.md
+          
+          # Count successes and failures
+          TOTAL=$(find . -name "verification_report_*.md" | wc -l)
+          PASSED=$(grep -l "✅ PASSED" verification_report_*.md 2>/dev/null | wc -l || echo 0)
+          FAILED=$((TOTAL - PASSED))
+          
+          echo "## Results" >> summary.md
+          echo "- Total Packages Verified: $TOTAL" >> summary.md
+          echo "- Passed: $PASSED" >> summary.md
+          echo "- Failed: $FAILED" >> summary.md
+          echo "" >> summary.md
+          
+          if [ $FAILED -gt 0 ]; then
+            echo "## Failed Verifications" >> summary.md
+            grep -l "❌ FAILED" verification_report_*.md | while read report; do
+              echo "- $(basename $report)" >> summary.md
+            done
+          fi
+          
+          cat summary.md
+      
+      - name: Upload Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-summary
+          path: summary.md

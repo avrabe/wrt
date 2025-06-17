@@ -201,8 +201,8 @@ Now let's use our calculator component from a host application:
    :caption: examples/use_calculator.rs
    :linenos:
 
-   use wasmtime::component::*;
-   use wasmtime::{Config, Engine, Store};
+   use wrt::component::*;
+   use wrt::{Config, Engine, Store};
    
    bindgen!({
        world: "calculator-world",

@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Side-Channel Resistance Analysis and Implementation
 // SW-REQ-ID: REQ_PLATFORM_SIDECHANNEL_001

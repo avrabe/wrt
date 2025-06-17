@@ -106,8 +106,9 @@ fn check_internet_connection() -> bool {
 }
 
 fn clone_testsuite(path: &Path) -> io::Result<()> {
-    let status =
-        Command::new("git").args(["clone", TESTSUITE_REPO_URL, path.to_str().expect("Path conversion failed")]).status()?;
+    let status = Command::new("git")
+        .args(["clone", TESTSUITE_REPO_URL, path.to_str().expect("Path conversion failed")])
+        .status()?;
 
     if !status.success() {
         return Err(io::Error::other(format!(

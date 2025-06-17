@@ -35,22 +35,22 @@ mod tests {
         From: TestConvertible,
         To: TestConvertible,
     {
-        fn convert(&self, from: &From) -> Result<To, TestConversionError>;
+        fn convert(&self, from: &From) -> core::result::Result<To, TestConversionError>;
     }
 
     impl<From, To, F> TestConversion<From, To> for F
     where
         From: TestConvertible,
         To: TestConvertible,
-        F: Fn(&From) -> Result<To, TestConversionError> + Send + Sync,
+        F: Fn(&From) -> core::result::Result<To, TestConversionError> + Send + Sync,
     {
-        fn convert(&self, from: &From) -> Result<To, TestConversionError> {
+        fn convert(&self, from: &From) -> core::result::Result<To, TestConversionError> {
             self(from)
         }
     }
 
     trait TestAnyConversion: Send + Sync {
-        fn convert_any(&self, from: &dyn Any) -> Result<Box<dyn Any>, TestConversionError>;
+        fn convert_any(&self, from: &dyn Any) -> core::result::Result<Box<dyn Any>, TestConversionError>;
         fn source_type_id(&self) -> TypeId;
         fn target_type_id(&self) -> TypeId;
     }
@@ -72,7 +72,7 @@ mod tests {
         To: TestConvertible + 'static,
         C: TestConversion<From, To> + 'static,
     {
-        fn convert_any(&self, from: &dyn Any) -> Result<Box<dyn Any>, TestConversionError> {
+        fn convert_any(&self, from: &dyn Any) -> core::result::Result<Box<dyn Any>, TestConversionError> {
             let from = from.downcast_ref::<From>().ok_or_else(|| TestConversionError {
                 message: "Source value doesn't match expected type".to_string(),
             })?;
@@ -103,7 +103,7 @@ mod tests {
         where
             From: TestConvertible + 'static,
             To: TestConvertible + 'static,
-            F: Fn(&From) -> Result<To, TestConversionError> + Send + Sync + 'static,
+            F: Fn(&From) -> core::result::Result<To, TestConversionError> + Send + Sync + 'static,
         {
             let adapter = TestConversionAdapter {
                 converter,
@@ -125,7 +125,7 @@ mod tests {
             self.conversions.contains_key(&key)
         }
 
-        fn convert<From, To>(&self, from: &From) -> Result<To, TestConversionError>
+        fn convert<From, To>(&self, from: &From) -> core::result::Result<To, TestConversionError>
         where
             From: TestConvertible + 'static,
             To: TestConvertible + 'static,
@@ -159,7 +159,7 @@ mod tests {
         let mut registry = TestRegistry::new();
 
         // Register a simple conversion
-        registry.register(|src: &TestSource| -> Result<TestTarget, TestConversionError> {
+        registry.register(|src: &TestSource| -> core::result::Result<TestTarget, TestConversionError> {
             Ok(TestTarget(src.0 * 2))
         });
 
@@ -191,7 +191,7 @@ mod tests {
         assert!(!registry.can_convert::<TestTarget, TestSource>());
 
         // Register one conversion
-        registry.register(|src: &TestSource| -> Result<TestTarget, TestConversionError> {
+        registry.register(|src: &TestSource| -> core::result::Result<TestTarget, TestConversionError> {
             Ok(TestTarget(src.0))
         });
 

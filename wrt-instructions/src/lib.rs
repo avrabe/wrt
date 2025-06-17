@@ -42,6 +42,10 @@ extern crate alloc;
 // Import prelude for common type access
 pub mod prelude;
 
+// Bounded infrastructure for static memory allocation
+#[cfg(not(feature = "std"))]
+pub mod bounded_instruction_infra;
+
 pub mod arithmetic_ops;
 pub mod comparison_ops;
 pub mod const_expr;
@@ -60,7 +64,7 @@ pub mod validation;
 pub mod variable_ops;
 
 // CFI-enhanced control flow operations
-// pub mod cfi_control_ops; // Temporarily disabled due to ConfigurableProvider trait issues
+pub mod cfi_control_ops;
 
 // SIMD operations
 pub mod simd_ops;
@@ -89,12 +93,12 @@ pub use wrt_foundation::{
     types::ValueType, values::Value, BlockType, RefType, Result as TypesResult,
 };
 
-// Re-export CFI control flow operations - temporarily disabled
-// pub use crate::cfi_control_ops::{
-//     CfiControlFlowOps, CfiControlFlowProtection, CfiExecutionContext, CfiLandingPad,
-//     CfiProtectedBranchTarget, CfiProtectionLevel, CfiTargetProtection, CfiTargetType,
-//     DefaultCfiControlFlowOps,
-// };
+// Re-export CFI control flow operations
+pub use crate::cfi_control_ops::{
+    CfiControlFlowOps, CfiControlFlowProtection, CfiExecutionContext, CfiLandingPad,
+    CfiProtectedBranchTarget, CfiProtectionLevel, CfiTargetProtection, CfiTargetType,
+    DefaultCfiControlFlowOps,
+};
 pub use crate::control_ops::{
     Block, ControlBlockType, ControlOp, Return, CallIndirect, BrTable,
     FunctionOperations, ControlContext,

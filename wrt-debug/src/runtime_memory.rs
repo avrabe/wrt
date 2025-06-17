@@ -5,6 +5,7 @@ use wrt_foundation::{
     NoStdProvider,
 };
 
+use crate::bounded_debug_infra;
 /// Runtime memory inspection implementation
 /// Provides safe memory access and heap analysis capabilities
 use crate::runtime_api::{DebugMemory, RuntimeState};
@@ -57,9 +58,10 @@ pub struct HeapAllocation {
 /// Memory inspector for runtime debugging
 pub struct MemoryInspector<'a> {
     /// Memory regions
-    regions: BoundedVec<MemoryRegion, 16, NoStdProvider<1024>>,
+    regions: BoundedVec<MemoryRegion, 16, crate::bounded_debug_infra::DebugProvider>,
     /// Binary std/no_std choice
-    allocations: BoundedVec<HeapAllocation, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>>,
+    allocations:
+        BoundedVec<HeapAllocation, MAX_DWARF_FILE_TABLE, crate::bounded_debug_infra::DebugProvider>,
     /// Reference to debug memory interface
     memory: Option<&'a dyn DebugMemory>,
 }

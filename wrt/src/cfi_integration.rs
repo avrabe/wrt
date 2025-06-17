@@ -21,6 +21,7 @@
 
 #![allow(dead_code)] // Allow during development
 
+use crate::bounded_wrt_infra::{new_loaded_module_vec, BoundedLoadedModuleVec, WrtProvider};
 use crate::prelude::*;
 
 /// CFI-protected WebAssembly execution engine
@@ -258,8 +259,8 @@ impl CfiProtectedEngine {
         // Set up CFI protection for this function
         self.setup_function_cfi_protection(function_metadata)?;
 
-        // Execute instructions with CFI protection
-        let mut instruction_results = Vec::new();
+        // Execute instructions with CFI protection using bounded collections
+        let mut instruction_results = new_loaded_module_vec();
         let function = &protected_module.module.functions[function_index as usize];
 
         for instruction in &function.instructions {
@@ -462,8 +463,8 @@ pub struct CfiProtectedModule {
 pub struct CfiExecutionResult {
     /// Function that was executed
     pub function_index: u32,
-    /// Results from each instruction execution
-    pub instruction_results: Vec<wrt_runtime::CfiExecutionResult>,
+    /// Results from each instruction execution using bounded collections
+    pub instruction_results: BoundedLoadedModuleVec<wrt_runtime::CfiExecutionResult>,
     /// CFI metadata for the executed function
     pub function_metadata: wrt_decoder::FunctionCfiInfo,
     /// Total CFI violations detected during execution

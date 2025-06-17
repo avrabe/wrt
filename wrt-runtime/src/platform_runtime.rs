@@ -16,7 +16,6 @@
 
 use crate::{
     foundation_stubs::{SafetyContext, UnifiedMemoryProvider, AsilLevel, MediumProvider},
-    platform_stubs::{ComprehensivePlatformLimits, PlatformId},
     component_stubs::ComponentId,
     cfi_engine::{CfiExecutionEngine, CfiViolationPolicy},
     execution::ExecutionContext,
@@ -29,8 +28,11 @@ use crate::{
 use crate::cfi_engine::CfiControlFlowProtection;
 use wrt_error::{Error, ErrorCategory, Result};
 
+// Import from wrt-platform for comprehensive platform limits
+use wrt_platform::{ComprehensivePlatformLimits, PlatformId};
+
 /// Simple platform memory adapter trait for platform_runtime.rs
-pub trait PlatformMemoryAdapter: Send + Sync {
+pub trait PlatformMemoryAdapter: Send + Sync + Debug {
     fn allocate(&mut self, size: usize) -> Result<&mut [u8]>;
     fn deallocate(&mut self, ptr: &mut [u8]) -> Result<()>;
     fn available_memory(&self) -> usize;
@@ -291,7 +293,9 @@ impl PlatformAwareRuntime {
     }
 }
 
-/// Linux-specific memory adapter
+/// Linux-specific memory adapter (requires alloc feature)
+#[cfg(any(feature = "std", feature = "alloc"))]
+#[derive(Debug)]
 struct LinuxMemoryAdapter {
     memory: Vec<u8>,
     allocated: usize,
@@ -341,6 +345,7 @@ impl PlatformMemoryAdapter for LinuxMemoryAdapter {
 }
 
 /// QNX-specific memory adapter
+#[derive(Debug)]
 struct QnxMemoryAdapter {
     memory: Vec<u8>,
     allocated: usize,
@@ -383,16 +388,16 @@ impl PlatformMemoryAdapter for QnxMemoryAdapter {
     fn total_memory(&self) -> usize {
         self.memory.len()
     }
-}
-
-// Separate platform identification trait
-impl LinuxMemoryAdapter {
-    pub fn platform_id(&self) -> PlatformId {
+    
+    fn platform_id(&self) -> PlatformId {
         PlatformId::QNX
     }
 }
 
+// LinuxMemoryAdapter platform_id is now part of the trait implementation
+
 /// Embedded system memory adapter
+#[derive(Debug)]
 struct EmbeddedMemoryAdapter {
     buffer: [u8; 65536], // Fixed 64KB buffer for embedded
     allocated: usize,
@@ -435,16 +440,16 @@ impl PlatformMemoryAdapter for EmbeddedMemoryAdapter {
     fn total_memory(&self) -> usize {
         self.buffer.len()
     }
-}
-
-// Separate platform identification trait
-impl LinuxMemoryAdapter {
-    pub fn platform_id(&self) -> PlatformId {
-        PlatformId::Embedded
+    
+    fn platform_id(&self) -> PlatformId {
+        PlatformId::Zephyr  // Use Zephyr as the embedded platform ID
     }
 }
 
+// EmbeddedMemoryAdapter platform_id is now part of the trait implementation
+
 /// macOS-specific memory adapter
+#[derive(Debug)]
 struct MacOSMemoryAdapter {
     memory: Vec<u8>,
     allocated: usize,
@@ -487,16 +492,16 @@ impl PlatformMemoryAdapter for MacOSMemoryAdapter {
     fn total_memory(&self) -> usize {
         self.memory.len()
     }
-}
-
-// Separate platform identification trait
-impl LinuxMemoryAdapter {
-    pub fn platform_id(&self) -> PlatformId {
+    
+    fn platform_id(&self) -> PlatformId {
         PlatformId::MacOS
     }
 }
 
+// MacOSMemoryAdapter platform_id is now part of the trait implementation
+
 /// Generic memory adapter for unknown platforms
+#[derive(Debug)]
 struct GenericMemoryAdapter {
     memory: Vec<u8>,
     allocated: usize,
@@ -539,19 +544,31 @@ impl PlatformMemoryAdapter for GenericMemoryAdapter {
     fn total_memory(&self) -> usize {
         self.memory.len()
     }
+    
+    fn platform_id(&self) -> PlatformId {
+        PlatformId::Linux  // Use Linux as default for generic adapter
+    }
 }
 
-// Separate platform identification trait
-impl LinuxMemoryAdapter {
-    pub fn platform_id(&self) -> PlatformId {
-        PlatformId::Unknown
-    }
+// GenericMemoryAdapter platform_id is now part of the trait implementation
+
+/// Create a generic memory adapter for use by other modules
+pub fn create_generic_memory_adapter(size: usize) -> Result<Box<dyn PlatformMemoryAdapter>> {
+    let adapter = GenericMemoryAdapter::new(size)?;
+    Ok(Box::new(adapter))
+}
+
+/// Create a memory adapter suitable for the current platform
+pub fn create_platform_memory_adapter(size: usize) -> Result<Box<dyn PlatformMemoryAdapter>> {
+    // For now, use the generic adapter. In the future, this could detect
+    // the platform and return the appropriate adapter type.
+    create_generic_memory_adapter(size)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::platform_stubs::ComprehensivePlatformLimits;
+    use wrt_foundation::platform_abstraction::ComprehensivePlatformLimits;
 
     #[test]
     fn test_platform_runtime_creation() {

@@ -21,7 +21,6 @@
 //! - **Call Validator**: Ensures call safety and security compliance
 //! - **Performance Monitor**: Tracks call performance and optimization opportunities
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -65,11 +64,17 @@ const MAX_STRING_LENGTH: usize = 65536;
 /// Maximum array/vector length in parameters
 const MAX_ARRAY_LENGTH: usize = 4096;
 
+/// Maximum number of concurrent call contexts
+const MAX_CALL_CONTEXTS: usize = 256;
+
 /// Call context manager for managing cross-component call state
 #[derive(Debug)]
 pub struct CallContextManager {
     /// Active call contexts by call ID
+    #[cfg(feature = "std")]
     contexts: HashMap<u64, ManagedCallContext>,
+    #[cfg(not(feature = "std"))]
+    contexts: BoundedVec<(u64, ManagedCallContext), MAX_CALL_CONTEXTS, crate::MemoryProvider>,
     /// Parameter marshaler
     marshaler: ParameterMarshaler,
     /// Resource coordinator
@@ -105,27 +110,45 @@ pub struct ParameterMarshaler {
     /// Marshaling configuration
     config: MarshalingConfig,
     /// Type compatibility cache
+    #[cfg(feature = "std")]
     type_cache: HashMap<String, TypeCompatibility>,
+    #[cfg(not(feature = "std"))]
+    type_cache: BoundedVec<(BoundedString<128, crate::MemoryProvider>, TypeCompatibility), 64, crate::MemoryProvider>,
 }
 
 /// Resource coordinator for managing resource transfers during calls
 #[derive(Debug)]
 pub struct ResourceCoordinator {
     /// Active resource locks
+    #[cfg(feature = "std")]
     resource_locks: HashMap<ResourceHandle, ResourceLock>,
+    #[cfg(not(feature = "std"))]
+    resource_locks: BoundedVec<(ResourceHandle, ResourceLock), 128, crate::MemoryProvider>,
     /// Transfer pending queue
+    #[cfg(feature = "std")]
     pending_transfers: Vec<PendingResourceTransfer>,
+    #[cfg(not(feature = "std"))]
+    pending_transfers: BoundedVec<PendingResourceTransfer, 64, crate::MemoryProvider>,
     /// Transfer policies
+    #[cfg(feature = "std")]
     transfer_policies: HashMap<(InstanceId, InstanceId), TransferPolicy>,
+    #[cfg(not(feature = "std"))]
+    transfer_policies: BoundedVec<((InstanceId, InstanceId), TransferPolicy), 32, crate::MemoryProvider>,
 }
 
 /// Call validator for ensuring call safety and security
 #[derive(Debug)]
 pub struct CallValidator {
     /// Security policies
+    #[cfg(feature = "std")]
     security_policies: HashMap<InstanceId, SecurityPolicy>,
+    #[cfg(not(feature = "std"))]
+    security_policies: BoundedVec<(InstanceId, SecurityPolicy), 64, crate::MemoryProvider>,
     /// Validation rules
+    #[cfg(feature = "std")]
     validation_rules: Vec<ValidationRule>,
+    #[cfg(not(feature = "std"))]
+    validation_rules: BoundedVec<ValidationRule, 32, crate::MemoryProvider>,
     /// Validation configuration
     config: ValidationConfig,
 }
@@ -733,7 +756,10 @@ impl CallContextManager {
     /// Create a new call context manager with configuration
     pub fn with_config(config: CallContextConfig) -> Self {
         Self {
+            #[cfg(feature = "std")]
             contexts: HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            contexts: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             marshaler: ParameterMarshaler::new(MarshalingConfig::default()),
             resource_coordinator: ResourceCoordinator::new(),
             validator: CallValidator::new(ValidationConfig::default()),
@@ -847,7 +873,10 @@ impl ParameterMarshaler {
         Self {
             abi: CanonicalABI::new(),
             config,
+            #[cfg(feature = "std")]
             type_cache: HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            type_cache: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 
@@ -964,9 +993,18 @@ impl ResourceCoordinator {
     /// Create a new resource coordinator
     pub fn new() -> Self {
         Self {
+            #[cfg(feature = "std")]
             resource_locks: HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            resource_locks: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
             pending_transfers: Vec::new(),
+            #[cfg(not(feature = "std"))]
+            pending_transfers: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
             transfer_policies: HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            transfer_policies: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 
@@ -1008,8 +1046,14 @@ impl CallValidator {
     /// Create a new call validator
     pub fn new(config: ValidationConfig) -> Self {
         Self {
+            #[cfg(feature = "std")]
             security_policies: HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            security_policies: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
             validation_rules: Vec::new(),
+            #[cfg(not(feature = "std"))]
+            validation_rules: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             config,
         }
     }

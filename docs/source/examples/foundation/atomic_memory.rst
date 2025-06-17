@@ -182,7 +182,7 @@ AtomicMemoryOps supports all verification levels:
 Real-World Pattern: Sensor Data Logger 📊
 -----------------------------------------
 
-Here's a production-ready sensor data logger using atomic memory:
+Here's an example sensor data logger demonstrating atomic memory usage:
 
 .. code-block:: rust
    :caption: Thread-safe sensor data logger

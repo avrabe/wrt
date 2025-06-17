@@ -7,8 +7,14 @@
 use core::str;
 
 // Conditional imports for different environments
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", feature = "safety-critical"))]
+use wrt_foundation::allocator::{CrateId, WrtVec};
+
+#[cfg(all(feature = "std", not(feature = "safety-critical")))]
 use std::{format, string::String, vec::Vec};
+
+#[cfg(all(feature = "std", feature = "safety-critical"))]
+use std::{format, string::String};
 
 #[cfg(not(feature = "std"))]
 use wrt_foundation::bounded::{BoundedString, BoundedVec};
@@ -720,19 +726,55 @@ pub mod with_alloc {
             return Ok(binary.clone());
         }
 
-        // Create a minimal valid module
+        // Create a minimal valid module with bounded allocation
+        #[cfg(feature = "safety-critical")]
+        let mut binary: WrtVec<u8, { CrateId::Format as u8 }, { 4 * 1024 * 1024 }> = WrtVec::new();
+
+        #[cfg(not(feature = "safety-critical"))]
         let mut binary = Vec::with_capacity(8);
 
-        // Magic bytes
+        // Magic bytes with capacity checking
+        #[cfg(feature = "safety-critical")]
+        {
+            for &byte in &WASM_MAGIC {
+                binary.push(byte).map_err(|_| {
+                    Error::new(
+                        ErrorCategory::Runtime,
+                        codes::CAPACITY_EXCEEDED,
+                        "Binary generation capacity exceeded (magic bytes)",
+                    )
+                })?;
+            }
+        }
+        #[cfg(not(feature = "safety-critical"))]
         binary.extend_from_slice(&WASM_MAGIC);
 
-        // Version
+        // Version with capacity checking
+        #[cfg(feature = "safety-critical")]
+        {
+            for &byte in &WASM_VERSION {
+                binary.push(byte).map_err(|_| {
+                    Error::new(
+                        ErrorCategory::Runtime,
+                        codes::CAPACITY_EXCEEDED,
+                        "Binary generation capacity exceeded (version)",
+                    )
+                })?;
+            }
+        }
+        #[cfg(not(feature = "safety-critical"))]
         binary.extend_from_slice(&WASM_VERSION);
 
         // Generate sections (placeholder)
         // This will be implemented in Phase 1
 
-        Ok(binary)
+        // Convert to Vec<u8> for return
+        #[cfg(feature = "safety-critical")]
+        let result = binary.to_vec();
+        #[cfg(not(feature = "safety-critical"))]
+        let result = binary;
+
+        Ok(result)
     }
 
     /// Read a LEB128 unsigned integer from a byte array
@@ -2358,7 +2400,7 @@ pub fn write_string_bounded<
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     // Define test helper functions directly here since imports aren't working
     // Read functions
     fn read_f32_test(bytes: &[u8], pos: usize) -> crate::Result<(f32, usize)> {
@@ -2371,7 +2413,7 @@ mod tests {
         let value = f32::from_le_bytes(buf);
         Ok((value, pos + 4))
     }
-    
+
     fn read_f64_test(bytes: &[u8], pos: usize) -> crate::Result<(f64, usize)> {
         if pos + 8 > bytes.len() {
             return Err(parse_error("Not enough bytes to read f64"));
@@ -2382,7 +2424,7 @@ mod tests {
         let value = f64::from_le_bytes(buf);
         Ok((value, pos + 8))
     }
-    
+
     #[cfg(feature = "std")]
     fn read_string_test(bytes: &[u8], pos: usize) -> crate::Result<(String, usize)> {
         if pos >= bytes.len() {
@@ -2404,9 +2446,13 @@ mod tests {
             Err(_) => Err(parse_error("Invalid UTF-8 in string")),
         }
     }
-    
+
     #[cfg(feature = "std")]
-    fn read_vector_test<T, F>(bytes: &[u8], pos: usize, read_elem: F) -> crate::Result<(Vec<T>, usize)>
+    fn read_vector_test<T, F>(
+        bytes: &[u8],
+        pos: usize,
+        read_elem: F,
+    ) -> crate::Result<(Vec<T>, usize)>
     where
         F: Fn(&[u8], usize) -> crate::Result<(T, usize)>,
     {
@@ -2421,7 +2467,7 @@ mod tests {
 
         Ok((result, offset))
     }
-    
+
     fn read_section_header_test(bytes: &[u8], pos: usize) -> crate::Result<(u8, u32, usize)> {
         if pos >= bytes.len() {
             return Err(parse_error("Attempted to read past end of binary"));
@@ -2431,14 +2477,14 @@ mod tests {
         let (payload_len, len_size) = read_leb128_u32(bytes, pos + 1)?;
         Ok((id, payload_len, pos + 1 + len_size))
     }
-    
+
     fn validate_utf8_test(bytes: &[u8]) -> crate::Result<()> {
         match core::str::from_utf8(bytes) {
             Ok(_) => Ok(()),
             Err(_) => Err(parse_error("Invalid UTF-8 sequence")),
         }
     }
-    
+
     // Write functions
     #[cfg(feature = "std")]
     fn write_leb128_u32_test(value: u32) -> Vec<u8> {
@@ -2462,19 +2508,19 @@ mod tests {
 
         result
     }
-    
+
     #[cfg(feature = "std")]
     fn write_f32_test(value: f32) -> Vec<u8> {
         let bytes = value.to_le_bytes();
         bytes.to_vec()
     }
-    
+
     #[cfg(feature = "std")]
     fn write_f64_test(value: f64) -> Vec<u8> {
         let bytes = value.to_le_bytes();
         bytes.to_vec()
     }
-    
+
     #[cfg(feature = "std")]
     fn write_string_test(value: &str) -> Vec<u8> {
         let mut result = Vec::new();
@@ -2483,7 +2529,7 @@ mod tests {
         result.extend_from_slice(value.as_bytes());
         result
     }
-    
+
     #[cfg(feature = "std")]
     fn write_leb128_u64_test(value: u64) -> Vec<u8> {
         let mut result = Vec::new();
@@ -2506,7 +2552,7 @@ mod tests {
 
         result
     }
-    
+
     #[cfg(feature = "std")]
     fn write_vector_test<T, F>(elements: &[T], write_elem: F) -> Vec<u8>
     where
@@ -2519,7 +2565,7 @@ mod tests {
         }
         result
     }
-    
+
     #[cfg(feature = "std")]
     fn write_section_header_test(id: u8, content_size: u32) -> Vec<u8> {
         let mut result = Vec::new();
@@ -2581,7 +2627,8 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn test_leb128_u64_roundtrip() {
-        let test_values = [0u64, 1, 127, 128, 16_384, 0x7FFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF_FFFF_FFFF];
+        let test_values =
+            [0u64, 1, 127, 128, 16_384, 0x7FFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF_FFFF_FFFF];
 
         for &value in &test_values {
             let bytes = write_leb128_u64_test(value);

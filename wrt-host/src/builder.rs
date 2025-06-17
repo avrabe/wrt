@@ -11,12 +11,18 @@
 // Use the prelude for consistent imports
 use crate::prelude::{Any, BuiltinType, CallbackRegistry, CallbackType, Error, HashSet, HostFunctionHandler, Result, Value, str};
 
+#[cfg(feature = "std")]
+use crate::prelude::{Arc, BuiltinHost, BuiltinInterceptor, LinkInterceptor};
+
 // Type aliases for no_std compatibility
 #[cfg(feature = "std")]
 type ValueVec = Vec<Value>;
 
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
-type ValueVec = wrt_foundation::BoundedVec<Value, 16, wrt_foundation::NoStdProvider<512>>;
+#[cfg(not(feature = "std"))]
+use crate::bounded_host_infra::{HostProvider, HOST_MEMORY_SIZE};
+
+#[cfg(not(feature = "std"))]
+type ValueVec = wrt_foundation::BoundedVec<Value, 16, HostProvider>;
 
 /// Builder for configuring and creating instances of `CallbackRegistry` with
 /// built-in support.
@@ -33,8 +39,8 @@ pub struct HostBuilder {
     required_builtins: HashSet<BuiltinType>,
     
     /// Built-in types that are required by the component (`no_std` version)
-    #[cfg(all(not(feature = "std"), not(feature = "std")))]
-    required_builtins: HashSet<BuiltinType, 32, wrt_foundation::NoStdProvider<1024>>,
+    #[cfg(not(feature = "std"))]
+    required_builtins: HashSet<BuiltinType, 32, HostProvider>,
 
     /// Built-in interceptor
     #[cfg(feature = "std")]
@@ -77,9 +83,12 @@ impl Default for HostBuilder {
             }
         }
         
-        #[cfg(all(not(feature = "std"), not(feature = "std")))]
+        #[cfg(not(feature = "std"))]
         {
-            let provider = wrt_foundation::NoStdProvider::default();
+            // TODO: Specify appropriate size for this allocation
+            use wrt_foundation::{safe_managed_alloc, CrateId};
+            
+            let provider = safe_managed_alloc!(HOST_MEMORY_SIZE, CrateId::Host).unwrap_or_else(|_| panic!("Failed to allocate memory for HostBuilder"));
             Self {
                 registry: CallbackRegistry::new(),
                 required_builtins: wrt_foundation::BoundedSet::new(provider).unwrap_or_else(|_| panic!("Failed to create builtins set")),
@@ -170,9 +179,13 @@ impl HostBuilder {
     {
         let handler_fn = HostFunctionHandler::new(move |target| {
             #[cfg(feature = "std")]
-            let args = Vec::new();
-            #[cfg(all(not(feature = "std"), not(feature = "std")))]
-            let args = ValueVec::new(wrt_foundation::NoStdProvider::<512>::default()).expect("Failed to create ValueVec");
+            let args: ValueVec = Vec::new();
+            #[cfg(not(feature = "std"))]
+            let args: ValueVec = {
+                use wrt_foundation::{safe_managed_alloc, CrateId};
+                let provider = safe_managed_alloc!(65536, CrateId::Host).unwrap();
+                ValueVec::new(provider).unwrap()
+            };
             handler(target, args)
         });
 
@@ -200,7 +213,7 @@ impl HostBuilder {
             self.required_builtins.contains(&builtin_type)
         }
         
-        #[cfg(all(not(feature = "std"), not(feature = "std")))]
+        #[cfg(not(feature = "std"))]
         {
             self.required_builtins.contains(&builtin_type).unwrap_or(false)
         }
@@ -232,7 +245,7 @@ impl HostBuilder {
                 }
             }
             
-            #[cfg(all(not(feature = "std"), not(feature = "std")))]
+            #[cfg(not(feature = "std"))]
             {
                 // In no_std mode, we can't easily iterate over BoundedSet
                 // For now, we'll skip validation since we can't store complex handlers anyway
@@ -298,9 +311,13 @@ impl HostBuilder {
     {
         let handler_fn = HostFunctionHandler::new(move |target| {
             #[cfg(feature = "std")]
-            let args = Vec::new();
-            #[cfg(all(not(feature = "std"), not(feature = "std")))]
-            let args = ValueVec::new(wrt_foundation::NoStdProvider::<512>::default()).expect("Failed to create ValueVec");
+            let args: ValueVec = Vec::new();
+            #[cfg(not(feature = "std"))]
+            let args: ValueVec = {
+                use wrt_foundation::{safe_managed_alloc, CrateId};
+                let provider = safe_managed_alloc!(65536, CrateId::Host).unwrap();
+                ValueVec::new(provider).unwrap()
+            };
             handler(target, args)
         });
 
@@ -534,18 +551,18 @@ mod tests {
             fn before_builtin(
                 &self,
                 _context: &InterceptContext,
-                _args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
+                _args: &[wrt_foundation::component_value::ComponentValue<wrt_foundation::safe_memory::NoStdProvider<64>>],
             ) -> Result<BeforeBuiltinResult> {
                 // Bypass normal execution and return our own result
-                Ok(BeforeBuiltinResult::Bypass(vec![ComponentValue::s32(777)]))
+                Ok(BeforeBuiltinResult::Bypass(vec![wrt_foundation::component_value::ComponentValue::s32(777)]))
             }
 
             fn after_builtin(
                 &self,
                 _context: &InterceptContext,
-                _args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-                result: Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>,
-            ) -> Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>> {
+                _args: &[wrt_foundation::component_value::ComponentValue<wrt_foundation::safe_memory::NoStdProvider<64>>],
+                result: Result<Vec<wrt_foundation::component_value::ComponentValue<wrt_foundation::safe_memory::NoStdProvider<64>>>>,
+            ) -> Result<Vec<wrt_foundation::component_value::ComponentValue<wrt_foundation::safe_memory::NoStdProvider<64>>>> {
                 // Just pass through the result
                 result
             }

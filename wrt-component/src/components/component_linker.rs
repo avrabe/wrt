@@ -1,19 +1,16 @@
 //! Component Linker and Import/Export Resolution System
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]
 use std::{boxed::Box, collections::HashMap, format, string::String, vec::Vec};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedString as String, BoundedVec as Vec, no_std_hashmap::NoStdHashMap as HashMap, safe_memory::NoStdProvider};
-
-// Type aliases for no_std compatibility
+use alloc::boxed::Box;
 #[cfg(not(feature = "std"))]
-type Box<T> = wrt_foundation::SafeBox<T, NoStdProvider<65536>>;
+use wrt_foundation::{bounded::BoundedString as String, bounded::BoundedVec as Vec, safe_memory::NoStdProvider};
 
-use crate::component_instantiation::{
+use crate::components::component_instantiation::{
     create_component_export, create_component_import, ComponentExport, ComponentImport,
     ComponentInstance, ExportType, FunctionSignature, ImportType, InstanceConfig, InstanceId,
     ResolvedImport,
@@ -49,11 +46,11 @@ pub struct ComponentDefinition {
     /// Component ID
     pub id: ComponentId,
     /// Component binary (simplified as bytes)
-    pub binary: Vec<u8>,
+    pub binary: BoundedVec<u8, 1048576, NoStdProvider<65536>>, // 1MB max binary size
     /// Parsed exports
-    pub exports: Vec<ComponentExport>,
+    pub exports: BoundedVec<ComponentExport, 64, NoStdProvider<65536>>,
     /// Parsed imports
-    pub imports: Vec<ComponentImport>,
+    pub imports: BoundedVec<ComponentImport, 64, NoStdProvider<65536>>,
     /// Component metadata
     pub metadata: ComponentMetadata,
 }
@@ -248,7 +245,7 @@ impl ComponentLinker {
         if !dependent_instances.is_empty() {
             return Err(Error::new(
                 ErrorCategory::Runtime,
-                codes::RESOURCE_IN_USE,
+                codes::RESOURCE_ACCESS_ERROR,
                 "Component is in use by active instances",
             ));
         }
@@ -345,7 +342,7 @@ impl ComponentLinker {
     fn parse_component_binary(
         &self,
         binary: &[u8],
-    ) -> Result<(Vec<ComponentExport>, Vec<ComponentImport>, ComponentMetadata)> {
+    ) -> core::result::Result<(Vec<ComponentExport>, Vec<ComponentImport>, ComponentMetadata)> {
         // Simplified component parsing
         if binary.is_empty() {
             return Err(Error::new(
@@ -454,7 +451,7 @@ impl ComponentLinker {
 
         Err(Error::new(
             ErrorCategory::Runtime,
-            codes::IMPORT_NOT_SATISFIED,
+            codes::COMPONENT_IMPORT_NOT_FOUND_ERROR,
             "Component not found",
         ))
     }
@@ -512,7 +509,7 @@ impl LinkGraph {
         if self.find_node_index(&component_id).is_some() {
             return Err(Error::new(
                 ErrorCategory::Validation,
-                codes::DUPLICATE_COMPONENT,
+                codes::DUPLICATE_OPERATION,
                 "Component already exists in graph",
             ));
         }
@@ -581,8 +578,8 @@ impl LinkGraph {
         #[cfg(not(feature = "std"))]
         {
             // For no_std, create bounded vectors
-            let mut visited = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-            let mut temp_visited = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            let mut visited = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
+            let mut temp_visited = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
             let mut result = Vec::new();
             
             // Initialize with false values
@@ -620,7 +617,7 @@ impl LinkGraph {
         if temp_visited[node_index] {
             return Err(Error::new(
                 ErrorCategory::Validation,
-                codes::CIRCULAR_DEPENDENCY,
+                codes::VALIDATION_ERROR,
                 "Circular dependency detected",
             ));
         }

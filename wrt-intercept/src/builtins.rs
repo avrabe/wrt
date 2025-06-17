@@ -3,11 +3,15 @@
 //! This module provides facilities for intercepting built-in function calls
 //! in the WebAssembly Component Model implementation.
 
-use crate::prelude::{BuiltinType, Debug, str, Value};
-use wrt_error::{Error, Result};
+
+use crate::prelude::{BuiltinType, Debug, str};
+use wrt_error::Error;
 
 #[cfg(feature = "std")]
-use std::{sync::{Arc, RwLock}, collections::HashSet};
+use wrt_foundation::values::Value;
+
+#[cfg(feature = "std")]
+use std::sync::Arc;
 
 #[cfg(feature = "std")]
 use wrt_foundation::component_value::{ComponentValue, ValType};
@@ -99,7 +103,7 @@ impl BuiltinSerialization {
     /// A `Result` containing the serialized bytes or an error
     pub fn serialize(
         values: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<Vec<u8>> {
+    ) -> wrt_error::Result<Vec<u8>> {
         // Simple implementation for now - convert to bytes
         let mut result = Vec::new();
         for value in values {
@@ -134,7 +138,7 @@ impl BuiltinSerialization {
     pub fn deserialize(
         bytes: &[u8],
         types: &[ValType<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>> {
+    ) -> wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>> {
         let mut result = Vec::new();
         let mut offset = 0;
 
@@ -295,7 +299,7 @@ pub trait BuiltinInterceptor: Send + Sync {
         &self,
         context: &InterceptContext,
         args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<BeforeBuiltinResult>;
+    ) -> wrt_error::Result<BeforeBuiltinResult>;
 
     /// Called after a built-in function has been invoked
     ///
@@ -312,8 +316,8 @@ pub trait BuiltinInterceptor: Send + Sync {
         &self,
         context: &InterceptContext,
         args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-        result: Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>,
-    ) -> Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>;
+        result: wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>,
+    ) -> wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>;
 
     /// Clone this interceptor
     ///

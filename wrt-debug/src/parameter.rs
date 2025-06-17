@@ -224,7 +224,7 @@ impl<'a> ParameterList<'a> {
 
     /// Get all parameters
     pub fn parameters(&self) -> &[Parameter<'a>] {
-        self.parameters.as_slice()
+        self.parameters.as_slice().unwrap_or(&[])
     }
 
     /// Get parameter count

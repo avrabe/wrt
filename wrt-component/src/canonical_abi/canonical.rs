@@ -11,10 +11,29 @@ use wrt_foundation::resource::ResourceOperation as FormatResourceOperation;
 // Additional dependencies not in prelude
 use wrt_runtime::Memory;
 
+// HashMap imports - migrate to WRT allocator for safety
+#[cfg(all(feature = "std", feature = "safety-critical"))]
+use wrt_foundation::allocator::{WrtHashMap as HashMap, WrtVec, CrateId};
+#[cfg(all(feature = "std", not(feature = "safety-critical")))]
+use std::collections::HashMap;
+#[cfg(not(feature = "std"))]
+use alloc::{sync::Arc, collections::BTreeMap as HashMap, format};
+
+#[cfg(feature = "std")]
+use std::sync::{Arc, Mutex, RwLock};
+#[cfg(not(feature = "std"))]
+use wrt_sync::{Mutex, RwLock};
+
+// Conditional imports for buffer pools
+#[cfg(feature = "std")]
+use crate::resources::buffer_pool::BufferPool;
+#[cfg(not(feature = "std"))]
+use crate::resources::bounded_buffer_pool::BoundedBufferPool;
+
 use crate::{
     memory_layout::{calculate_layout, MemoryLayout},
-    prelude::*,
-    resources::buffer_pool::BufferPool,
+    resource_management::ResourceTable,
+    resources::{MemoryStrategy, VerificationLevel},
     string_encoding::{
         lift_string_with_options, lower_string_with_options, CanonicalStringOptions, StringEncoding,
     },
@@ -27,15 +46,15 @@ const MAX_BUFFER_SIZE: usize = 10 * 1024 * 1024; // 10MB
 #[derive(Debug)]
 pub struct CanonicalABI {
     /// Binary std/no_std choice
-    buffer_pool: Arc<RwLock<BufferPool>>,
-    /// Memory strategy for canonical operations
+    buffer_pool: BoundedBufferPool,
+    /// Memory strategy for canonical operations  
     memory_strategy: MemoryStrategy,
     /// Verification level for canonical operations
     verification_level: VerificationLevel,
     /// Optional interceptor for canonical operations
-    interceptor: Option<Arc<LinkInterceptor>>,
+    interceptor: Option<u32>, // Placeholder for LinkInterceptor
     /// Metrics for canonical operations
-    metrics: Arc<Mutex<CanonicalMetrics>>,
+    metrics: CanonicalMetrics,
     /// String encoding options
     string_options: CanonicalStringOptions,
 }
@@ -61,11 +80,11 @@ impl CanonicalABI {
     /// Create a new CanonicalABI instance
     pub fn new(buffer_pool_size: usize) -> Self {
         Self {
-            buffer_pool: Arc::new(RwLock::new(BufferPool::new(buffer_pool_size))),
+            buffer_pool: BoundedBufferPool::new(),
             memory_strategy: MemoryStrategy::BoundedCopy,
             verification_level: VerificationLevel::Critical,
             interceptor: None,
-            metrics: Arc::new(Mutex::new(CanonicalMetrics::default())),
+            metrics: CanonicalMetrics::default(),
             string_options: CanonicalStringOptions::default(),
         }
     }
@@ -73,6 +92,18 @@ impl CanonicalABI {
     /// Create a new CanonicalABI instance with default settings
     pub fn default() -> Self {
         Self::new(1024 * 1024) // 1MB default buffer pool
+    }
+
+    /// Create a new CanonicalABI instance with no parameters
+    pub fn new() -> Self {
+        Self {
+            buffer_pool: BoundedBufferPool::new(),
+            memory_strategy: MemoryStrategy::BoundedCopy,
+            verification_level: VerificationLevel::Critical,
+            interceptor: None,
+            metrics: CanonicalMetrics::default(),
+            string_options: CanonicalStringOptions::default(),
+        }
     }
 
     /// Set the memory strategy for canonical operations
@@ -111,10 +142,7 @@ impl CanonicalABI {
         let memory_strategy = self.get_strategy_from_interceptor();
 
         // Update metrics
-        {
-            let mut metrics = self.metrics.lock().unwrap();
-            metrics.lift_count += 1;
-        }
+        self.metrics.lift_count += 1;
 
         // Intercept if necessary
         if let Some(interceptor) = &self.interceptor {
@@ -146,10 +174,7 @@ impl CanonicalABI {
         let memory_strategy = self.get_strategy_from_interceptor();
 
         // Update metrics
-        {
-            let mut metrics = self.metrics.lock().unwrap();
-            metrics.lower_count += 1;
-        }
+        self.metrics.lower_count += 1;
 
         // Perform lower operation based on value type
         if let Some(b) = value.as_bool() {
@@ -243,10 +268,19 @@ impl CanonicalABI {
     ) -> Result<Value> {
         // Tuple is a sequence of values with their specific types
         let mut current_addr = addr;
+        #[cfg(feature = "safety-critical")]
+        let mut values: WrtVec<Box<ComponentValue>, {CrateId::Component as u8}, 32> = WrtVec::new();
+        #[cfg(not(feature = "safety-critical"))]
         let mut values = Vec::new();
 
         for ty in types {
             let value = self.lift_value(ty, current_addr, resource_table, memory_bytes)?;
+            #[cfg(feature = "safety-critical")]
+            values.push(Box::new(value)).map_err(|_| {
+                Error::new(ErrorCategory::Runtime, codes::RUNTIME_CAPACITY_ERROR_CODE, 
+                          "Tuple value count exceeds safety limit of 32")
+            })?;
+            #[cfg(not(feature = "safety-critical"))]
             values.push(Box::new(value));
 
             // Advance address based on the size of the current type
@@ -262,7 +296,11 @@ impl CanonicalABI {
         let num_bytes = (names.len() + 7) / 8; // Number of bytes needed
         self.check_bounds(addr, num_bytes as u32, memory_bytes)?;
 
+        #[cfg(feature = "safety-critical")]
+        let mut flags: WrtVec<u32, {CrateId::Component as u8}, 64> = WrtVec::new();
+        #[cfg(not(feature = "safety-critical"))]
         let mut flags = Vec::new();
+        
         for (i, _) in names.iter().enumerate() {
             let byte_idx = i / 8;
             let bit_position = i % 8;
@@ -270,6 +308,12 @@ impl CanonicalABI {
 
             // Check if the bit is set
             if (flag_byte & (1 << bit_position)) != 0 {
+                #[cfg(feature = "safety-critical")]
+                flags.push(i as u32).map_err(|_| {
+                    Error::new(ErrorCategory::Runtime, codes::RUNTIME_CAPACITY_ERROR_CODE, 
+                              "Flag count exceeds safety limit of 64")
+                })?;
+                #[cfg(not(feature = "safety-critical"))]
                 flags.push(i as u32);
             }
         }
@@ -287,10 +331,19 @@ impl CanonicalABI {
     ) -> Result<Value> {
         // Similar to list but with fixed size
         let mut current_addr = addr;
+        #[cfg(feature = "safety-critical")]
+        let mut values: WrtVec<Box<ComponentValue>, {CrateId::Component as u8}, 256> = WrtVec::new();
+        #[cfg(not(feature = "safety-critical"))]
         let mut values = Vec::new();
 
         for _ in 0..size {
             let value = self.lift_value(inner_ty, current_addr, resource_table, memory_bytes)?;
+            #[cfg(feature = "safety-critical")]
+            values.push(Box::new(value)).map_err(|_| {
+                Error::new(ErrorCategory::Runtime, codes::RUNTIME_CAPACITY_ERROR_CODE, 
+                          "Fixed list size exceeds safety limit of 256")
+            })?;
+            #[cfg(not(feature = "safety-critical"))]
             values.push(Box::new(value));
 
             // Advance address based on the size of inner type
@@ -392,11 +445,8 @@ impl CanonicalABI {
         let value = i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
 
         // Update metrics if needed
-        {
-            let mut metrics = self.metrics.lock().unwrap();
-            metrics.lift_bytes += 4;
-            metrics.max_lift_bytes = metrics.max_lift_bytes.max(4);
-        }
+        self.metrics.lift_bytes += 4;
+        self.metrics.max_lift_bytes = self.metrics.max_lift_bytes.max(4);
 
         Ok(wrt_foundation::values::Value::I32(value))
     }
@@ -420,11 +470,8 @@ impl CanonicalABI {
         ]);
 
         // Update metrics if needed
-        {
-            let mut metrics = self.metrics.lock().unwrap();
-            metrics.lift_bytes += 8;
-            metrics.max_lift_bytes = metrics.max_lift_bytes.max(8);
-        }
+        self.metrics.lift_bytes += 8;
+        self.metrics.max_lift_bytes = self.metrics.max_lift_bytes.max(8);
 
         Ok(wrt_foundation::values::Value::I64(value))
     }
@@ -450,11 +497,8 @@ impl CanonicalABI {
         let value = f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
 
         // Update metrics if needed
-        {
-            let mut metrics = self.metrics.lock().unwrap();
-            metrics.lift_bytes += 4;
-            metrics.max_lift_bytes = metrics.max_lift_bytes.max(4);
-        }
+        self.metrics.lift_bytes += 4;
+        self.metrics.max_lift_bytes = self.metrics.max_lift_bytes.max(4);
 
         Ok(wrt_foundation::values::Value::F32(value))
     }
@@ -467,11 +511,8 @@ impl CanonicalABI {
         ]);
 
         // Update metrics if needed
-        {
-            let mut metrics = self.metrics.lock().unwrap();
-            metrics.lift_bytes += 8;
-            metrics.max_lift_bytes = metrics.max_lift_bytes.max(8);
-        }
+        self.metrics.lift_bytes += 8;
+        self.metrics.max_lift_bytes = self.metrics.max_lift_bytes.max(8);
 
         Ok(wrt_foundation::values::Value::F64(value))
     }
@@ -552,21 +593,27 @@ impl CanonicalABI {
         self.check_bounds(data_ptr, total_size, memory_bytes)?;
 
         // Lift each element
+        #[cfg(feature = "safety-critical")]
+        let mut values: WrtVec<Box<ComponentValue>, {CrateId::Component as u8}, 1024> = WrtVec::new();
+        #[cfg(not(feature = "safety-critical"))]
         let mut values = Vec::new();
         let mut current_addr = data_ptr;
 
         for _ in 0..length {
             let value = self.lift_value(inner_ty, current_addr, resource_table, memory_bytes)?;
+            #[cfg(feature = "safety-critical")]
+            values.push(Box::new(value)).map_err(|_| {
+                Error::new(ErrorCategory::Runtime, codes::RUNTIME_CAPACITY_ERROR_CODE, 
+                          "List length exceeds safety limit of 1024")
+            })?;
+            #[cfg(not(feature = "safety-critical"))]
             values.push(Box::new(value));
             current_addr += element_size;
         }
 
         // Update metrics
-        {
-            let mut metrics = self.metrics.lock().unwrap();
-            metrics.lift_bytes += 8 + total_size as u64;
-            metrics.max_lift_bytes = metrics.max_lift_bytes.max(8 + total_size as u64);
-        }
+        self.metrics.lift_bytes += 8 + total_size as u64;
+        self.metrics.max_lift_bytes = self.metrics.max_lift_bytes.max(8 + total_size as u64);
 
         Ok(Value::List(values))
     }
@@ -580,12 +627,21 @@ impl CanonicalABI {
     ) -> Result<Value> {
         // Records are stored as a sequence of field values
         let mut current_addr = addr;
+        #[cfg(feature = "safety-critical")]
+        let mut record_map: WrtHashMap<String, Box<ComponentValue>, {CrateId::Component as u8}, 32> = WrtHashMap::new();
+        #[cfg(not(feature = "safety-critical"))]
         let mut record_map = HashMap::new();
 
         for (field_name, field_type) in fields {
             // Lift the field value
             let field_value =
                 self.lift_value(field_type, current_addr, resource_table, memory_bytes)?;
+            #[cfg(feature = "safety-critical")]
+            record_map.insert(field_name.clone(), Box::new(field_value)).map_err(|_| {
+                Error::new(ErrorCategory::Runtime, codes::RUNTIME_CAPACITY_ERROR_CODE, 
+                          "Record field count exceeds safety limit of 32")
+            })?;
+            #[cfg(not(feature = "safety-critical"))]
             record_map.insert(field_name.clone(), Box::new(field_value));
 
             // Advance address by the size of the field
@@ -910,11 +966,8 @@ impl CanonicalABI {
         }
 
         // Update metrics
-        {
-            let mut metrics = self.metrics.lock().unwrap();
-            metrics.lower_bytes += 8 + total_size as u64;
-            metrics.max_lower_bytes = metrics.max_lower_bytes.max(8 + total_size as u64);
-        }
+        self.metrics.lower_bytes += 8 + total_size as u64;
+        self.metrics.max_lower_bytes = self.metrics.max_lower_bytes.max(8 + total_size as u64);
 
         Ok(())
     }
@@ -1159,7 +1212,7 @@ impl CanonicalABI {
 
     fn lower_result(
         &self,
-        _result: &Result<Option<Box<Value>>, Option<Box<Value>>>,
+        _result: &core::result::Result<Option<Box<Value>>, Option<Box<Value>>>,
         _addr: u32,
         _resource_table: &ResourceTable,
         _memory_bytes: &mut [u8],
@@ -1237,14 +1290,13 @@ impl CanonicalABI {
     }
 
     /// Get the current metrics
-    pub fn get_metrics(&self) -> CanonicalMetrics {
-        self.metrics.lock().unwrap().clone()
+    pub fn get_metrics(&self) -> &CanonicalMetrics {
+        &self.metrics
     }
 
     /// Reset the metrics to zero
-    pub fn reset_metrics(&self) {
-        let mut metrics = self.metrics.lock().unwrap();
-        *metrics = CanonicalMetrics::default();
+    pub fn reset_metrics(&mut self) {
+        self.metrics = CanonicalMetrics::default();
     }
 
     /// Get memory strategy from interceptor for canonical operations
@@ -1629,9 +1681,18 @@ pub fn convert_value_for_canonical_abi(
         }
         wrt_foundation::component_value::ValType::List(inner_type) => {
             if let Some(list) = value.as_list() {
+                #[cfg(feature = "safety-critical")]
+                let mut converted_list: WrtVec<Value, {CrateId::Component as u8}, 1024> = WrtVec::new();
+                #[cfg(not(feature = "safety-critical"))]
                 let mut converted_list = Vec::new();
                 for item in list {
                     let converted_item = convert_value_for_canonical_abi(item, &inner_type)?;
+                    #[cfg(feature = "safety-critical")]
+                    converted_list.push(converted_item).map_err(|_| {
+                        Error::new(ErrorCategory::Runtime, codes::RUNTIME_CAPACITY_ERROR_CODE, 
+                                  "List conversion exceeds safety limit of 1024")
+                    })?;
+                    #[cfg(not(feature = "safety-critical"))]
                     converted_list.push(converted_item);
                 }
                 Ok(wrt_foundation::values::Value::List(converted_list))
@@ -1645,11 +1706,20 @@ pub fn convert_value_for_canonical_abi(
         }
         wrt_foundation::component_value::ValType::Record(fields) => {
             if let Some(record) = value.as_record() {
+                #[cfg(feature = "safety-critical")]
+                let mut converted_record: WrtHashMap<String, Value, {CrateId::Component as u8}, 64> = WrtHashMap::new();
+                #[cfg(not(feature = "safety-critical"))]
                 let mut converted_record = HashMap::new();
                 for (field_name, field_type) in fields {
                     if let Some(field_value) = record.get(field_name) {
                         let converted_field =
                             convert_value_for_canonical_abi(field_value, field_type)?;
+                        #[cfg(feature = "safety-critical")]
+                        converted_record.insert(field_name.clone(), converted_field).map_err(|_| {
+                            Error::new(ErrorCategory::Runtime, codes::RUNTIME_CAPACITY_ERROR_CODE, 
+                                      "Record conversion exceeds safety limit of 64 fields")
+                        })?;
+                        #[cfg(not(feature = "safety-critical"))]
                         converted_record.insert(field_name.clone(), converted_field);
                     } else {
                         return Err(Error::new(
@@ -1681,9 +1751,18 @@ pub fn convert_value_for_canonical_abi(
                         )),
                     ));
                 }
+                #[cfg(feature = "safety-critical")]
+                let mut converted_tuple: WrtVec<Value, {CrateId::Component as u8}, 32> = WrtVec::new();
+                #[cfg(not(feature = "safety-critical"))]
                 let mut converted_tuple = Vec::new();
                 for (item, item_type) in tuple.iter().zip(types.iter()) {
                     let converted_item = convert_value_for_canonical_abi(item, item_type)?;
+                    #[cfg(feature = "safety-critical")]
+                    converted_tuple.push(converted_item).map_err(|_| {
+                        Error::new(ErrorCategory::Runtime, codes::RUNTIME_CAPACITY_ERROR_CODE, 
+                                  "Tuple conversion exceeds safety limit of 32 elements")
+                    })?;
+                    #[cfg(not(feature = "safety-critical"))]
                     converted_tuple.push(converted_item);
                 }
                 Ok(wrt_foundation::values::Value::Tuple(converted_tuple))
@@ -1718,9 +1797,18 @@ pub fn convert_value_for_canonical_abi(
                     }
                 }
                 // Convert all flag values to booleans
+                #[cfg(feature = "safety-critical")]
+                let mut converted_flags: WrtHashMap<String, bool, {CrateId::Component as u8}, 64> = WrtHashMap::new();
+                #[cfg(not(feature = "safety-critical"))]
                 let mut converted_flags = HashMap::new();
                 for (name, value) in flags {
                     if let Some(b) = value.as_bool() {
+                        #[cfg(feature = "safety-critical")]
+                        converted_flags.insert(name.clone(), b).map_err(|_| {
+                            Error::new(ErrorCategory::Runtime, codes::RUNTIME_CAPACITY_ERROR_CODE, 
+                                      "Flags conversion exceeds safety limit of 64 flags")
+                        })?;
+                        #[cfg(not(feature = "safety-critical"))]
                         converted_flags.insert(name.clone(), b);
                     } else {
                         return Err(Error::new(

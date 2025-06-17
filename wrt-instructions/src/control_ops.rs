@@ -49,7 +49,8 @@
 
 // Remove unused imports
 
-use crate::prelude::{BlockType, BoundedCapacity, BoundedVec, Debug, Error, ErrorCategory, PartialEq, PureInstruction, Result, Value, codes, str};
+use crate::prelude::{BlockType, Debug, Error, ErrorCategory, PartialEq, PureInstruction, Result, Value, codes, str};
+use wrt_foundation::{BoundedVec, traits::BoundedCapacity};
 // use crate::validation::{Validate, ValidationContext}; // Currently unused
 
 
@@ -79,7 +80,7 @@ pub enum Block {
 }
 
 /// Represents a pure control flow operation for WebAssembly.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ControlOp {
     /// A basic block of instructions with a label that can be branched to
     Block(ControlBlockType),
@@ -134,6 +135,12 @@ pub enum ControlOp {
     BrOnNull(u32),
     /// Branch if reference is not null (`br_on_non_null`)
     BrOnNonNull(u32),
+}
+
+impl Default for ControlOp {
+    fn default() -> Self {
+        ControlOp::Nop
+    }
 }
 
 /// Return operation (return)
@@ -293,7 +300,7 @@ impl BrTable {
         }
         #[cfg(not(feature = "std"))]
         {
-            let provider = wrt_foundation::NoStdProvider::<8192>::new();
+            let provider = wrt_foundation::NoStdProvider::<8192>::default();
             let mut table = wrt_foundation::BoundedVec::new(provider).map_err(|_| {
                 Error::memory_error("Could not create BoundedVec")
             })?;
@@ -330,7 +337,7 @@ impl BrTable {
         {
             // For no_std, we create a temporary slice on the stack
             let mut slice_vec = [0u32; 256]; // Static array for no_std
-            let len = core::cmp::min(self.table.len(), 256);
+            let len = core::cmp::min(BoundedCapacity::len(&self.table), 256);
             for i in 0..len {
                 slice_vec[i] = self.table.get(i).map_err(|_| {
                     Error::runtime_error("Branch table index out of bounds")
@@ -470,7 +477,11 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
             }
             Self::BrTable { table, default } => {
                 // Use from_slice for unified interface across all feature configurations
+                #[cfg(feature = "std")]
                 let slice: &[u32] = table.as_slice();
+                #[cfg(not(feature = "std"))]
+                let slice: &[u32] = table.as_slice().map_err(|_| Error::runtime_error("Failed to get table slice"))?;
+                
                 let br_table = BrTable::from_slice(slice, *default)?;
                 br_table.execute(context)
             }

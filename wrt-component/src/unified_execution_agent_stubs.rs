@@ -1,14 +1,13 @@
-//! Minimal stubs for unified execution agent compilation
-//! These stubs allow the unified agent to compile without all dependencies
+//! Minimal stubs for unified execution engine compilation
+//! These stubs allow the unified engine to compile without all dependencies
 
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
     prelude::*,
-    traits::DefaultMemoryProvider,
+    safe_memory::NoStdProvider,
     WrtResult,
 };
 
-#[cfg(feature = "std")]
 #[cfg(feature = "std")]
 use wrt_foundation::component_value::ComponentValue;
 
@@ -86,7 +85,7 @@ impl ComponentRuntimeBridge {
         _instance_id: u32,
         _function_name: &str,
         _args: &[wrt_foundation::component_value::ComponentValue],
-    ) -> Result<wrt_foundation::component_value::ComponentValue, wrt_error::Error> {
+    ) -> core::result::Result<wrt_foundation::component_value::ComponentValue, wrt_error::Error> {
         // Return a dummy successful result
         Ok(wrt_foundation::component_value::ComponentValue::U32(42))
     }
@@ -97,7 +96,7 @@ impl ComponentRuntimeBridge {
         _module_name: alloc::string::String,
         _function_count: u32,
         _memory_size: u32,
-    ) -> Result<u32, wrt_error::Error> {
+    ) -> core::result::Result<u32, wrt_error::Error> {
         Ok(1)
     }
     
@@ -107,9 +106,9 @@ impl ComponentRuntimeBridge {
         _name: alloc::string::String,
         _signature: crate::component_instantiation::FunctionSignature,
         _func: F,
-    ) -> Result<usize, wrt_error::Error>
+    ) -> core::result::Result<usize, wrt_error::Error>
     where
-        F: Fn(&[ComponentValue]) -> Result<ComponentValue, wrt_error::Error> + Send + Sync + 'static,
+        F: Fn(&[ComponentValue]) -> core::result::Result<ComponentValue, wrt_error::Error> + Send + Sync + 'static,
     {
         Ok(0)
     }
@@ -117,10 +116,10 @@ impl ComponentRuntimeBridge {
     #[cfg(not(feature = "std"))]
     pub fn register_host_function(
         &mut self,
-        _name: BoundedString<64, DefaultMemoryProvider>,
+        _name: BoundedString<64, NoStdProvider::<65536>>,
         _signature: crate::component_instantiation::FunctionSignature,
-        _func: fn(&[ComponentValue]) -> Result<ComponentValue, wrt_error::Error>,
-    ) -> Result<usize, wrt_error::Error> {
+        _func: fn(&[ComponentValue]) -> core::result::Result<ComponentValue, wrt_error::Error>,
+    ) -> core::result::Result<usize, wrt_error::Error> {
         Ok(0)
     }
 }
@@ -249,9 +248,9 @@ pub mod cfi_stubs {
     pub struct CfiExecutionContext {
         pub current_function: u32,
         pub current_instruction: u32,
-        pub shadow_stack: BoundedVec<u32, 1024, DefaultMemoryProvider>,
+        pub shadow_stack: BoundedVec<u32, 1024, NoStdProvider::<65536, NoStdProvider<65536>>>,
         pub violation_count: u32,
-        pub landing_pad_expectations: BoundedVec<LandingPadExpectation, 16, DefaultMemoryProvider>,
+        pub landing_pad_expectations: BoundedVec<LandingPadExpectation, 16, NoStdProvider::<65536, NoStdProvider<65536>>>,
         pub metrics: CfiMetrics,
     }
     
@@ -296,7 +295,7 @@ pub mod cfi_stubs {
             _table_idx: u32,
             _protection: &CfiControlFlowProtection,
             _context: &mut CfiExecutionContext,
-        ) -> Result<CfiProtectedBranchTarget, wrt_error::Error> {
+        ) -> core::result::Result<CfiProtectedBranchTarget, wrt_error::Error> {
             Ok(CfiProtectedBranchTarget {
                 target: 0,
                 protection: CfiProtection::default(),
@@ -307,7 +306,7 @@ pub mod cfi_stubs {
             &mut self,
             _protection: &CfiControlFlowProtection,
             _context: &mut CfiExecutionContext,
-        ) -> Result<(), wrt_error::Error> {
+        ) -> core::result::Result<(), wrt_error::Error> {
             Ok(())
         }
         
@@ -317,7 +316,7 @@ pub mod cfi_stubs {
             _conditional: bool,
             _protection: &CfiControlFlowProtection,
             _context: &mut CfiExecutionContext,
-        ) -> Result<CfiProtectedBranchTarget, wrt_error::Error> {
+        ) -> core::result::Result<CfiProtectedBranchTarget, wrt_error::Error> {
             Ok(CfiProtectedBranchTarget {
                 target: _label_idx,
                 protection: CfiProtection::default(),
@@ -330,9 +329,9 @@ pub mod cfi_stubs {
             Self {
                 current_function: 0,
                 current_instruction: 0,
-                shadow_stack: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                shadow_stack: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
                 violation_count: 0,
-                landing_pad_expectations: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                landing_pad_expectations: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
                 metrics: CfiMetrics::default(),
             }
         }

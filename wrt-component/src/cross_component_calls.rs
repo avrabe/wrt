@@ -157,11 +157,11 @@ impl CrossComponentCallManager {
             #[cfg(feature = "std")]
             targets: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            targets: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            targets: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             call_stack: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            call_stack: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            call_stack: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             canonical_abi: CanonicalAbi::new(),
             resource_manager: ResourceLifecycleManager::new(),
             max_call_depth: MAX_CROSS_CALL_DEPTH,
@@ -184,7 +184,11 @@ impl CrossComponentCallManager {
         #[cfg(not(any(feature = "std", )))]
         {
             self.targets.push(target).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many call targets".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many call targets"
+                )
             })?;
         }
 
@@ -201,8 +205,10 @@ impl CrossComponentCallManager {
     ) -> WrtResult<CrossCallResult> {
         // Check call depth
         if self.call_stack.len() >= self.max_call_depth {
-            return Err(wrt_foundation::WrtError::ResourceExhausted(
-                "Maximum call depth exceeded".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Resource,
+                wrt_error::codes::RESOURCE_EXHAUSTED,
+                "Maximum call depth exceeded"
             ));
         }
 
@@ -210,13 +216,19 @@ impl CrossComponentCallManager {
         let target = self
             .targets
             .get(target_id as usize)
-            .ok_or_else(|| wrt_foundation::WrtError::invalid_input("Invalid input"))?
+            .ok_or_else(|| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?
             .clone();
 
         // Check permissions
         if !target.permissions.allowed {
-            return Err(wrt_foundation::WrtError::PermissionDenied(
-                "Cross-component call not allowed".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Runtime,
+                wrt_error::codes::RUNTIME_ERROR,
+                "Cross-component call not allowed"
             ));
         }
 
@@ -230,7 +242,7 @@ impl CrossComponentCallManager {
             #[cfg(feature = "std")]
             transferred_resources: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            transferred_resources: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            transferred_resources: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
         };
 
         // Push call frame
@@ -241,7 +253,11 @@ impl CrossComponentCallManager {
         #[cfg(not(any(feature = "std", )))]
         {
             self.call_stack.push(call_frame).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Call stack overflow".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Call stack overflow"
+                )
             })?;
         }
 
@@ -282,7 +298,7 @@ impl CrossComponentCallManager {
                     #[cfg(feature = "std")]
                     transferred_resources: Vec::new(),
                     #[cfg(not(any(feature = "std", )))]
-                    transferred_resources: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                    transferred_resources: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
                     stats,
                 }
             }
@@ -307,7 +323,7 @@ impl CrossComponentCallManager {
         args: &[Value],
         target: &CallTarget,
         caller_instance: u32,
-    ) -> WrtResult<(Vec<Value>, Vec<TransferredResource>)> {
+    ) -> Wrtcore::result::Result<(Vec<Value>, Vec<TransferredResource>)> {
         #[cfg(feature = "std")]
         let mut prepared_args = Vec::new();
         #[cfg(not(any(feature = "std", )))]
@@ -333,8 +349,10 @@ impl CrossComponentCallManager {
                         transferred_resources.push(transferred);
                         prepared_args.push(arg.clone());
                     } else {
-                        return Err(wrt_foundation::WrtError::PermissionDenied(
-                            "Resource transfer not allowed".into(),
+                        return Err(wrt_foundation::Error::new(
+                            wrt_foundation::ErrorCategory::Runtime,
+                            wrt_error::codes::RUNTIME_ERROR,
+                            "Resource transfer not allowed"
                         ));
                     }
                 }
@@ -357,8 +375,10 @@ impl CrossComponentCallManager {
         transfer_type: ResourceTransferPolicy,
     ) -> WrtResult<TransferredResource> {
         match transfer_type {
-            ResourceTransferPolicy::None => Err(wrt_foundation::WrtError::PermissionDenied(
-                "Resource transfer not allowed".into(),
+            ResourceTransferPolicy::None => Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Runtime,
+                wrt_error::codes::RUNTIME_ERROR,
+                "Resource transfer not allowed"
             )),
             ResourceTransferPolicy::Transfer => {
                 // Transfer ownership

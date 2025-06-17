@@ -1,5 +1,5 @@
 // Platform-aware Component Runtime Implementation
-// This is Agent C's implementation of the platform component runtime
+// This is the implementation of the platform component runtime
 
 use crate::foundation_stubs::{SmallVec, MediumVec, SafetyContext, AsilLevel};
 use crate::platform_stubs::{ComprehensivePlatformLimits, PlatformId};

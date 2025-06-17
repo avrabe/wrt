@@ -51,10 +51,7 @@ mod async_context_tests {
 
         let retrieved = AsyncContextManager::get_context_value(&key).unwrap();
         assert!(retrieved.is_some());
-        assert_eq!(
-            retrieved.unwrap().as_component_value().unwrap(),
-            &ComponentValue::I32(42)
-        );
+        assert_eq!(retrieved.unwrap().as_component_value().unwrap(), &ComponentValue::I32(42));
 
         // Clean up
         AsyncContextManager::clear_context().unwrap();
@@ -62,10 +59,8 @@ mod async_context_tests {
 
     #[test]
     fn test_context_scope() {
-        let original_count = AsyncContextManager::context_get()
-            .unwrap()
-            .map(|c| c.len())
-            .unwrap_or(0);
+        let original_count =
+            AsyncContextManager::context_get().unwrap().map(|c| c.len()).unwrap_or(0);
 
         {
             let _scope = AsyncContextScope::enter_empty().unwrap();
@@ -74,10 +69,7 @@ mod async_context_tests {
         }
 
         // Context should be popped after scope
-        let final_count = AsyncContextManager::context_get()
-            .unwrap()
-            .map(|c| c.len())
-            .unwrap_or(0);
+        let final_count = AsyncContextManager::context_get().unwrap().map(|c| c.len()).unwrap_or(0);
         assert_eq!(original_count, final_count);
     }
 
@@ -99,18 +91,15 @@ mod async_context_tests {
             .unwrap();
 
             // Level 2 context should only have level2 key
-            let level2_val = AsyncContextManager::get_context_value(
-                &ContextKey::new("level2".to_string())
-            )
-            .unwrap();
+            let level2_val =
+                AsyncContextManager::get_context_value(&ContextKey::new("level2".to_string()))
+                    .unwrap();
             assert!(level2_val.is_some());
         }
 
         // Back to level 1, level2 key should be gone
-        let level2_val = AsyncContextManager::get_context_value(
-            &ContextKey::new("level2".to_string())
-        )
-        .unwrap();
+        let level2_val =
+            AsyncContextManager::get_context_value(&ContextKey::new("level2".to_string())).unwrap();
         assert!(level2_val.is_none());
     }
 }
@@ -124,13 +113,15 @@ mod task_management_tests {
         TaskBuiltins::initialize().unwrap();
 
         let task_id = TaskBuiltins::task_start().unwrap();
-        
+
         let status = TaskBuiltins::task_status(task_id).unwrap();
         assert_eq!(status, TaskStatus::Running);
 
-        TaskBuiltins::task_return(task_id, TaskReturn::from_component_value(
-            ComponentValue::Bool(true)
-        )).unwrap();
+        TaskBuiltins::task_return(
+            task_id,
+            TaskReturn::from_component_value(ComponentValue::Bool(true)),
+        )
+        .unwrap();
 
         let final_status = TaskBuiltins::task_status(task_id).unwrap();
         assert_eq!(final_status, TaskStatus::Completed);
@@ -156,11 +147,7 @@ mod task_management_tests {
 
         let task_id = TaskBuiltins::task_start().unwrap();
 
-        TaskBuiltins::set_task_metadata(
-            task_id,
-            "priority",
-            ComponentValue::I32(5)
-        ).unwrap();
+        TaskBuiltins::set_task_metadata(task_id, "priority", ComponentValue::I32(5)).unwrap();
 
         let metadata = TaskBuiltins::get_task_metadata(task_id, "priority").unwrap();
         assert_eq!(metadata, Some(ComponentValue::I32(5)));
@@ -186,7 +173,9 @@ mod task_management_tests {
 #[cfg(feature = "std")]
 mod waitable_set_tests {
     use super::*;
-    use crate::async_types::{Future, FutureHandle, FutureState, Stream, StreamHandle, StreamState};
+    use crate::async_types::{
+        Future, FutureHandle, FutureState, Stream, StreamHandle, StreamState,
+    };
 
     #[test]
     fn test_waitable_set_lifecycle() {
@@ -195,15 +184,10 @@ mod waitable_set_tests {
         let set_id = WaitableSetBuiltins::waitable_set_new().unwrap();
         assert_eq!(WaitableSetBuiltins::waitable_set_count(set_id).unwrap(), 0);
 
-        let future = Future {
-            handle: FutureHandle::new(),
-            state: FutureState::Pending,
-        };
+        let future = Future { handle: FutureHandle::new(), state: FutureState::Pending };
 
-        let waitable_id = WaitableSetBuiltins::waitable_set_add(
-            set_id,
-            Waitable::Future(future)
-        ).unwrap();
+        let waitable_id =
+            WaitableSetBuiltins::waitable_set_add(set_id, Waitable::Future(future)).unwrap();
 
         assert!(WaitableSetBuiltins::waitable_set_contains(set_id, waitable_id).unwrap());
         assert_eq!(WaitableSetBuiltins::waitable_set_count(set_id).unwrap(), 1);
@@ -219,10 +203,7 @@ mod waitable_set_tests {
         let set_id = WaitableSetBuiltins::waitable_set_new().unwrap();
 
         // Add pending future
-        let pending = Future {
-            handle: FutureHandle::new(),
-            state: FutureState::Pending,
-        };
+        let pending = Future { handle: FutureHandle::new(), state: FutureState::Pending };
         WaitableSetBuiltins::waitable_set_add(set_id, Waitable::Future(pending)).unwrap();
 
         // Wait should timeout since nothing is ready
@@ -248,14 +229,8 @@ mod waitable_set_tests {
         let set_id = WaitableSetBuiltins::waitable_set_new().unwrap();
 
         // Add different types of waitables
-        let future = Future {
-            handle: FutureHandle::new(),
-            state: FutureState::Pending,
-        };
-        let stream = Stream {
-            handle: StreamHandle::new(),
-            state: StreamState::Open,
-        };
+        let future = Future { handle: FutureHandle::new(), state: FutureState::Pending };
+        let stream = Stream { handle: StreamHandle::new(), state: StreamState::Open };
 
         WaitableSetBuiltins::waitable_set_add(set_id, Waitable::Future(future)).unwrap();
         WaitableSetBuiltins::waitable_set_add(set_id, Waitable::Stream(stream)).unwrap();
@@ -268,10 +243,7 @@ mod waitable_set_tests {
         WaitableSetBuiltins::initialize().unwrap();
 
         let futures = vec![
-            Future {
-                handle: FutureHandle::new(),
-                state: FutureState::Pending,
-            },
+            Future { handle: FutureHandle::new(), state: FutureState::Pending },
             Future {
                 handle: FutureHandle::new(),
                 state: FutureState::Resolved(ComponentValue::Bool(true)),
@@ -279,8 +251,9 @@ mod waitable_set_tests {
         ];
 
         let set_id = waitable_set_helpers::create_waitable_set_with(
-            futures.into_iter().map(Waitable::Future).collect()
-        ).unwrap();
+            futures.into_iter().map(Waitable::Future).collect(),
+        )
+        .unwrap();
 
         assert_eq!(WaitableSetBuiltins::waitable_set_count(set_id).unwrap(), 2);
     }
@@ -294,10 +267,9 @@ mod error_context_tests {
     fn test_error_context_lifecycle() {
         ErrorContextBuiltins::initialize().unwrap();
 
-        let context_id = ErrorContextBuiltins::error_context_new(
-            "Test error".to_string(),
-            ErrorSeverity::Error
-        ).unwrap();
+        let context_id =
+            ErrorContextBuiltins::error_context_new("Test error".to_string(), ErrorSeverity::Error)
+                .unwrap();
 
         let message = ErrorContextBuiltins::error_context_debug_message(context_id).unwrap();
         assert_eq!(message, "Test error");
@@ -314,19 +286,19 @@ mod error_context_tests {
 
         let context_id = ErrorContextBuiltins::error_context_new(
             "Test error".to_string(),
-            ErrorSeverity::Warning
-        ).unwrap();
+            ErrorSeverity::Warning,
+        )
+        .unwrap();
 
         ErrorContextBuiltins::error_context_set_metadata(
             context_id,
             "component".to_string(),
-            ComponentValue::String("test_component".to_string())
-        ).unwrap();
+            ComponentValue::String("test_component".to_string()),
+        )
+        .unwrap();
 
-        let metadata = ErrorContextBuiltins::error_context_get_metadata(
-            context_id,
-            "component"
-        ).unwrap();
+        let metadata =
+            ErrorContextBuiltins::error_context_get_metadata(context_id, "component").unwrap();
         assert_eq!(metadata, Some(ComponentValue::String("test_component".to_string())));
     }
 
@@ -336,16 +308,18 @@ mod error_context_tests {
 
         let context_id = ErrorContextBuiltins::error_context_new(
             "Stack trace test".to_string(),
-            ErrorSeverity::Error
-        ).unwrap();
+            ErrorSeverity::Error,
+        )
+        .unwrap();
 
         ErrorContextBuiltins::error_context_add_stack_frame(
             context_id,
             "test_function".to_string(),
             Some("test.rs".to_string()),
             Some(42),
-            Some(10)
-        ).unwrap();
+            Some(10),
+        )
+        .unwrap();
 
         let stack_trace = ErrorContextBuiltins::error_context_stack_trace(context_id).unwrap();
         assert!(stack_trace.contains("test_function"));
@@ -368,7 +342,9 @@ mod error_context_tests {
 #[cfg(feature = "std")]
 mod advanced_threading_tests {
     use super::*;
-    use crate::thread_builtins::{FunctionSignature, ThreadSpawnConfig, ValueType as ThreadValueType};
+    use crate::thread_builtins::{
+        FunctionSignature, ThreadSpawnConfig, ValueType as ThreadValueType,
+    };
 
     #[test]
     fn test_advanced_thread_lifecycle() {
@@ -381,19 +357,13 @@ mod advanced_threading_tests {
                 results: vec![ThreadValueType::I32],
             },
             0,
-            42
+            42,
         );
 
-        let config = ThreadSpawnConfig {
-            stack_size: Some(65536),
-            priority: Some(5),
-        };
+        let config = ThreadSpawnConfig { stack_size: Some(65536), priority: Some(5) };
 
-        let thread_id = AdvancedThreadingBuiltins::thread_spawn_ref(
-            func_ref,
-            config,
-            None
-        ).unwrap();
+        let thread_id =
+            AdvancedThreadingBuiltins::thread_spawn_ref(func_ref, config, None).unwrap();
 
         let state = AdvancedThreadingBuiltins::thread_state(thread_id).unwrap();
         assert_eq!(state, AdvancedThreadState::Running);
@@ -405,39 +375,32 @@ mod advanced_threading_tests {
 
         let func_ref = FunctionReference::new(
             "test_func".to_string(),
-            FunctionSignature {
-                params: vec![],
-                results: vec![],
-            },
+            FunctionSignature { params: vec![], results: vec![] },
             0,
-            0
+            0,
         );
 
-        let config = ThreadSpawnConfig {
-            stack_size: Some(65536),
-            priority: Some(5),
-        };
+        let config = ThreadSpawnConfig { stack_size: Some(65536), priority: Some(5) };
 
-        let thread_id = AdvancedThreadingBuiltins::thread_spawn_ref(
-            func_ref,
-            config,
-            None
-        ).unwrap();
+        let thread_id =
+            AdvancedThreadingBuiltins::thread_spawn_ref(func_ref, config, None).unwrap();
 
         // Set thread-local values
         AdvancedThreadingBuiltins::thread_local_set(
             thread_id,
             1,
             ComponentValue::String("test_value".to_string()),
-            None
-        ).unwrap();
+            None,
+        )
+        .unwrap();
 
         AdvancedThreadingBuiltins::thread_local_set(
             thread_id,
             2,
             ComponentValue::I32(42),
-            Some(100) // destructor function index
-        ).unwrap();
+            Some(100), // destructor function index
+        )
+        .unwrap();
 
         // Get thread-local values
         let value1 = AdvancedThreadingBuiltins::thread_local_get(thread_id, 1).unwrap();
@@ -455,19 +418,13 @@ mod advanced_threading_tests {
             0,  // table_index
             10, // function_index
             1,  // type_index
-            vec![ComponentValue::I32(123), ComponentValue::Bool(true)]
+            vec![ComponentValue::I32(123), ComponentValue::Bool(true)],
         );
 
-        let config = ThreadSpawnConfig {
-            stack_size: Some(65536),
-            priority: Some(5),
-        };
+        let config = ThreadSpawnConfig { stack_size: Some(65536), priority: Some(5) };
 
-        let thread_id = AdvancedThreadingBuiltins::thread_spawn_indirect(
-            indirect_call,
-            config,
-            None
-        ).unwrap();
+        let thread_id =
+            AdvancedThreadingBuiltins::thread_spawn_indirect(indirect_call, config, None).unwrap();
 
         let state = AdvancedThreadingBuiltins::thread_state(thread_id).unwrap();
         assert_eq!(state, AdvancedThreadState::Running);
@@ -479,30 +436,19 @@ mod advanced_threading_tests {
 
         let func_ref = FunctionReference::new(
             "parent_func".to_string(),
-            FunctionSignature {
-                params: vec![],
-                results: vec![],
-            },
+            FunctionSignature { params: vec![], results: vec![] },
             0,
-            0
+            0,
         );
 
-        let config = ThreadSpawnConfig {
-            stack_size: Some(65536),
-            priority: Some(5),
-        };
+        let config = ThreadSpawnConfig { stack_size: Some(65536), priority: Some(5) };
 
-        let parent_id = AdvancedThreadingBuiltins::thread_spawn_ref(
-            func_ref.clone(),
-            config.clone(),
-            None
-        ).unwrap();
+        let parent_id =
+            AdvancedThreadingBuiltins::thread_spawn_ref(func_ref.clone(), config.clone(), None)
+                .unwrap();
 
-        let child_id = AdvancedThreadingBuiltins::thread_spawn_ref(
-            func_ref,
-            config,
-            Some(parent_id)
-        ).unwrap();
+        let child_id =
+            AdvancedThreadingBuiltins::thread_spawn_ref(func_ref, config, Some(parent_id)).unwrap();
 
         assert_ne!(parent_id, child_id);
     }
@@ -577,11 +523,9 @@ mod fixed_length_list_tests {
         assert_eq!(range.get(2), Some(&ComponentValue::I32(7)));
 
         // Test repeat_element
-        let repeated = fixed_list_utils::repeat_element(
-            ValueType::Bool,
-            ComponentValue::Bool(true),
-            4
-        ).unwrap();
+        let repeated =
+            fixed_list_utils::repeat_element(ValueType::Bool, ComponentValue::Bool(true), 4)
+                .unwrap();
         assert_eq!(repeated.current_length(), 4);
         for i in 0..4 {
             assert_eq!(repeated.get(i), Some(&ComponentValue::Bool(true)));
@@ -622,14 +566,16 @@ mod fixed_length_list_tests {
         let list1_type = FixedLengthListType::new(ValueType::I32, 2);
         let list1 = FixedLengthList::with_elements(
             list1_type,
-            vec![ComponentValue::I32(1), ComponentValue::I32(2)]
-        ).unwrap();
+            vec![ComponentValue::I32(1), ComponentValue::I32(2)],
+        )
+        .unwrap();
 
         let list2_type = FixedLengthListType::new(ValueType::I32, 2);
         let list2 = FixedLengthList::with_elements(
             list2_type,
-            vec![ComponentValue::I32(3), ComponentValue::I32(4)]
-        ).unwrap();
+            vec![ComponentValue::I32(3), ComponentValue::I32(4)],
+        )
+        .unwrap();
 
         let concatenated = fixed_list_utils::concatenate(&list1, &list2).unwrap();
         assert_eq!(concatenated.length(), 4);
@@ -650,8 +596,9 @@ mod fixed_length_list_tests {
                 ComponentValue::I32(30),
                 ComponentValue::I32(40),
                 ComponentValue::I32(50),
-            ]
-        ).unwrap();
+            ],
+        )
+        .unwrap();
 
         let sliced = fixed_list_utils::slice(&list, 1, 3).unwrap();
         assert_eq!(sliced.length(), 3);
@@ -678,16 +625,19 @@ mod cross_feature_integration_tests {
         // Set context value
         AsyncContextManager::set_context_value(
             ContextKey::new("task_group".to_string()),
-            ContextValue::from_component_value(ComponentValue::String("integration_test".to_string()))
-        ).unwrap();
+            ContextValue::from_component_value(ComponentValue::String(
+                "integration_test".to_string(),
+            )),
+        )
+        .unwrap();
 
         // Create task within context
         let task_id = TaskBuiltins::task_start().unwrap();
 
         // Verify context is available during task
-        let group = AsyncContextManager::get_context_value(
-            &ContextKey::new("task_group".to_string())
-        ).unwrap();
+        let group =
+            AsyncContextManager::get_context_value(&ContextKey::new("task_group".to_string()))
+                .unwrap();
         assert!(group.is_some());
 
         // Complete task
@@ -708,32 +658,32 @@ mod cross_feature_integration_tests {
         // Create error context for the task
         let error_id = ErrorContextBuiltins::error_context_new(
             "Task execution error".to_string(),
-            ErrorSeverity::Error
-        ).unwrap();
+            ErrorSeverity::Error,
+        )
+        .unwrap();
 
         // Add task metadata to error
         ErrorContextBuiltins::error_context_set_metadata(
             error_id,
             "task_id".to_string(),
-            ComponentValue::U64(task_id.as_u64())
-        ).unwrap();
+            ComponentValue::U64(task_id.as_u64()),
+        )
+        .unwrap();
 
         // Fail the task
         TaskBuiltins::task_cancel(task_id).unwrap();
         assert_eq!(TaskBuiltins::task_status(task_id).unwrap(), TaskStatus::Cancelled);
 
         // Verify error context has task info
-        let task_id_from_error = ErrorContextBuiltins::error_context_get_metadata(
-            error_id,
-            "task_id"
-        ).unwrap();
+        let task_id_from_error =
+            ErrorContextBuiltins::error_context_get_metadata(error_id, "task_id").unwrap();
         assert_eq!(task_id_from_error, Some(ComponentValue::U64(task_id.as_u64())));
     }
 
     #[test]
     fn test_waitable_sets_with_multiple_features() {
         WaitableSetBuiltins::initialize().unwrap();
-        
+
         let set_id = WaitableSetBuiltins::waitable_set_new().unwrap();
 
         // Add future
@@ -744,10 +694,7 @@ mod cross_feature_integration_tests {
         WaitableSetBuiltins::waitable_set_add(set_id, Waitable::Future(future)).unwrap();
 
         // Add stream
-        let stream = Stream {
-            handle: StreamHandle::new(),
-            state: StreamState::Open,
-        };
+        let stream = Stream { handle: StreamHandle::new(), state: StreamState::Open };
         WaitableSetBuiltins::waitable_set_add(set_id, Waitable::Stream(stream)).unwrap();
 
         // Check for ready items
@@ -763,12 +710,9 @@ mod cross_feature_integration_tests {
         let arg_list_type = FixedLengthListType::new(ValueType::I32, 3);
         let args = FixedLengthList::with_elements(
             arg_list_type,
-            vec![
-                ComponentValue::I32(10),
-                ComponentValue::I32(20),
-                ComponentValue::I32(30),
-            ]
-        ).unwrap();
+            vec![ComponentValue::I32(10), ComponentValue::I32(20), ComponentValue::I32(30)],
+        )
+        .unwrap();
 
         // Create function reference that takes a list
         let func_ref = FunctionReference::new(
@@ -778,28 +722,17 @@ mod cross_feature_integration_tests {
                 results: vec![ThreadValueType::I32],
             },
             0,
-            100
+            100,
         );
 
-        let config = ThreadSpawnConfig {
-            stack_size: Some(65536),
-            priority: Some(5),
-        };
+        let config = ThreadSpawnConfig { stack_size: Some(65536), priority: Some(5) };
 
-        let thread_id = AdvancedThreadingBuiltins::thread_spawn_ref(
-            func_ref,
-            config,
-            None
-        ).unwrap();
+        let thread_id =
+            AdvancedThreadingBuiltins::thread_spawn_ref(func_ref, config, None).unwrap();
 
         // Store list data in thread-local storage
         let list_value: ComponentValue = args.into();
-        AdvancedThreadingBuiltins::thread_local_set(
-            thread_id,
-            1,
-            list_value,
-            None
-        ).unwrap();
+        AdvancedThreadingBuiltins::thread_local_set(thread_id, 1, list_value, None).unwrap();
 
         // Verify stored
         let retrieved = AdvancedThreadingBuiltins::thread_local_get(thread_id, 1).unwrap();
@@ -826,19 +759,12 @@ mod test_helpers {
     pub fn create_test_stream(open: bool) -> Stream {
         Stream {
             handle: StreamHandle::new(),
-            state: if open {
-                StreamState::Open
-            } else {
-                StreamState::Closed
-            },
+            state: if open { StreamState::Open } else { StreamState::Closed },
         }
     }
 
     pub fn create_test_error_context(message: &str) -> Result<ErrorContextId, wrt_error::Error> {
-        ErrorContextBuiltins::error_context_new(
-            message.to_string(),
-            ErrorSeverity::Error
-        )
+        ErrorContextBuiltins::error_context_new(message.to_string(), ErrorSeverity::Error)
     }
 
     pub fn assert_task_status(task_id: TaskBuiltinId, expected: TaskStatus) {

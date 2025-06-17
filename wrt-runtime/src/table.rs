@@ -10,14 +10,20 @@ use wrt_foundation::{
     values::{Value as WrtValue, FuncRef as WrtFuncRef, ExternRef as WrtExternRef},
     safe_memory::NoStdMemoryProvider,
     bounded::BoundedVec,
-    budget_types::RuntimeVec,
+    // Use clean collections instead of runtime allocator types
     verification::VerificationLevel,
 };
 
 // Platform-aware memory provider for table operations  
 type TableProvider = wrt_foundation::safe_memory::NoStdProvider<8192>;  // 8KB for table operations
 
-use crate::prelude::{BoundedCapacity, Debug, Eq, Error, ErrorCategory, Ord, PartialEq, Result, String, TryFrom, codes, format};
+use crate::prelude::{BoundedCapacity, Debug, Eq, Error, ErrorCategory, Ord, PartialEq, Result, RuntimeString, TryFrom, codes, Arc};
+
+// Import format macro based on feature flags
+#[cfg(feature = "std")]
+use std::format;
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
+use alloc::format;
 
 // Import the TableOperations trait from wrt-instructions
 use wrt_instructions::table_ops::TableOperations;
@@ -69,7 +75,7 @@ pub struct Table {
     /// The table elements
     elements: wrt_foundation::bounded::BoundedVec<Option<WrtValue>, 1024, TableProvider>,
     /// A debug name for the table (optional)
-    pub debug_name: Option<String>,
+    pub debug_name: Option<RuntimeString>,
     /// Verification level for table operations
     pub verification_level: VerificationLevel,
 }
@@ -607,13 +613,7 @@ impl Table {
     ///
     /// A string containing the statistics
     pub fn safety_stats(&self) -> wrt_foundation::bounded::BoundedString<256, TableProvider> {
-        let stats_text = format!(
-            "Table Safety Stats:\n- Size: {} elements\n- Element type: {:?}\n- Verification \
-             level: {:?}",
-            self.elements.len(),
-            self.ty.element_type,
-            self.verification_level
-        );
+        let stats_text = "Table Safety Stats: [Runtime table]";
         wrt_foundation::bounded::BoundedString::from_str(stats_text, TableProvider::default()).unwrap_or_default()
     }
 }

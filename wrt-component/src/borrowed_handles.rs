@@ -281,7 +281,7 @@ impl<T> OwnHandle<T> {
     }
     
     /// Create from a Value
-    pub fn from_value(value: &Value) -> Result<Self, HandleConversionError> {
+    pub fn from_value(value: &Value) -> core::result::Result<Self, HandleConversionError> {
         match value {
             Value::Own(handle) => Ok(Self::new(*handle, 0)), // Generation would be validated separately
             _ => Err(HandleConversionError::TypeMismatch),
@@ -321,7 +321,7 @@ impl<T> BorrowHandle<T> {
     }
     
     /// Create from a Value
-    pub fn from_value(value: &Value, borrow_id: BorrowId) -> Result<Self, HandleConversionError> {
+    pub fn from_value(value: &Value, borrow_id: BorrowId) -> core::result::Result<Self, HandleConversionError> {
         match value {
             Value::Borrow(handle) => Ok(Self::new(*handle, 0, borrow_id)), // Generation would be validated separately
             _ => Err(HandleConversionError::TypeMismatch),
@@ -336,17 +336,17 @@ impl HandleLifetimeTracker {
             #[cfg(feature = "std")]
             owned_handles: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            owned_handles: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            owned_handles: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             
             #[cfg(feature = "std")]
             borrowed_handles: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            borrowed_handles: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            borrowed_handles: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             
             #[cfg(feature = "std")]
             scope_stack: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            scope_stack: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            scope_stack: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             
             next_handle_id: AtomicU32::new(1),
             next_borrow_id: AtomicU64::new(1),
@@ -547,7 +547,7 @@ impl HandleLifetimeTracker {
             #[cfg(feature = "std")]
             borrows: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            borrows: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            borrows: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             created_at: self.get_current_time(),
             active: true,
         };

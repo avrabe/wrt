@@ -20,9 +20,15 @@ fn test_source_span() {
 #[test]
 fn test_identifier() {
     use wrt_format::wit_parser::WitBoundedString;
-    use wrt_foundation::NoStdProvider;
+    use wrt_foundation::{NoStdProvider, safe_managed_alloc};
     
-    let provider = NoStdProvider::default();
+    // TODO: Specify appropriate size for this allocation
+
+    
+    let guard = safe_managed_alloc!(8192, CrateId::Format)?;
+
+    
+    let provider = unsafe { guard.release() };
     let name = WitBoundedString::from_str("test", provider).unwrap();
     let span = SourceSpan::new(0, 4, 0);
     
@@ -71,9 +77,15 @@ fn test_type_expr() {
     
     // Test that we can create a named type
     use wrt_format::wit_parser::WitBoundedString;
-    use wrt_foundation::NoStdProvider;
+    use wrt_foundation::{NoStdProvider, safe_managed_alloc};
     
-    let provider = NoStdProvider::default();
+    // TODO: Specify appropriate size for this allocation
+
+    
+    let guard = safe_managed_alloc!(8192, CrateId::Format)?;
+
+    
+    let provider = unsafe { guard.release() };
     let name = WitBoundedString::from_str("MyType", provider).unwrap();
     let ident = Identifier::new(name, SourceSpan::new(0, 6, 0));
     

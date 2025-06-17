@@ -9,9 +9,14 @@ use crate::prelude::{Debug, Eq, PartialEq};
 use wrt_foundation::traits::BoundedCapacity;
 use crate::atomic_execution::{AtomicMemoryContext, AtomicExecutionStats};
 use crate::thread_manager::{ThreadManager, ThreadId, ThreadState};
+use crate::bounded_runtime_infra::{
+    BoundedThreadMap, RuntimeProvider, new_thread_map
+};
 use wrt_error::{Error, ErrorCategory, Result, codes};
 use wrt_instructions::atomic_ops::{MemoryOrdering, AtomicOp};
-use wrt_platform::sync::Ordering as PlatformOrdering;
+
+// Import platform ordering from wrt-foundation abstraction layer
+use core::sync::atomic::Ordering as AtomicOrdering;
 
 #[cfg(feature = "std")]
 use std::{vec::Vec, sync::Arc, time::Instant};
@@ -71,7 +76,7 @@ impl AtomicMemoryModel {
         let result = match &operation {
             AtomicOp::Load(_) => {
                 self.model_stats.load_operations += 1;
-                self.atomic_context.execute_atomic(thread_id, operation.clone())
+                self.atomic_context.execute_atomic_with_operands(thread_id, operation.clone(), operands)
             },
             AtomicOp::Store(_) => {
                 self.model_stats.store_operations += 1;
@@ -109,11 +114,11 @@ impl AtomicMemoryModel {
             },
             AtomicOp::WaitNotify(_) => {
                 self.model_stats.wait_notify_operations += 1;
-                self.atomic_context.execute_atomic(thread_id, operation.clone())
+                self.atomic_context.execute_atomic_with_operands(thread_id, operation.clone(), operands)
             },
             AtomicOp::Fence(_) => {
                 self.model_stats.fence_operations += 1;
-                self.atomic_context.execute_atomic(thread_id, operation.clone())
+                self.atomic_context.execute_atomic_with_operands(thread_id, operation.clone(), operands)
             },
         };
         
@@ -222,7 +227,7 @@ impl AtomicMemoryModel {
         match self.ordering_policy {
             MemoryOrderingPolicy::StrictSequential => {
                 // Ensure all previous operations complete before this one
-                core::sync::atomic::fence(PlatformOrdering::SeqCst);
+                core::sync::atomic::fence(AtomicOrdering::SeqCst);
             },
             MemoryOrderingPolicy::Relaxed => {
                 // No ordering constraints
@@ -231,16 +236,16 @@ impl AtomicMemoryModel {
                 // Apply ordering based on operation type
                 match &operation {
                     AtomicOp::Load(_) => {
-                        core::sync::atomic::fence(PlatformOrdering::Acquire);
+                        core::sync::atomic::fence(AtomicOrdering::Acquire);
                     },
                     AtomicOp::Store(_) => {
-                        core::sync::atomic::fence(PlatformOrdering::Release);
+                        core::sync::atomic::fence(AtomicOrdering::Release);
                     },
                     AtomicOp::RMW(_) | AtomicOp::Cmpxchg(_) => {
-                        core::sync::atomic::fence(PlatformOrdering::SeqCst);
+                        core::sync::atomic::fence(AtomicOrdering::SeqCst);
                     },
                     AtomicOp::Fence(_) | AtomicOp::WaitNotify(_) => {
-                        core::sync::atomic::fence(PlatformOrdering::SeqCst);
+                        core::sync::atomic::fence(AtomicOrdering::SeqCst);
                     },
                 }
             },
@@ -374,27 +379,23 @@ pub enum MemoryOrderingPolicy {
 /// Thread synchronization state tracking
 #[derive(Debug)]
 pub struct ThreadSyncState {
-    /// Active synchronization operations per thread
-    #[cfg(feature = "std")]
-    sync_operations: alloc::collections::BTreeMap<ThreadId, u32>,
-    #[cfg(not(feature = "std"))]
-    sync_operations: wrt_foundation::bounded::BoundedVec<(ThreadId, u32), 32, wrt_foundation::safe_memory::NoStdProvider<1024>>,  // Simplified for no_std
+    /// Active synchronization operations per thread using bounded collections
+    sync_operations: BoundedThreadMap<u32>,
 }
 
 impl ThreadSyncState {
     fn new() -> Result<Self> {
         Ok(Self {
-            #[cfg(feature = "std")]
-            sync_operations: alloc::collections::BTreeMap::new(),
-            #[cfg(not(feature = "std"))]
-            sync_operations: wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap(),
+            sync_operations: new_thread_map()?,
         })
     }
     
     fn record_sync_operation(&mut self, thread_id: ThreadId) -> Result<()> {
         #[cfg(feature = "std")]
         {
-            *self.sync_operations.entry(thread_id).or_insert(0) += 1;
+            // BoundedMap entry API returns the value, not a mutable reference
+            let current = self.sync_operations.get(&thread_id)?.unwrap_or(0);
+            self.sync_operations.insert(thread_id, current + 1)?;
         }
         #[cfg(not(feature = "std"))]
         {

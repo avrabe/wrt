@@ -32,6 +32,8 @@ mod tests {
             codes::CAPACITY_EXCEEDED,
             codes::GAS_LIMIT_EXCEEDED,
             codes::CALL_STACK_EXHAUSTED,
+            codes::INVALID_VALUE,
+            codes::UNIMPLEMENTED,
         ];
 
         for code in &core_codes {
@@ -131,7 +133,6 @@ mod tests {
             codes::PARSE_INVALID_TABLE_INDEX_TYPE,
             codes::PARSE_INVALID_MEMORY_INDEX_TYPE,
             codes::PARSE_INVALID_GLOBAL_INDEX_TYPE,
-            codes::INVALID_VALUE,
             codes::VALUE_OUT_OF_RANGE,
             codes::TYPE_INVALID_CONVERSION,
             codes::TYPE_PARAM_COUNT_MISMATCH,

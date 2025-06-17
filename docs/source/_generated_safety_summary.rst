@@ -1,11 +1,11 @@
-Safety Verification Status
-===========================
+Safety Verification Status (Example Data)
+==========================================
 
 .. raw:: html
 
    <div class="safety-status-card">
      <div class="safety-header">
-       <h3>🛡️ WRT Safety Verification Dashboard</h3>
+       <h3>🛡️ PulseEngine Safety Verification Dashboard (Example)</h3>
        <span class="timestamp">Last Updated: 2025-06-07T03:53:16.274847+00:00</span>
      </div>
    </div>
@@ -48,10 +48,13 @@ Current Safety Status
      - ❌ FAIL
      - 35.0%
 
-.. note::
-   🎯 **Overall Certification Readiness: 76.4%**
+.. warning::
+   **EXAMPLE DATA**: This safety verification data is generated for demonstration purposes only.
+   PulseEngine is not currently certified to any safety standard.
    
-   Status: Approaching readiness - address key gaps
+   🎯 **Example Certification Readiness: 76.4%**
+   
+   Status: Example status - actual certification requires completion of core execution engine
 
 Requirements Traceability
 -------------------------
@@ -131,6 +134,10 @@ To update this status or get detailed reports:
    # Check specific requirements
    cargo xtask verify-requirements --detailed
 
+.. important::
+   **Development Status**: Safety verification tools and processes are in development.
+   Actual safety certification requires completion of the WebAssembly execution engine.
+   
 For complete safety verification documentation, see :doc:`developer/tooling/safety_verification`.
 
 .. raw:: html

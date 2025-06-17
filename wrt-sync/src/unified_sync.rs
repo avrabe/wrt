@@ -27,6 +27,7 @@
 //! let (sender, receiver) = BoundedChannel::<i32, 16>::new()?;
 //! ```
 
+
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::cell::UnsafeCell;
 use core::marker::PhantomData;

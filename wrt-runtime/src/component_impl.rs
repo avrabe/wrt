@@ -271,12 +271,12 @@ impl ComponentRuntime for ComponentRuntimeImpl {
             #[cfg(feature = "std")]
             host_factories: Vec::with_capacity(8),
             #[cfg(all(not(feature = "std"), not(feature = "std")))]
-            host_factories: HostFactoryVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).expect("Failed to create host_factories"),
+            host_factories: HostFactoryVec::new(wrt_provider!(1024, CrateId::Runtime).unwrap_or_default()).expect("Failed to create host_factories"),
             verification_level: VerificationLevel::default(),
             #[cfg(feature = "std")]
             host_functions: HostFunctionMap::new(),
             #[cfg(all(not(feature = "std"), not(feature = "std")))]
-            host_functions: HostFunctionMap::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).expect("Failed to create host_functions"),
+            host_functions: HostFunctionMap::new(wrt_provider!(1024, CrateId::Runtime).unwrap_or_default()).expect("Failed to create host_functions"),
         }
     }
 
@@ -372,7 +372,7 @@ impl ComponentRuntime for ComponentRuntimeImpl {
             Ok(Box::new(ComponentInstanceImpl {
                 component_type: component_type.clone(),
                 verification_level: self.verification_level,
-                memory_store: wrt_foundation::safe_memory::SafeMemoryHandler::<wrt_foundation::safe_memory::NoStdProvider<1024>>::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()),
+                memory_store: wrt_foundation::safe_memory::SafeMemoryHandler::<wrt_foundation::safe_memory::NoStdProvider<1024>>::new(wrt_provider!(1024, CrateId::Runtime).unwrap_or_default()),
                 host_function_names,
                 host_functions,
             }))
@@ -700,6 +700,7 @@ mod tests {
             _ty: &crate::func::FuncType,
         ) -> Result<Box<dyn HostFunction>> {
             // Create a simple echo function
+            #[allow(deprecated)]
             let func_type = match FuncType::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default(), Vec::new(wrt_foundation::safe_memory::NoStdProvider::new())?, Vec::new(wrt_foundation::safe_memory::NoStdProvider::new())?) {
                 Ok(ty) => ty,
                 Err(e) => return Err(e.into()),
@@ -710,6 +711,7 @@ mod tests {
                 func_type,
                 implementation: Arc::new(move |args: &[Value]| {
                     // Create a new SafeStack with the right verification level
+                    #[allow(deprecated)]
                     let provider = wrt_foundation::safe_memory::NoStdProvider::default();
                     let mut result = SafeStack::new(provider)?;
                     result.set_verification_level(verification_level);
@@ -736,7 +738,13 @@ mod tests {
             _ty: &crate::func::FuncType,
         ) -> Result<Box<dyn HostFunction>> {
             // Create a simple legacy echo function
-            let func_type = FuncType::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default(), Vec::new(wrt_foundation::safe_memory::NoStdProvider::new())?, Vec::new(wrt_foundation::safe_memory::NoStdProvider::new())?)?;
+            let func_type = FuncType::new(wrt_provider!(1024, CrateId::Runtime).unwrap_or_default(), {
+                let provider = wrt_provider!(1024, CrateId::Runtime).unwrap_or_default();
+                Vec::new(provider)?
+            }, {
+                let provider = wrt_provider!(1024, CrateId::Runtime).unwrap_or_default();
+                Vec::new(provider)?
+            })?;
 
             Ok(Box::new(LegacyHostFunctionImpl {
                 func_type,
@@ -789,9 +797,18 @@ mod tests {
         // Create a component type for testing
         let component_type =
             ComponentType { 
-                imports: Vec::new(wrt_foundation::safe_memory::NoStdProvider::new())?, 
-                exports: Vec::new(wrt_foundation::safe_memory::NoStdProvider::new())?, 
-                instances: Vec::new(wrt_foundation::safe_memory::NoStdProvider::new())? 
+                imports: {
+                let provider = wrt_provider!(1024, CrateId::Runtime).unwrap_or_default();
+                Vec::new(provider)?
+            }, 
+                exports: {
+                let provider = wrt_provider!(1024, CrateId::Runtime).unwrap_or_default();
+                Vec::new(provider)?
+            }, 
+                instances: {
+                let provider = wrt_provider!(1024, CrateId::Runtime).unwrap_or_default();
+                Vec::new(provider)?
+            } 
             };
 
         // Create a component instance with enough memory
@@ -800,7 +817,10 @@ mod tests {
             component_type,
             verification_level: VerificationLevel::Standard,
             memory_store: wrt_foundation::safe_memory::SafeMemoryHandler::<wrt_foundation::safe_memory::NoStdProvider<1024>>::new(data),
-            host_function_names: Vec::new(wrt_foundation::safe_memory::NoStdProvider::new())?,
+            host_function_names: {
+                let provider = wrt_provider!(1024, CrateId::Runtime).unwrap_or_default();
+                Vec::new(provider)?
+            },
             #[cfg(feature = "std")]
             host_functions: HashMap::new(),
             #[cfg(not(feature = "std"))]

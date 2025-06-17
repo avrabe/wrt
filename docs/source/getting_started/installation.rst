@@ -2,7 +2,11 @@
 Installation
 ============
 
-This page provides detailed installation instructions for WRT across all supported platforms.
+This page provides detailed installation instructions for PulseEngine (WRT Edition) across all supported platforms.
+
+.. warning::
+   **Source-Only Installation**: PulseEngine is currently available only as source code. 
+   Pre-built binaries and package manager distributions are not yet available.
 
 .. contents:: On this page
    :local:
@@ -94,7 +98,10 @@ For full development workflow:
    cargo install cargo-component
 
    # WebAssembly tools
-   cargo install wasmtime-cli wasm-tools
+   cargo install wasm-tools
+   
+   # PulseEngine command-line interface (from source)
+   cargo install --path wrtd
 
    # Code coverage (optional)
    cargo install cargo-llvm-cov
@@ -111,7 +118,7 @@ Source Installation
 
    .. code-block:: bash
 
-      git clone https://github.com/pulseengine/wrt.git
+      git clone https://github.com/pulseengine/wrt
       cd wrt
 
 2. Build from source:
@@ -135,41 +142,22 @@ Source Installation
 Binary Installation
 -------------------
 
-**For production deployment**
+.. warning::
+   **Not Available**: Pre-built binaries are not currently available. 
+   Please use source installation method above.
 
-Pre-built binaries are available for major platforms:
+Package Manager Installation
+----------------------------
 
-.. code-block:: bash
-
-   # Download and install (example)
-   wget https://releases.example.com/wrt/latest/wrt-linux-x86_64.tar.gz
-   tar -xzf wrt-linux-x86_64.tar.gz
-   sudo cp wrtd /usr/local/bin/
-
-Package Managers
-----------------
-
-**Platform-specific packages**
-
-.. tabs::
-
-   .. tab:: Cargo
-
-      .. code-block:: bash
-
-         cargo install wrt-runtime
-
-   .. tab:: Homebrew (macOS)
-
-      .. code-block:: bash
-
-         brew install wrt
-
-   .. tab:: Debian/Ubuntu
-
-      .. code-block:: bash
-
-         sudo apt install wrt
+.. warning::
+   **Not Available**: PulseEngine is not currently published to package managers including:
+   
+   - crates.io (Cargo)
+   - Homebrew
+   - APT repositories
+   - Other package managers
+   
+   Please use source installation method above.
 
 Configuration
 =============
@@ -215,8 +203,8 @@ Verify your installation works correctly:
 
 .. code-block:: bash
 
-   # Check WRT installation
-   wrtd --version
+   # Check PulseEngine installation (if installed from source)
+   cargo run --bin wrtd -- --version
 
    # Build and run example
    just test-wrtd-example

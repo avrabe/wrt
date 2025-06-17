@@ -125,7 +125,7 @@ mod tests {
     use super::*;
     use crate::{
         safe_memory::{NoStdProvider, DEFAULT_MEMORY_PROVIDER_CAPACITY},
-        types::{DEFAULT_FUNC_TYPE_PROVIDER_CAPACITY, RefType, ValueType as CoreValueType},
+        types::{RefType, ValueType as CoreValueType, DEFAULT_FUNC_TYPE_PROVIDER_CAPACITY},
         values::Value,
     };
 

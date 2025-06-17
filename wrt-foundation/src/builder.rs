@@ -548,106 +548,168 @@ impl<P: MemoryProvider + Default + Clone> MemoryBuilder<P> {
     }
 }
 
-/// Generic builder for NoStdProvider instances.
+/// Generic builder for NoStdProvider instances (DEPRECATED).
 ///
-/// This builder allows creating a `NoStdProvider` with a specific capacity at
-/// compile time through the const generic parameter N.
+/// # Migration Required
+/// This builder has been replaced with the modern WRT memory factory system.
+/// Use `WrtProviderFactory::create_provider::<SIZE>(crate_id)` instead.
+///
+/// # Migration Example
+/// ```ignore
+/// // OLD (deprecated):
+/// let provider = NoStdProviderBuilder::<1024>::new()
+///     .with_verification_level(VerificationLevel::Full)
+///     .build()?;
+///
+/// // NEW (recommended):
+/// let guard = WrtProviderFactory::create_provider_with_verification::<1024>(
+///     CrateId::YourCrate,
+///     VerificationLevel::Full
+/// )?;
+/// let provider = unsafe { guard.release() };
+/// ```
+#[deprecated(
+    since = "0.3.0",
+    note = "Use WrtProviderFactory::create_provider() for budget-aware allocation. See type documentation for migration guide."
+)]
 pub struct NoStdProviderBuilder<const N: usize> {
-    verification_level: VerificationLevel,
-    init_size: Option<usize>,
+    _migration_marker: core::marker::PhantomData<()>,
 }
 
+#[allow(deprecated)]
 impl<const N: usize> Default for NoStdProviderBuilder<N> {
     fn default() -> Self {
-        Self { verification_level: VerificationLevel::default(), init_size: None }
+        Self { _migration_marker: core::marker::PhantomData }
     }
 }
 
+#[allow(deprecated)]
 impl<const N: usize> NoStdProviderBuilder<N> {
     /// Creates a new builder with default settings for NoStdProvider<N>.
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use BudgetProvider::new() or create_provider! macro for budget-aware allocation"
+    )]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Sets the initial size for the provider's internal buffer.
     /// This size cannot exceed the fixed capacity N.
-    pub fn with_init_size(mut self, size: usize) -> Self {
-        self.init_size = Some(size.min(N));
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use BudgetProvider::new() or create_provider! macro for budget-aware allocation"
+    )]
+    pub fn with_init_size(self, _size: usize) -> Self {
         self
     }
 
-    /// Sets the verification level for memory operations.
-    pub fn with_verification_level(mut self, level: VerificationLevel) -> Self {
-        self.verification_level = level;
+    /// Sets the verification level (MIGRATION REQUIRED).
+    ///
+    /// # Migration
+    /// Use `WrtProviderFactory::create_provider_with_verification()` instead.
+    #[deprecated(
+        since = "0.3.0",
+        note = "Use WrtProviderFactory::create_provider_with_verification() for new code."
+    )]
+    pub fn with_verification_level(self, _level: VerificationLevel) -> Self {
         self
     }
 
-    /// Builds a NoStdProvider with the configured settings.
+    /// Builds a NoStdProvider (MIGRATION REQUIRED).
+    ///
+    /// # Migration
+    /// This method now returns an error directing users to the new API.
+    /// Use `WrtProviderFactory::create_provider::<N>(crate_id)` instead.
+    #[deprecated(
+        since = "0.3.0",
+        note = "Use WrtProviderFactory::create_provider() for budget-aware allocation."
+    )]
     pub fn build(self) -> WrtResult<NoStdProvider<N>> {
-        // Create the provider with the specified verification level
-        let mut provider = NoStdProvider::<N>::with_verification_level(self.verification_level);
-
-        // If an initial size was specified, resize the provider accordingly
-        if let Some(size) = self.init_size {
-            provider.resize(size)?;
-        }
-
-        Ok(provider)
+        Err(crate::Error::new(
+            crate::ErrorCategory::Runtime,
+            wrt_error::codes::DEPRECATED_API,
+            "NoStdProviderBuilder::build() is deprecated. Use WrtProviderFactory::create_provider() instead."
+        ))
     }
 }
 
-/// Backwards compatibility type for code using the old non-generic
-/// NoStdProviderBuilder
+/// Backwards compatibility type (DEPRECATED).
+///
+/// # Migration Required
+/// Use `WrtProviderFactory::create_provider()` instead.
+#[deprecated(
+    since = "0.3.0",
+    note = "Use WrtProviderFactory::create_provider() for budget-aware allocation."
+)]
 pub struct NoStdProviderBuilder1 {
-    size: usize,
-    verification_level: VerificationLevel,
+    _migration_marker: core::marker::PhantomData<()>,
 }
 
+#[allow(deprecated)]
 impl Default for NoStdProviderBuilder1 {
     fn default() -> Self {
-        Self {
-            size: DEFAULT_MEMORY_PROVIDER_CAPACITY,
-            verification_level: VerificationLevel::default(),
-        }
+        Self { _migration_marker: core::marker::PhantomData }
     }
 }
 
+#[allow(deprecated)]
 impl NoStdProviderBuilder1 {
     /// Creates a new builder with default settings.
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use BudgetProvider::new() or create_provider! macro for budget-aware allocation"
+    )]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Sets the size for the provider's internal buffer.
-    pub fn with_size(mut self, size: usize) -> Self {
-        self.size = size;
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use BudgetProvider::new() or create_provider! macro for budget-aware allocation"
+    )]
+    pub fn with_size(self, _size: usize) -> Self {
         self
     }
 
-    /// Sets the verification level for memory operations.
-    pub fn with_verification_level(mut self, level: VerificationLevel) -> Self {
-        self.verification_level = level;
+    /// Sets the verification level (MIGRATION REQUIRED).
+    #[deprecated(
+        since = "0.3.0",
+        note = "Use WrtProviderFactory::create_provider_with_verification() for new code."
+    )]
+    pub fn with_verification_level(self, _level: VerificationLevel) -> Self {
         self
     }
 
-    /// Builds a NoStdProvider with the configured settings.
+    /// Builds a provider (MIGRATION REQUIRED).
+    #[deprecated(
+        since = "0.3.0",
+        note = "Use WrtProviderFactory::create_provider() for budget-aware allocation."
+    )]
     pub fn build(self) -> WrtResult<DefaultNoStdProvider> {
-        let mut provider = DefaultNoStdProvider::with_verification_level(self.verification_level);
-        if self.size > 0 && self.size <= DEFAULT_MEMORY_PROVIDER_CAPACITY {
-            provider.resize(self.size)?;
-        }
-        Ok(provider)
+        Err(crate::Error::new(
+            crate::ErrorCategory::Runtime,
+            wrt_error::codes::DEPRECATED_API,
+            "NoStdProviderBuilder1::build() is deprecated. Use WrtProviderFactory::create_provider() instead."
+        ))
     }
 }
 
-/// Convenience type aliases for common NoStdProvider sizes
-pub type SmallNoStdProviderBuilder = NoStdProviderBuilder<512>;
-pub type MediumNoStdProviderBuilder = NoStdProviderBuilder<4096>;
-pub type LargeNoStdProviderBuilder = NoStdProviderBuilder<16_384>;
+// Note: NoStdProviderBuilder type aliases have been removed.
+// Use WrtProviderFactory::create_provider::<SIZE>(crate_id) instead.
+// Examples:
+// - Small: WrtProviderFactory::create_provider::<512>(crate_id)
+// - Medium: WrtProviderFactory::create_provider::<4096>(crate_id)
+// - Large: WrtProviderFactory::create_provider::<16384>(crate_id)
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "alloc"))]
+    use alloc::format;
+    #[cfg(feature = "std")]
+    use std::format;
 
     #[test]
     fn test_bounded_builder() {
@@ -661,8 +723,9 @@ mod tests {
 
     #[test]
     fn test_string_builder() {
-        let builder =
-            StringBuilder::<256, NoStdProvider<1024>>::new().with_content("test").with_truncation(true);
+        let builder = StringBuilder::<256, NoStdProvider<1024>>::new()
+            .with_content("test")
+            .with_truncation(true);
 
         let string = builder.build_string().unwrap();
         assert_eq!(string.as_str().unwrap(), "test");
@@ -730,48 +793,40 @@ mod tests {
     }
 
     #[test]
-    fn test_no_std_provider_builder() {
-        // Test with small provider (512 bytes)
+    fn test_no_std_provider_builder_migration() {
+        // Test that deprecated builder now returns an error directing to new API
+        #[allow(deprecated)]
         let builder = NoStdProviderBuilder::<512>::new()
             .with_init_size(256)
             .with_verification_level(VerificationLevel::Full);
 
-        let provider = builder.build().unwrap();
-        assert_eq!(provider.capacity(), 512);
-        assert_eq!(provider.size(), 256);
-        assert_eq!(provider.verification_level(), VerificationLevel::Full);
+        let result = builder.build();
+        assert!(result.is_err(), "Deprecated builder should return an error");
 
-        // Test with medium provider using type alias
-        let builder =
-            MediumNoStdProviderBuilder::new().with_verification_level(VerificationLevel::Full);
-
-        let provider = builder.build().unwrap();
-        assert_eq!(provider.capacity(), 4096);
-        assert_eq!(provider.verification_level(), VerificationLevel::Full);
-
-        // Test that init_size is capped at capacity
-        let builder = SmallNoStdProviderBuilder::new().with_init_size(1000); // Larger than 512 capacity
-
-        let provider = builder.build().unwrap();
-        assert_eq!(provider.size(), 512); // Capped at 512
+        // Verify the error message contains migration guidance
+        let error_msg = format!("{}", result.unwrap_err());
+        assert!(
+            error_msg.contains("WrtProviderFactory"),
+            "Error should mention WrtProviderFactory"
+        );
     }
 
     #[test]
-    fn test_no_std_provider_builder_legacy() {
-        // Test the legacy (non-generic) builder for backward compatibility
+    fn test_no_std_provider_builder_legacy_migration() {
+        // Test the legacy (non-generic) builder migration
+        #[allow(deprecated)]
         let builder = NoStdProviderBuilder1::new()
             .with_size(1024)
             .with_verification_level(VerificationLevel::Full);
 
-        let provider = builder.build().unwrap();
-        assert_eq!(provider.capacity(), DEFAULT_MEMORY_PROVIDER_CAPACITY);
-        assert_eq!(provider.size(), 1024);
-        assert_eq!(provider.verification_level(), VerificationLevel::Full);
+        let result = builder.build();
+        assert!(result.is_err(), "Deprecated legacy builder should return an error");
 
-        // Test with default settings
-        let builder = NoStdProviderBuilder1::new();
-        let provider = builder.build().unwrap();
-        assert_eq!(provider.capacity(), DEFAULT_MEMORY_PROVIDER_CAPACITY);
-        assert_eq!(provider.verification_level(), VerificationLevel::default());
+        // Verify the error message contains migration guidance
+        let error_msg = format!("{}", result.unwrap_err());
+        assert!(
+            error_msg.contains("WrtProviderFactory"),
+            "Error should mention WrtProviderFactory"
+        );
     }
 }

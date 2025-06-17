@@ -4,6 +4,7 @@
 
 //! DWARF .debug_info section parsing
 
+use crate::bounded_debug_infra;
 #[cfg(feature = "std")]
 use std::vec::Vec;
 #[cfg(all(not(feature = "std")))]
@@ -69,7 +70,11 @@ pub struct DebugInfoParser<'a> {
     /// String table for name resolution
     string_table: Option<StringTable<'a>>,
     /// Function cache
-    functions: BoundedVec<FunctionInfo<'a>, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>>,
+    functions: BoundedVec<
+        FunctionInfo<'a>,
+        MAX_DWARF_FILE_TABLE,
+        crate::bounded_debug_infra::DebugProvider,
+    >,
     /// Inlined functions
     inlined_functions: InlinedFunctions<'a>,
     /// Current compilation unit index

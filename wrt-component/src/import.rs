@@ -6,7 +6,7 @@ use wrt_format::component::ExternType;
 use wrt_foundation::{component::ComponentType, ExternType as RuntimeExternType};
 
 use crate::{
-    component::ExternValue, namespace::Namespace, prelude::*, type_conversion::bidirectional,
+    components::component::ExternValue, /* namespace::Namespace, */ prelude::*, type_conversion::bidirectional,
 };
 
 /// Type of import in the component model

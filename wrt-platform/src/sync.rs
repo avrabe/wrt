@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Platform Synchronization Primitives
 // SW-REQ-ID: REQ_PLATFORM_001

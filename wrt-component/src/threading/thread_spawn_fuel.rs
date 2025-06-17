@@ -57,7 +57,7 @@ impl FuelTrackedThreadContext {
         }
     }
 
-    pub fn consume_fuel(&self, amount: u64) -> Result<(), ThreadSpawnError> {
+    pub fn consume_fuel(&self, amount: u64) -> core::result::Result<(), ThreadSpawnError> {
         let current_fuel = self.remaining_fuel.load(Ordering::Acquire);
 
         if current_fuel < amount {
@@ -83,7 +83,7 @@ impl FuelTrackedThreadContext {
         Ok(())
     }
 
-    pub fn check_fuel_status(&self) -> Result<(), ThreadSpawnError> {
+    pub fn check_fuel_status(&self) -> core::result::Result<(), ThreadSpawnError> {
         if self.fuel_exhausted.load(Ordering::Acquire) {
             return Err(ThreadSpawnError {
                 kind: ThreadSpawnErrorKind::ResourceLimitExceeded,
@@ -394,11 +394,11 @@ pub fn create_unlimited_fuel_thread_config() -> FuelThreadConfiguration {
 
 /// Integration with component execution
 pub trait FuelAwareExecution {
-    fn execute_with_fuel<F, R>(&self, fuel: u64, f: F) -> Result<R, ThreadSpawnError>
+    fn execute_with_fuel<F, R>(&self, fuel: u64, f: F) -> core::result::Result<R, ThreadSpawnError>
     where
         F: FnOnce() -> R;
 
-    fn check_fuel_before_operation(&self, required_fuel: u64) -> Result<(), ThreadSpawnError>;
+    fn check_fuel_before_operation(&self, required_fuel: u64) -> core::result::Result<(), ThreadSpawnError>;
 }
 
 #[cfg(test)]

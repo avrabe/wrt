@@ -40,7 +40,6 @@
 //! manager.transfer_ownership(file_handle, target_instance_id)?;
 //! ```
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]

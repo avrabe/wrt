@@ -275,7 +275,7 @@ pub fn has_state_sections(custom_sections: &[CustomSection]) -> bool {
         }
         #[cfg(not(any(feature = "std")))]
         {
-            section.name.starts_with(STATE_SECTION_PREFIX).unwrap_or(false)
+            section.name.starts_with(STATE_SECTION_PREFIX)
         }
     })
 }

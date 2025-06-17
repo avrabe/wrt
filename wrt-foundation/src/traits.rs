@@ -902,21 +902,17 @@ impl<'a> ReadStream<'a> {
         Ok(())
     }
 
-    /// Provides access to the underlying memory provider if the ReadStream
-    /// was constructed with one that is clonable or referenceable.
-    /// This method is a placeholder for how one might access a provider.
+    /// Attempts to provide access to the underlying memory provider.
+    /// Returns None if the ReadStream was not constructed with a provider
+    /// or if direct provider access is not supported in this design.
+    ///
     /// For this ReadStream<'a> which operates on a Slice<'a>, direct provider
-    /// access is not typical unless Slice itself carries provider info or
-    /// ReadStream is generic. For now, it will be assumed that if a
-    /// provider is needed for deserializing nested types, it's passed
-    /// explicitly to from_bytes_with_provider.
-    pub fn provider<P: crate::MemoryProvider>(&self, _provider_ref: &P) -> &P {
-        // This is tricky. ReadStream currently only has Slice<'a>.
-        // If P is needed by FromBytes, it must be passed in.
-        // This method is more relevant if ReadStream itself is generic over P and holds
-        // it. For now, let's assume this is for API compatibility if other
-        // stream types exist.
-        unimplemented!("ReadStream does not hold a direct MemoryProvider instance in this design");
+    /// access is not typical. It's recommended to pass providers explicitly
+    /// to methods that need them rather than relying on this method.
+    pub fn try_provider<P: crate::MemoryProvider>(&self, _provider_ref: &P) -> Option<&P> {
+        // ReadStream currently only has Slice<'a> and does not hold a direct
+        // MemoryProvider instance in this design.
+        None
     }
 }
 
@@ -1048,13 +1044,15 @@ impl<'a> WriteStream<'a> {
         Ok(())
     }
 
-    /// Provides access to the underlying memory provider if the WriteStream
-    /// was constructed with one that is clonable or referenceable.
-    /// Similar to ReadStream, direct provider access is not typical here.
-    /// It's assumed that if a provider is needed for serializing
-    /// nested types, it's passed explicitly to to_bytes_with_provider.
-    pub fn provider<P: crate::MemoryProvider>(&self, _provider_ref: &P) -> &P {
-        unimplemented!("WriteStream does not hold a direct MemoryProvider instance in this design");
+    /// Attempts to provide access to the underlying memory provider.
+    /// Returns None if the WriteStream was not constructed with a provider
+    /// or if direct provider access is not supported in this design.
+    ///
+    /// It's recommended to pass providers explicitly to methods that need them
+    /// rather than relying on this method.
+    pub fn try_provider<P: crate::MemoryProvider>(&self, _provider_ref: &P) -> Option<&P> {
+        // WriteStream does not hold a direct MemoryProvider instance in this design
+        None
     }
 }
 

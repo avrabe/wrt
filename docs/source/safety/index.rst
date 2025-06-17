@@ -21,12 +21,13 @@ This safety documentation is organized into the following major components:
 1. **Safety Guidelines**: General guidelines for using the runtime safely
 2. **Safety Classification**: Unified cross-standard safety integrity levels
 3. **Safety Constraints**: Specific constraints that must be followed
-4. **Verification Strategies**: Approaches for verifying safety properties
-5. **Safety Mechanisms**: Specific mechanisms implemented to ensure safety
-6. **Safety Implementations**: How safety requirements are implemented
-7. **Safety Test Cases**: Test cases that verify safety properties
-8. **Performance Tuning**: Guidelines for balancing safety and performance
-9. **Traceability Matrix**: Mapping from safety standards to implementations
+4. **Formal Verification**: Mathematical proof of safety properties using KANI
+5. **Verification Strategies**: Approaches for verifying safety properties
+6. **Safety Mechanisms**: Specific mechanisms implemented to ensure safety
+7. **Safety Implementations**: How safety requirements are implemented
+8. **Safety Test Cases**: Test cases that verify safety properties
+9. **Performance Tuning**: Guidelines for balancing safety and performance
+10. **Traceability Matrix**: Mapping from safety standards to implementations
 
 Live Safety Verification Status
 ---------------------------------
@@ -64,11 +65,12 @@ Safety Certification Approach
 
 The safety certification approach for the WebAssembly Runtime includes:
 
-* Static verification of critical components
-* Dynamic verification through test suites
-* Code review by safety experts
-* Formal verification of core algorithms where applicable
-* Hazard and risk analysis
+* **Formal verification** of safety properties using KANI (29 mathematical proofs)
+* **Static verification** of critical components through advanced static analysis
+* **Dynamic verification** through comprehensive test suites and property testing
+* **Code review** by safety experts with ISO 26262 expertise
+* **Hazard and risk analysis** following automotive safety standards
+* **ASIL-level verification** with four levels of verification rigor (ASIL-A through ASIL-D)
 
 Safety-Critical Features
 ------------------------
@@ -244,10 +246,13 @@ Detailed Safety Documentation
    safety_guidelines
    safety_classification
    constraints
+   formal_verification
+   verification_strategies
    mechanisms
    implementations
-   verification_strategies
    test_cases
    traceability_matrix
    performance_tuning
+   safety_tiers
+   iso26262_compliance
    certification_validation

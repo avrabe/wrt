@@ -7,7 +7,11 @@ Architectural Overview
    :align: right
    :alt: Architecture Icon
 
-**Teaching Point**: This overview shows how Pulseengine (WRT Edition) is decomposed into manageable, testable components that work together to execute WebAssembly safely.
+**Teaching Point**: This overview shows how PulseEngine (WRT Edition) is decomposed into manageable, testable components that work together to execute WebAssembly safely.
+
+.. warning::
+   **Implementation Status**: This document describes the target architecture. Core WebAssembly 
+   execution engine is under development. See :doc:`../../overview/implementation_status` for current state.
 
 System Context
 --------------
@@ -17,13 +21,14 @@ System Context
    :type: system
    :tags: core
 
-Pulseengine (WRT Edition) is a WebAssembly runtime designed for safety-critical systems. It provides:
+PulseEngine (WRT Edition) is WebAssembly infrastructure designed for safety-critical systems. It provides:
 
-- WebAssembly Core specification execution
-- Component Model support
-- Multi-platform deployment (Linux, macOS, QNX, VxWorks, Zephyr, bare-metal)
-- Configurable memory allocation strategies
-- Formal safety verification
+- **Implemented**: WebAssembly memory operations and type system
+- **Implemented**: Safety-critical memory allocation strategies
+- **Implemented**: Multi-platform abstraction layer
+- **In Development**: WebAssembly Core specification execution
+- **In Development**: Component Model support
+- **Implemented**: Formal safety verification infrastructure
 
 High-Level Architecture
 -----------------------
@@ -35,12 +40,14 @@ Component Decomposition
 
 .. arch_decision:: Component-Based Architecture
    :id: ARCH_DEC_COMP_001
-   :status: implemented
+   :status: partial
    :rationale: Modular design enables independent testing, certification, and platform-specific optimization
    :impacts: All architectural components
    :links: ARCH_COMP_SYSTEM
+   
+   **Status Note**: Architecture is designed and infrastructure implemented. Core execution components in development.
 
-The following diagram shows the high-level decomposition of Pulseengine into its constituent components:
+The following diagram shows the high-level decomposition of PulseEngine into its constituent components:
 
 .. uml:: ../../_static/high_level_decomposition_simple.puml
 
@@ -55,12 +62,14 @@ Deployment Architecture
 
 .. arch_decision:: Multi-Platform Deployment Strategy
    :id: ARCH_DEC_DEPLOY_001
-   :status: implemented
+   :status: partial
    :rationale: Different deployment environments require different memory models and security features
    :impacts: Platform layer, memory management
    :links: ARCH_CON_001, ARCH_CON_002
+   
+   **Status Note**: Platform abstraction layer implemented. Platform-specific features vary in completion.
 
-Pulseengine can be deployed across various platforms with platform-specific optimizations:
+PulseEngine can be deployed across various platforms with platform-specific optimizations:
 
 .. uml:: ../../_static/deployment_architecture_simple.puml
 

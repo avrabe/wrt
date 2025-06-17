@@ -35,23 +35,26 @@
 //! let result = router.dispatch_call(context)?;
 //! ```
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]
 use std::{vec::Vec, string::String, collections::HashMap, boxed::Box, format};
 
 #[cfg(all(not(feature = "std")))]
-use std::{vec::Vec, string::String, collections::BTreeMap as HashMap, boxed::Box, format};
+use alloc::{vec::Vec, string::String, collections::BTreeMap as HashMap, boxed::Box, format};
 
-#[cfg(not(any(feature = "std", )))]
-use wrt_foundation::{BoundedVec, BoundedString, BoundedMap as HashMap, safe_memory::NoStdProvider};
+#[cfg(not(feature = "std"))]
+use wrt_foundation::{bounded::{BoundedString, BoundedVec}, safe_memory::NoStdProvider};
 
-// Type aliases for no_std compatibility
-#[cfg(not(any(feature = "std", )))]
-type Vec<T> = BoundedVec<T, 64, NoStdProvider<65536>>;
-#[cfg(not(any(feature = "std", )))]
-type String = BoundedString<256, NoStdProvider<65536>>;
+// Note: Using alloc for no_std instead of wrt_foundation bounded types for now
+// #[cfg(not(any(feature = "std", )))]
+// use wrt_foundation::{BoundedVec, BoundedString, BoundedMap as HashMap, safe_memory::NoStdProvider};
+
+// Type aliases for no_std compatibility (commented out to avoid conflicts)
+// #[cfg(not(any(feature = "std", )))]
+// type Vec<T> = BoundedVec<T, 64, NoStdProvider<65536>>;
+// #[cfg(not(any(feature = "std", )))]
+// type String = BoundedString<256, NoStdProvider<65536>>;
 
 use wrt_error::{Error, ErrorCategory, Result, codes};
 use crate::canonical_abi::{ComponentType};
@@ -62,7 +65,7 @@ use crate::canonical_abi::ComponentValue;
 #[cfg(not(feature = "std"))]
 // For no_std, use a simpler ComponentValue representation
 use crate::types::Value as ComponentValue;
-use crate::component_instantiation::{InstanceId, ComponentInstance, FunctionSignature};
+use crate::components::component_instantiation::{InstanceId, ComponentInstance, FunctionSignature};
 use crate::resource_management::{ResourceHandle, ResourceManager as ComponentResourceManager};
 
 /// Maximum call stack depth to prevent infinite recursion
@@ -440,7 +443,7 @@ impl CallRouter {
         if self.call_stack.current_depth >= self.config.max_call_stack_depth {
             return Err(Error::new(
                 ErrorCategory::Runtime,
-                codes::CALL_STACK_OVERFLOW,
+                codes::STACK_OVERFLOW,
                 "Call stack depth exceeded",
             ));
         }
@@ -642,7 +645,7 @@ impl CallStack {
         if self.current_depth >= self.max_depth {
             return Err(Error::new(
                 ErrorCategory::Runtime,
-                codes::CALL_STACK_OVERFLOW,
+                codes::STACK_OVERFLOW,
                 "Call stack overflow",
             ));
         }

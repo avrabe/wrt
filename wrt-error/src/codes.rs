@@ -120,9 +120,9 @@ pub const VERIFICATION_LEVEL_VIOLATION: u16 = 5006;
 /// Validation global type mismatch error
 pub const VALIDATION_GLOBAL_TYPE_MISMATCH: u16 = 5007;
 /// Validation invalid memory index error
-pub const VALIDATION_INVALID_MEMORY_INDEX: u16 = 5006;
+pub const VALIDATION_INVALID_MEMORY_INDEX: u16 = 5027;
 /// Validation invalid global index error
-pub const VALIDATION_INVALID_GLOBAL_INDEX: u16 = 5007;
+pub const VALIDATION_INVALID_GLOBAL_INDEX: u16 = 5028;
 /// Validation unsupported feature error
 pub const VALIDATION_UNSUPPORTED_FEATURE: u16 = 5008;
 /// Validation invalid instruction error
@@ -191,6 +191,14 @@ pub const VERIFICATION_FAILED: u16 = 7003;
 pub const SAFETY_CONTEXT_INVALID: u16 = 7004;
 /// Safety guard failure error
 pub const SAFETY_GUARD_FAILURE: u16 = 7005;
+/// Determinism violation error (ASIL-D)
+pub const DETERMINISM_VIOLATION: u16 = 7006;
+/// Redundancy check failure error (ASIL-D)
+pub const REDUNDANCY_CHECK_FAILURE: u16 = 7007;
+/// ASIL level mismatch error
+pub const ASIL_LEVEL_MISMATCH: u16 = 7008;
+/// Safety monitor timeout error
+pub const SAFETY_MONITOR_TIMEOUT: u16 = 7009;
 
 // Unified types error codes (8000-8999)
 /// Unified type configuration error
@@ -202,7 +210,7 @@ pub const TYPE_SYSTEM_INIT_ERROR: u16 = 8002;
 /// Memory provider creation error
 pub const MEMORY_PROVIDER_CREATION_ERROR: u16 = 8003;
 
-// Memory system error codes (9000-9999) 
+// Memory system error codes (9000-9999)
 /// Memory allocation failed error
 pub const MEMORY_ALLOCATION_FAILED: u16 = 9000;
 /// Memory deallocation failed error  
@@ -231,6 +239,8 @@ pub const BOUNDED_COLLECTION_UTF8_ERROR: u16 = 10004;
 pub const BOUNDED_COLLECTION_ITEM_TOO_LARGE: u16 = 10005;
 /// Bounded collection verification error
 pub const BOUNDED_COLLECTION_VERIFICATION_ERROR: u16 = 10006;
+/// Deprecated API usage error
+pub const DEPRECATED_API: u16 = 10007;
 
 // Additional error codes for existing categories
 /// Invalid value error (general)
@@ -238,7 +248,7 @@ pub const INVALID_VALUE: u16 = 1019;
 /// Unimplemented feature error
 pub const UNIMPLEMENTED: u16 = 1020;
 /// Conversion error (general) - moved to system error codes section as `CONVERSION_ERROR`: u16 = 8002
-// WIT parsing error codes (11000-11999) - Agent C stubs
+// WIT parsing error codes (11000-11999)
 /// WIT input too large error
 pub const WIT_INPUT_TOO_LARGE: u16 = 11000;
 /// WIT world limit exceeded error  
@@ -250,7 +260,7 @@ pub const WIT_IDENTIFIER_TOO_LONG: u16 = 11003;
 /// WIT parsing buffer overflow error
 pub const WIT_PARSING_BUFFER_OVERFLOW: u16 = 11004;
 
-// Component error codes (12000-12999) - Agent C stubs
+// Component error codes (12000-12999)
 /// Insufficient memory for component error
 pub const INSUFFICIENT_MEMORY: u16 = 12000;
 /// Component limit exceeded error
@@ -260,7 +270,7 @@ pub const RESOURCE_TYPE_LIMIT_EXCEEDED: u16 = 12002;
 /// Component memory budget exceeded error
 pub const COMPONENT_MEMORY_BUDGET_EXCEEDED: u16 = 12003;
 
-// Platform error codes (13000-13999) - Agent B stubs  
+// Platform error codes (13000-13999)
 /// Platform detection failed error
 pub const PLATFORM_DETECTION_FAILED: u16 = 13000;
 /// Platform limits discovery failed error
@@ -272,7 +282,7 @@ pub const STACK_LIMIT_EXCEEDED: u16 = 13003;
 /// Debug infrastructure error
 pub const DEBUG_INFRASTRUCTURE_ERROR: u16 = 13004;
 
-// Runtime error codes (14000-14999) - Agent D stubs
+// Runtime error codes (14000-14999)
 /// CFI validation failed error  
 pub const CFI_VALIDATION_FAILED: u16 = 14000;
 /// CFI unsupported error
@@ -287,6 +297,20 @@ pub const PARSE_INVALID_GLOBAL_INDEX_TYPE: u16 = 6007;
 pub const VALUE_OUT_OF_RANGE: u16 = 6015;
 /// Type invalid conversion
 pub const TYPE_INVALID_CONVERSION: u16 = 6016;
+
+// Security error codes (15000-15999)
+/// Access denied error
+pub const ACCESS_DENIED: u16 = 15000;
+/// Operation not permitted error
+pub const OPERATION_NOT_PERMITTED: u16 = 15001;
+/// Invalid parameter error
+pub const INVALID_PARAMETER: u16 = 15002;
+/// Out of bounds error
+pub const OUT_OF_BOUNDS: u16 = 15003;
+/// Bounds violation error
+pub const BOUNDS_VIOLATION: u16 = 15004;
+/// Verification required error
+pub const VERIFICATION_REQUIRED: u16 = 15005;
 /// Type parameter count mismatch
 pub const TYPE_PARAM_COUNT_MISMATCH: u16 = 6017;
 /// Type parameter type mismatch

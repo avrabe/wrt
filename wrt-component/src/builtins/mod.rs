@@ -4,7 +4,6 @@
 // Component Model built-ins, including resource handling, async operations,
 // error contexts, and threading.
 
-use std::{boxed::Box, sync::Arc, vec::Vec};
 #[cfg(feature = "std")]
 use std::{
     boxed::Box,
@@ -12,11 +11,87 @@ use std::{
     vec::Vec,
 };
 
+#[cfg(not(feature = "std"))]
+use alloc::{
+    boxed::Box,
+    sync::Arc,
+    vec::Vec,
+};
+
+#[cfg(not(feature = "std"))]
+use wrt_sync::Mutex;
+
+#[cfg(not(feature = "std"))]
+use wrt_foundation::{bounded::{BoundedVec, BoundedString}, safe_memory::NoStdProvider};
+
 use wrt_error::{Error, Result};
 #[cfg(feature = "std")]
 use wrt_foundation::{builtin::BuiltinType, component_value::ComponentValue};
+
+#[cfg(not(feature = "std"))]
+use crate::types::Value as ComponentValue;
+
+// Define a unified BuiltinType for no_std
+#[cfg(not(feature = "std"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuiltinType {
+    // Error built-ins
+    ErrorNew,
+    ErrorTrace,
+    // Resource built-ins
+    ResourceCreate,
+    ResourceDrop,
+    ResourceRep,
+    ResourceGet,
+    // Threading built-ins
+    ThreadingSpawn,
+    ThreadingJoin,
+    ThreadingSync,
+    // Async built-ins
+    AsyncNew,
+    AsyncGet,
+    AsyncPoll,
+    AsyncWait,
+}
 // Commented out until wrt_intercept is properly available
 // use wrt_intercept::{BeforeBuiltinResult, BuiltinInterceptor, InterceptContext};
+
+// No_std stubs for interception (simplified)
+#[cfg(not(feature = "std"))]
+#[derive(Debug)]
+pub struct InterceptContext {
+    component_name: BoundedString<128, NoStdProvider<65536>>,
+    builtin_type: BuiltinType,
+    host_id: BoundedString<128, NoStdProvider<65536>>,
+}
+
+#[cfg(not(feature = "std"))]
+impl InterceptContext {
+    pub fn new(component_name: &str, builtin_type: BuiltinType, host_id: &str) -> Self {
+        Self {
+            component_name: BoundedString::from_str(component_name).unwrap_or_default(),
+            builtin_type,
+            host_id: BoundedString::from_str(host_id).unwrap_or_default(),
+        }
+    }
+}
+
+#[cfg(not(feature = "std"))]
+#[derive(Debug)]
+pub enum BeforeBuiltinResult {
+    Continue(BoundedVec<ComponentValue, 16, NoStdProvider<65536>>),
+    Override(BoundedVec<ComponentValue, 16, NoStdProvider<65536>>),
+    Deny,
+}
+
+#[cfg(not(feature = "std"))]
+pub trait BuiltinInterceptor {
+    fn before_builtin(&self, context: &InterceptContext, args: &[ComponentValue]) -> Result<BeforeBuiltinResult>;
+}
+
+// Import the real types for std
+#[cfg(feature = "std")]
+use wrt_intercept::{BeforeBuiltinResult, BuiltinInterceptor, InterceptContext};
 
 use crate::resources::ResourceManager;
 
@@ -43,6 +118,7 @@ pub mod safe_threading;
 ///
 /// This trait defines the interface for handlers that implement built-in
 /// functions for the WebAssembly Component Model.
+#[cfg(feature = "std")]
 pub trait BuiltinHandler: Send + Sync {
     /// Get the type of built-in this handler manages
     fn builtin_type(&self) -> BuiltinType;
@@ -63,6 +139,18 @@ pub trait BuiltinHandler: Send + Sync {
     /// # Returns
     ///
     /// A boxed clone of this handler
+    fn clone_handler(&self) -> Box<dyn BuiltinHandler>;
+}
+
+#[cfg(not(feature = "std"))]
+pub trait BuiltinHandler {
+    /// Get the type of built-in this handler manages
+    fn builtin_type(&self) -> BuiltinType;
+
+    /// Execute the built-in function with the given arguments (no_std version)
+    fn execute(&self, args: &[ComponentValue]) -> core::result::Result<BoundedVec<ComponentValue, 16, NoStdProvider<65536>>>;
+
+    /// Clone this handler
     fn clone_handler(&self) -> Box<dyn BuiltinHandler>;
 }
 

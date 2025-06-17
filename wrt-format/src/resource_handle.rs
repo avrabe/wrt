@@ -338,7 +338,9 @@ mod tests {
     #[cfg(feature = "std")]
     use std::string::String as StdString;
     #[cfg(all(not(feature = "std")))]
-    use std::string::String as StdString;
+    extern crate alloc;
+    #[cfg(all(not(feature = "std")))]
+    use alloc::string::String as StdString;
     
     #[test]
     #[cfg(feature = "std")]

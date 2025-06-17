@@ -67,7 +67,7 @@ The following matrix shows the relationships between requirements, specification
 Key Requirements
 ----------------
 
-The following are the key requirements driving the SentryPulse Engine design:
+The following are the key requirements driving the PulseEngine design:
 
 .. needtable::
    :columns: id;title;status

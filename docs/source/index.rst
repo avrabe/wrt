@@ -1,16 +1,19 @@
 =======================================
-WebAssembly Runtime (WRT) Documentation
+PulseEngine (WRT Edition) Documentation
 =======================================
 
 .. raw:: html
 
    <div class="landing-header">
       <img src="_static/icons/logo.svg" alt="WRT Logo" class="landing-logo">
-      <p class="landing-subtitle">A safety-critical WebAssembly runtime for embedded systems</p>
+      <p class="landing-subtitle">Safety-critical WebAssembly infrastructure for embedded systems</p>
    </div>
 
 .. warning::
-   This documentation is for WRT version |version|. For other versions, use the version switcher in the navigation bar.
+   This documentation is for PulseEngine (WRT Edition) version |version|. For other versions, use the version switcher in the navigation bar.
+
+.. note::
+   **Development Status**: PulseEngine provides foundational WebAssembly infrastructure. The instruction execution engine and component model are under active development.
 
 User Documentation
 ------------------
@@ -34,7 +37,7 @@ User Documentation
       :link: user_guide/index
       :link-type: doc
 
-      How to use WRT in your applications
+      How to use PulseEngine in your applications
 
    .. grid-item-card:: Examples
       :link: examples/index
@@ -82,7 +85,7 @@ API Reference
       :link: api/index
       :link-type: doc
 
-      Complete API documentation for all WRT crates
+      Complete API documentation for all PulseEngine crates
 
 Qualification Material
 ----------------------
@@ -100,7 +103,7 @@ Qualification Material
       :link: qualification/plan
       :link-type: doc
 
-      ISO 26262 ASIL-D qualification approach
+      ISO 26262 ASIL-D qualification preparation (not certified)
 
    .. grid-item-card:: Test Documentation
       :link: qualification/index
@@ -130,7 +133,7 @@ Developer Documentation
       :link: developer/contributing/index
       :link-type: doc
 
-      Guidelines for contributing to WRT
+      Guidelines for contributing to PulseEngine
 
    .. grid-item-card:: Build System
       :link: developer/build_system/index
@@ -185,6 +188,7 @@ Reference Documentation
    :caption: User Documentation
 
    overview/index
+   overview/implementation_status
    getting_started/index
    user_guide/index
    examples/index
@@ -200,19 +204,15 @@ Reference Documentation
    wrt-host/lib
    wrt-instructions/lib
    wrt-logging/lib
-   wrt-safety/lib
    api/index
 
 .. toctree::
    :hidden:
-   :caption: Qualification
+   :caption: Safety & Qualification
 
+   safety_manual/index
    requirements/index
    qualification/index
-   safety_requirements
-   safety_mechanisms
-   safety_implementations
-   safety_test_cases
 
 .. toctree::
    :hidden:
@@ -233,7 +233,7 @@ Reference Documentation
    binary
    changelog.md
    
-.. include:: _generated_symbols.rst
+.. comment:: _generated_symbols.rst - Generated during build process
 
 .. include:: _generated_coverage_summary.rst
 

@@ -25,6 +25,7 @@ pub fn format_block_type_to_block_type(format_block_type: &FormatBlockType) -> B
     match format_block_type {
         FormatBlockType::Empty => BlockType::Value(None),
         FormatBlockType::ValueType(value_type) => BlockType::Value(Some(*value_type)),
+        #[cfg(any(feature = "std", feature = "alloc"))]
         FormatBlockType::FuncType(_func_type) => BlockType::FuncType(0), // TODO: proper type
         // index mapping
         FormatBlockType::TypeIndex(idx) => BlockType::FuncType(*idx),

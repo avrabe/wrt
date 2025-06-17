@@ -248,14 +248,14 @@ fn test_wast_files() -> Result<(), Error> {
     if !test_dir.exists() {
         println!("No testsuite directory found at: {}", test_dir.display());
         println!("Checking external testsuite...");
-        
+
         // Try the external testsuite path
         let external_dir = workspace_root.join("external/testsuite");
         if !external_dir.exists() {
             println!("No external testsuite found either. Skipping WAST tests.");
             return Ok(());
         }
-        
+
         return test_external_testsuite(&external_dir);
     }
 
@@ -283,7 +283,7 @@ fn test_wast_files() -> Result<(), Error> {
     for test_path in passing_tests {
         if test_path.exists() && test_path.extension().is_some_and(|ext| ext == "wast") {
             tests_run += 1;
-            
+
             let rel_display_path = test_path
                 .strip_prefix(workspace_root)
                 .map(|p| p.to_path_buf())
@@ -293,8 +293,12 @@ fn test_wast_files() -> Result<(), Error> {
 
             match runner.run_wast_file(&test_path) {
                 Ok(stats) => {
-                    println!("✅ PASS: {} ({} passed, {} failed)", 
-                        rel_display_path.display(), stats.passed, stats.failed);
+                    println!(
+                        "✅ PASS: {} ({} passed, {} failed)",
+                        rel_display_path.display(),
+                        stats.passed,
+                        stats.failed
+                    );
                     if stats.failed == 0 {
                         tests_passed += 1;
                     }
@@ -315,32 +319,27 @@ fn test_wast_files() -> Result<(), Error> {
 /// Test the external testsuite with a subset of files
 fn test_external_testsuite(testsuite_dir: &Path) -> Result<(), Error> {
     println!("Testing external testsuite at: {}", testsuite_dir.display());
-    
+
     let mut runner = WastTestRunner::new();
-    
+
     // Basic test files that should work with minimal implementation
-    let basic_tests = [
-        "nop.wast",
-        "const.wast", 
-        "i32.wast",
-        "i64.wast",
-        "f32.wast",
-        "f64.wast",
-    ];
-    
+    let basic_tests = ["nop.wast", "const.wast", "i32.wast", "i64.wast", "f32.wast", "f64.wast"];
+
     let mut tests_run = 0;
     let mut tests_passed = 0;
-    
+
     for test_file in &basic_tests {
         let test_path = testsuite_dir.join(test_file);
         if test_path.exists() {
             tests_run += 1;
             println!("Running external test {}: {}", tests_run, test_file);
-            
+
             match runner.run_wast_file(&test_path) {
                 Ok(stats) => {
-                    println!("✅ {} - {} directives passed, {} failed", 
-                        test_file, stats.passed, stats.failed);
+                    println!(
+                        "✅ {} - {} directives passed, {} failed",
+                        test_file, stats.passed, stats.failed
+                    );
                     if stats.failed == 0 {
                         tests_passed += 1;
                     }
@@ -353,10 +352,14 @@ fn test_external_testsuite(testsuite_dir: &Path) -> Result<(), Error> {
             println!("⚠️  Test file not found: {}", test_file);
         }
     }
-    
-    println!("External testsuite: {} files passed, {} failed", tests_passed, tests_run - tests_passed);
+
+    println!(
+        "External testsuite: {} files passed, {} failed",
+        tests_passed,
+        tests_run - tests_passed
+    );
     println!("Final runner stats: {:?}", runner.stats);
-    
+
     Ok(())
 }
 
@@ -385,8 +388,7 @@ fn run_basic_wast_tests(runner: &mut WastTestRunner, test_dir: &Path) -> Result<
 
             match runner.run_wast_file(path) {
                 Ok(stats) => {
-                    println!("✅ {} - {} passed, {} failed", 
-                        file_name, stats.passed, stats.failed);
+                    println!("✅ {} - {} passed, {} failed", file_name, stats.passed, stats.failed);
                     if stats.failed == 0 {
                         tests_passed += 1;
                     }

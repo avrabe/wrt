@@ -7,7 +7,6 @@
 #[cfg(feature = "std")]
 use std::sync::Weak;
 
-use crate::prelude::*;
 
 // Submodules
 pub mod bounded_buffer_pool;
@@ -21,6 +20,7 @@ pub mod resource_arena;
 pub mod resource_arena_no_std;
 pub mod resource_builder;
 pub mod resource_interceptor;
+pub mod resource_lifecycle;
 #[cfg(feature = "std")]
 pub mod resource_manager;
 pub mod resource_manager_no_std;
@@ -33,12 +33,15 @@ pub mod resource_strategy_no_std;
 pub mod resource_table;
 pub mod resource_table_no_std;
 #[cfg(feature = "std")]
+pub mod resource_table_budget_integration;
+#[cfg(feature = "std")]
 pub mod size_class_buffer_pool;
 
 #[cfg(test)]
 mod tests;
 
 // Re-export for no_std feature
+#[cfg(not(feature = "std"))]
 pub use bounded_buffer_pool::{BoundedBufferPool, BoundedBufferStats as BufferPoolStats};
 // Re-export for std feature
 #[cfg(feature = "std")]
@@ -46,10 +49,11 @@ pub use buffer_pool::BufferPool;
 #[cfg(feature = "std")]
 pub use memory_access::MemoryAccessMode;
 // Common re-exports for both std and no_std
-pub use memory_strategy::MemoryStrategy as MemoryStrategyTrait;
+// pub use memory_strategy::MemoryStrategy as MemoryStrategyTrait;
 // Export ResourceArena based on feature flags
 #[cfg(feature = "std")]
 pub use resource_arena::ResourceArena;
+#[cfg(not(feature = "std"))]
 pub use resource_arena_no_std::ResourceArena;
 // Export Builder types
 pub use resource_builder::{ResourceBuilder, ResourceManagerBuilder, ResourceTableBuilder};
@@ -58,11 +62,12 @@ pub use resource_interceptor::ResourceInterceptor;
 // Export ResourceId and ResourceManager based on feature flags
 #[cfg(feature = "std")]
 pub use resource_manager::{ResourceId, ResourceManager};
+#[cfg(not(feature = "std"))]
 pub use resource_manager_no_std::{ResourceId, ResourceManager};
 // Export resource_operation based on feature flags
 #[cfg(feature = "std")]
-pub use resource_operation::{from_format_resource_operation, to_format_resource_operation};
-pub use resource_operation_no_std::{from_format_resource_operation, to_format_resource_operation};
+// pub use resource_operation::{from_format_resource_operation, to_format_resource_operation};
+// pub use resource_operation_no_std::{from_format_resource_operation, to_format_resource_operation};
 // Export ResourceStrategy
 pub use resource_strategy::ResourceStrategy;
 pub use resource_strategy_no_std::{ResourceStrategyNoStd, MAX_BUFFER_SIZE};
@@ -71,6 +76,12 @@ pub use resource_strategy_no_std::{ResourceStrategyNoStd, MAX_BUFFER_SIZE};
 pub use resource_table::{
     BufferPoolTrait, MemoryStrategy, Resource, ResourceTable, VerificationLevel,
 };
+#[cfg(feature = "std")]
+pub use resource_table_budget_integration::{
+    BudgetAwareResourceTablePool, ResourceTableUsageStats, create_budget_aware_resource_table,
+    verify_budget_integration,
+};
+#[cfg(not(feature = "std"))]
 pub use resource_table_no_std::{
     BufferPoolTrait, MemoryStrategy, Resource, ResourceTable, VerificationLevel,
 };

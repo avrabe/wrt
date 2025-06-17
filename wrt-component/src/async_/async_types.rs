@@ -203,7 +203,7 @@ impl<T> Stream<T> {
             #[cfg(feature = "std")]
             buffer: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            buffer: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            buffer: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             readable_closed: false,
             writable_closed: false,
         }
@@ -262,8 +262,10 @@ impl<T> Future<T> {
     /// Set the future value
     pub fn set_value(&mut self, value: T) -> WrtResult<()> {
         if self.state != FutureState::Pending {
-            return Err(wrt_foundation::WrtError::InvalidState(
-                "Future already has a value or was cancelled".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Future already has a value or was cancelled"
             ));
         }
         self.value = Some(value);
@@ -322,7 +324,7 @@ impl DebugInfo {
             #[cfg(feature = "std")]
             properties: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            properties: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            properties: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
         }
     }
 
@@ -336,7 +338,11 @@ impl DebugInfo {
     #[cfg(not(any(feature = "std", )))]
     pub fn add_property(&mut self, key: BoundedString<64, NoStdProvider<65536>>, value: ComponentValue) -> WrtResult<()> {
         self.properties.push((key, value)).map_err(|_| {
-            wrt_foundation::WrtError::ResourceExhausted("Too many debug properties".into())
+            wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Resource,
+                wrt_error::codes::RESOURCE_EXHAUSTED,
+                "Too many debug properties"
+            )
         })
     }
 }
@@ -348,7 +354,7 @@ impl WaitableSet {
             #[cfg(feature = "std")]
             waitables: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            waitables: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            waitables: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             ready_mask: 0,
         }
     }
@@ -357,8 +363,10 @@ impl WaitableSet {
     pub fn add(&mut self, waitable: Waitable) -> WrtResult<u32> {
         let index = self.waitables.len();
         if index >= 64 {
-            return Err(wrt_foundation::WrtError::ResourceExhausted(
-                "Too many waitables in set".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Resource,
+                wrt_error::codes::RESOURCE_EXHAUSTED,
+                "Too many waitables in set"
             ));
         }
 
@@ -369,7 +377,11 @@ impl WaitableSet {
         #[cfg(not(any(feature = "std", )))]
         {
             self.waitables.push(waitable).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Waitable set full".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Waitable set full"
+                )
             })?;
         }
 

@@ -958,7 +958,7 @@ impl CfiControlFlowOps for DefaultCfiControlFlowOps {
                     { vec![table_idx] }
                     #[cfg(not(feature = "std"))]
                     {
-                        let mut targets = CfiTargetVec::new(wrt_foundation::NoStdProvider::<1024>::default())
+                        let mut targets = CfiTargetVec::new(wrt_foundation::NoStdProvider::<8192>::default())
                             .unwrap_or_else(|_| panic!("Failed to create CfiTargetVec"));
                         targets.push(table_idx).unwrap_or_else(|_| panic!("Failed to push to CfiTargetVec"));
                         targets
@@ -1058,9 +1058,9 @@ impl CfiControlFlowOps for DefaultCfiControlFlowOps {
             }
             #[cfg(not(feature = "std"))]
             {
-                let mut reqs = crate::types::CfiRequirementVec::new(wrt_foundation::NoStdProvider::<1024>::default())
+                let mut reqs = crate::types::CfiRequirementVec::new(wrt_foundation::NoStdProvider::<8192>::default())
                     .unwrap_or_else(|_| panic!("Failed to create CfiRequirementVec"));
-                let mut targets = crate::types::CfiTargetVec::new(wrt_foundation::NoStdProvider::<1024>::default())
+                let mut targets = crate::types::CfiTargetVec::new(wrt_foundation::NoStdProvider::<8192>::default())
                     .unwrap_or_else(|_| panic!("Failed to create CfiTargetVec"));
                 targets.push(target_offset).unwrap_or_else(|_| panic!("Failed to push to CfiTargetVec"));
                 reqs.push(CfiValidationRequirement::ControlFlowTargetCheck {
@@ -1294,7 +1294,7 @@ impl DefaultCfiControlFlowOps {
                 { vec![CfiTargetType::IndirectCall] }
                 #[cfg(not(feature = "std"))]
                 {
-                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<1024>::default())
+                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<8192>::default())
                         .unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec"));
                     types.push(CfiTargetType::IndirectCall).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
                     types
@@ -1305,7 +1305,7 @@ impl DefaultCfiControlFlowOps {
                 { vec![CfiTargetType::DirectCall, CfiTargetType::IndirectCall] }
                 #[cfg(not(feature = "std"))]
                 {
-                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<1024>::default())
+                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<8192>::default())
                         .unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec"));
                     types.push(CfiTargetType::DirectCall).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
                     types.push(CfiTargetType::IndirectCall).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
@@ -1317,7 +1317,7 @@ impl DefaultCfiControlFlowOps {
                 { vec![CfiTargetType::Branch] }
                 #[cfg(not(feature = "std"))]
                 {
-                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<1024>::default())
+                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<8192>::default())
                         .unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec"));
                     types.push(CfiTargetType::Branch).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
                     types
@@ -1328,7 +1328,7 @@ impl DefaultCfiControlFlowOps {
                 { vec![CfiTargetType::Branch] }
                 #[cfg(not(feature = "std"))]
                 {
-                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<1024>::default())
+                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<8192>::default())
                         .unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec"));
                     types.push(CfiTargetType::Branch).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
                     types
@@ -1339,7 +1339,7 @@ impl DefaultCfiControlFlowOps {
                 { vec![CfiTargetType::DirectCall, CfiTargetType::IndirectCall] }
                 #[cfg(not(feature = "std"))]
                 {
-                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<1024>::default())
+                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<8192>::default())
                         .unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec"));
                     types.push(CfiTargetType::DirectCall).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
                     types.push(CfiTargetType::IndirectCall).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));

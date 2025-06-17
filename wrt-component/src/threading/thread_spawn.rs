@@ -5,7 +5,7 @@ use crate::{
     virtualization::{Capability, ResourceUsage, VirtualizationManager},
 };
 // Placeholder types
-pub type ComponentInstanceId = u32;
+pub use crate::types::ComponentInstanceId;
 pub type ResourceHandle = u32;
 pub type ValType = u32;
 use core::{
@@ -90,7 +90,7 @@ impl Default for ThreadConfiguration {
             name: None,
             detached: false,
             cpu_affinity: None,
-            capabilities: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            capabilities: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
         }
     }
 }
@@ -140,7 +140,7 @@ impl ComponentThreadManager {
         Self {
             threads: BoundedHashMap::new(),
             component_threads: BoundedHashMap::new(),
-            spawn_requests: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            spawn_requests: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             next_thread_id: AtomicU32::new(1),
             task_manager: TaskManager::new(),
             virt_manager: None,
@@ -504,7 +504,7 @@ impl ComponentThreadManager {
         _component_id: ComponentInstanceId,
         _function_name: &str,
         _arguments: &[ComponentValue],
-    ) -> Result<Option<ComponentValue>, String> {
+    ) -> core::result::Result<Option<ComponentValue>, String> {
         Ok(Some(ComponentValue::I32(42)))
     }
 }
@@ -627,7 +627,7 @@ mod tests {
         let request = ThreadSpawnRequest {
             component_id,
             function_name: "test_function".to_string(),
-            arguments: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            arguments: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             configuration: ThreadConfiguration::default(),
             return_type: Some(ValType::I32),
         };

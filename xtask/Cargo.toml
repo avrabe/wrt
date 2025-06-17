@@ -9,6 +9,10 @@ license = "MIT"
 [features]
 default = []
 wrt-integration = ["wrt"]
+safety-asil-b = []
+safety-asil-c = ["safety-asil-b"]
+safety-asil-d = ["safety-asil-c"]
+
 
 [dependencies]
 xshell = "0.2.5"

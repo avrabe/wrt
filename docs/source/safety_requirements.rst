@@ -43,7 +43,7 @@ Memory Safety Requirements
 
 .. req:: Memory Bounds Checking
    :id: REQ_MEM_SAFETY_001
-   :status: active
+   :status: working
    
    All memory accesses shall be validated against defined boundaries to prevent out-of-bounds access.
 

@@ -498,7 +498,7 @@ mod tests {
 
     #[test]
     fn test_streaming_parser_creation() {
-        let provider: NoStdProvider<1024> = NoStdProvider::default();
+        let provider = NoStdProvider::<1024>::default();
         let parser = StreamingParser::new(provider);
         assert!(parser.is_ok());
 
@@ -509,7 +509,7 @@ mod tests {
 
     #[test]
     fn test_magic_bytes_processing() {
-        let provider: NoStdProvider<1024> = NoStdProvider::default();
+        let provider = NoStdProvider::<1024>::default();
         let mut parser = StreamingParser::new(provider).unwrap();
 
         // Process magic bytes
@@ -520,7 +520,7 @@ mod tests {
 
     #[test]
     fn test_section_parser_creation() {
-        let provider: NoStdProvider<1024> = NoStdProvider::default();
+        let provider = NoStdProvider::<1024>::default();
         let parser = SectionParser::new(provider);
         assert!(parser.is_ok());
     }

@@ -5,7 +5,7 @@
 use wrt_format::component::ExternType;
 use wrt_foundation::ExternType as RuntimeExternType;
 
-use crate::{component::ExternValue, prelude::*, type_conversion::bidirectional};
+use crate::{components::component::ExternValue, prelude::*, type_conversion::bidirectional};
 
 /// Export from a component
 #[derive(Debug, Clone)]

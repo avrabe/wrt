@@ -5,6 +5,7 @@ use wrt_foundation::{
     NoStdProvider,
 };
 
+use crate::bounded_debug_infra;
 /// Runtime variable inspection implementation
 /// Provides the ability to read variable values from runtime state
 use crate::{
@@ -44,7 +45,11 @@ pub struct VariableDefinition<'a> {
 /// Runtime variable inspector
 pub struct VariableInspector<'a> {
     /// Variable definitions from DWARF
-    variables: BoundedVec<VariableDefinition<'a>, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>>,
+    variables: BoundedVec<
+        VariableDefinition<'a>,
+        MAX_DWARF_FILE_TABLE,
+        crate::bounded_debug_infra::DebugProvider,
+    >,
 }
 
 impl<'a> VariableInspector<'a> {
@@ -132,8 +137,9 @@ impl<'a> VariableInspector<'a> {
         pc: u32,
         state: &dyn RuntimeState,
         memory: &dyn DebugMemory,
-    ) -> BoundedVec<LiveVariable<'a>, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>> {
-        let mut live_vars = BoundedVec::new(NoStdProvider::<1024>::default());
+    ) -> BoundedVec<LiveVariable<'a>, MAX_DWARF_FILE_TABLE, crate::bounded_debug_infra::DebugProvider>
+    {
+        let mut live_vars = crate::bounded_debug_infra::create_debug_vec();
 
         for var_def in self.find_variables_at_pc(pc) {
             let value = self.read_variable(var_def, state, memory);

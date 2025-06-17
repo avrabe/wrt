@@ -4,16 +4,23 @@ Sequence Diagrams
 ==================
 
 This section provides detailed sequence diagrams showing the dynamic interactions between
-components in Pulseengine (WRT Edition) across different runtime environments and scenarios.
+components in PulseEngine (WRT Edition) across different runtime environments and scenarios.
+
+.. warning::
+   **Design Documentation**: These sequence diagrams show the intended design and interactions.
+   Many of these sequences are not yet implemented. Component instantiation, function execution,
+   and resource management are under development.
 
 .. arch_component:: ARCH_COMP_SEQ_001
    :title: Component Interaction Sequences
-   :status: implemented
+   :status: design
    :version: 1.0
    :rationale: Document runtime interaction patterns for different environments
 
-   Comprehensive sequence diagrams showing how components interact during
+   Comprehensive sequence diagrams showing intended component interactions during
    component loading, execution, and resource management across environments.
+   
+   **Note**: These are design diagrams. Actual implementation is in progress.
 
 Component Instantiation Sequence
 ---------------------------------

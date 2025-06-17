@@ -60,7 +60,7 @@ impl fmt::Display for HandleRepresentationError {
 #[cfg(feature = "std")]
 impl std::error::Error for HandleRepresentationError {}
 
-pub type HandleRepresentationResult<T> = Result<T, HandleRepresentationError>;
+pub type HandleRepresentationcore::result::Result<T> = Result<T, HandleRepresentationError>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HandleRepresentation {
@@ -120,7 +120,7 @@ pub struct HandleMetadata {
 #[derive(Debug, Clone)]
 pub enum HandleOperation {
     Read { fields: BoundedVec<String, 16, NoStdProvider<65536>> },
-    Write { fields: BoundedVec<(String, ComponentValue), 16> },
+    Write { fields: BoundedVec<(String, ComponentValue), 16, NoStdProvider<65536>> },
     Call { method: String, args: BoundedVec<ComponentValue, 16, NoStdProvider<65536>> },
     Drop,
     Share { target_component: ComponentInstanceId },
@@ -154,7 +154,7 @@ impl HandleRepresentationManager {
         Self {
             representations: BoundedHashMap::new(),
             metadata: BoundedHashMap::new(),
-            access_policies: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            access_policies: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             type_registry: GenerativeTypeRegistry::new(),
             bounds_checker: TypeBoundsChecker::new(),
             virt_manager: None,
@@ -204,7 +204,7 @@ impl HandleRepresentationManager {
             last_accessed: self.get_current_time(),
             access_count: 0,
             creator_component: component_id,
-            tags: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            tags: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             custom_data: BoundedHashMap::new(),
         };
 

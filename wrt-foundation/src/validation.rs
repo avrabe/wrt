@@ -146,7 +146,10 @@ pub fn validate_checksum(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{traits::importance, verification::{VerificationLevel, Checksum}};
+    use crate::{
+        traits::importance,
+        verification::{Checksum, VerificationLevel},
+    };
     // For BoundedVec tests
     #[cfg(feature = "std")]
     use crate::safe_memory::StdProvider;

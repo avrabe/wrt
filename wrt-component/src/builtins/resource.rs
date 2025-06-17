@@ -20,11 +20,25 @@ use wrt_foundation::{BoundedVec as Vec, safe_memory::NoStdProvider};
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 #[cfg(not(feature = "std"))]
-use alloc::vec;
+use alloc::{boxed::Box, sync::Arc, vec};
+#[cfg(not(feature = "std"))]
+use wrt_sync::Mutex;
 
 use wrt_error::{Error, Result};
 #[cfg(feature = "std")]
 use wrt_foundation::{builtin::BuiltinType, component_value::ComponentValue};
+
+#[cfg(not(feature = "std"))]
+use crate::types::Value as ComponentValue;
+
+#[cfg(not(feature = "std"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuiltinType {
+    ResourceCreate,
+    ResourceDrop,
+    ResourceRep,
+    ResourceGet,
+}
 
 use crate::{
     builtins::BuiltinHandler,
@@ -44,8 +58,8 @@ impl ResourceCreateHandler {
 }
 
 impl BuiltinHandler for ResourceCreateHandler {
-    fn builtin_type(&self) -> BuiltinType {
-        BuiltinType::ResourceCreate
+    fn builtin_type(&self) -> crate::builtins::BuiltinType {
+        crate::builtins::BuiltinType::ResourceCreate
     }
 
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
@@ -82,7 +96,7 @@ impl BuiltinHandler for ResourceCreateHandler {
         }
         #[cfg(not(feature = "std"))]
         {
-            let mut result = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            let mut result = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
             result.push(ComponentValue::U32(id.0)).map_err(|_| Error::new(
                 wrt_error::ErrorCategory::Memory,
                 wrt_error::codes::MEMORY_ALLOCATION_FAILED,
@@ -110,8 +124,8 @@ impl ResourceDropHandler {
 }
 
 impl BuiltinHandler for ResourceDropHandler {
-    fn builtin_type(&self) -> BuiltinType {
-        BuiltinType::ResourceDrop
+    fn builtin_type(&self) -> crate::builtins::BuiltinType {
+        crate::builtins::BuiltinType::ResourceDrop
     }
 
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
@@ -170,8 +184,8 @@ impl ResourceRepHandler {
 }
 
 impl BuiltinHandler for ResourceRepHandler {
-    fn builtin_type(&self) -> BuiltinType {
-        BuiltinType::ResourceRep
+    fn builtin_type(&self) -> crate::builtins::BuiltinType {
+        crate::builtins::BuiltinType::ResourceRep
     }
 
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
@@ -232,8 +246,8 @@ impl ResourceGetHandler {
 }
 
 impl BuiltinHandler for ResourceGetHandler {
-    fn builtin_type(&self) -> BuiltinType {
-        BuiltinType::ResourceGet
+    fn builtin_type(&self) -> crate::builtins::BuiltinType {
+        crate::builtins::BuiltinType::ResourceGet
     }
 
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
@@ -279,7 +293,7 @@ impl BuiltinHandler for ResourceGetHandler {
         }
         #[cfg(not(feature = "std"))]
         {
-            let mut result = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            let mut result = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
             result.push(ComponentValue::U32(id.0)).map_err(|_| Error::new(
                 wrt_error::ErrorCategory::Memory,
                 wrt_error::codes::MEMORY_ALLOCATION_FAILED,

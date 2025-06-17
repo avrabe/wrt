@@ -5,8 +5,9 @@
 //! hardcoded memory sizes with platform-aware dynamic sizing.
 
 use wrt_foundation::{
-    global_memory_config::{global_memory_config, GlobalMemoryAwareProvider},
-    memory_system::{UnifiedMemoryProvider, ConfigurableProvider},
+    budget_aware_provider::CrateId,
+    safe_memory::NoStdProvider,
+    capabilities::{CapabilityAwareProvider, capability_context, safe_capability_alloc},
     prelude::*,
 };
 
@@ -139,17 +140,11 @@ pub mod platform_types {
         BoundedVec::new(provider)
     }
     
-    /// Create a platform-aware memory provider
-    #[cfg(any(feature = "std", feature = "alloc"))]
-    pub fn create_platform_provider() -> Result<Box<dyn UnifiedMemoryProvider>> {
-        let config = runtime_memory_config();
-        create_memory_provider(config.provider_buffer_size())
-    }
-    
-    /// Create a platform-aware memory provider (no_std version)
-    #[cfg(not(any(feature = "std", feature = "alloc")))]
-    pub fn create_platform_provider() -> Result<ConfigurableProvider<4096>> {
-        Ok(ConfigurableProvider::<4096>::new())
+    /// Create a platform-aware memory provider for runtime operations
+    pub fn create_platform_provider() -> Result<CapabilityAwareProvider<NoStdProvider<8192>>> {
+        let context = capability_context!(dynamic(CrateId::Runtime, 8192))?;
+        let provider = safe_capability_alloc!(context, CrateId::Runtime, 8192)?;
+        Ok(provider)
     }
 }
 
@@ -158,53 +153,32 @@ pub struct DynamicProviderFactory;
 
 impl DynamicProviderFactory {
     /// Create a provider sized for the current platform
-    #[cfg(any(feature = "std", feature = "alloc"))]
-    pub fn create_for_use_case(use_case: MemoryUseCase) -> Result<Box<dyn UnifiedMemoryProvider>> {
-        let _config = runtime_memory_config();
-        let _global = global_memory_config();
-        
+    pub fn create_for_use_case(use_case: MemoryUseCase) -> Result<CapabilityAwareProvider<NoStdProvider<16384>>> {
         let size = match use_case {
-            MemoryUseCase::FunctionLocals => 1024,
+            MemoryUseCase::FunctionLocals => 16384,
             MemoryUseCase::InstructionBuffer => 16384,
-            MemoryUseCase::ModuleMetadata => 8192,
-            MemoryUseCase::ComponentData => 32768,
-            MemoryUseCase::TemporaryBuffer => 4096,
+            MemoryUseCase::ModuleMetadata => 16384,
+            MemoryUseCase::ComponentData => 16384,
+            MemoryUseCase::TemporaryBuffer => 16384,
         };
-        
-        create_memory_provider(size)
-    }
-    
-    /// Create a provider sized for the current platform (no_std version)
-    #[cfg(not(any(feature = "std", feature = "alloc")))]
-    pub fn create_for_use_case(_use_case: MemoryUseCase) -> Result<ConfigurableProvider<8192>> {
-        // For no_std, create a standard-sized provider
-        Ok(ConfigurableProvider::<8192>::new())
+        // Use consistent 16KB provider for all runtime use cases
+        let context = capability_context!(dynamic(CrateId::Runtime, 16384))?;
+        let provider = safe_capability_alloc!(context, CrateId::Runtime, 16384)?;
+        Ok(provider)
     }
     
     /// Create a string provider with platform-appropriate size
-    #[cfg(any(feature = "std", feature = "alloc"))]
-    pub fn create_string_provider() -> Result<Box<dyn UnifiedMemoryProvider>> {
-        let config = runtime_memory_config();
-        create_memory_provider(config.string_buffer_size() * 16) // Space for multiple strings
-    }
-    
-    /// Create a string provider with platform-appropriate size (no_std version)
-    #[cfg(not(any(feature = "std", feature = "alloc")))]
-    pub fn create_string_provider() -> Result<ConfigurableProvider<4096>> {
-        Ok(ConfigurableProvider::<4096>::new())
+    pub fn create_string_provider() -> Result<CapabilityAwareProvider<NoStdProvider<8192>>> {
+        let context = capability_context!(dynamic(CrateId::Runtime, 8192))?;
+        let provider = safe_capability_alloc!(context, CrateId::Runtime, 8192)?;
+        Ok(provider)
     }
     
     /// Create a collection provider with platform-appropriate size
-    #[cfg(any(feature = "std", feature = "alloc"))]
-    pub fn create_collection_provider() -> Result<Box<dyn UnifiedMemoryProvider>> {
-        let config = runtime_memory_config();
-        create_memory_provider(config.vector_capacity() * 32) // Space for collections
-    }
-    
-    /// Create a collection provider with platform-appropriate size (no_std version)  
-    #[cfg(not(any(feature = "std", feature = "alloc")))]
-    pub fn create_collection_provider() -> Result<ConfigurableProvider<8192>> {
-        Ok(ConfigurableProvider::<8192>::new())
+    pub fn create_collection_provider() -> Result<CapabilityAwareProvider<NoStdProvider<16384>>> {
+        let context = capability_context!(dynamic(CrateId::Runtime, 16384))?;
+        let provider = safe_capability_alloc!(context, CrateId::Runtime, 16384)?;
+        Ok(provider)
     }
 }
 
@@ -223,31 +197,24 @@ pub enum MemoryUseCase {
     TemporaryBuffer,
 }
 
-/// Wrapper that ensures all runtime memory allocations respect global limits
-/// Note: Simplified for no_std - in production would use bounded collections
+/// Simplified runtime memory manager for current memory system
+/// Uses safe_managed_alloc! for all allocations
 pub struct RuntimeMemoryManager {
-    // providers: Vec<Box<dyn UnifiedMemoryProvider>>, // Not available in no_std
-    provider_count: usize,
+    allocation_count: usize,
 }
 
 impl RuntimeMemoryManager {
     /// Create a new runtime memory manager
     pub fn new() -> Self {
         Self {
-            provider_count: 0,
+            allocation_count: 0,
         }
     }
     
-    /// Get a provider for a specific use case
-    pub fn get_provider(&mut self, use_case: MemoryUseCase) -> Result<&mut dyn UnifiedMemoryProvider> {
-        // Note: In no_std mode, we can't store dynamic providers
-        // This is a placeholder that would need a different approach in production
-        self.provider_count += 1;
-        
-        // For now, return an error indicating this needs implementation
-        Err(Error::new(ErrorCategory::InvalidOperation, 
-                      codes::INVALID_VERSION, // Using available error code
-                      "Dynamic provider management not available in no_std mode"))
+    /// Create a provider for a specific use case
+    pub fn create_provider(&mut self, use_case: MemoryUseCase) -> Result<NoStdProvider<16384>> {
+        self.allocation_count += 1;
+        DynamicProviderFactory::create_for_use_case(use_case)
     }
     
     /// Get memory usage statistics for all managed providers
@@ -256,7 +223,7 @@ impl RuntimeMemoryManager {
         RuntimeMemoryStats {
             total_allocated: 0, // Would need tracking in real implementation
             total_capacity: 0,  // Would need tracking in real implementation
-            provider_count: self.provider_count,
+            provider_count: self.allocation_count,
         }
     }
 }

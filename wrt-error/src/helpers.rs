@@ -164,3 +164,33 @@ pub const fn cfi_unsupported_error(message: &'static str) -> Error {
 pub const fn execution_engine_error(message: &'static str) -> Error {
     Error::new(ErrorCategory::Runtime, codes::EXECUTION_ENGINE_ERROR, message)
 }
+
+// ASIL-specific error helpers
+
+/// Create an ASIL violation error (ASIL-B and above)
+#[cfg(any(feature = "asil-b", feature = "asil-c", feature = "asil-d"))]
+#[must_use]
+pub const fn asil_violation_error(_level: &'static str, message: &'static str) -> Error {
+    Error::new(ErrorCategory::Safety, codes::SAFETY_ASIL_VIOLATION, message)
+}
+
+/// Create a safety-critical memory error (ASIL-C and above)
+#[cfg(any(feature = "asil-c", feature = "asil-d"))]
+#[must_use]
+pub const fn safety_critical_memory_error(message: &'static str) -> Error {
+    Error::new(ErrorCategory::Memory, codes::MEMORY_CORRUPTION_DETECTED, message)
+}
+
+/// Create a determinism violation error (ASIL-D only)
+#[cfg(feature = "asil-d")]
+#[must_use]
+pub const fn determinism_violation_error(message: &'static str) -> Error {
+    Error::new(ErrorCategory::Safety, codes::DETERMINISM_VIOLATION, message)
+}
+
+/// Create a redundancy check failure error (ASIL-D only)
+#[cfg(feature = "asil-d")]
+#[must_use]
+pub const fn redundancy_check_failure_error(message: &'static str) -> Error {
+    Error::new(ErrorCategory::Safety, codes::REDUNDANCY_CHECK_FAILURE, message)
+}

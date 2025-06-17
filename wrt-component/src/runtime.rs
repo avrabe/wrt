@@ -6,7 +6,6 @@
 // Import from wrt-foundation instead of wrt-runtime
 use wrt_foundation::component::{GlobalType, MemoryType, TableType};
 
-use crate::prelude::*;
 
 /// WebAssembly function type
 #[derive(Debug, Clone, PartialEq)]

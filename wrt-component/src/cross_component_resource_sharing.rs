@@ -227,8 +227,8 @@ impl CrossComponentResourceSharingManager {
 
             sharing_agreements: BoundedHashMap::new(),
             shared_resources: BoundedHashMap::new(),
-            sharing_policies: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-            transfer_queue: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            sharing_policies: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
+            transfer_queue: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
 
             callbacks: BoundedHashMap::new(),
 
@@ -282,9 +282,9 @@ impl CrossComponentResourceSharingManager {
                     source_component.id(),
                     target_component.id()
                 ),
-                tags: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-                restrictions: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-                audit_log: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                tags: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
+                restrictions: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
+                audit_log: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             },
         };
 
@@ -763,7 +763,7 @@ impl CrossComponentResourceSharingManager {
                     resource: Some(handle),
                 })?;
 
-            let mut shared_with_vec = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            let mut shared_with_vec = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
             shared_with_vec.push(shared_with).map_err(|_| ResourceSharingError {
                 kind: ResourceSharingErrorKind::ResourceLimitExceeded,
                 message: "Failed to create shared_with list".to_string(),
@@ -772,7 +772,7 @@ impl CrossComponentResourceSharingManager {
                 resource: Some(handle),
             })?;
 
-            let mut agreements_vec = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            let mut agreements_vec = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
             agreements_vec.push(agreement_id).map_err(|_| ResourceSharingError {
                 kind: ResourceSharingErrorKind::ResourceLimitExceeded,
                 message: "Failed to create agreements list".to_string(),
@@ -922,7 +922,7 @@ pub fn create_basic_sharing_policy(name: &str) -> SharingPolicy {
         id: 0, // Will be assigned by manager
         name: name.to_string(),
         applies_to: PolicyScope::Global,
-        rules: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+        rules: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
         priority: 0,
         enabled: true,
     }
@@ -937,7 +937,7 @@ pub fn create_component_pair_policy(
         id: 0,
         name: name.to_string(),
         applies_to: PolicyScope::ComponentPair { source, target },
-        rules: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+        rules: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
         priority: 0,
         enabled: true,
     }

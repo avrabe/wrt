@@ -264,11 +264,11 @@ impl HostIntegrationManager {
             #[cfg(feature = "std")]
             host_functions: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            host_functions: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            host_functions: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             event_handlers: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            event_handlers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            event_handlers: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             host_resources: HostResourceManager::new(),
             canonical_abi: CanonicalAbi::new(),
             security_policy: SecurityPolicy::default(),
@@ -306,7 +306,11 @@ impl HostIntegrationManager {
         let registry_entry = HostFunctionRegistry { name, signature, implementation, permissions };
 
         self.host_functions.push(registry_entry).map_err(|_| {
-            wrt_foundation::WrtError::ResourceExhausted("Too many host functions".into())
+            wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Resource,
+                wrt_error::codes::RESOURCE_EXHAUSTED,
+                "Too many host functions"
+            )
         })?;
 
         Ok(function_id)
@@ -321,20 +325,28 @@ impl HostIntegrationManager {
         engine: &mut ComponentExecutionEngine,
     ) -> WrtResult<Value> {
         let function = self.host_functions.get(function_id as usize).ok_or_else(|| {
-            wrt_foundation::WrtError::invalid_input("Invalid input")
+            wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            )
         })?;
 
         // Check security policy
         if !self.security_policy.allow_arbitrary_host_calls {
-            return Err(wrt_foundation::WrtError::PermissionDenied(
-                "Arbitrary host calls not allowed".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Runtime,
+                wrt_error::codes::RUNTIME_ERROR,
+                "Arbitrary host calls not allowed"
             ));
         }
 
         // Check function permissions
         if !self.check_function_permissions(&function.permissions, caller_instance) {
-            return Err(wrt_foundation::WrtError::PermissionDenied(
-                "Host function call not permitted".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Runtime,
+                wrt_error::codes::RUNTIME_ERROR,
+                "Host function call not permitted"
             ));
         }
 
@@ -398,7 +410,11 @@ impl HostIntegrationManager {
         let event_handler = EventHandler { event_type, handler, priority };
 
         self.event_handlers.push(event_handler).map_err(|_| {
-            wrt_foundation::WrtError::ResourceExhausted("Too many event handlers".into())
+            wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Resource,
+                wrt_error::codes::RESOURCE_EXHAUSTED,
+                "Too many event handlers"
+            )
         })?;
 
         Ok(())
@@ -432,8 +448,10 @@ impl HostIntegrationManager {
     ) -> WrtResult<u32> {
         // Check security policy
         if !self.security_policy.allowed_resource_types.contains(&resource_type) {
-            return Err(wrt_foundation::WrtError::PermissionDenied(
-                "Host resource type not allowed".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Runtime,
+                wrt_error::codes::RUNTIME_ERROR,
+                "Host resource type not allowed"
             ));
         }
 
@@ -448,7 +466,11 @@ impl HostIntegrationManager {
         #[cfg(not(any(feature = "std", )))]
         {
             self.host_resources.resources.push(resource).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many host resources".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many host resources"
+                )
             })?;
         }
 
@@ -464,19 +486,25 @@ impl HostIntegrationManager {
     ) -> WrtResult<()> {
         let resource =
             self.host_resources.resources.get(resource_id as usize).ok_or_else(|| {
-                wrt_foundation::WrtError::invalid_input("Invalid input")
+                wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            )
             })?;
 
         if !resource.permissions.shareable {
-            return Err(wrt_foundation::WrtError::PermissionDenied(
-                "Host resource is not shareable".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Runtime,
+                wrt_error::codes::RUNTIME_ERROR,
+                "Host resource is not shareable"
             ));
         }
 
         #[cfg(feature = "std")]
         let mut allowed_instances = Vec::new();
         #[cfg(not(any(feature = "std", )))]
-        let mut allowed_instances = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let mut allowed_instances = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
 
         #[cfg(feature = "std")]
         {
@@ -485,7 +513,11 @@ impl HostIntegrationManager {
         #[cfg(not(any(feature = "std", )))]
         {
             allowed_instances.push(instance_id).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many allowed instances".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many allowed instances"
+                )
             })?;
         }
 
@@ -498,7 +530,11 @@ impl HostIntegrationManager {
         #[cfg(not(any(feature = "std", )))]
         {
             self.host_resources.sharing_policies.push(policy).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many sharing policies".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many sharing policies"
+                )
             })?;
         }
 
@@ -549,11 +585,11 @@ impl HostResourceManager {
             #[cfg(feature = "std")]
             resources: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            resources: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            resources: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             sharing_policies: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            sharing_policies: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            sharing_policies: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
         }
     }
 
@@ -613,7 +649,7 @@ impl Default for SecurityPolicy {
             allowed_resource_types: vec![HostResourceType::Buffer],
             #[cfg(not(any(feature = "std", )))]
             allowed_resource_types: {
-                let mut types = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+                let mut types = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
                 let _ = types.push(HostResourceType::Buffer);
                 types
             },

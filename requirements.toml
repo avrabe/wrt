@@ -62,3 +62,13 @@ asil_level = "AsilB"
 implementations = ["wrt-error/src/errors.rs", "wrt-error/src/codes.rs"]
 tests = ["wrt-error/tests/error_conversion_test.rs"]
 documentation = ["docs/architecture/logging.rst"]
+
+[[requirement]]
+id = "REQ_ADVANCED_THREADING_001"
+title = "Advanced Threading Support"
+description = "Advanced threading capabilities including task management, spawning, and synchronization"
+type = "Runtime"
+asil_level = "AsilB"
+implementations = ["wrt-component/src/threading/advanced_threading_builtins.rs", "wrt-component/src/threading/thread_builtins.rs"]
+tests = ["wrt-component/tests/"]
+documentation = ["docs/source/requirements.rst"]

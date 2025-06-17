@@ -42,11 +42,11 @@ mod integration_tests {
         ]);
 
         // Convert from format to types
-        let types_type = registry.convert::<FormatValType, TypesValType>(&format_type).unwrap();
+        let types_type = registry.convert::<FormatValType, TypesValType(&format_type).unwrap();
 
         // Convert back to format
         let format_type_back =
-            registry.convert::<TypesValType, FormatValType>(&types_type).unwrap();
+            registry.convert::<TypesValType, FormatValType(&types_type).unwrap();
 
         // The structure should be preserved after round-trip conversion
         // (In a real test, we'd do deep comparison, but that would require implementing
@@ -158,7 +158,7 @@ mod integration_tests {
 
         // Convert to FormatComponentType
         let format_type =
-            registry.convert::<RuntimeComponentType, FormatComponentType>(&runtime_type).unwrap();
+            registry.convert::<RuntimeComponentType, FormatComponentType(&runtime_type).unwrap();
 
         // Check the structure
         assert_eq!(format_type.imports.len(), 1);
@@ -169,7 +169,7 @@ mod integration_tests {
 
         // Convert back to RuntimeComponentType
         let runtime_type_back =
-            registry.convert::<FormatComponentType, RuntimeComponentType>(&format_type).unwrap();
+            registry.convert::<FormatComponentType, RuntimeComponentType(&format_type).unwrap();
         let inner = runtime_type_back.inner();
 
         // Check the structure is preserved

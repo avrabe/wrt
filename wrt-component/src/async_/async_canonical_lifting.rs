@@ -88,7 +88,7 @@ impl AsyncCanonicalEncoder {
             #[cfg(feature = "std")]
             buffer: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            buffer: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            buffer: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             position: 0,
         }
     }
@@ -246,7 +246,7 @@ impl AsyncCanonicalEncoder {
         }
     }
     
-    fn encode_result(&mut self, result: &Result<Box<Value>, Box<Value>>, options: &CanonicalOptions) -> Result<()> {
+    fn encode_result(&mut self, result: &core::result::Result<Box<Value>, Box<Value>>, options: &CanonicalOptions) -> Result<()> {
         match result {
             Ok(val) => {
                 self.encode_u32(0)?; // Ok discriminant
@@ -460,7 +460,7 @@ impl<'a> AsyncCanonicalDecoder<'a> {
         Ok(Vec::new())
     }
     
-    fn decode_record(&mut self, fields: &[(String, ValType)], options: &CanonicalOptions) -> Result<Vec<(String, Value)>> {
+    fn decode_record(&mut self, fields: &[(String, ValType)], options: &CanonicalOptions) -> core::result::Result<Vec<(String, Value)>> {
         let mut result = Vec::new();
         for (name, field_type) in fields {
             let value = self.decode_value(field_type, options)?;
@@ -469,7 +469,7 @@ impl<'a> AsyncCanonicalDecoder<'a> {
         Ok(result)
     }
     
-    fn decode_variant(&mut self, cases: &[(String, Option<ValType>)], options: &CanonicalOptions) -> Result<Value> {
+    fn decode_variant(&mut self, cases: &[(String, Option<ValType)], options: &CanonicalOptions) -> Result<Value> {
         let tag = self.decode_u32()?;
         
         if let Some((_, case_type)) = cases.get(tag as usize) {
@@ -509,7 +509,7 @@ impl<'a> AsyncCanonicalDecoder<'a> {
         }
     }
     
-    fn decode_result(&mut self, ok_type: &ValType, err_type: &ValType, options: &CanonicalOptions) -> Result<Result<Box<Value>, Box<Value>>> {
+    fn decode_result(&mut self, ok_type: &ValType, err_type: &ValType, options: &CanonicalOptions) -> core::result::Result<Result<Box<Value>, Box<Value>>> {
         let discriminant = self.decode_u32()?;
         match discriminant {
             0 => Ok(Ok(Box::new(self.decode_value(ok_type, options)?))),

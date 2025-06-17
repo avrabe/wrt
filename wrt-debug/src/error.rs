@@ -17,6 +17,7 @@ pub enum DebugError {
 }
 
 /// Result type for debug operations
+#[allow(dead_code)]
 pub type DebugResult<T> = Result<T, DebugError>;
 
 impl From<wrt_error::Error> for DebugError {

@@ -5,7 +5,6 @@
 // - threading.join: Join a thread (wait for its completion)
 // - threading.sync: Create a synchronization primitive
 
-use std::{boxed::Box, collections::HashMap, string::String, sync::Arc, vec::Vec};
 #[cfg(feature = "std")]
 use std::{
     boxed::Box,
@@ -18,9 +17,26 @@ use std::{
     vec::Vec,
 };
 
-use wrt_error::{kinds::ThreadingError, Error, Result};
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, vec::Vec};
+
+#[cfg(not(feature = "std"))]
+use wrt_foundation::{bounded::BoundedVec, safe_memory::NoStdProvider};
+
+use wrt_error::{Error, Result};
 #[cfg(feature = "std")]
 use wrt_foundation::{builtin::BuiltinType, component_value::ComponentValue};
+
+#[cfg(not(feature = "std"))]
+use crate::types::Value as ComponentValue;
+
+#[cfg(not(feature = "std"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuiltinType {
+    ThreadingSpawn,
+    ThreadingJoin,
+    ThreadingSync,
+}
 
 use super::BuiltinHandler;
 

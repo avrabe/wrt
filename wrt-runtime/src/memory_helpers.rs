@@ -11,6 +11,12 @@ use std::sync::Arc;
 #[cfg(not(feature = "std"))]
 use alloc::sync::Arc;
 
+// Import Vec
+#[cfg(feature = "std")]
+use std::vec::Vec;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 use wrt_error::{Error, Result};
 use wrt_foundation::{safe_memory::SafeStack, values::Value};
 
@@ -212,16 +218,9 @@ impl ArcMemoryExt for Arc<Memory> {
         // Get data from the safe slice with integrity verification built in
         let data = safe_slice.data()?;
 
-        // More efficiently add all bytes to the SafeStack using extend_from_slice
-        #[cfg(feature = "std")]
+        // Add all bytes to the SafeStack
         {
-            safe_stack.extend_from_slice(data)?;
-        }
-
-        // Fallback implementation if we need to populate item by item (for no_std)
-        #[cfg(not(feature = "std"))]
-        {
-            // Add all bytes to the SafeStack
+            // Use push for each byte since extend_from_slice is not available
             for &byte in data {
                 safe_stack.push(byte)?;
             }
@@ -241,10 +240,7 @@ impl ArcMemoryExt for Arc<Memory> {
     fn read_exact(&self, offset: u32, len: u32) -> Result<Vec<u8>> {
         // Early return for zero-length reads
         if len == 0 {
-            #[cfg(feature = "std")]
             return Ok(Vec::new());
-            #[cfg(not(feature = "std"))]
-            return Ok(wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default())?);
         }
 
         // Get a memory-safe slice directly instead of creating a temporary buffer
@@ -253,13 +249,11 @@ impl ArcMemoryExt for Arc<Memory> {
         // Get data from the safe slice with integrity verification built in
         let data = safe_slice.data()?;
 
-        // Create a BoundedVec from the verified slice data
-        let mut buffer = wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default())?;
+        // Create a Vec from the verified slice data
+        let mut buffer = Vec::new();
         for &byte in data {
-            buffer.push(byte)?;
+            buffer.push(byte);
         }
-
-        // Return the verified buffer
         Ok(buffer)
     }
 
@@ -398,7 +392,7 @@ impl ArcMemoryExt for Arc<Memory> {
             Value::I64(v) => mem.write_i64(addr, v),
             Value::F32(v) => mem.write_f32(addr, f32::from_bits(v.to_bits())),
             Value::F64(v) => mem.write_f64(addr, f64::from_bits(v.to_bits())),
-            Value::V128(v) => mem.write_v128(addr, v.into()),
+            Value::V128(v) => mem.write_v128(addr, v.bytes),
             _ => Err(wrt_error::Error::new(
                 wrt_error::ErrorCategory::Type,
                 wrt_error::errors::codes::TYPE_MISMATCH_ERROR,
@@ -515,14 +509,16 @@ impl ArcMemoryExt for Arc<Memory> {
     }
 
     fn write_via_callback(&self, offset: u32, buffer: &[u8]) -> Result<()> {
-        // Use internal Mutex or RwLock to provide thread-safe mutation
-        // Clone and modify through interior mutability
-        let mut current_buffer = self.buffer()?;
-        let start = offset as usize;
-        let end = start + buffer.len();
+        #[cfg(feature = "std")]
+        {
+            // Use internal Mutex or RwLock to provide thread-safe mutation
+            // Clone and modify through interior mutability
+            let mut current_buffer = self.buffer()?;
+            let start = offset as usize;
+            let end = start + buffer.len();
 
-        if end > current_buffer.len() {
-            return Err(Error::new(
+            if end > current_buffer.len() {
+                return Err(Error::new(
                 ErrorCategory::Memory,
                 codes::MEMORY_ACCESS_OUT_OF_BOUNDS,
                 "Memory access out of bounds",
@@ -537,6 +533,13 @@ impl ArcMemoryExt for Arc<Memory> {
             }
             Ok(())
         })
+        }
+        
+        #[cfg(not(feature = "std"))]
+        {
+            // For no_std, use write method directly
+            self.as_ref().write(offset, buffer)
+        }
     }
 
     fn grow_via_callback(&self, _pages: u32) -> Result<u32> {

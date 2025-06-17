@@ -1,10 +1,14 @@
 #![cfg(feature = "runtime-stepping")]
 
 use wrt_foundation::{
-    bounded::{BoundedStack, BoundedVec, MAX_DWARF_FILE_TABLE},
-    NoStdProvider,
+    safe_managed_alloc,
+    {
+        bounded::{BoundedStack, BoundedVec, MAX_DWARF_FILE_TABLE},
+        managed_alloc, CrateId, NoStdProvider,
+    },
 };
 
+use crate::bounded_debug_infra;
 /// Runtime stepping logic implementation
 /// Provides single-step, step-over, step-into, and step-out functionality
 use crate::{
@@ -49,7 +53,7 @@ pub struct StepController {
     /// Target file for line stepping
     target_file: Option<u16>,
     /// Call stack for step-over/out
-    call_stack: BoundedStack<StepFrame, 64, NoStdProvider<1024>>,
+    call_stack: BoundedStack<StepFrame, 64, crate::bounded_debug_infra::DebugProvider>,
     /// Depth for step-over
     step_over_depth: u32,
     /// Previous PC for detecting loops
@@ -65,7 +69,10 @@ impl StepController {
             mode: StepMode::None,
             target_line: None,
             target_file: None,
-            call_stack: BoundedStack::new(NoStdProvider),
+            call_stack: BoundedStack::new(
+                safe_managed_alloc!(32768, CrateId::Debug).unwrap().provider().clone(),
+            )
+            .unwrap(),
             step_over_depth: 0,
             previous_pc: 0,
             previous_line: None,
@@ -254,7 +261,8 @@ pub struct SteppingDebugger {
     /// Step controller
     controller: StepController,
     /// Line number cache
-    line_cache: BoundedVec<LineCacheEntry, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>>,
+    line_cache:
+        BoundedVec<LineCacheEntry, MAX_DWARF_FILE_TABLE, crate::bounded_debug_infra::DebugProvider>,
 }
 
 #[derive(Debug, Clone)]
@@ -267,7 +275,13 @@ struct LineCacheEntry {
 impl SteppingDebugger {
     /// Create a new stepping debugger
     pub fn new() -> Self {
-        Self { controller: StepController::new(), line_cache: BoundedVec::new(NoStdProvider) }
+        Self {
+            controller: StepController::new(),
+            line_cache: BoundedVec::new(
+                safe_managed_alloc!(32768, CrateId::Debug).unwrap().provider().clone(),
+            )
+            .unwrap(),
+        }
     }
 
     /// Add line mapping to cache
@@ -296,7 +310,7 @@ impl SteppingDebugger {
     }
 
     /// Check if we should break
-    pub fn should_break(&mut self, pc: u32, state: &dyn RuntimeState) -> DebugAction {
+    pub fn should_break(&mut self, pc: u32, state: &(dyn RuntimeState + 'static)) -> DebugAction {
         let current_line = self.find_line(pc).copied();
         self.controller.should_break(pc, state, current_line)
     }

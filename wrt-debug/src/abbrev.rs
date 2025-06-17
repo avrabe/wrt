@@ -12,6 +12,7 @@ use wrt_foundation::{
 
 use crate::cursor::DwarfCursor;
 
+use crate::bounded_debug_infra;
 /// DWARF attribute form constants
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AttributeForm {
@@ -96,13 +97,14 @@ pub struct Abbreviation {
     /// Has children flag
     pub has_children: bool,
     /// Attribute specifications
-    pub attributes: BoundedVec<AttributeSpec, 32, NoStdProvider<1024>>,
+    pub attributes: BoundedVec<AttributeSpec, 32, crate::bounded_debug_infra::DebugProvider>,
 }
 
 /// DWARF abbreviation table
 pub struct AbbreviationTable {
     /// Cached abbreviations
-    entries: BoundedVec<Abbreviation, MAX_DWARF_ABBREV_CACHE, NoStdProvider<1024>>,
+    entries:
+        BoundedVec<Abbreviation, MAX_DWARF_ABBREV_CACHE, crate::bounded_debug_infra::DebugProvider>,
 }
 
 impl AbbreviationTable {

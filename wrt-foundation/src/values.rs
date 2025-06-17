@@ -34,22 +34,24 @@ use wrt_error::{codes, Error, ErrorCategory, Result as WrtResult};
 pub use crate::float_repr::{FloatBits32, FloatBits64};
 // // use std::format; // Removed: format! should come from prelude
 use crate::traits::LittleEndian as TraitLittleEndian; // Alias trait
-// Use the canonical LittleEndian trait and BytesWriter from crate::traits
+                                                      // Use the canonical LittleEndian trait and BytesWriter from crate::traits
 use crate::traits::{
-    BytesWriter, Checksummable, FromBytes, LittleEndian, ReadStream, ToBytes, WriteStream,
-    DefaultMemoryProvider, BoundedCapacity,
+    BoundedCapacity, BytesWriter, Checksummable, DefaultMemoryProvider, FromBytes, LittleEndian,
+    ReadStream, ToBytes, WriteStream,
 };
-use crate::types::{ValueType, MAX_STRUCT_FIELDS, MAX_ARRAY_ELEMENTS}; // Import ValueType and RefType
+use crate::types::{ValueType, MAX_ARRAY_ELEMENTS, MAX_STRUCT_FIELDS}; // Import ValueType and RefType
 use crate::{
+    bounded::BoundedVec,
     prelude::{Debug, Eq, PartialEq},
     verification::Checksum,
-    bounded::BoundedVec,
     MemoryProvider,
 }; // Added for Checksummable
 
 /// GC-managed struct reference for WebAssembly 3.0
 #[derive(Debug, Clone, PartialEq, Eq, core::hash::Hash)]
-pub struct StructRef<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq = DefaultMemoryProvider> {
+pub struct StructRef<
+    P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq = DefaultMemoryProvider,
+> {
     /// Type index of the struct
     pub type_index: u32,
     /// Field values
@@ -87,7 +89,9 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> St
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default for StructRef<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default
+    for StructRef<P>
+{
     fn default() -> Self {
         let provider = P::default();
         Self::new(0, provider).expect("Default StructRef creation failed")
@@ -96,7 +100,9 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> De
 
 /// GC-managed array reference for WebAssembly 3.0
 #[derive(Debug, Clone, PartialEq, Eq, core::hash::Hash)]
-pub struct ArrayRef<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq = DefaultMemoryProvider> {
+pub struct ArrayRef<
+    P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq = DefaultMemoryProvider,
+> {
     /// Type index of the array
     pub type_index: u32,
     /// Array elements
@@ -111,7 +117,12 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Ar
     }
 
     /// Create an array with initial size and value
-    pub fn with_size(type_index: u32, size: usize, init_value: Value, provider: P) -> WrtResult<Self> {
+    pub fn with_size(
+        type_index: u32,
+        size: usize,
+        init_value: Value,
+        provider: P,
+    ) -> WrtResult<Self> {
         let mut elements = BoundedVec::new(provider).map_err(Error::from)?;
         for _ in 0..size {
             elements.push(init_value.clone()).map_err(Error::from)?;
@@ -153,7 +164,9 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Ar
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default for ArrayRef<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default
+    for ArrayRef<P>
+{
     fn default() -> Self {
         let provider = P::default();
         Self::new(0, provider).expect("Default ArrayRef creation failed")
@@ -877,8 +890,8 @@ impl Checksummable for Value {
             Value::V128(_) => 4u8,
             Value::FuncRef(_) => 5u8,
             Value::ExternRef(_) => 6u8,
-            Value::Ref(_) => 7u8,   // Generic Ref
-            Value::I16x8(_) => 8u8, // I16x8, distinct from V128 for checksum
+            Value::Ref(_) => 7u8,       // Generic Ref
+            Value::I16x8(_) => 8u8,     // I16x8, distinct from V128 for checksum
             Value::StructRef(_) => 9u8, // Struct reference
             Value::ArrayRef(_) => 10u8, // Array reference
         };
@@ -914,8 +927,8 @@ impl ToBytes for Value {
             Value::V128(_) => 4u8,
             Value::FuncRef(_) => 5u8,
             Value::ExternRef(_) => 6u8,
-            Value::Ref(_) => 7u8,   // Generic Ref, serialized as u32
-            Value::I16x8(_) => 8u8, // I16x8, serialized as V128
+            Value::Ref(_) => 7u8,       // Generic Ref, serialized as u32
+            Value::I16x8(_) => 8u8,     // I16x8, serialized as V128
             Value::StructRef(_) => 9u8, // Struct reference
             Value::ArrayRef(_) => 10u8, // Array reference
         };
@@ -1051,14 +1064,18 @@ impl FromBytes for Value {
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Checksummable for StructRef<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Checksummable
+    for StructRef<P>
+{
     fn update_checksum(&self, checksum: &mut Checksum) {
         self.type_index.update_checksum(checksum);
         self.fields.update_checksum(checksum);
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> ToBytes for StructRef<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> ToBytes
+    for StructRef<P>
+{
     fn to_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         &self,
         writer: &mut WriteStream<'a>,
@@ -1076,7 +1093,9 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> To
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> FromBytes for StructRef<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> FromBytes
+    for StructRef<P>
+{
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
@@ -1096,14 +1115,18 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Fr
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Checksummable for ArrayRef<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Checksummable
+    for ArrayRef<P>
+{
     fn update_checksum(&self, checksum: &mut Checksum) {
         self.type_index.update_checksum(checksum);
         self.elements.update_checksum(checksum);
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> ToBytes for ArrayRef<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> ToBytes
+    for ArrayRef<P>
+{
     fn to_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         &self,
         writer: &mut WriteStream<'a>,
@@ -1121,7 +1144,9 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> To
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> FromBytes for ArrayRef<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> FromBytes
+    for ArrayRef<P>
+{
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,

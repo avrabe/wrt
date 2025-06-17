@@ -15,13 +15,14 @@ This guide covers setting up a complete development environment for contributing
 Prerequisites
 =============
 
-System Requirements
--------------------
+For basic prerequisites and installation instructions, see the :doc:`/getting_started/installation` guide.
 
-* **Rust 1.86.0 or newer**
-* **Git 2.20 or newer**
+Additional Development Requirements
+-----------------------------------
+
 * **Docker or Podman** (for Dagger CI)
-* **4GB RAM minimum** (8GB recommended)
+* **4GB RAM minimum** (8GB recommended for development)
+* **Python 3.8+** (for documentation generation)
 
 Platform Support
 -----------------
@@ -30,39 +31,26 @@ Platform Support
 * **macOS**: Full support with native tools
 * **Windows**: WSL2 recommended
 
-Essential Tools
-===============
+Development Tools
+=================
 
-Core Toolchain
---------------
+Beyond the basic installation requirements, developers need additional tools:
 
 .. code-block:: bash
-
-   # Install Rust
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   source ~/.cargo/env
-
-   # Install just (task runner)
-   cargo install just
 
    # Install Dagger (CI tool)
    curl -fsSL https://dl.dagger.io/dagger/install.sh | sh
 
-Development Tools
------------------
-
-.. code-block:: bash
-
-   # WASM tooling
-   cargo install cargo-component
-   cargo install wasm-tools
-
-   # Code quality
+   # Code quality tools
    cargo install cargo-llvm-cov
    cargo install cargo-deny
 
-   # Documentation
+   # Documentation dependencies
    pip install -r docs/requirements.txt
+
+   # Optional: Additional development utilities
+   cargo install cargo-watch  # For automatic rebuilds
+   cargo install cargo-expand # For macro expansion debugging
 
 Quick Setup
 ===========

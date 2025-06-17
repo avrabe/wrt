@@ -3,10 +3,14 @@
 //! This module provides functionality to parse WebAssembly modules
 //! using the project's own wrt-decoder implementation.
 
-use wrt_decoder::{Parser, Payload};
 use wrt_error::kinds::DecodingError;
 
-use crate::prelude::*;
+#[cfg(feature = "std")]
+use std::collections::HashSet;
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeSet as HashSet;
+
+use crate::{prelude::*, builtins::BuiltinType};
 
 /// Scan a WebAssembly module for built-in imports
 ///
@@ -18,63 +22,73 @@ use crate::prelude::*;
 ///
 /// A Result containing a vector of built-in names found in the import section
 pub fn scan_for_builtins(binary: &[u8]) -> Result<Vec<String>> {
-    let parser = Parser::new(binary);
-    let mut builtin_imports = Vec::new();
-
-    for payload_result in parser {
-        match payload_result {
-            Ok(Payload::ImportSection(data, size)) => {
-                let reader =
-                    match Parser::create_import_section_reader(&Payload::ImportSection(data, size))
-                    {
-                        Ok(reader) => reader,
-                        Err(err) => {
-                            return Err(Error::new(
-                                ErrorCategory::Parse,
-                                codes::DECODING_ERROR,
-                                DecodingError(format!(
-                                    "Failed to create import section reader: {}",
-                                    err
-                                )),
-                            ));
-                        }
-                    };
-
-                for import_result in reader {
-                    match import_result {
-                        Ok(import) => {
-                            if import.module == "wasi_builtin" {
-                                builtin_imports.push(import.name.to_string());
-                            }
-                        }
-                        Err(err) => {
-                            return Err(Error::new(
-                                ErrorCategory::Parse,
-                                codes::DECODING_ERROR,
-                                DecodingError(format!(
-                                    "Failed to parse import during built-in scan: {}",
-                                    err
-                                )),
-                            ));
-                        }
-                    }
-                }
-
-                // Import section found and processed, we can stop parsing
-                break;
-            }
-            Err(err) => {
-                return Err(Error::new(
-                    ErrorCategory::Parse,
-                    codes::DECODING_ERROR,
-                    "Component parsing error",
-                ));
-            }
-            _ => {} // Skip other payload types
-        }
+    use wrt_decoder::sections::parsers::parse_import_section;
+    use wrt_format::binary;
+    
+    // Validate WebAssembly magic number and version
+    if binary.len() < 8 {
+        return Err(Error::new(
+            ErrorCategory::Parse,
+            wrt_error::codes::PARSE_ERROR,
+            "Binary too short to be a valid WebAssembly module"
+        ));
     }
-
-    Ok(builtin_imports)
+    
+    // Check magic number
+    if &binary[0..4] != b"\0asm" {
+        return Err(Error::new(
+            ErrorCategory::Parse,
+            wrt_error::codes::PARSE_ERROR,
+            "Invalid WebAssembly magic number"
+        ));
+    }
+    
+    let mut builtin_names = Vec::new();
+    let mut offset = 8; // Skip magic number and version
+    
+    // Parse sections to find the import section
+    while offset < binary.len() {
+        // Read section ID
+        let section_id = binary[offset];
+        offset += 1;
+        
+        // Read section size
+        let (section_size, new_offset) = binary::read_leb128_u32(binary, offset)
+            .map_err(|e| Error::new(
+                ErrorCategory::Parse,
+                wrt_error::codes::PARSE_ERROR,
+                &format!("Failed to read section size: {}", e)
+            ))?;
+        offset = new_offset;
+        
+        let section_end = offset + section_size as usize;
+        
+        // Check if this is the import section (ID = 2)
+        if section_id == 2 {
+            // Parse imports
+            let section_data = &binary[offset..section_end];
+            let imports = parse_import_section(section_data)
+                .map_err(|e| Error::new(
+                    ErrorCategory::Parse,
+                    wrt_error::codes::PARSE_ERROR,
+                    &format!("Failed to parse import section: {}", e)
+                ))?;
+            
+            // Look for wasi_builtin imports
+            for import in imports {
+                if import.module == "wasi_builtin" {
+                    builtin_names.push(import.name.clone());
+                }
+            }
+            
+            break; // No need to continue after import section
+        }
+        
+        // Skip to next section
+        offset = section_end;
+    }
+    
+    Ok(builtin_names)
 }
 
 /// Scan a WebAssembly binary for built-in imports and map them to built-in

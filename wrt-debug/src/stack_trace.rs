@@ -114,6 +114,7 @@ impl<'a> StackTrace<'a> {
 
 /// Helper to build a stack trace from runtime information
 pub struct StackTraceBuilder<'a> {
+    #[allow(dead_code)]
     debug_info: &'a mut crate::DwarfDebugInfo<'a>,
 }
 

@@ -3,6 +3,7 @@
 //! This module provides a high-level thread management system that enforces
 //! safety constraints and resource limits for WebAssembly thread execution.
 
+
 use core::{
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
@@ -170,6 +171,18 @@ pub struct WasmThreadManager {
     shutdown: WrtMutex<bool>,
     /// Task executor function
     executor: Arc<dyn Fn(u32, Vec<u8>) -> Result<Vec<u8>> + Send + Sync>,
+}
+
+impl core::fmt::Debug for WasmThreadManager {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("WasmThreadManager")
+            .field("resource_tracker", &self.resource_tracker)
+            .field("threads", &"<BTreeMap>")
+            .field("modules", &"<BTreeMap>")
+            .field("next_thread_id", &self.next_thread_id)
+            .field("shutdown", &self.shutdown)
+            .finish()
+    }
 }
 
 impl WasmThreadManager {
@@ -342,8 +355,8 @@ impl WasmThreadManager {
         let threads = self.threads.read();
         let thread_info = threads.get(&thread_id).ok_or_else(|| {
             Error::new(
-                ErrorCategory::Validation, 1,
-                ErrorCategory::Validation, 1,
+                ErrorCategory::Validation,
+                1,
                 "Thread not found",
             )
         })?;

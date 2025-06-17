@@ -2,7 +2,6 @@
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "std")]
 extern crate std;

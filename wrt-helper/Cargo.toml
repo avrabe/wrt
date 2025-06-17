@@ -33,7 +33,10 @@ platform-baremetal = []
 arm-hardening = []
 
 # Disable panic handler for library builds to avoid conflicts
-disable-panic-handler = []
+safety-asil-b = []
+safety-asil-c = ["safety-asil-b"]
+safety-asil-d = ["safety-asil-c"]
+
 
 [dependencies]
 wrt-foundation = { workspace = true, default-features = false }
