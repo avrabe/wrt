@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Hardware-Specific Optimizations
 // SW-REQ-ID: REQ_PLATFORM_HW_OPT_001

@@ -32,8 +32,8 @@ type CanonicalValType = TypesValType;
 /// Serialize a ComponentValue to a bounded buffer in a no_std environment
 pub fn serialize_component_value_no_std(
     value: &ComponentValue,
-) -> Result<BoundedVec<u8, MAX_SERIALIZED_VALUE_SIZE>, NoStdProvider<65536>> {
-    let mut buffer = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+) -> core::result::Result<BoundedVec<u8, MAX_SERIALIZED_VALUE_SIZE, NoStdProvider<65536>>, NoStdProvider<65536>> {
+    let mut buffer = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
 
     match value {
         ComponentValue::Bool(b) => {
@@ -531,7 +531,7 @@ pub fn serialize_component_value_no_std(
 /// This function is adapted for no_std environments
 pub fn convert_valtype_to_format<P: MemoryProvider + Default + Clone + PartialEq + Eq>(
     val_type: &TypesValType<P>,
-) -> Result<FormatValType> {
+) -> Result<FormatValType {
     match val_type {
         TypesValType::Bool => Ok(FormatValType::Bool),
         TypesValType::S8 => Ok(FormatValType::S8),
@@ -612,15 +612,15 @@ mod tests {
 
     #[test]
     fn test_valtype_conversion() {
-        use wrt_foundation::DefaultMemoryProvider;
+        use wrt_foundation::safe_memory::NoStdProvider<65536>;
 
         // Test bool conversion
-        let bool_type = TypesValType::<DefaultMemoryProvider>::Bool;
+        let bool_type = TypesValType::<NoStdProvider::<65536>>::Bool;
         let format_type = convert_valtype_to_format(&bool_type).unwrap();
         assert!(matches!(format_type, FormatValType::Bool));
 
         let converted_back =
-            convert_format_to_valtype::<DefaultMemoryProvider>(&format_type).unwrap();
+            convert_format_to_valtype::<NoStdProvider::<65536>>(&format_type).unwrap();
         assert!(matches!(converted_back, TypesValType::Bool));
     }
 }

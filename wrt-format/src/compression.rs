@@ -159,7 +159,11 @@ pub fn rle_decode(input: &[u8]) -> Result<Vec<u8>> {
 #[cfg(not(any(feature = "std")))]
 pub fn rle_encode<P: MemoryProvider + Clone + Default + Eq>(data: &[u8]) -> Result<WasmVec<u8, P>> {
     let mut result = WasmVec::new(P::default()).map_err(|_| {
-        Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Failed to create result vector")
+        Error::new(
+            ErrorCategory::Memory,
+            codes::MEMORY_ERROR,
+            "Failed to create result vector",
+        )
     })?;
     let mut i = 0;
 
@@ -176,13 +180,25 @@ pub fn rle_encode<P: MemoryProvider + Clone + Default + Eq>(data: &[u8]) -> Resu
         if run_length >= 4 {
             // Encode as RLE: [0x00, count, value]
             result.push(0x00).map_err(|_| {
-                Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Buffer overflow")
+                Error::new(
+                    ErrorCategory::Memory,
+                    codes::MEMORY_ERROR,
+                    "Buffer overflow",
+                )
             })?;
             result.push(run_length as u8).map_err(|_| {
-                Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Buffer overflow")
+                Error::new(
+                    ErrorCategory::Memory,
+                    codes::MEMORY_ERROR,
+                    "Buffer overflow",
+                )
             })?;
             result.push(current).map_err(|_| {
-                Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Buffer overflow")
+                Error::new(
+                    ErrorCategory::Memory,
+                    codes::MEMORY_ERROR,
+                    "Buffer overflow",
+                )
             })?;
             i += run_length;
         } else {
@@ -190,11 +206,19 @@ pub fn rle_encode<P: MemoryProvider + Clone + Default + Eq>(data: &[u8]) -> Resu
             // [count, byte1, byte2, ...]
             let literal_length = cmp::min(255, data.len() - i);
             result.push(literal_length as u8).map_err(|_| {
-                Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Buffer overflow")
+                Error::new(
+                    ErrorCategory::Memory,
+                    codes::MEMORY_ERROR,
+                    "Buffer overflow",
+                )
             })?;
             for j in 0..literal_length {
                 result.push(data[i + j]).map_err(|_| {
-                    Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Buffer overflow")
+                    Error::new(
+                        ErrorCategory::Memory,
+                        codes::MEMORY_ERROR,
+                        "Buffer overflow",
+                    )
                 })?;
             }
             i += literal_length;
@@ -216,12 +240,20 @@ pub fn rle_decode<P: MemoryProvider + Clone + Default + Eq>(
 ) -> Result<WasmVec<u8, P>> {
     if input.is_empty() {
         return WasmVec::new(P::default()).map_err(|_| {
-            Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Failed to create result vector")
+            Error::new(
+                ErrorCategory::Memory,
+                codes::MEMORY_ERROR,
+                "Failed to create result vector",
+            )
         });
     }
 
     let mut result = WasmVec::new(P::default()).map_err(|_| {
-        Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Failed to create result vector")
+        Error::new(
+            ErrorCategory::Memory,
+            codes::MEMORY_ERROR,
+            "Failed to create result vector",
+        )
     })?;
     let mut i = 0;
 
@@ -253,7 +285,11 @@ pub fn rle_decode<P: MemoryProvider + Clone + Default + Eq>(
 
             for _ in 0..count {
                 result.push(value).map_err(|_| {
-                    Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Buffer overflow")
+                    Error::new(
+                        ErrorCategory::Memory,
+                        codes::MEMORY_ERROR,
+                        "Buffer overflow",
+                    )
                 })?;
             }
         } else {
@@ -269,7 +305,11 @@ pub fn rle_decode<P: MemoryProvider + Clone + Default + Eq>(
 
             for j in 0..count {
                 result.push(input[i + j]).map_err(|_| {
-                    Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Buffer overflow")
+                    Error::new(
+                        ErrorCategory::Memory,
+                        codes::MEMORY_ERROR,
+                        "Buffer overflow",
+                    )
                 })?;
             }
             i += count;
@@ -282,7 +322,9 @@ pub fn rle_decode<P: MemoryProvider + Clone + Default + Eq>(
 #[cfg(test)]
 mod tests {
     #[cfg(all(not(feature = "std")))]
-    use std::vec;
+    extern crate alloc;
+    #[cfg(all(not(feature = "std")))]
+    use alloc::vec;
     #[cfg(feature = "std")]
     use std::vec;
 

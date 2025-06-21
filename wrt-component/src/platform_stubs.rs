@@ -1,5 +1,5 @@
-// Platform stubs for Agent C independent development
-// These will be replaced with real implementations during integration
+// Platform stubs for component module development
+// These provide the interface to the platform module's types
 
 use crate::foundation_stubs::AsilLevel;
 
@@ -40,14 +40,14 @@ impl Default for ComprehensivePlatformLimits {
 }
 
 pub trait ComprehensiveLimitProvider: Send + Sync {
-    fn discover_limits(&self) -> Result<ComprehensivePlatformLimits, wrt_error::Error>;
+    fn discover_limits(&self) -> core::result::Result<ComprehensivePlatformLimits, wrt_error::Error>;
     fn platform_id(&self) -> PlatformId;
 }
 
 pub struct DefaultLimitProvider;
 
 impl ComprehensiveLimitProvider for DefaultLimitProvider {
-    fn discover_limits(&self) -> Result<ComprehensivePlatformLimits, wrt_error::Error> {
+    fn discover_limits(&self) -> core::result::Result<ComprehensivePlatformLimits, wrt_error::Error> {
         Ok(ComprehensivePlatformLimits::default())
     }
     

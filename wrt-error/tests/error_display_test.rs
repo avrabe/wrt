@@ -131,14 +131,17 @@ mod tests {
     fn test_complex_error_types_display() {
         // Test error types with more complex Display logic
 
-        let wasm30_construct =
-            UnsupportedWasm30ConstructInWasm20Module { construct_name: "advanced_feature" };
+        let wasm30_construct = UnsupportedWasm30ConstructInWasm20Module {
+            construct_name: "advanced_feature",
+        };
         let display = wasm30_construct.to_string();
         assert!(!display.is_empty());
         assert!(display.contains("Unsupported Wasm 3.0 construct"));
         assert!(display.contains("advanced_feature"));
 
-        let wasm30_instruction = InvalidWasm30InstructionImmediate { instruction: "complex.instr" };
+        let wasm30_instruction = InvalidWasm30InstructionImmediate {
+            instruction: "complex.instr",
+        };
         let display = wasm30_instruction.to_string();
         assert!(!display.is_empty());
         assert!(display.contains("Invalid Wasm 3.0 instruction immediate"));
@@ -150,7 +153,10 @@ mod tests {
         assert!(display.contains("Malformed Wasm 3.0 TypeInformation section"));
         assert!(display.contains("corrupt data"));
 
-        let invalid_memory_wasm30 = InvalidMemoryIndexWasm30 { index: 5, max_memories: 3 };
+        let invalid_memory_wasm30 = InvalidMemoryIndexWasm30 {
+            index: 5,
+            max_memories: 3,
+        };
         let display = invalid_memory_wasm30.to_string();
         assert!(!display.is_empty());
         assert!(display.contains("Invalid Wasm 3.0 memory index"));
@@ -191,35 +197,45 @@ mod tests {
         assert!(display.contains("Invalid import/export kind for Wasm 1.1"));
         assert!(display.contains("0xFF"));
 
-        let unsupported_wasm20 = UnsupportedWasm20Feature { feature_name: "threads" };
+        let unsupported_wasm20 = UnsupportedWasm20Feature {
+            feature_name: "threads",
+        };
         let display = unsupported_wasm20.to_string();
         assert!(!display.is_empty());
         assert!(display.contains("Unsupported Wasm 2.0 feature"));
         assert!(display.contains("threads"));
 
-        let invalid_ref_type = InvalidReferenceTypeUsage { message: "funcref in wrong context" };
+        let invalid_ref_type = InvalidReferenceTypeUsage {
+            message: "funcref in wrong context",
+        };
         let display = invalid_ref_type.to_string();
         assert!(!display.is_empty());
         assert!(display.contains("Invalid reference type usage"));
         assert!(display.contains("funcref in wrong context"));
 
-        let bulk_op_error =
-            BulkOperationError { operation_name: "memory.copy", reason: "overlapping regions" };
+        let bulk_op_error = BulkOperationError {
+            operation_name: "memory.copy",
+            reason: "overlapping regions",
+        };
         let display = bulk_op_error.to_string();
         assert!(!display.is_empty());
         assert!(display.contains("Bulk operation error"));
         assert!(display.contains("memory.copy"));
         assert!(display.contains("overlapping regions"));
 
-        let simd_error =
-            SimdOperationError { instruction_name: "v128.load", reason: "misaligned address" };
+        let simd_error = SimdOperationError {
+            instruction_name: "v128.load",
+            reason: "misaligned address",
+        };
         let display = simd_error.to_string();
         assert!(!display.is_empty());
         assert!(display.contains("SIMD operation error"));
         assert!(display.contains("v128.load"));
         assert!(display.contains("misaligned address"));
 
-        let tail_call_error = TailCallError { message: "stack overflow" };
+        let tail_call_error = TailCallError {
+            message: "stack overflow",
+        };
         let display = tail_call_error.to_string();
         assert!(!display.is_empty());
         assert!(display.contains("Tail call error"));
@@ -243,7 +259,10 @@ mod tests {
         ];
 
         for display in empty_string_tests {
-            assert!(!display.is_empty(), "Display should handle empty strings gracefully");
+            assert!(
+                !display.is_empty(),
+                "Display should handle empty strings gracefully"
+            );
         }
 
         // Test with special characters
@@ -254,7 +273,10 @@ mod tests {
         ];
 
         for display in special_char_tests {
-            assert!(!display.is_empty(), "Display should handle special characters");
+            assert!(
+                !display.is_empty(),
+                "Display should handle special characters"
+            );
         }
     }
 }

@@ -328,21 +328,20 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentValueStore<P
         S: AsRef<str> + Debug,
         P: Clone,
     {
-        let mut flag_values = BoundedVec::<
-            (WasmName<MAX_WASM_NAME_LENGTH, P>, bool),
-            MAX_COMPONENT_FLAGS,
-            P,
-        >::new(self.provider.clone())
-        .map_err(|_e| {
-            Error::new(
-                wrt_error::ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_ERROR,
-                // #[cfg(feature = "std")]
-                // format!("Failed to create BoundedVec for flags: {:?}", e), // format! requires
-                // Binary std/no_std choice
-                "Failed to create BoundedVec for flags",
+        let mut flag_values =
+            BoundedVec::<(WasmName<MAX_WASM_NAME_LENGTH, P>, bool), MAX_COMPONENT_FLAGS, P>::new(
+                self.provider.clone(),
             )
-        })?;
+            .map_err(|_e| {
+                Error::new(
+                    wrt_error::ErrorCategory::Memory,
+                    codes::MEMORY_ALLOCATION_ERROR,
+                    // #[cfg(feature = "std")]
+                    // format!("Failed to create BoundedVec for flags: {:?}", e), // format! requires
+                    // Binary std/no_std choice
+                    "Failed to create BoundedVec for flags",
+                )
+            })?;
 
         for (name_str, val) in flags {
             let name =

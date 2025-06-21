@@ -60,7 +60,10 @@ fn test_cfi_engine_creation() {
 #[test]
 fn test_cfi_engine_creation_with_default() {
     let result = new_cfi_protected_engine();
-    assert!(result.is_ok(), "CFI engine creation with defaults should succeed");
+    assert!(
+        result.is_ok(),
+        "CFI engine creation with defaults should succeed"
+    );
 }
 
 #[test]
@@ -97,11 +100,11 @@ fn test_simple_wasm_module_load() {
     match result {
         Ok(protected_module) => {
             assert!(!protected_module.cfi_metadata.functions.is_empty());
-        }
+        },
         Err(_) => {
             // Expected for our minimal test WASM module
             // In production, this should be a valid module
-        }
+        },
     }
 }
 

@@ -128,7 +128,9 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
             size: 8, // ptr + len
             alignment: 4,
             offset: None,
-            details: CanonicalLayoutDetails::String { encoding: StringEncoding::UTF8 },
+            details: CanonicalLayoutDetails::String {
+                encoding: StringEncoding::UTF8,
+            },
         },
         ValType::Record(fields) => {
             let mut field_layouts = Vec::with_capacity(fields.len());
@@ -166,9 +168,11 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 size: total_size,
                 alignment: max_alignment,
                 offset: None,
-                details: CanonicalLayoutDetails::Record { fields: field_layouts },
+                details: CanonicalLayoutDetails::Record {
+                    fields: field_layouts,
+                },
             }
-        }
+        },
         ValType::Variant(cases) => {
             let case_count = cases.len();
             let tag_size = if case_count <= 256 {
@@ -215,7 +219,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                     cases: case_layouts,
                 },
             }
-        }
+        },
         ValType::List(_element_type) => {
             // element_type is ValTypeRef, needs type store to resolve
             let element_layout = CanonicalLayout {
@@ -233,7 +237,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                     fixed_length: None,
                 },
             }
-        }
+        },
         ValType::FixedList(_element_type, length) => {
             // element_type is ValTypeRef, needs type store to resolve
             let element_layout = CanonicalLayout {
@@ -252,7 +256,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                     fixed_length: Some(*length),
                 },
             }
-        }
+        },
         ValType::Tuple(elements) => {
             let mut field_layouts = Vec::with_capacity(elements.len());
             let mut total_size = 0;
@@ -287,9 +291,11 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 size: total_size,
                 alignment: max_alignment,
                 offset: None,
-                details: CanonicalLayoutDetails::Record { fields: field_layouts },
+                details: CanonicalLayoutDetails::Record {
+                    fields: field_layouts,
+                },
             }
-        }
+        },
         ValType::Flags(names) => {
             let byte_count = names.len().div_ceil(8);
             CanonicalLayout {
@@ -298,7 +304,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Primitive,
             }
-        }
+        },
         ValType::Enum(_) => {
             // Enums are represented as a tag
             CanonicalLayout {
@@ -307,7 +313,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Primitive,
             }
-        }
+        },
         ValType::Option(_inner_type) => {
             // Option type is equivalent to variant with None and Some cases
             // inner_type is ValTypeRef, needs type store to resolve
@@ -335,7 +341,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                     ],
                 },
             }
-        }
+        },
         ValType::Result { ok: _, err: _ } => {
             // Result type now has ok and err as Option<ValTypeRef>
             // needs type store to resolve
@@ -357,10 +363,13 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Variant {
                     tag_size: tag_size as u8,
-                    cases: vec![("Ok".to_string(), Some(ok_layout)), ("Err".to_string(), None)],
+                    cases: vec![
+                        ("Ok".to_string(), Some(ok_layout)),
+                        ("Err".to_string(), None),
+                    ],
                 },
             }
-        }
+        },
         ValType::Own(_) | ValType::Borrow(_) => {
             // Resource handles are represented as 32-bit integers
             CanonicalLayout {
@@ -369,7 +378,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Resource { handle_bits: 32 },
             }
-        }
+        },
         ValType::ErrorContext => {
             // Error context represented as a structure
             CanonicalLayout {
@@ -378,7 +387,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Primitive,
             }
-        }
+        },
         ValType::Ref(_) => {
             // Reference types are represented as 32-bit indices
             CanonicalLayout {
@@ -387,7 +396,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Primitive,
             }
-        }
+        },
     }
 }
 

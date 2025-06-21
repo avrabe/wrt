@@ -22,9 +22,14 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       
+      - name: Install cargo-wrt
+        run: |
+          cargo build --package cargo-wrt
+          cargo install --path cargo-wrt
+      
       - name: Test documentation examples
         run: |
-          cargo test --doc
+          cargo-wrt test --no-doc-tests
           cargo test --test doc_examples_test
       
       - name: Build example projects

@@ -25,6 +25,7 @@ pub fn format_block_type_to_block_type(format_block_type: &FormatBlockType) -> B
     match format_block_type {
         FormatBlockType::Empty => BlockType::Value(None),
         FormatBlockType::ValueType(value_type) => BlockType::Value(Some(*value_type)),
+        #[cfg(any(feature = "std", feature = "alloc"))]
         FormatBlockType::FuncType(_func_type) => BlockType::FuncType(0), // TODO: proper type
         // index mapping
         FormatBlockType::TypeIndex(idx) => BlockType::FuncType(*idx),
@@ -106,7 +107,10 @@ pub fn format_limits_to_wrt_limits(
         }
     }
 
-    Ok(wrt_foundation::types::Limits { min: min_u32, max: max_u32 })
+    Ok(wrt_foundation::types::Limits {
+        min: min_u32,
+        max: max_u32,
+    })
 }
 
 /// Convert from wrt_foundation::Limits to format-specific Limits
@@ -127,7 +131,12 @@ pub fn wrt_limits_to_format_limits(
     shared: bool,
     memory64: bool,
 ) -> Limits {
-    Limits { min: limits.min as u64, max: limits.max.map(|m| m as u64), shared, memory64 }
+    Limits {
+        min: limits.min as u64,
+        max: limits.max.map(|m| m as u64),
+        shared,
+        memory64,
+    }
 }
 
 /// A shorthand function for converting wrt_foundation::Limits to format Limits
@@ -282,7 +291,10 @@ mod tests {
         let format_type_idx_2 = block_type_to_format_block_type(&block_type_idx);
 
         assert!(matches!(format_empty_2, FormatBlockType::Empty));
-        assert!(matches!(format_value_2, FormatBlockType::ValueType(ValueType::I32)));
+        assert!(matches!(
+            format_value_2,
+            FormatBlockType::ValueType(ValueType::I32)
+        ));
         assert!(matches!(format_type_idx_2, FormatBlockType::TypeIndex(42)));
     }
 
@@ -290,7 +302,10 @@ mod tests {
     fn test_limits_conversion() {
         // Test wrt-foundation Limits -> FormatLimits
         let wrt_limits_min = wrt_foundation::types::Limits { min: 10, max: None };
-        let wrt_limits_both = wrt_foundation::types::Limits { min: 10, max: Some(20) };
+        let wrt_limits_both = wrt_foundation::types::Limits {
+            min: 10,
+            max: Some(20),
+        };
 
         let format_limits_min = wrt_limits_to_format_limits(&wrt_limits_min, false, false);
         let format_limits_both = wrt_limits_to_format_limits(&wrt_limits_both, false, false);

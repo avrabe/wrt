@@ -9,6 +9,9 @@ documentation = "https://docs.rs/wrt-logging"
 keywords = ["wasm", "webassembly", "runtime", "logging", "component-model"]
 categories = ["wasm", "no-std", "development-tools::debugging"]
 
+[lints]
+workspace = true
+
 [dependencies]
 wrt-error = { workspace = true, default-features = false }
 wrt-host = { workspace = true, default-features = false }
@@ -25,46 +28,25 @@ std = ["wrt-host/std", "wrt-foundation/std", "log"]
 # For compatibility with verification script
 # This is a no-op since the crate is no_std by default
 no_std = []
+
+# Allocation support for no_std environments
+alloc = ["wrt-foundation/alloc", "wrt-host/alloc"]
 kani = ["wrt-host/kani"]
 
+# Safety level presets using capability-based features
+qm = ["wrt-foundation/dynamic-allocation"]
+asil-a = ["wrt-foundation/bounded-collections"]
+asil-b = ["wrt-foundation/bounded-collections"]
+asil-c = ["wrt-foundation/static-memory-safety"]
+asil-d = ["wrt-foundation/asil-d"]
+
+# Legacy compatibility features
+safe-memory = ["asil-b"]
+safety-asil-b = ["asil-b"]
+safety-asil-c = ["asil-c"]
+safety-asil-d = ["asil-d"]
+
 # Disable panic handler for library builds to avoid conflicts
-disable-panic-handler = []
-
-[lints.rust]
-unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] }
-# Rule 1
-# pointer_cast is not a valid Rust lint
-# Rule 9
-missing_docs = "deny"
-unsafe_code = "forbid"
-
-[lints.clippy]
-# Rule 1: Language subset
-inline_asm_x86_att_syntax = "warn"
-transmute_ptr_to_ref = "deny"
-type_id = "deny"
-dyn_trait = "warn"
-float_arithmetic = "warn"
-# Rule 2: Unsafe usage
-ptr_offset_with_cast = "warn"
-# Rule 3: Error handling & panics
-unwrap_used = "warn"
-panic = "warn" # Also covers Rule 4
-result_unit_err = "warn"
-let_underscore_drop = "warn"
-must_use_candidate = "warn"
-must_use_unit = "warn"
-# Rule 4: Control-flow soundness
-match_wildcard_for_single_variants = "warn"
-never_loop = "warn"
-unreachable = "warn" # Also related to Rule 4
-# Rule 5: Memory & concurrency safety
-static_mut_reference = "deny"
-arc_mutate = "deny"
-# Rule 8: Static analysis gates (CI)
-pedantic = "warn"
-# Rule 9: Documentation
-debug_assert_with_mut_call = "warn"
 
 [package.metadata.docs.rs]
 all-features = true

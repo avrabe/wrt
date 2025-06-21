@@ -14,7 +14,6 @@
 //! WebAssembly Component Model, including `thread.spawn_ref`, `thread.spawn_indirect`,
 //! and `thread.join` operations.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -39,7 +38,7 @@ use wrt_foundation::BoundedString;
 
 // Type aliases for no_std compatibility
 #[cfg(not(feature = "std"))]
-type String = BoundedString<256, NoStdProvider<65536>>;
+type ThreadingString = BoundedString<256, NoStdProvider<65536>>;
 
 #[cfg(not(feature = "std"))]
 // For no_std, use a simpler ComponentValue representation
@@ -253,7 +252,7 @@ impl AdvancedThread {
             #[cfg(feature = "std")]
             child_threads: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            child_threads: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            child_threads: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
         }
     }
 
@@ -727,8 +726,8 @@ pub mod advanced_threading_helpers {
     }
 
     #[cfg(not(any(feature = "std", )))]
-    pub fn cancel_child_threads(parent_id: AdvancedThreadId) -> Result<BoundedVec<AdvancedThreadId, MAX_THREADS>, NoStdProvider<65536>> {
-        let mut cancelled = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+    pub fn cancel_child_threads(parent_id: AdvancedThreadId) -> core::result::Result<BoundedVec<AdvancedThreadId, MAX_THREADS, NoStdProvider<65536>>, NoStdProvider<65536>> {
+        let mut cancelled = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
         
         AdvancedThreadingBuiltins::with_registry_mut(|registry| {
             if let Some(parent) = registry.get_thread(parent_id) {

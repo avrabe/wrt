@@ -10,7 +10,7 @@
 //! The extended constant expressions proposal adds support for more
 //! instructions in constant contexts.
 
-use crate::prelude::{BoundedCapacity, BoundedVec, Debug, PartialEq};
+use crate::prelude::{Debug, PartialEq, BoundedVec};
 use wrt_error::{Error, Result};
 use wrt_foundation::{
     types::{RefType, ValueType},

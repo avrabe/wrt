@@ -27,11 +27,13 @@ pub fn read_name_as_string(data: &[u8], offset: usize) -> Result<(String, usize)
         #[cfg(not(feature = "std"))]
         Ok(s) => {
             use wrt_foundation::BoundedString;
-            BoundedString::from_str(s).map_err(|_| Error::new(
-                ErrorCategory::Parse,
-                codes::PARSE_ERROR,
-                "String too long for bounded storage",
-            ))?
+            BoundedString::from_str(s).map_err(|_| {
+                Error::new(
+                    ErrorCategory::Parse,
+                    codes::PARSE_ERROR,
+                    "String too long for bounded storage",
+                )
+            })?
         },
         Err(_) => {
             return Err(Error::new(
@@ -39,7 +41,7 @@ pub fn read_name_as_string(data: &[u8], offset: usize) -> Result<(String, usize)
                 codes::PARSE_ERROR,
                 "Invalid UTF-8 in name",
             ))
-        }
+        },
     };
 
     Ok((name, bytes_read))
@@ -110,7 +112,7 @@ pub fn detect_binary_type(data: &[u8]) -> Result<BinaryType> {
                     "Unsupported WebAssembly version",
                 ))
             }
-        }
+        },
         // Component magic "\0cmp"
         [0x00, 0x63, 0x6D, 0x70] => {
             if data[4..8] == [0x01, 0x00, 0x00, 0x00] {
@@ -122,8 +124,12 @@ pub fn detect_binary_type(data: &[u8]) -> Result<BinaryType> {
                     "Unsupported Component version",
                 ))
             }
-        }
-        _ => Err(Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Invalid binary format")),
+        },
+        _ => Err(Error::new(
+            ErrorCategory::Parse,
+            codes::PARSE_ERROR,
+            "Invalid binary format",
+        )),
     }
 }
 

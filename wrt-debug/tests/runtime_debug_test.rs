@@ -78,7 +78,11 @@ mod runtime_debug_tests {
             name: None, // Would come from .debug_str
             var_type: BasicType::SignedInt(4),
             location: DwarfLocation::Register(0),
-            scope: VariableScope { start_pc: 0x1000, end_pc: 0x2000, depth: 0 },
+            scope: VariableScope {
+                start_pc: 0x1000,
+                end_pc: 0x2000,
+                depth: 0,
+            },
             file_index: 1,
             line: 42,
         };
@@ -87,7 +91,11 @@ mod runtime_debug_tests {
             name: None,
             var_type: BasicType::UnsignedInt(8),
             location: DwarfLocation::Register(2),
-            scope: VariableScope { start_pc: 0x1000, end_pc: 0x2000, depth: 0 },
+            scope: VariableScope {
+                start_pc: 0x1000,
+                end_pc: 0x2000,
+                depth: 0,
+            },
             file_index: 1,
             line: 43,
         };
@@ -96,7 +104,9 @@ mod runtime_debug_tests {
         inspector.add_variable(var2).unwrap();
 
         // Create mock memory
-        let memory = MockMemory { data: vec![0; 0x10000] };
+        let memory = MockMemory {
+            data: vec![0; 0x10000],
+        };
 
         // Get live variables at PC
         let live_vars = inspector.get_live_variables(0x1000, &state, &memory);
@@ -203,7 +213,13 @@ mod runtime_debug_tests {
             .add_line_mapping(
                 0x1000,
                 0x1010,
-                LineInfo { file_index: 1, line: 10, column: 0, is_stmt: true, end_sequence: false },
+                LineInfo {
+                    file_index: 1,
+                    line: 10,
+                    column: 0,
+                    is_stmt: true,
+                    end_sequence: false,
+                },
             )
             .unwrap();
 
@@ -211,7 +227,13 @@ mod runtime_debug_tests {
             .add_line_mapping(
                 0x1010,
                 0x1020,
-                LineInfo { file_index: 1, line: 11, column: 0, is_stmt: true, end_sequence: false },
+                LineInfo {
+                    file_index: 1,
+                    line: 11,
+                    column: 0,
+                    is_stmt: true,
+                    end_sequence: false,
+                },
             )
             .unwrap();
 
@@ -258,7 +280,11 @@ mod runtime_debug_tests {
                 name: None,
                 var_type: BasicType::SignedInt(4),
                 location: DwarfLocation::Register(0),
-                scope: VariableScope { start_pc: 0x1000, end_pc: 0x2000, depth: 0 },
+                scope: VariableScope {
+                    start_pc: 0x1000,
+                    end_pc: 0x2000,
+                    depth: 0,
+                },
                 file_index: 1,
                 line: 42,
             })
@@ -323,7 +349,9 @@ mod runtime_debug_tests {
             func_idx: None,
         };
 
-        let memory = MockMemory { data: vec![0; 0x10000] };
+        let memory = MockMemory {
+            data: vec![0; 0x10000],
+        };
 
         let mut inspector = MemoryInspector::new();
         inspector.attach(&memory);

@@ -1,0 +1,127 @@
+# KANI configuration for WRT integration tests
+# This configuration provides comprehensive formal verification settings
+# for safety-critical WebAssembly runtime components
+
+[kani]
+# Enable all unstable features for comprehensive verification
+enable-unstable = true
+
+# Use CaDiCal SAT solver for better performance on complex proofs
+solver = "cadical"
+
+# Enable parallel verification for faster results
+parallel = 4
+
+# Set default unwind limit for loops
+default-unwind = 5
+
+# Enable concrete playback for debugging failed proofs
+concrete-playback = "inplace"
+
+# Enable stubbing for external dependencies
+stubbing-enabled = true
+
+# Output format for CI integration
+output-format = "terse"
+
+# Memory model configuration
+[kani.memory]
+# Enable memory safety checks
+check-memory-safety = true
+
+# Set maximum object size for verification (1MB)
+max-object-size = 1048576
+
+# Enable pointer validity checks
+check-pointer-validity = true
+
+# Verification profiles for different ASIL levels
+[profile.asil-a]
+# Basic verification for ASIL-A components
+default-unwind = 3
+parallel = 2
+solver = "minisat"
+
+[profile.asil-b]
+# Enhanced verification for ASIL-B components
+default-unwind = 4
+parallel = 3
+solver = "cadical"
+check-undefined-behavior = true
+
+[profile.asil-c]
+# Comprehensive verification for ASIL-C components (default)
+default-unwind = 5
+parallel = 4
+solver = "cadical"
+check-undefined-behavior = true
+check-arithmetic-overflow = true
+
+[profile.asil-d]
+# Maximum verification for ASIL-D components
+default-unwind = 7
+parallel = 8
+solver = "cadical"
+check-undefined-behavior = true
+check-arithmetic-overflow = true
+check-memory-initialization = true
+enable-coverage = true
+
+# Harness-specific configurations
+[[harness]]
+name = "kani_verify_memory_budget_never_exceeded"
+unwind = 10
+profile = "asil-c"
+
+[[harness]]
+name = "kani_verify_hierarchical_budget_consistency"
+unwind = 8
+profile = "asil-c"
+
+[[harness]]
+name = "kani_verify_atomic_compare_and_swap"
+unwind = 5
+profile = "asil-d"
+
+[[harness]]
+name = "kani_verify_mutex_mutual_exclusion"
+unwind = 7
+profile = "asil-d"
+
+[[harness]]
+name = "kani_verify_resource_lifecycle_correctness"
+unwind = 6
+profile = "asil-c"
+
+[[harness]]
+name = "kani_verify_cross_component_memory_isolation"
+unwind = 8
+profile = "asil-d"
+
+[[harness]]
+name = "kani_verify_end_to_end_safety_preservation"
+unwind = 10
+profile = "asil-d"
+
+# Stub configurations for external dependencies
+[[stub]]
+original = "std::alloc::alloc"
+replacement = "wrt_foundation::safe_memory::bounded_alloc"
+
+[[stub]]
+original = "std::alloc::dealloc"
+replacement = "wrt_foundation::safe_memory::bounded_dealloc"
+
+# Assumptions for bounded verification
+[assumptions]
+# Maximum memory size for verification (16MB)
+max-memory = 16777216
+
+# Maximum number of threads for concurrent verification
+max-threads = 4
+
+# Maximum recursion depth
+max-recursion = 10
+
+# Maximum number of allocations per test
+max-allocations = 1000

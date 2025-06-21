@@ -58,3 +58,13 @@ Topics
    migration_guides
    adding_platform_support
    external_platform_crates
+
+Documentation Guidelines
+------------------------
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Documentation:
+
+   documentation_style_guide
+   documentation_maintenance_checklist

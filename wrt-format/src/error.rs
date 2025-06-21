@@ -89,12 +89,6 @@ pub fn wrt_type_error(message: &'static str) -> Error {
     Error::type_error(message)
 }
 
-/// Create a parse error with the given message
-#[deprecated(since = "0.2.0", note = "use Error::parse_error instead")]
-pub fn wrt_parse_error(message: &'static str) -> Error {
-    parse_error(message)
-}
-
 #[cfg(test)]
 mod tests {
     use wrt_error::{ErrorCategory, ErrorSource};

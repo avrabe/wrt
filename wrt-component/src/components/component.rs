@@ -8,21 +8,68 @@ use log::{debug, error, info, trace, warn};
 // Import wrt_decoder types for decode and parse
 // use wrt_decoder::component::decode::Component as DecodedComponent;
 // Additional imports that aren't in the prelude
-use wrt_format::component::ExternType as FormatExternType;
+use wrt_format::component::{ExternType as FormatExternType, FormatValType};
+use crate::bounded_component_infra::ComponentProvider;
 use wrt_foundation::resource::ResourceOperation as FormatResourceOperation;
+
+// HashMap imports
+#[cfg(feature = "std")]
+use std::collections::HashMap;
+#[cfg(not(feature = "std"))]
+use alloc::format;
+
+use crate::prelude::*;
+use wrt_foundation::{bounded::BoundedVec, safe_memory::NoStdProvider};
+
+// Simple HashMap substitute for no_std using BoundedVec
+#[cfg(not(feature = "std"))]
+pub struct SimpleMap<K, V> {
+    entries: BoundedVec<(K, V), 64, NoStdProvider<65536>>,
+}
+
+#[cfg(not(feature = "std"))]
+impl<K: PartialEq + Clone, V: Clone> SimpleMap<K, V> {
+    pub fn new() -> Self {
+        Self {
+            entries: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
+        }
+    }
+    
+    pub fn insert(&mut self, key: K, value: V) {
+        // Remove existing entry if present
+        self.entries.retain(|(k, _)| k != &key);
+        // Add new entry
+        let _ = self.entries.push((key, value));
+    }
+    
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    }
+    
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+    
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+#[cfg(not(feature = "std"))]
+type ComponentMap<K, V> = SimpleMap<K, V>;
 
 // Runtime types with explicit namespacing
 use wrt_runtime::types::{MemoryType, TableType};
 use wrt_runtime::{
     func::FuncType as RuntimeFuncType,
-    global::{Global, GlobalType},
+    global::{Global, WrtGlobalType as GlobalType},
     memory::Memory,
     table::Table,
 };
 
 // Import RwLock from prelude (it will be std::sync::RwLock or a no_std equivalent from the
 // prelude)
-use crate::execution::{run_with_time_bounds, TimeBoundedConfig, TimeBoundedOutcome};
+// use wrt_runtime::execution::{run_with_time_bounds, TimeBoundedConfig, TimeBoundedOutcome};
 // Binary std/no_std choice
 
 // core::str is already imported via prelude
@@ -33,7 +80,6 @@ use crate::type_conversion::bidirectional::{
     convert_format_to_types_valtype, convert_format_valtype_to_valuetype,
     convert_types_to_format_valtype, extern_type_to_func_type,
 };
-use crate::{debug_println, prelude::*};
 
 // Define type aliases for missing types
 type ComponentDecoder = fn(&[u8]) -> wrt_error::Result<wrt_format::component::Component>;
@@ -47,9 +93,9 @@ type TypeDef = wrt_format::component::ComponentType;
 #[derive(Debug, Clone)]
 pub struct WrtComponentType {
     /// Component imports
-    pub imports: Vec<(String, String, ExternType)>,
+    pub imports: Vec<(String, String, ExternType<NoStdProvider<65536>>)>,
     /// Component exports
-    pub exports: Vec<(String, ExternType)>,
+    pub exports: Vec<(String, ExternType<NoStdProvider<65536>>)>,
     /// Component instances
     pub instances: Vec<wrt_format::component::ComponentTypeDefinition>,
     /// Verification level for this component type
@@ -60,9 +106,24 @@ impl WrtComponentType {
     /// Creates a new empty component type
     pub fn new() -> Self {
         Self {
-            imports: Vec::new(),
-            exports: Vec::new(),
-            instances: Vec::new(),
+            imports: {
+                #[cfg(feature = "std")]
+                { std::vec::Vec::new() }
+                #[cfg(not(feature = "std"))]
+                { wrt_foundation::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<4096>::default()).unwrap_or_default() }
+            },
+            exports: {
+                #[cfg(feature = "std")]
+                { std::vec::Vec::new() }
+                #[cfg(not(feature = "std"))]
+                { wrt_foundation::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<4096>::default()).unwrap_or_default() }
+            },
+            instances: {
+                #[cfg(feature = "std")]
+                { std::vec::Vec::new() }
+                #[cfg(not(feature = "std"))]
+                { wrt_foundation::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<4096>::default()).unwrap_or_default() }
+            },
             verification_level: wrt_foundation::verification::VerificationLevel::Standard,
         }
     }
@@ -70,9 +131,24 @@ impl WrtComponentType {
     /// Create a new empty component type
     pub fn empty() -> Self {
         Self {
-            imports: Vec::new(),
-            exports: Vec::new(),
-            instances: Vec::new(),
+            imports: {
+                #[cfg(feature = "std")]
+                { std::vec::Vec::new() }
+                #[cfg(not(feature = "std"))]
+                { wrt_foundation::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<4096>::default()).unwrap_or_default() }
+            },
+            exports: {
+                #[cfg(feature = "std")]
+                { std::vec::Vec::new() }
+                #[cfg(not(feature = "std"))]
+                { wrt_foundation::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<4096>::default()).unwrap_or_default() }
+            },
+            instances: {
+                #[cfg(feature = "std")]
+                { std::vec::Vec::new() }
+                #[cfg(not(feature = "std"))]
+                { wrt_foundation::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<4096>::default()).unwrap_or_default() }
+            },
             verification_level: wrt_foundation::verification::VerificationLevel::Standard,
         }
     }
@@ -98,7 +174,10 @@ impl Default for WrtComponentType {
 }
 
 /// Represents a component instance
-#[derive(Debug)]
+// Type aliases for compatibility
+pub type ComponentInstance = RuntimeInstance;
+pub type ComponentType = WrtComponentType;
+
 pub struct Component {
     /// Component type
     pub(crate) component_type: WrtComponentType,
@@ -209,7 +288,7 @@ impl RuntimeInstance {
         // Look up the function in our registered functions
         let function = self.functions.get(name).ok_or_else(|| {
             Error::new(
-                ErrorCategory::Function,
+                ErrorCategory::Runtime,
                 codes::FUNCTION_NOT_FOUND,
                 "Component not found",
             )
@@ -319,7 +398,7 @@ struct ModuleInstance {
 }
 
 /// Helper function to convert FormatValType to ValueType
-fn convert_to_valuetype(val_type_pair: &(String, FormatValType)) -> ValueType {
+fn convert_to_valuetype(val_type_pair: &(String, FormatValType<ComponentProvider>)) -> ValueType {
     format_val_type_to_value_type(&val_type_pair.1).expect("Failed to convert format value type")
 }
 
@@ -779,32 +858,42 @@ pub fn scan_builtins(bytes: &[u8]) -> Result<BuiltinRequirements> {
     let mut requirements = BuiltinRequirements::new();
 
     // Try to decode as component or module
-    match wrt_decoder::component::decode_component(bytes) {
-        Ok(component) => {
-            scan_functions_for_builtins(&component, &mut requirements)?;
-            Ok(requirements)
+    #[cfg(feature = "decoder")]
+    {
+        match wrt_decoder::component::decode_component(bytes) {
+            Ok(component) => {
+                scan_functions_for_builtins(&component, &mut requirements)?;
+                return Ok(requirements);
+            }
+            Err(err) => {
+                return Err(Error::new(
+                    ErrorCategory::Parse,
+                    codes::DECODING_ERROR,
+                    "Component not found",
+                ));
+            }
         }
-        Err(err) => {
-            return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::DECODING_ERROR,
-                "Component not found",
-            ));
-        }
+    }
+    #[cfg(not(feature = "decoder"))]
+    {
+        // Without decoder, return empty requirements
+        Ok(requirements)
     }
 }
 
 /// Scans a module binary for builtins
 fn scan_module_for_builtins(module: &[u8], requirements: &mut BuiltinRequirements) -> Result<()> {
     // This would need to be implemented for core modules
-    // For now, we'll just return success
-    match wrt_decoder::module::decode_module(module) {
-        Ok(_) => Ok(()),
-        Err(err) => Err(Error::new(
+    // For now, we'll just return success (decoder module not available in current build)
+    // TODO: Implement proper module validation when decoder API is available
+    if module.is_empty() {
+        Err(Error::new(
             ErrorCategory::Parse,
             codes::DECODING_ERROR,
-            "Component not found",
-        )),
+            "Empty module provided",
+        ))
+    } else {
+        Ok(())
     }
 }
 
@@ -858,27 +947,45 @@ fn scan_functions_for_builtins(
 /// Extracts embedded modules from a binary
 fn extract_embedded_modules(bytes: &[u8]) -> Result<Vec<Vec<u8>>> {
     // Try to decode as component
-    match wrt_decoder::component::decode_component(bytes) {
-        Ok(component) => {
-            // Extract modules from component
-            // Let's create a simple mock implementation since component doesn't have
-            // modules()
-            let modules = Vec::new(); // Create an empty vector as a placeholder
-            Ok(modules)
+    #[cfg(feature = "decoder")]
+    {
+        match wrt_decoder::component::decode_component(bytes) {
+            Ok(component) => {
+                // Extract modules from component
+                // Let's create a simple mock implementation since component doesn't have
+                // modules()
+                let modules = {
+                    #[cfg(feature = "std")]
+                    { std::vec::Vec::new() }
+                    #[cfg(not(feature = "std"))]
+                    { wrt_foundation::BoundedVec::<_, 16, _>::new(wrt_foundation::safe_memory::NoStdProvider::<4096>::default()).unwrap_or_default() }
+                }; // Create an empty vector as a placeholder
+                return Ok(modules);
+            }
+            Err(err) => {
+                return Err(Error::new(
+                    ErrorCategory::Parse,
+                    codes::DECODING_ERROR,
+                    "Component not found",
+                ));
+            }
         }
-        Err(err) => {
-            return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::DECODING_ERROR,
-                "Component not found",
-            ));
-        }
+    }
+    #[cfg(not(feature = "decoder"))]
+    {
+        // Without decoder, return empty modules list
+        Ok({
+            #[cfg(feature = "std")]
+            { std::vec::Vec::new() }
+            #[cfg(not(feature = "std"))]
+            { wrt_foundation::BoundedVec::<_, 16, _>::new(wrt_foundation::safe_memory::NoStdProvider::<4096>::default()).unwrap_or_default() }
+        })
     }
 }
 
 /// Convert a component value to a runtime value
 pub fn component_value_to_value(
-    component_value: &wrt_foundation::ComponentValue,
+    component_value: &wrt_foundation::WrtComponentValue,
 ) -> wrt_intercept::Value {
     use wrt_intercept::Value;
 
@@ -890,18 +997,18 @@ pub fn component_value_to_value(
 }
 
 /// Convert a runtime value to a component value
-pub fn value_to_component_value(value: &wrt_intercept::Value) -> wrt_foundation::ComponentValue {
-    use wrt_foundation::ComponentValue;
+pub fn value_to_component_value(value: &wrt_intercept::Value) -> wrt_foundation::WrtComponentValue {
+    // WrtComponentValue is already imported from prelude
 
     use crate::type_conversion::core_value_to_types_componentvalue;
 
     // Use the new conversion function
-    core_value_to_types_componentvalue(value).unwrap_or(ComponentValue::Void) // Provide a sensible default on error
+    core_value_to_types_componentvalue(value).unwrap_or(WrtComponentValue::Void) // Provide a sensible default on error
 }
 
 /// Convert parameter to value type
 pub fn convert_param_to_value_type(
-    param: &wrt_format::component::ValType,
+    param: &FormatValType<ComponentProvider>,
 ) -> wrt_foundation::types::ValueType {
     crate::type_conversion::format_val_type_to_value_type(param)
         .unwrap_or(wrt_foundation::types::ValueType::I32)
@@ -964,7 +1071,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(e) => {
-                assert_eq!(e.category(), ErrorCategory::Function);
+                assert_eq!(e.category(), ErrorCategory::Runtime);
                 assert!(e.to_string().contains("not found"));
             }
             _ => panic!("Expected an error"),

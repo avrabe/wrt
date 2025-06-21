@@ -7,8 +7,14 @@
 use core::str;
 
 // Conditional imports for different environments
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", feature = "safety-critical"))]
+use wrt_foundation::allocator::{CrateId, WrtVec};
+
+#[cfg(all(feature = "std", not(feature = "safety-critical")))]
 use std::{format, string::String, vec::Vec};
+
+#[cfg(all(feature = "std", feature = "safety-critical"))]
+use std::{format, string::String};
 
 #[cfg(not(feature = "std"))]
 use wrt_foundation::bounded::{BoundedString, BoundedVec};
@@ -701,7 +707,10 @@ pub fn read_string(bytes: &[u8], pos: usize) -> wrt_error::Result<(&[u8], usize)
         return Err(parse_error("String data exceeds buffer bounds"));
     }
 
-    Ok((&bytes[string_start..string_end], length_size + length as usize))
+    Ok((
+        &bytes[string_start..string_end],
+        length_size + length as usize,
+    ))
 }
 
 // Binary std/no_std choice
@@ -720,19 +729,55 @@ pub mod with_alloc {
             return Ok(binary.clone());
         }
 
-        // Create a minimal valid module
+        // Create a minimal valid module with bounded allocation
+        #[cfg(feature = "safety-critical")]
+        let mut binary: WrtVec<u8, { CrateId::Format as u8 }, { 4 * 1024 * 1024 }> = WrtVec::new();
+
+        #[cfg(not(feature = "safety-critical"))]
         let mut binary = Vec::with_capacity(8);
 
-        // Magic bytes
+        // Magic bytes with capacity checking
+        #[cfg(feature = "safety-critical")]
+        {
+            for &byte in &WASM_MAGIC {
+                binary.push(byte).map_err(|_| {
+                    Error::new(
+                        ErrorCategory::Runtime,
+                        codes::CAPACITY_EXCEEDED,
+                        "Binary generation capacity exceeded (magic bytes)",
+                    )
+                })?;
+            }
+        }
+        #[cfg(not(feature = "safety-critical"))]
         binary.extend_from_slice(&WASM_MAGIC);
 
-        // Version
+        // Version with capacity checking
+        #[cfg(feature = "safety-critical")]
+        {
+            for &byte in &WASM_VERSION {
+                binary.push(byte).map_err(|_| {
+                    Error::new(
+                        ErrorCategory::Runtime,
+                        codes::CAPACITY_EXCEEDED,
+                        "Binary generation capacity exceeded (version)",
+                    )
+                })?;
+            }
+        }
+        #[cfg(not(feature = "safety-critical"))]
         binary.extend_from_slice(&WASM_VERSION);
 
         // Generate sections (placeholder)
         // This will be implemented in Phase 1
 
-        Ok(binary)
+        // Convert to Vec<u8> for return
+        #[cfg(feature = "safety-critical")]
+        let result = binary.to_vec();
+        #[cfg(not(feature = "safety-critical"))]
+        let result = binary;
+
+        Ok(result)
     }
 
     /// Read a LEB128 unsigned integer from a byte array
@@ -1214,7 +1259,9 @@ pub mod with_alloc {
     #[cfg(feature = "std")]
     pub fn parse_block_type(bytes: &[u8], pos: usize) -> Result<(FormatBlockType, usize)> {
         if pos >= bytes.len() {
-            return Err(parse_error("Unexpected end of input when reading block type"));
+            return Err(parse_error(
+                "Unexpected end of input when reading block type",
+            ));
         }
 
         let byte = bytes[pos];
@@ -1234,13 +1281,15 @@ pub mod with_alloc {
 
                 // Type references are negative
                 if value >= 0 {
-                    return Err(parse_error("Invalid block type index: expected negative value"));
+                    return Err(parse_error(
+                        "Invalid block type index: expected negative value",
+                    ));
                 }
 
                 // Convert to function type index (positive)
                 let func_type_idx = (-value - 1) as u32;
                 (FormatBlockType::TypeIndex(func_type_idx), size)
-            }
+            },
         };
 
         Ok(block_type)
@@ -1255,7 +1304,9 @@ pub mod with_alloc {
         use crate::component::FormatValType as ValType;
 
         if pos >= bytes.len() {
-            return Err(parse_error("Unexpected end of input when reading component value type"));
+            return Err(parse_error(
+                "Unexpected end of input when reading component value type",
+            ));
         }
 
         let byte = bytes[pos];
@@ -1278,7 +1329,7 @@ pub mod with_alloc {
             COMPONENT_VALTYPE_REF => {
                 // TODO: ValType::Ref variant not yet implemented
                 Err(parse_error("COMPONENT_VALTYPE_REF not supported yet"))
-            }
+            },
             COMPONENT_VALTYPE_RECORD => {
                 let (count, next_pos) = read_leb128_u32(bytes, new_pos)?;
                 new_pos = next_pos;
@@ -1294,7 +1345,7 @@ pub mod with_alloc {
 
                 // Return a placeholder - proper implementation needs type store
                 Err(parse_error("Record type parsing not yet implemented"))
-            }
+            },
             COMPONENT_VALTYPE_VARIANT => {
                 let (count, next_pos) = read_leb128_u32(bytes, new_pos)?;
                 new_pos = next_pos;
@@ -1315,13 +1366,13 @@ pub mod with_alloc {
 
                 // Return a placeholder - proper implementation needs type store
                 Err(parse_error("Variant type parsing not yet implemented"))
-            }
+            },
             COMPONENT_VALTYPE_LIST => {
                 let (_, _next_pos) = read_component_valtype(bytes, new_pos)?;
                 // List now uses ValTypeRef, not Box<ValType>
                 // Return a placeholder - proper implementation needs type store
                 Err(parse_error("List type parsing not yet implemented"))
-            }
+            },
             COMPONENT_VALTYPE_FIXED_LIST => {
                 let (_, next_pos) = read_component_valtype(bytes, new_pos)?;
                 new_pos = next_pos;
@@ -1330,7 +1381,7 @@ pub mod with_alloc {
                 // FixedList now uses ValTypeRef, not Box<ValType>
                 // Return a placeholder - proper implementation needs type store
                 Err(parse_error("FixedList type parsing not yet implemented"))
-            }
+            },
             COMPONENT_VALTYPE_TUPLE => {
                 let (count, next_pos) = read_leb128_u32(bytes, new_pos)?;
                 new_pos = next_pos;
@@ -1344,7 +1395,7 @@ pub mod with_alloc {
                 // Tuple now uses BoundedVec<ValTypeRef>
                 // Return a placeholder - proper implementation needs type store
                 Err(parse_error("Tuple type parsing not yet implemented"))
-            }
+            },
             COMPONENT_VALTYPE_FLAGS => {
                 let (count, next_pos) = read_leb128_u32(bytes, new_pos)?;
                 new_pos = next_pos;
@@ -1358,7 +1409,7 @@ pub mod with_alloc {
                 // Flags now uses BoundedVec<WasmName>
                 // Return a placeholder - proper implementation needs type store
                 Err(parse_error("Flags type parsing not yet implemented"))
-            }
+            },
             COMPONENT_VALTYPE_ENUM => {
                 let (count, next_pos) = read_leb128_u32(bytes, new_pos)?;
                 new_pos = next_pos;
@@ -1372,26 +1423,26 @@ pub mod with_alloc {
                 // Enum now uses BoundedVec<WasmName>
                 // Return a placeholder - proper implementation needs type store
                 Err(parse_error("Enum type parsing not yet implemented"))
-            }
+            },
             COMPONENT_VALTYPE_OPTION => {
                 let (_, _next_pos) = read_component_valtype(bytes, new_pos)?;
                 // Option now uses ValTypeRef
                 // Return a placeholder - proper implementation needs type store
                 Err(parse_error("Option type parsing not yet implemented"))
-            }
+            },
             COMPONENT_VALTYPE_RESULT => {
                 let (_, _next_pos) = read_component_valtype(bytes, new_pos)?;
                 // Result now uses Option<ValTypeRef>, not Box<ValType>
                 // Return a placeholder - proper implementation needs type store
                 Err(parse_error("Result type parsing not yet implemented"))
-            }
+            },
             COMPONENT_VALTYPE_RESULT_ERR => {
                 // Convert to regular Result for backward compatibility
                 let (_, _next_pos) = read_component_valtype(bytes, new_pos)?;
                 // Result now uses Option<ValTypeRef>, not Box<ValType>
                 // Return a placeholder - proper implementation needs type store
                 Err(parse_error("Result (err) type parsing not yet implemented"))
-            }
+            },
             COMPONENT_VALTYPE_RESULT_BOTH => {
                 // Convert to regular Result for backward compatibility
                 let (_, next_pos) = read_component_valtype(bytes, new_pos)?;
@@ -1401,16 +1452,18 @@ pub mod with_alloc {
                 let (_, _next_pos) = read_component_valtype(bytes, new_pos)?;
                 // Result now uses Option<ValTypeRef>, not Box<ValType>
                 // Return a placeholder - proper implementation needs type store
-                Err(parse_error("Result (both) type parsing not yet implemented"))
-            }
+                Err(parse_error(
+                    "Result (both) type parsing not yet implemented",
+                ))
+            },
             COMPONENT_VALTYPE_OWN => {
                 let (idx, next_pos) = read_leb128_u32(bytes, new_pos)?;
                 Ok((ValType::Own(idx), next_pos))
-            }
+            },
             COMPONENT_VALTYPE_BORROW => {
                 let (idx, next_pos) = read_leb128_u32(bytes, new_pos)?;
                 Ok((ValType::Borrow(idx), next_pos))
-            }
+            },
             COMPONENT_VALTYPE_ERROR_CONTEXT => Ok((ValType::ErrorContext, new_pos)),
             _ => Err(parse_error("Invalid component value type")),
         }
@@ -1438,7 +1491,7 @@ pub mod with_alloc {
                 let mut result = vec![COMPONENT_VALTYPE_REF];
                 result.extend_from_slice(&write_leb128_u32(*idx));
                 result
-            }
+            },
             ValType::Record(fields) => {
                 let mut result = vec![COMPONENT_VALTYPE_RECORD];
                 result.extend_from_slice(&write_leb128_u32(fields.len() as u32));
@@ -1449,7 +1502,7 @@ pub mod with_alloc {
                     result.extend_from_slice(&[0, 0, 0, 0]); // Placeholder
                 }
                 result
-            }
+            },
             ValType::Variant(cases) => {
                 let mut result = vec![COMPONENT_VALTYPE_VARIANT];
                 result.extend_from_slice(&write_leb128_u32(cases.len() as u32));
@@ -1461,31 +1514,31 @@ pub mod with_alloc {
                             result.push(1); // Has type flag
                                             // ty is now ValTypeRef, need type store to resolve
                             result.extend_from_slice(&[0, 0, 0, 0]); // Placeholder
-                        }
+                        },
                         None => {
                             result.push(0); // No type flag
-                        }
+                        },
                     }
                 }
                 result
-            }
+            },
             ValType::List(_element_type) => {
                 // List now uses ValTypeRef, need type store to resolve
                 vec![COMPONENT_VALTYPE_LIST, 0, 0, 0, 0] // Placeholder
-            }
+            },
             ValType::FixedList(_element_type, length) => {
                 // FixedList now uses ValTypeRef, need type store to resolve
                 let mut result = vec![COMPONENT_VALTYPE_FIXED_LIST, 0, 0, 0, 0];
                 result.extend_from_slice(&write_leb128_u32(*length));
                 result
-            }
+            },
             ValType::Tuple(types) => {
                 // Tuple now uses BoundedVec<ValTypeRef>, need type store to resolve
                 let mut result = vec![COMPONENT_VALTYPE_TUPLE];
                 result.extend_from_slice(&write_leb128_u32(types.len() as u32));
                 // Can't write the actual types without resolving ValTypeRef
                 result
-            }
+            },
             ValType::Flags(names) => {
                 let mut result = vec![COMPONENT_VALTYPE_FLAGS];
                 result.extend_from_slice(&write_leb128_u32(names.len() as u32));
@@ -1494,7 +1547,7 @@ pub mod with_alloc {
                     result.extend_from_slice(&write_string(name));
                 }
                 result
-            }
+            },
             ValType::Enum(names) => {
                 let mut result = vec![COMPONENT_VALTYPE_ENUM];
                 result.extend_from_slice(&write_leb128_u32(names.len() as u32));
@@ -1503,25 +1556,25 @@ pub mod with_alloc {
                     result.extend_from_slice(&write_string(name));
                 }
                 result
-            }
+            },
             ValType::Option(_inner) => {
                 // Option now uses ValTypeRef, need type store to resolve
                 vec![COMPONENT_VALTYPE_OPTION, 0, 0, 0, 0] // Placeholder
-            }
+            },
             ValType::Result(_) => {
                 // Result now uses Option<ValTypeRef>, need type store to resolve
                 vec![COMPONENT_VALTYPE_RESULT, 0, 0, 0, 0] // Placeholder
-            }
+            },
             ValType::Own(type_idx) => {
                 let mut result = vec![COMPONENT_VALTYPE_OWN];
                 result.extend_from_slice(&write_leb128_u32(*type_idx));
                 result
-            }
+            },
             ValType::Borrow(type_idx) => {
                 let mut result = vec![COMPONENT_VALTYPE_BORROW];
                 result.extend_from_slice(&write_leb128_u32(*type_idx));
                 result
-            }
+            },
             ValType::Void => vec![COMPONENT_VALTYPE_ERROR_CONTEXT],
             ValType::ErrorContext => vec![COMPONENT_VALTYPE_ERROR_CONTEXT],
         }
@@ -1645,7 +1698,9 @@ pub mod with_alloc {
     pub fn read_name(bytes: &[u8], pos: usize) -> Result<(&[u8], usize)> {
         // Ensure we have enough bytes to read the string length
         if pos >= bytes.len() {
-            return Err(parse_error("Unexpected end of input while reading name length"));
+            return Err(parse_error(
+                "Unexpected end of input while reading name length",
+            ));
         }
 
         // Read the string length
@@ -1654,7 +1709,9 @@ pub mod with_alloc {
 
         // Ensure we have enough bytes to read the string
         if name_start + name_len as usize > bytes.len() {
-            return Err(parse_error("Unexpected end of input while reading name content"));
+            return Err(parse_error(
+                "Unexpected end of input while reading name content",
+            ));
         }
 
         // Return the slice containing the name and the total bytes read
@@ -1735,16 +1792,16 @@ pub mod with_alloc {
                         )));
                     }
                     depth -= 1;
-                }
+                },
                 // Skip immediates for known const instructions
                 I32_CONST => {
                     let (_, off) = read_leb128_i32(bytes, offset)?;
                     offset = off;
-                }
+                },
                 I64_CONST => {
                     let (_, off) = read_leb128_i64(bytes, offset)?;
                     offset = off;
-                }
+                },
                 F32_CONST => {
                     if offset + 4 > bytes.len() {
                         return Err(crate::error::parse_error_dynamic(format!(
@@ -1753,7 +1810,7 @@ pub mod with_alloc {
                         )));
                     }
                     offset += 4;
-                }
+                },
                 F64_CONST => {
                     if offset + 8 > bytes.len() {
                         return Err(crate::error::parse_error_dynamic(format!(
@@ -1762,7 +1819,7 @@ pub mod with_alloc {
                         )));
                     }
                     offset += 8;
-                }
+                },
                 REF_NULL => {
                     // 0xD0 ht:heap_type
                     if offset >= bytes.len() {
@@ -1772,19 +1829,19 @@ pub mod with_alloc {
                         )));
                     }
                     offset += 1; // heap_type
-                }
+                },
                 REF_FUNC | GLOBAL_GET => {
                     // 0xD2 f:funcidx or 0x23 x:globalidx
                     let (_, off) = read_leb128_u32(bytes, offset)?;
                     offset = off;
-                }
+                },
                 // Other opcodes that might appear in const expressions depending on enabled
                 // features. For Wasm 2.0, only the above are generally considered
                 // constant. Vector ops (v128.const) could also be here if SIMD
                 // consts are allowed.
                 _ => { // other opcodes - assuming they have no immediates or are
                      // invalid in const expr
-                }
+                },
             }
         }
         Ok((bytes[start_offset..offset].to_vec(), offset))
@@ -1835,8 +1892,11 @@ pub mod with_alloc {
 
                 element_type = RefType::Funcref;
                 init = ElementInit::FuncIndices(func_indices);
-                mode = crate::module::ElementMode::Active { table_index: table_idx, offset_expr };
-            }
+                mode = crate::module::ElementMode::Active {
+                    table_index: table_idx,
+                    offset_expr,
+                };
+            },
             0x01 => {
                 // Passive: elemkind vec(expr) end
                 let (elemkind_byte, next_offset) = read_u8(bytes, offset)?;
@@ -1873,7 +1933,7 @@ pub mod with_alloc {
 
                 init = ElementInit::Expressions(exprs_vec);
                 mode = crate::module::ElementMode::Passive;
-            }
+            },
             0x02 => {
                 // Active with tableidx: tableidx expr elemkind vec(expr) end
                 let (table_idx, next_offset) = read_leb128_u32(bytes, offset).map_err(|e| {
@@ -1926,8 +1986,11 @@ pub mod with_alloc {
                 offset += 1; // Consume END
 
                 init = ElementInit::Expressions(exprs_vec);
-                mode = crate::module::ElementMode::Active { table_index: table_idx, offset_expr };
-            }
+                mode = crate::module::ElementMode::Active {
+                    table_index: table_idx,
+                    offset_expr,
+                };
+            },
             0x03 => {
                 // Declared: elemkind vec(expr) end
                 let (elemkind_byte, next_offset) = read_u8(bytes, offset)?;
@@ -1964,7 +2027,7 @@ pub mod with_alloc {
 
                 init = ElementInit::Expressions(exprs_vec);
                 mode = crate::module::ElementMode::Declared;
-            }
+            },
             0x04 => {
                 // Active with tableidx 0 (encoded in prefix): expr vec(funcidx) end
                 let table_idx = 0; // Implicitly table 0 due to prefix for some interpretations, though spec shows
@@ -1998,8 +2061,11 @@ pub mod with_alloc {
 
                 element_type = RefType::Funcref;
                 init = ElementInit::FuncIndices(func_indices);
-                mode = crate::module::ElementMode::Active { table_index: table_idx, offset_expr };
-            }
+                mode = crate::module::ElementMode::Active {
+                    table_index: table_idx,
+                    offset_expr,
+                };
+            },
             0x05 => {
                 // Passive: reftype vec(expr) end
                 let rt_byte = bytes.get(offset).copied().ok_or_else(|| {
@@ -2038,7 +2104,7 @@ pub mod with_alloc {
 
                 init = ElementInit::Expressions(exprs_vec);
                 mode = crate::module::ElementMode::Passive;
-            }
+            },
             0x06 => {
                 // Active with tableidx: tableidx expr reftype vec(expr) end
                 let (table_idx, next_offset) = read_leb128_u32(bytes, offset).map_err(|e| {
@@ -2093,8 +2159,11 @@ pub mod with_alloc {
                 offset += 1; // Consume END
 
                 init = ElementInit::Expressions(exprs_vec);
-                mode = crate::module::ElementMode::Active { table_index: table_idx, offset_expr };
-            }
+                mode = crate::module::ElementMode::Active {
+                    table_index: table_idx,
+                    offset_expr,
+                };
+            },
             0x07 => {
                 // Declared: reftype vec(expr) end
                 let rt_byte = bytes.get(offset).copied().ok_or_else(|| {
@@ -2133,17 +2202,24 @@ pub mod with_alloc {
 
                 init = ElementInit::Expressions(exprs_vec);
                 mode = crate::module::ElementMode::Declared;
-            }
+            },
             _ => {
                 return Err(crate::error::parse_error_dynamic(format!(
                     "(offset {}): Invalid element segment prefix: 0x{:02X}",
                     offset.saturating_sub(1),
                     prefix_val
                 )))
-            }
+            },
         }
 
-        Ok((Element { mode, element_type, init }, offset))
+        Ok((
+            Element {
+                mode,
+                element_type,
+                init,
+            },
+            offset,
+        ))
     }
 
     /// Parses a data segment from the binary format.
@@ -2189,7 +2265,7 @@ pub mod with_alloc {
                     },
                     offset,
                 ))
-            }
+            },
             0x01 => {
                 // Passive data segment
                 let (init_byte_count, bytes_read_count) = read_leb128_u32(bytes, offset)?;
@@ -2214,7 +2290,7 @@ pub mod with_alloc {
                     },
                     offset,
                 ))
-            }
+            },
             0x02 => {
                 // Active data segment with explicit memory index
                 let (memory_idx, bytes_read_mem_idx) = read_leb128_u32(bytes, offset)?;
@@ -2245,7 +2321,7 @@ pub mod with_alloc {
                     },
                     offset,
                 ))
-            }
+            },
             _ => Err(crate::error::parse_error_dynamic(format!(
                 "Unsupported data segment prefix: 0x{:02X}",
                 prefix
@@ -2358,7 +2434,7 @@ pub fn write_string_bounded<
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     // Define test helper functions directly here since imports aren't working
     // Read functions
     fn read_f32_test(bytes: &[u8], pos: usize) -> crate::Result<(f32, usize)> {
@@ -2371,7 +2447,7 @@ mod tests {
         let value = f32::from_le_bytes(buf);
         Ok((value, pos + 4))
     }
-    
+
     fn read_f64_test(bytes: &[u8], pos: usize) -> crate::Result<(f64, usize)> {
         if pos + 8 > bytes.len() {
             return Err(parse_error("Not enough bytes to read f64"));
@@ -2382,7 +2458,7 @@ mod tests {
         let value = f64::from_le_bytes(buf);
         Ok((value, pos + 8))
     }
-    
+
     #[cfg(feature = "std")]
     fn read_string_test(bytes: &[u8], pos: usize) -> crate::Result<(String, usize)> {
         if pos >= bytes.len() {
@@ -2404,9 +2480,13 @@ mod tests {
             Err(_) => Err(parse_error("Invalid UTF-8 in string")),
         }
     }
-    
+
     #[cfg(feature = "std")]
-    fn read_vector_test<T, F>(bytes: &[u8], pos: usize, read_elem: F) -> crate::Result<(Vec<T>, usize)>
+    fn read_vector_test<T, F>(
+        bytes: &[u8],
+        pos: usize,
+        read_elem: F,
+    ) -> crate::Result<(Vec<T>, usize)>
     where
         F: Fn(&[u8], usize) -> crate::Result<(T, usize)>,
     {
@@ -2421,7 +2501,7 @@ mod tests {
 
         Ok((result, offset))
     }
-    
+
     fn read_section_header_test(bytes: &[u8], pos: usize) -> crate::Result<(u8, u32, usize)> {
         if pos >= bytes.len() {
             return Err(parse_error("Attempted to read past end of binary"));
@@ -2431,14 +2511,14 @@ mod tests {
         let (payload_len, len_size) = read_leb128_u32(bytes, pos + 1)?;
         Ok((id, payload_len, pos + 1 + len_size))
     }
-    
+
     fn validate_utf8_test(bytes: &[u8]) -> crate::Result<()> {
         match core::str::from_utf8(bytes) {
             Ok(_) => Ok(()),
             Err(_) => Err(parse_error("Invalid UTF-8 sequence")),
         }
     }
-    
+
     // Write functions
     #[cfg(feature = "std")]
     fn write_leb128_u32_test(value: u32) -> Vec<u8> {
@@ -2462,19 +2542,19 @@ mod tests {
 
         result
     }
-    
+
     #[cfg(feature = "std")]
     fn write_f32_test(value: f32) -> Vec<u8> {
         let bytes = value.to_le_bytes();
         bytes.to_vec()
     }
-    
+
     #[cfg(feature = "std")]
     fn write_f64_test(value: f64) -> Vec<u8> {
         let bytes = value.to_le_bytes();
         bytes.to_vec()
     }
-    
+
     #[cfg(feature = "std")]
     fn write_string_test(value: &str) -> Vec<u8> {
         let mut result = Vec::new();
@@ -2483,7 +2563,7 @@ mod tests {
         result.extend_from_slice(value.as_bytes());
         result
     }
-    
+
     #[cfg(feature = "std")]
     fn write_leb128_u64_test(value: u64) -> Vec<u8> {
         let mut result = Vec::new();
@@ -2506,7 +2586,7 @@ mod tests {
 
         result
     }
-    
+
     #[cfg(feature = "std")]
     fn write_vector_test<T, F>(elements: &[T], write_elem: F) -> Vec<u8>
     where
@@ -2519,7 +2599,7 @@ mod tests {
         }
         result
     }
-    
+
     #[cfg(feature = "std")]
     fn write_section_header_test(id: u8, content_size: u32) -> Vec<u8> {
         let mut result = Vec::new();
@@ -2531,7 +2611,16 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn test_f32_roundtrip() {
-        let values = [0.0f32, -0.0, 1.0, -1.0, 3.14159, f32::INFINITY, f32::NEG_INFINITY, f32::NAN];
+        let values = [
+            0.0f32,
+            -0.0,
+            1.0,
+            -1.0,
+            3.14159,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::NAN,
+        ];
 
         for &value in &values {
             let bytes = write_f32_test(value);
@@ -2549,8 +2638,16 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn test_f64_roundtrip() {
-        let values =
-            [0.0f64, -0.0, 1.0, -1.0, 3.14159265358979, f64::INFINITY, f64::NEG_INFINITY, f64::NAN];
+        let values = [
+            0.0f64,
+            -0.0,
+            1.0,
+            -1.0,
+            3.14159265358979,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ];
 
         for &value in &values {
             let bytes = write_f64_test(value);
@@ -2568,7 +2665,12 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn test_string_roundtrip() {
-        let test_strings = ["", "Hello, World!", "UTF-8 test: ñáéíóú", "🦀 Rust is awesome!"];
+        let test_strings = [
+            "",
+            "Hello, World!",
+            "UTF-8 test: ñáéíóú",
+            "🦀 Rust is awesome!",
+        ];
 
         for &s in &test_strings {
             let bytes = write_string_test(s);
@@ -2581,7 +2683,16 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn test_leb128_u64_roundtrip() {
-        let test_values = [0u64, 1, 127, 128, 16_384, 0x7FFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF_FFFF_FFFF];
+        let test_values = [
+            0u64,
+            1,
+            127,
+            128,
+            16_384,
+            0x7FFF_FFFF,
+            0xFFFF_FFFF,
+            0xFFFF_FFFF_FFFF_FFFF,
+        ];
 
         for &value in &test_values {
             let bytes = write_leb128_u64_test(value);

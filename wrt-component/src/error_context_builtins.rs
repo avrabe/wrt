@@ -14,7 +14,6 @@
 //! required by the WebAssembly Component Model for managing error contexts and
 //! debugging information.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -243,7 +242,7 @@ impl ErrorContextImpl {
             handle: ErrorContextHandle::new(),
             severity,
             debug_message: bounded_message,
-            stack_trace: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            stack_trace: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             metadata: BoundedMap::new(),
             error_code: None,
             source_error: None,
@@ -341,7 +340,7 @@ impl ErrorContextImpl {
     }
 
     #[cfg(not(any(feature = "std", )))]
-    pub fn format_stack_trace(&self) -> Result<BoundedString<1024, NoStdProvider<65536>>> {
+    pub fn format_stack_trace(&self) -> core::result::Result<BoundedString<1024, NoStdProvider<65536>>> {
         let mut output = BoundedString::new();
         for (i, frame) in self.stack_trace.iter().enumerate() {
             // Binary std/no_std choice
@@ -577,7 +576,7 @@ impl ErrorContextBuiltins {
     }
 
     #[cfg(not(any(feature = "std", )))]
-    pub fn error_context_stack_trace(context_id: ErrorContextId) -> Result<BoundedString<1024, NoStdProvider<65536>>> {
+    pub fn error_context_stack_trace(context_id: ErrorContextId) -> core::result::Result<BoundedString<1024, NoStdProvider<65536>>> {
         Self::with_registry(|registry| {
             if let Some(context) = registry.get_context(context_id) {
                 context.format_stack_trace()

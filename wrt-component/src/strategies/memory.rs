@@ -6,8 +6,8 @@
 use wrt_error::kinds::{OutOfBoundsAccess, ResourceLimitExceeded};
 
 use crate::{
+    resources::{BoundedBufferPool, MemoryStrategy},
     prelude::*,
-    resources::{BufferPool, MemoryStrategy},
 };
 
 /// Trait defining a memory optimization strategy
@@ -127,7 +127,7 @@ impl MemoryOptimizationStrategy for ZeroCopyStrategy {
 #[derive(Debug)]
 pub struct BoundedCopyStrategy {
     /// Binary std/no_std choice
-    buffer_pool: Arc<RwLock<BufferPool>>,
+    buffer_pool: Arc<RwLock<BoundedBufferPool>>,
     /// Maximum copy size in bytes
     max_copy_size: usize,
     /// Minimum trust level required for this strategy
@@ -137,7 +137,7 @@ pub struct BoundedCopyStrategy {
 impl BoundedCopyStrategy {
     /// Create a new bounded-copy strategy with the given parameters
     pub fn new(
-        buffer_pool: Arc<RwLock<BufferPool>>,
+        buffer_pool: Arc<RwLock<BoundedBufferPool>>,
         max_copy_size: usize,
         min_trust_level: u8,
     ) -> Self {
@@ -147,7 +147,7 @@ impl BoundedCopyStrategy {
     /// Create a new bounded-copy strategy with default settings
     pub fn default() -> Self {
         Self {
-            buffer_pool: Arc::new(RwLock::new(BufferPool::new(1024 * 1024))), // 1MB pool
+            buffer_pool: Arc::new(RwLock::new(BoundedBufferPool::new())), // Bounded pool
             max_copy_size: 64 * 1024,                                         // 64KB max copy
             min_trust_level: 1, // Works for standard trust components
         }

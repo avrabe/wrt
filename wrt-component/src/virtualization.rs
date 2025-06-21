@@ -5,7 +5,7 @@ use crate::{
 };
 
 // Placeholder types
-pub type ComponentInstanceId = u32;
+pub use crate::types::ComponentInstanceId;
 pub type ResourceHandle = u32;
 pub type ValType = u32;
 use core::{
@@ -56,7 +56,7 @@ impl fmt::Display for VirtualizationError {
 #[cfg(feature = "std")]
 impl std::error::Error for VirtualizationError {}
 
-pub type VirtualizationResult<T> = Result<T, VirtualizationError>;
+pub type Virtualizationcore::result::Result<T> = Result<T, VirtualizationError>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Capability {
@@ -236,7 +236,7 @@ impl VirtualizationManager {
     pub fn new() -> Self {
         Self {
             virtual_components: BoundedHashMap::new(),
-            capability_grants: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            capability_grants: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             host_exports: BoundedHashMap::new(),
             sandbox_registry: BoundedHashMap::new(),
             next_virtual_id: AtomicU32::new(1000),
@@ -276,11 +276,11 @@ impl VirtualizationManager {
             instance_id,
             name: name.to_string(),
             parent,
-            children: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-            capabilities: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            children: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
+            capabilities: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             virtual_imports: BoundedHashMap::new(),
             virtual_exports: BoundedHashMap::new(),
-            memory_regions: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            memory_regions: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             isolation_level,
             resource_limits: ResourceLimits::default(),
             is_sandboxed: isolation_level != IsolationLevel::None,
@@ -666,7 +666,7 @@ pub fn create_memory_capability(max_size: usize) -> Capability {
 }
 
 pub fn create_network_capability(allowed_hosts: &[&str]) -> Capability {
-    let mut hosts = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+    let mut hosts = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
     for host in allowed_hosts {
         let _ = hosts.push(host.to_string());
     }

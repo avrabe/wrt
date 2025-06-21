@@ -3,23 +3,23 @@
 //! This module provides the Import type for component imports.
 
 use wrt_format::component::ExternType;
-use wrt_foundation::{component::ComponentType, ExternType as RuntimeExternType};
+use wrt_foundation::{component::WrtComponentType, ExternType as RuntimeExternType};
 
 use crate::{
-    component::ExternValue, namespace::Namespace, prelude::*, type_conversion::bidirectional,
+    components::component::ExternValue, /* namespace::Namespace, */ prelude::*, type_conversion::bidirectional,
 };
 
 /// Type of import in the component model
 #[derive(Debug, Clone)]
 pub enum ImportType {
     /// Function import
-    Function(ComponentType),
+    Function(WrtComponentType),
     /// Value import (global, memory, table)
-    Value(ComponentType),
+    Value(WrtComponentType),
     /// Instance import
-    Instance(ComponentType),
+    Instance(WrtComponentType),
     /// Type import
-    Type(ComponentType),
+    Type(WrtComponentType),
 }
 
 /// Import to a component
@@ -41,7 +41,7 @@ impl Import {
     /// Creates a new import
     pub fn new(namespace: Namespace, name: String, ty: ExternType, value: ExternValue) -> Self {
         // Default import type based on ExternType - this is a simplified mapping
-        let import_type = ImportType::Function(ComponentType::Unit);
+        let import_type = ImportType::Function(WrtComponentType::Unit);
         Self { namespace, name, import_type, ty, value }
     }
 

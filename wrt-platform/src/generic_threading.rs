@@ -5,6 +5,7 @@
 //!
 //! This module is only available when the `std` feature is enabled.
 
+
 use core::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Duration,
@@ -39,7 +40,7 @@ impl PlatformThreadHandle for GenericThreadHandle {
             match handle.join() {
                 Ok(result) => result,
                 Err(_) => Err(Error::new(
-                    ErrorCategory::Platform,
+                    ErrorCategory::System,
                     1,
                     "Thread panicked during execution",
                 )),
@@ -59,6 +60,17 @@ impl PlatformThreadHandle for GenericThreadHandle {
 
     fn get_stats(&self) -> Result<ThreadStats> {
         Ok(self.stats.lock().clone())
+    }
+
+    fn terminate(&self) -> Result<()> {
+        self.running.store(false, Ordering::Release);
+        Ok(())
+    }
+
+    fn join_timeout(&self, timeout: Duration) -> Result<Option<Vec<u8>>> {
+        // For generic implementation, we can't easily implement timeout join
+        // Return None to indicate timeout not supported
+        Ok(None)
     }
 }
 
@@ -116,8 +128,8 @@ impl PlatformThreadPool for GenericThreadPool {
         // Check if shutting down
         if self.shutdown.load(Ordering::Acquire) {
             return Err(Error::new(
-                ErrorCategory::Platform, 1,
-                
+                ErrorCategory::System,
+                1,
                 "Thread pool is shutting down",
             ));
         }
@@ -169,8 +181,8 @@ impl PlatformThreadPool for GenericThreadPool {
             })
             .map_err(|_| {
                 Error::new(
-                    ErrorCategory::Platform, 1,
-                    
+                    ErrorCategory::System,
+                    1,
                     "Failed to spawn thread",
                 )
             })?;
@@ -189,10 +201,7 @@ impl PlatformThreadPool for GenericThreadPool {
             stats.total_spawned += 1;
         }
 
-        Ok(ThreadHandle {
-            id: thread_id,
-            platform_handle,
-        })
+        Ok(ThreadHandle::new(thread_id, platform_handle))
     }
 
     fn get_stats(&self) -> ThreadPoolStats {

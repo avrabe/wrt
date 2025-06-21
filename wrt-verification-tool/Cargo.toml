@@ -26,7 +26,10 @@ std = ["wrt-decoder/std", "log", "wrt-test-registry/std"]
 no_std = ["wrt-decoder/no_std", "wrt-test-registry/no_std"]
 
 # Disable panic handler for library builds to avoid conflicts
-disable-panic-handler = []
+safety-asil-b = []
+safety-asil-c = ["safety-asil-b"]
+safety-asil-d = ["safety-asil-c"]
+
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] }
@@ -37,7 +40,6 @@ unsafe_code = "forbid"
 [lints.clippy]
 inline_asm_x86_att_syntax = "warn"
 transmute_ptr_to_ref = "deny"
-type_id = "deny"
 dyn_trait = "warn"
 float_arithmetic = "warn"
 ptr_offset_with_cast = "warn"
@@ -50,7 +52,7 @@ must_use_unit = "warn"
 match_wildcard_for_single_variants = "warn"
 never_loop = "warn"
 unreachable = "warn"
-static_mut_reference = "deny"
+# static_mut_reference renamed to static_mut_refs in newer Rust versions
 arc_mutate = "deny"
 pedantic = "warn"
 debug_assert_with_mut_call = "warn" 

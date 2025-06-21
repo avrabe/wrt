@@ -17,6 +17,7 @@ pub enum DebugError {
 }
 
 /// Result type for debug operations
+#[allow(dead_code)]
 pub type DebugResult<T> = Result<T, DebugError>;
 
 impl From<wrt_error::Error> for DebugError {
@@ -30,23 +31,31 @@ impl From<wrt_error::Error> for DebugError {
 impl From<DebugError> for wrt_error::Error {
     fn from(err: DebugError) -> Self {
         match err {
-            DebugError::InvalidData => {
-                Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Invalid DWARF data")
-            }
-            DebugError::UnexpectedEof => {
-                Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Unexpected end of DWARF data")
-            }
+            DebugError::InvalidData => Error::new(
+                ErrorCategory::Parse,
+                codes::PARSE_ERROR,
+                "Invalid DWARF data",
+            ),
+            DebugError::UnexpectedEof => Error::new(
+                ErrorCategory::Parse,
+                codes::PARSE_ERROR,
+                "Unexpected end of DWARF data",
+            ),
             DebugError::UnsupportedVersion(_version) => Error::new(
                 ErrorCategory::Parse,
                 codes::VALIDATION_UNSUPPORTED_FEATURE,
                 "Unsupported DWARF version",
             ),
-            DebugError::InvalidAbbreviation(_code) => {
-                Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Invalid abbreviation code")
-            }
-            DebugError::StringError => {
-                Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "String table access error")
-            }
+            DebugError::InvalidAbbreviation(_code) => Error::new(
+                ErrorCategory::Parse,
+                codes::PARSE_ERROR,
+                "Invalid abbreviation code",
+            ),
+            DebugError::StringError => Error::new(
+                ErrorCategory::Parse,
+                codes::PARSE_ERROR,
+                "String table access error",
+            ),
         }
     }
 }

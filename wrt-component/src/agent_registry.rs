@@ -1,7 +1,7 @@
-//! Agent Registry for Managing Execution Agents
+//! Execution Agent Registry
 //!
-//! This module provides a centralized registry for managing different types of execution agents
-//! and provides a migration path from the legacy individual agents to the unified agent system.
+//! This module provides a centralized registry for managing different types of execution engines
+//! and provides a migration path from legacy execution engines to the unified execution system.
 
 #[cfg(feature = "std")]
 use std::{collections::HashMap, boxed::Box, sync::Arc};
@@ -11,7 +11,7 @@ use core::marker::PhantomData;
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
     prelude::*,
-    traits::DefaultMemoryProvider,
+    safe_memory::NoStdProvider,
 };
 
 use crate::{
@@ -35,13 +35,13 @@ pub struct AgentRegistry {
     #[cfg(feature = "std")]
     unified_agents: HashMap<AgentId, Box<UnifiedExecutionAgent>>,
     #[cfg(not(feature = "std"))]
-    unified_agents: BoundedVec<(AgentId, UnifiedExecutionAgent), MAX_AGENTS, DefaultMemoryProvider>,
+    unified_agents: BoundedVec<(AgentId, UnifiedExecutionAgent), MAX_AGENTS, NoStdProvider::<65536, NoStdProvider<65536>>>,
     
     /// Legacy agents (deprecated)
     #[cfg(feature = "std")]
     legacy_agents: HashMap<AgentId, Box<dyn LegacyExecutionAgent>>,
     #[cfg(not(feature = "std"))]
-    legacy_agents: BoundedVec<(AgentId, LegacyAgentType), 16, DefaultMemoryProvider>,
+    legacy_agents: BoundedVec<(AgentId, LegacyAgentType), 16, NoStdProvider::<65536, NoStdProvider<65536>>>,
     
     /// Next agent ID
     next_agent_id: u32,
@@ -77,7 +77,7 @@ pub struct MigrationStatus {
     #[cfg(feature = "std")]
     pub pending_migrations: Vec<AgentId>,
     #[cfg(not(feature = "std"))]
-    pub pending_migrations: BoundedVec<AgentId, MAX_AGENTS, DefaultMemoryProvider>,
+    pub pending_migrations: BoundedVec<AgentId, MAX_AGENTS, NoStdProvider::<65536, NoStdProvider<65536>>>,
     
     /// Completed migrations
     pub completed_migrations: u32,
@@ -86,7 +86,7 @@ pub struct MigrationStatus {
     #[cfg(feature = "std")]
     pub warnings: Vec<MigrationWarning>,
     #[cfg(not(feature = "std"))]
-    pub warnings: BoundedVec<MigrationWarning, 16, DefaultMemoryProvider>,
+    pub warnings: BoundedVec<MigrationWarning, 16, NoStdProvider::<65536, NoStdProvider<65536>>>,
 }
 
 /// Migration warning information
@@ -94,7 +94,7 @@ pub struct MigrationStatus {
 pub struct MigrationWarning {
     pub agent_id: AgentId,
     pub warning_type: WarningType,
-    pub message: BoundedString<256, DefaultMemoryProvider>,
+    pub message: BoundedString<256, NoStdProvider::<65536>>,
 }
 
 /// Types of migration warnings
@@ -164,7 +164,7 @@ pub enum PreferredAgentType {
 impl AgentRegistry {
     /// Create a new agent registry
     pub fn new() -> Self {
-        let provider = DefaultMemoryProvider::default();
+        let provider = NoStdProvider::<65536>::default();
         
         Self {
             #[cfg(feature = "std")]
@@ -207,7 +207,11 @@ impl AgentRegistry {
         #[cfg(not(feature = "std"))]
         {
             self.unified_agents.push((agent_id, agent)).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many agents".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many agents"
+                )
             })?;
         }
 
@@ -227,7 +231,11 @@ impl AgentRegistry {
                 if options.allow_legacy_fallback {
                     self.create_legacy_component_agent()
                 } else {
-                    Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                    Err(wrt_foundation::Error::new(
+                        wrt_foundation::ErrorCategory::Validation,
+                        wrt_error::errors::codes::INVALID_INPUT,
+                        "Invalid input"
+                    ))
                 }
             }
             #[cfg(feature = "async")]
@@ -235,7 +243,11 @@ impl AgentRegistry {
                 if options.allow_legacy_fallback {
                     self.create_legacy_async_agent()
                 } else {
-                    Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                    Err(wrt_foundation::Error::new(
+                        wrt_foundation::ErrorCategory::Validation,
+                        wrt_error::errors::codes::INVALID_INPUT,
+                        "Invalid input"
+                    ))
                 }
             }
             PreferredAgentType::Auto => {
@@ -259,7 +271,11 @@ impl AgentRegistry {
         #[cfg(not(feature = "std"))]
         {
             self.legacy_agents.push((agent_id, LegacyAgentType::Component(agent))).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many legacy agents".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many legacy agents"
+                )
             })?;
         }
 
@@ -287,7 +303,11 @@ impl AgentRegistry {
         #[cfg(not(feature = "std"))]
         {
             self.legacy_agents.push((agent_id, LegacyAgentType::Async(agent))).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many legacy agents".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many legacy agents"
+                )
             })?;
         }
 
@@ -342,14 +362,22 @@ impl AgentRegistry {
                         #[cfg(feature = "async")]
                         LegacyAgentType::Async(_engine) => {
                             // Async execution would require different API
-                            Err(wrt_foundation::WrtError::InvalidOperation("Async agent requires different API".into()))
+                            Err(wrt_foundation::Error::new(
+                                wrt_foundation::ErrorCategory::Runtime,
+                                wrt_error::codes::RUNTIME_ERROR,
+                                "Async agent requires different API"
+                            ))
                         }
                     };
                 }
             }
         }
 
-        Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+        Err(wrt_foundation::Error::new(
+            wrt_foundation::ErrorCategory::Validation,
+            wrt_error::errors::codes::INVALID_INPUT,
+            "Invalid input"
+        ))
     }
 
     /// Migrate a legacy agent to unified agent
@@ -359,11 +387,19 @@ impl AgentRegistry {
         let migration_config = {
             if let Some(agent) = self.legacy_agents.get(&agent_id) {
                 if !agent.can_migrate() {
-                    return Err(wrt_foundation::WrtError::InvalidOperation("Agent cannot be migrated".into()));
+                    return Err(wrt_foundation::Error::new(
+                        wrt_foundation::ErrorCategory::Runtime,
+                        wrt_error::codes::RUNTIME_ERROR,
+                        "Agent cannot be migrated"
+                    ));
                 }
                 agent.migration_config()
             } else {
-                return Err(wrt_foundation::WrtError::invalid_input("Invalid input"));
+                return Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ));
             }
         };
 
@@ -391,7 +427,11 @@ impl AgentRegistry {
             }
             
             if !found {
-                return Err(wrt_foundation::WrtError::invalid_input("Invalid input"));
+                return Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ));
             }
             config
         };
@@ -411,7 +451,11 @@ impl AgentRegistry {
             self.legacy_agents.retain(|(id, _)| *id != agent_id);
             // Add to unified agents
             self.unified_agents.push((agent_id, unified_agent)).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many unified agents".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many unified agents"
+                )
             })?;
         }
 
@@ -525,7 +569,11 @@ impl AgentRegistry {
             self.stats.active_agents = self.stats.active_agents.saturating_sub(1);
             Ok(())
         } else {
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))
         }
     }
 
@@ -547,8 +595,8 @@ impl AgentRegistry {
         #[cfg(feature = "std")]
         let legacy_ids: Vec<AgentId> = self.legacy_agents.keys().copied().collect();
         #[cfg(not(feature = "std"))]
-        let legacy_ids: BoundedVec<AgentId, MAX_AGENTS, DefaultMemoryProvider> = {
-            let mut ids = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let legacy_ids: BoundedVec<AgentId, MAX_AGENTS, NoStdProvider::<65536, NoStdProvider<65536>>> = {
+            let mut ids = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
             for (id, _) in &self.legacy_agents {
                 let _ = ids.push(*id);
             }
@@ -653,7 +701,11 @@ impl LegacyExecutionAgent for ComponentExecutionEngine {
 impl LegacyExecutionAgent for AsyncExecutionEngine {
     fn call_function(&mut self, _instance_id: u32, _function_index: u32, _args: &[Value]) -> WrtResult<Value> {
         // Async engines need different API - this is just a placeholder
-        Err(wrt_foundation::WrtError::InvalidOperation("Async agent requires different API".into()))
+        Err(wrt_foundation::Error::new(
+            wrt_foundation::ErrorCategory::Runtime,
+            wrt_error::codes::RUNTIME_ERROR,
+            "Async agent requires different API"
+        ))
     }
 
     fn agent_type(&self) -> &'static str {
@@ -844,7 +896,7 @@ impl Default for MigrationWarning {
         Self {
             agent_id: AgentId::default(),
             warning_type: WarningType::FeatureNotSupported,
-            message: BoundedString::new(DefaultMemoryProvider::default()).unwrap(),
+            message: BoundedString::new(NoStdProvider::<65536>::default()).unwrap(),
         }
     }
 }

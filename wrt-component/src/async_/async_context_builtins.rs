@@ -14,7 +14,6 @@
 //! built-in functions required by the WebAssembly Component Model for managing
 //! async execution contexts.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;

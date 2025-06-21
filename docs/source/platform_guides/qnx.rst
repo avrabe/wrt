@@ -119,12 +119,12 @@ Source Installation
 
 .. code-block:: bash
 
-   # Build for all QNX targets
-   just build-qnx
+   # Build with QNX platform features
+   cargo build --features platform-qnx
 
-   # Build specific architecture
-   just build-qnx-x86_64
-   just build-qnx-aarch64
+   # Build for specific QNX targets (requires QNX toolchain)
+   cargo build --target x86_64-pc-nto-qnx710
+   cargo build --target aarch64-unknown-nto-qnx710
 
 Momentics IDE Integration
 -------------------------
@@ -409,8 +409,8 @@ QNX Test Environment
    qvm create qnx710-vm
    qvm start qnx710-vm
 
-   # Deploy test build
-   just test-qnx-vm
+   # Run tests with QNX features (requires QNX environment)
+   cargo test --features platform-qnx
 
 **Hardware-in-the-loop testing:**
 
@@ -419,8 +419,9 @@ QNX Test Environment
    # Connect to target hardware
    qconn target_ip
 
-   # Run automated tests
-   just test-qnx-hardware
+   # Run automated tests on QNX target
+   # Note: Requires cross-compilation and QNX target environment
+   cargo test --target x86_64-pc-nto-qnx710
 
 Real-Time Testing
 -----------------

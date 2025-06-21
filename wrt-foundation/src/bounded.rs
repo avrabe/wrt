@@ -126,18 +126,18 @@ extern crate alloc;
 // Binary std/no_std choice
 
 // For no_std environment
-#[cfg(feature = "std")]
-use std::format;
-#[cfg(feature = "std")]
-use std::string::String;
-#[cfg(feature = "std")]
-use std::vec::Vec;
 #[cfg(not(feature = "std"))]
 use core::fmt; // Removed hash, mem
 use core::{
     hash::{Hash, Hash as CoreHash, Hasher, Hasher as CoreHasher},
     marker::PhantomData,
 };
+#[cfg(feature = "std")]
+use std::format;
+#[cfg(feature = "std")]
+use std::string::String;
+#[cfg(feature = "std")]
+use std::vec::Vec;
 // use core::mem::MaybeUninit; // No longer needed here if SafeMemoryHandler doesn't expose it
 // directly
 #[cfg(feature = "std")]
@@ -1351,10 +1351,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<u32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(2).unwrap();
@@ -1377,20 +1376,22 @@ where
     /// In no_std environments, this returns a clone of the current BoundedVec
     /// as a standard Vec type isn't available.
     #[cfg(not(feature = "std"))]
-    pub fn to_vec(&self) -> WrtResult<Self> 
+    pub fn to_vec(&self) -> WrtResult<Self>
     where
         P: Default,
     {
         let mut result = Self::new(P::default())?;
         result.verification_level = self.verification_level;
-        
+
         for i in 0..self.length {
             let item = self.get(i)?;
-            result.push(item).map_err(|e| crate::Error::new(
-                crate::ErrorCategory::Memory,
-                crate::codes::INVALID_VALUE,
-                "Failed to push item during to_vec conversion",
-            ))?;
+            result.push(item).map_err(|e| {
+                crate::Error::new(
+                    crate::ErrorCategory::Memory,
+                    crate::codes::INVALID_VALUE,
+                    "Failed to push item during to_vec conversion",
+                )
+            })?;
         }
         Ok(result)
     }
@@ -1403,10 +1404,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<u32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(2).unwrap();
@@ -1436,10 +1436,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<u32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(2).unwrap();
@@ -1547,10 +1546,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<u32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(3).unwrap();
@@ -1696,10 +1694,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<u32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(2).unwrap();
@@ -1824,10 +1821,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<u32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(2).unwrap();
@@ -1869,10 +1865,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<u32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(2).unwrap();
@@ -1929,10 +1924,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<u32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(2).unwrap();
@@ -1995,10 +1989,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<u32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(2).unwrap();
@@ -2042,10 +2035,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<u32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(2).unwrap();
@@ -2118,10 +2110,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<u32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(3).unwrap();
@@ -2207,11 +2198,10 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// # use core::cmp::Ordering;
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<(u32, u32), 10, _>::new(provider).unwrap();
     /// # vec.push((1, 2)).unwrap();
     /// # vec.push((3, 4)).unwrap();
@@ -2304,10 +2294,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<(u32, u32), 10, _>::new(provider).unwrap();
     /// # vec.push((1, 42)).unwrap();
     /// # vec.push((3, 100)).unwrap();
@@ -2336,10 +2325,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<i32, 10, _>::new(provider).unwrap();
     /// # vec.push(5).unwrap();
     /// # vec.push(3).unwrap();
@@ -2370,10 +2358,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<i32, 10, _>::new(provider).unwrap();
     /// # vec.push(5).unwrap();
     /// # vec.push(3).unwrap();
@@ -2445,10 +2432,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<(i32, &str), 10, _>::new(provider).unwrap();
     /// # vec.push((5, "five")).unwrap();
     /// # vec.push((3, "three")).unwrap();
@@ -2481,10 +2467,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<i32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(2).unwrap();
@@ -2519,10 +2504,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<i32, 10, _>::new(provider).unwrap();
     /// # vec.push(10).unwrap();
     /// # vec.push(20).unwrap();
@@ -2608,10 +2592,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<(i32, &str), 10, _>::new(provider).unwrap();
     /// # vec.push((1, "one")).unwrap();
     /// # vec.push((2, "two")).unwrap();
@@ -2648,10 +2631,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<i32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// # vec.push(2).unwrap();
@@ -2772,10 +2754,9 @@ where
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedVec;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut vec = BoundedVec::<i32, 10, _>::new(provider).unwrap();
     /// # vec.push(1).unwrap();
     /// let items = [2, 3, 4, 5];
@@ -2811,13 +2792,17 @@ where
 
     /// Returns a slice view of the vector's contents
     ///
-    /// This creates a temporary array and copies all elements to provide a slice view.
-    /// Note: This is inefficient for large vectors and should be used sparingly.
-    pub fn as_slice(&self) -> &[T] {
-        // This is a simplified implementation that doesn't actually work
-        // because we can't return a reference to temporary data.
-        // For now, we'll panic to indicate this method shouldn't be used.
-        panic!("as_slice is not supported for BoundedVec in no_std mode")
+    /// Note: This method is not supported in no_std mode due to memory layout constraints.
+    /// Use individual element access methods instead.
+    pub fn as_slice(&self) -> crate::WrtResult<&[T]> {
+        // This operation is not supported in no_std mode because we can't
+        // safely return a reference to our internal storage structure.
+        // The memory layout of BoundedVec is not compatible with slice representation.
+        Err(crate::Error::new(
+            crate::ErrorCategory::Runtime,
+            crate::codes::UNIMPLEMENTED,
+            "as_slice is not supported for BoundedVec in no_std mode - use individual element access"
+        ))
     }
 
     /// Get a mutable reference to an element at the given index
@@ -2827,6 +2812,14 @@ where
     pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
         // Cannot provide mutable references to serialized data
         None
+    }
+    
+    /// Returns the last element of the vector, or None if it is empty.
+    pub fn last(&self) -> WrtResult<Option<T>> {
+        if self.is_empty() {
+            return Ok(None);
+        }
+        self.get(self.length - 1).map(Some)
     }
 }
 
@@ -2885,6 +2878,52 @@ where
     }
 }
 
+// Owned iterator that consumes the BoundedVec
+pub struct BoundedVecIntoIterator<T, const N_ELEMENTS: usize, P: MemoryProvider>
+where
+    T: Sized + Checksummable + ToBytes + FromBytes + Default + Clone + PartialEq + Eq,
+    P: MemoryProvider + Clone + PartialEq + Eq,
+{
+    vec: BoundedVec<T, N_ELEMENTS, P>,
+    current_index: usize,
+}
+
+impl<T, const N_ELEMENTS: usize, P: MemoryProvider> Iterator
+    for BoundedVecIntoIterator<T, N_ELEMENTS, P>
+where
+    T: Sized + Checksummable + ToBytes + FromBytes + Default + Clone + PartialEq + Eq,
+    P: MemoryProvider + Clone + PartialEq + Eq,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_index < self.vec.len() {
+            if let Ok(item) = self.vec.get(self.current_index) {
+                self.current_index += 1;
+                Some(item)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
+// Implement IntoIterator for BoundedVec (owned version)
+impl<T, const N_ELEMENTS: usize, P> IntoIterator for BoundedVec<T, N_ELEMENTS, P>
+where
+    T: Sized + Checksummable + ToBytes + FromBytes + Default + Clone + PartialEq + Eq,
+    P: MemoryProvider + Clone + PartialEq + Eq,
+{
+    type Item = T;
+    type IntoIter = BoundedVecIntoIterator<T, N_ELEMENTS, P>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        BoundedVecIntoIterator { vec: self, current_index: 0 }
+    }
+}
+
 impl<T, const N_ELEMENTS: usize, P: MemoryProvider> BoundedCapacity for BoundedVec<T, N_ELEMENTS, P>
 where
     T: Sized + Checksummable + ToBytes + FromBytes + Default + Clone + PartialEq + Eq,
@@ -2940,6 +2979,21 @@ where
                     // verification level. For now, if get
                     // fails, that part of data won't contribute to checksum.
                 }
+            }
+        }
+    }
+}
+
+// Implement Extend trait for BoundedVec
+impl<T, const N_ELEMENTS: usize, P: MemoryProvider> Extend<T> for BoundedVec<T, N_ELEMENTS, P>
+where
+    T: Sized + Checksummable + ToBytes + FromBytes + Default + Clone + PartialEq + Eq,
+    P: MemoryProvider + Clone + PartialEq + Eq,
+{
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        for item in iter {
+            if self.push(item).is_err() {
+                break; // Stop if we exceed capacity
             }
         }
     }
@@ -3144,19 +3198,45 @@ pub struct BoundedString<const N_BYTES: usize, P: MemoryProvider + Default + Clo
 }
 
 // Implement Ord specifically for BoundedString to support HashMap keys in no_std (BTreeMap)
-impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq + PartialOrd + Ord> PartialOrd for BoundedString<N_BYTES, P> {
+impl<
+        const N_BYTES: usize,
+        P: MemoryProvider + Default + Clone + PartialEq + Eq + PartialOrd + Ord,
+    > PartialOrd for BoundedString<N_BYTES, P>
+{
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq + PartialOrd + Ord> Ord for BoundedString<N_BYTES, P> {
+impl<
+        const N_BYTES: usize,
+        P: MemoryProvider + Default + Clone + PartialEq + Eq + PartialOrd + Ord,
+    > Ord for BoundedString<N_BYTES, P>
+{
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         // Compare strings lexicographically by comparing their byte sequences
         // If as_str() fails, fall back to comparing the raw bytes
         match (self.as_str(), other.as_str()) {
             (Ok(self_str), Ok(other_str)) => self_str.cmp(other_str),
-            _ => self.bytes.as_slice().cmp(other.bytes.as_slice()),
+            _ => {
+                // Fall back to element-by-element comparison since as_slice() is not available in no_std
+                let self_len = self.len();
+                let other_len = other.len();
+                let min_len = self_len.min(other_len);
+
+                for i in 0..min_len {
+                    match (self.bytes.get(i), other.bytes.get(i)) {
+                        (Ok(a), Ok(b)) => {
+                            let cmp = a.cmp(&b);
+                            if cmp != core::cmp::Ordering::Equal {
+                                return cmp;
+                            }
+                        }
+                        _ => break,
+                    }
+                }
+                self_len.cmp(&other_len)
+            }
         }
     }
 }
@@ -3418,10 +3498,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut s = BoundedString::<10, _>::from_str_truncate("Hello", provider).unwrap();
     /// s.push_str(", World!").unwrap();
     /// assert_eq!(s.as_str().unwrap(), "Hello, Wor"); // Truncated to fit capacity
@@ -3456,10 +3535,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut s = BoundedString::<10, _>::from_str_truncate("Hello", provider).unwrap();
     /// s.clear().unwrap();
     /// assert!(s.is_empty());
@@ -3474,10 +3552,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let s = BoundedString::<10, _>::from_str_truncate("Hello, World", provider).unwrap();
     /// assert!(s.starts_with("Hello").unwrap());
     /// assert!(!s.starts_with("World").unwrap());
@@ -3493,10 +3570,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let s = BoundedString::<10, _>::from_str_truncate("Hello, Wor", provider).unwrap();
     /// assert!(s.ends_with("Wor").unwrap());
     /// assert!(!s.ends_with("World").unwrap());
@@ -3512,10 +3588,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let s = BoundedString::<10, _>::from_str_truncate("Hello, World", provider).unwrap();
     /// let substring = s.substring(0, 5).unwrap();
     /// assert_eq!(substring.as_str().unwrap(), "Hello");
@@ -3560,10 +3635,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let mut s = BoundedString::<10, _>::from_str_truncate("Hello", provider).unwrap();
     /// s.push_char('!').unwrap();
     /// assert_eq!(s.as_str().unwrap(), "Hello!");
@@ -3582,10 +3656,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let s = BoundedString::<20, _>::from_str_truncate("  Hello  ", provider).unwrap();
     /// let trimmed = s.trim().unwrap();
     /// assert_eq!(trimmed.as_str().unwrap(), "Hello");
@@ -3606,10 +3679,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let s = BoundedString::<20, _>::from_str_truncate("Hello WORLD", provider).unwrap();
     /// let lowercase = s.to_lowercase().unwrap();
     /// assert_eq!(lowercase.as_str().unwrap(), "hello world");
@@ -3635,10 +3707,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let s = BoundedString::<20, _>::from_str_truncate("Hello World", provider).unwrap();
     /// let uppercase = s.to_uppercase().unwrap();
     /// assert_eq!(uppercase.as_str().unwrap(), "HELLO WORLD");
@@ -3660,10 +3731,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let s = BoundedString::<10, _>::from_str_truncate("Hello", provider).unwrap();
     /// assert_eq!(s.capacity(), 10);
     /// ```
@@ -3677,10 +3747,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let s = BoundedString::<20, _>::from_str_truncate("Hello World", provider).unwrap();
     /// assert!(s.contains("World").unwrap());
     /// assert!(!s.contains("Rust").unwrap());
@@ -3943,10 +4012,9 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
     ///
     /// ```
     /// # use wrt_foundation::bounded::BoundedString;
-    /// # use wrt_foundation::NoStdProvider;
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let s = BoundedString::<20, _>::from_str_truncate("Hello,World,Rust", provider).unwrap();
     /// let parts = s.split(',').unwrap();
     /// assert_eq!(parts.len(), 3);
@@ -3967,5 +4035,155 @@ impl<const N_BYTES: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq>
         }
 
         Ok(result)
+    }
+}
+
+/// Kani verification proofs for BoundedVec and BoundedString operations
+#[cfg(kani)]
+mod kani_proofs {
+    use super::*;
+    use crate::safe_memory::NoStdProvider;
+    
+    /// Verify that BoundedVec push never violates capacity bounds
+    #[kani::proof]
+    fn verify_bounded_vec_push_capacity() {
+        const CAPACITY: usize = 8;
+        let provider = NoStdProvider::<1024>::default();
+        let mut vec: BoundedVec<u32, CAPACITY, _> = BoundedVec::new(provider).unwrap();
+        
+        // Fill to capacity - 1
+        for i in 0..(CAPACITY - 1) {
+            assert!(vec.push(i as u32).is_ok());
+            assert_eq!(vec.len(), i + 1);
+            assert!(!vec.is_full());
+        }
+        
+        // Last push should succeed
+        assert!(vec.push((CAPACITY - 1) as u32).is_ok());
+        assert_eq!(vec.len(), CAPACITY);
+        assert!(vec.is_full());
+        
+        // Next push should fail
+        assert!(vec.push(CAPACITY as u32).is_err());
+        assert_eq!(vec.len(), CAPACITY); // Length unchanged
+    }
+    
+    /// Verify that BoundedVec pop maintains correct state
+    #[kani::proof]
+    fn verify_bounded_vec_pop_state() {
+        const CAPACITY: usize = 4;
+        let provider = NoStdProvider::<1024>::default();
+        let mut vec: BoundedVec<u32, CAPACITY, _> = BoundedVec::new(provider).unwrap();
+        
+        // Initially empty
+        assert!(vec.is_empty());
+        assert_eq!(vec.pop().unwrap(), None);
+        
+        // Add some items
+        vec.push(10).unwrap();
+        vec.push(20).unwrap();
+        vec.push(30).unwrap();
+        
+        // Pop items in LIFO order
+        assert_eq!(vec.pop().unwrap(), Some(30));
+        assert_eq!(vec.len(), 2);
+        
+        assert_eq!(vec.pop().unwrap(), Some(20));
+        assert_eq!(vec.len(), 1);
+        
+        assert_eq!(vec.pop().unwrap(), Some(10));
+        assert_eq!(vec.len(), 0);
+        assert!(vec.is_empty());
+        
+        // Pop from empty returns None
+        assert_eq!(vec.pop().unwrap(), None);
+    }
+    
+    /// Verify that BoundedVec indexing is always safe
+    #[kani::proof]
+    fn verify_bounded_vec_indexing() {
+        const CAPACITY: usize = 8;
+        let provider = NoStdProvider::<1024>::default();
+        let mut vec: BoundedVec<u32, CAPACITY, _> = BoundedVec::new(provider).unwrap();
+        
+        // Add some items
+        let count: usize = kani::any_where(|&c| c <= CAPACITY);
+        for i in 0..count {
+            vec.push(i as u32).unwrap();
+        }
+        
+        // Valid indices should always work
+        for i in 0..vec.len() {
+            let result = vec.get(i);
+            assert!(result.is_ok());
+            if let Ok(Some(value)) = result {
+                assert_eq!(*value, i as u32);
+            }
+        }
+        
+        // Invalid indices should return None or error safely
+        let invalid_index = vec.len();
+        if invalid_index < CAPACITY {
+            assert!(vec.get(invalid_index).unwrap().is_none());
+        }
+    }
+    
+    /// Verify that BoundedString operations maintain UTF-8 validity
+    #[kani::proof]
+    fn verify_bounded_string_utf8() {
+        const CAPACITY: usize = 64;
+        let provider = NoStdProvider::<1024>::default();
+        
+        // Valid UTF-8 strings should always work
+        let test_str = "Hello, 世界!";
+        let bounded_str = BoundedString::<CAPACITY, _>::from_str(test_str, provider).unwrap();
+        
+        // Should be able to convert back to &str
+        let as_str = bounded_str.as_str().unwrap();
+        assert_eq!(as_str, test_str);
+        
+        // Length should match
+        assert_eq!(bounded_str.len(), test_str.len());
+    }
+    
+    /// Verify that overflow detection works in capacity calculations
+    #[kani::proof]
+    fn verify_no_overflow_in_capacity_calculation() {
+        let length: usize = kani::any();
+        let item_size: usize = kani::any_where(|&s| s > 0 && s <= 1024);
+        
+        // Verify that overflow is properly detected
+        if let Some(total_size) = length.checked_mul(item_size) {
+            assert!(total_size >= length);
+            assert!(total_size >= item_size);
+            
+            // If multiplication succeeded, verify bounds
+            if total_size <= usize::MAX / 2 {
+                // Safe range for further operations
+                assert!(total_size.checked_add(item_size).is_some());
+            }
+        }
+    }
+    
+    /// Verify that memory provider operations are always bounded
+    #[kani::proof]
+    fn verify_memory_provider_bounds() {
+        const PROVIDER_SIZE: usize = 1024;
+        let provider = NoStdProvider::<PROVIDER_SIZE>::default();
+        
+        let offset: usize = kani::any_where(|&o| o < PROVIDER_SIZE);
+        let len: usize = kani::any_where(|&l| l <= PROVIDER_SIZE - offset);
+        
+        // Read operations should never exceed provider bounds
+        let data = vec![0u8; len];
+        let write_result = provider.write_data(offset, &data);
+        
+        if write_result.is_ok() {
+            let read_result = provider.read_data(offset, len);
+            assert!(read_result.is_ok());
+            if let Ok(read_data) = read_result {
+                assert_eq!(read_data.len(), len);
+            }
+        }
     }
 }

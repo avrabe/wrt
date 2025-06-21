@@ -38,22 +38,22 @@ impl<P: MemoryProvider> MemoryPool<P> {
     pub fn new(provider: P) -> Self {
         Self {
             #[cfg(feature = "std")]
-            instruction_pools: crate::prelude::Vec::new(),
+            instruction_pools: std::vec::Vec::with_capacity(0),
             #[cfg(feature = "std")]
-            string_pools: crate::prelude::Vec::new(),
+            string_pools: std::vec::Vec::with_capacity(0),
             provider,
         }
     }
 
     /// Get a reusable vector for instructions
     #[cfg(feature = "std")]
-    pub fn get_instruction_vector(&mut self) -> crate::prelude::Vec<u8> {
-        self.instruction_pools.pop().unwrap_or_else(crate::prelude::Vec::new)
+    pub fn get_instruction_vector(&mut self) -> std::vec::Vec<u8> {
+        self.instruction_pools.pop().unwrap_or_else(|| std::vec::Vec::with_capacity(0))
     }
 
     /// Return a vector to the instruction pool
     #[cfg(feature = "std")]
-    pub fn return_instruction_vector(&mut self, mut vec: crate::prelude::Vec<u8>) {
+    pub fn return_instruction_vector(&mut self, mut vec: std::vec::Vec<u8>) {
         vec.clear();
         if vec.capacity() <= 1024 {
             // Don't pool overly large vectors
@@ -63,13 +63,13 @@ impl<P: MemoryProvider> MemoryPool<P> {
 
     /// Get a reusable vector for string operations
     #[cfg(feature = "std")]
-    pub fn get_string_buffer(&mut self) -> crate::prelude::Vec<u8> {
-        self.string_pools.pop().unwrap_or_else(crate::prelude::Vec::new)
+    pub fn get_string_buffer(&mut self) -> std::vec::Vec<u8> {
+        self.string_pools.pop().unwrap_or_else(std::vec::Vec::new)
     }
 
     /// Return a vector to the string pool
     #[cfg(feature = "std")]
-    pub fn return_string_buffer(&mut self, mut vec: crate::prelude::Vec<u8>) {
+    pub fn return_string_buffer(&mut self, mut vec: std::vec::Vec<u8>) {
         vec.clear();
         if vec.capacity() <= 256 {
             // Don't pool overly large vectors
@@ -104,7 +104,11 @@ pub fn parse_string_inplace<'a>(
     offset: usize,
 ) -> Result<(&'a str, usize)> {
     let data = slice.data().map_err(|_| {
-        Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Failed to access slice data")
+        Error::new(
+            ErrorCategory::Parse,
+            codes::PARSE_ERROR,
+            "Failed to access slice data",
+        )
     })?;
 
     if offset >= data.len() {
@@ -165,12 +169,21 @@ impl<'a> StreamingCollectionParser<'a> {
     /// Create a new streaming parser for a collection
     pub fn new(slice: &'a SafeSlice<'a>, offset: usize) -> Result<Self> {
         let data = slice.data().map_err(|_| {
-            Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Failed to access slice data")
+            Error::new(
+                ErrorCategory::Parse,
+                codes::PARSE_ERROR,
+                "Failed to access slice data",
+            )
         })?;
 
         let (count, new_offset) = read_leb128_u32(data, offset)?;
 
-        Ok(Self { slice, offset: new_offset, count, processed: 0 })
+        Ok(Self {
+            slice,
+            offset: new_offset,
+            count,
+            processed: 0,
+        })
     }
 
     /// Get the total count of items
@@ -211,7 +224,23 @@ pub struct ModuleArena {
 impl ModuleArena {
     /// Create a new arena with the given capacity
     pub fn new(capacity: usize) -> Self {
-        Self { buffer: crate::prelude::Vec::with_capacity(capacity), offset: 0 }
+        Self {
+            buffer: {
+                #[cfg(feature = "std")]
+                { std::vec::Vec::with_capacity(capacity) }
+                #[cfg(not(feature = "std"))]
+                { 
+                    let provider = crate::prelude::create_decoder_provider::<4096>().unwrap_or_default();
+                    let mut vec = crate::prelude::DecoderVec::new(provider).unwrap_or_default();
+                    // Pre-allocate by pushing zeros up to capacity
+                    for _ in 0..capacity.min(4096) {
+                        let _ = vec.push(0);
+                    }
+                    vec
+                }
+            },
+            offset: 0,
+        }
     }
 
     /// Allocate space in the arena
@@ -247,7 +276,11 @@ pub struct BoundedIterator<'a, T> {
 impl<'a, T> BoundedIterator<'a, T> {
     /// Create a new bounded iterator
     pub fn new(items: &'a [T], max_items: usize) -> Self {
-        Self { items, index: 0, max_items }
+        Self {
+            items,
+            index: 0,
+            max_items,
+        }
     }
 }
 
@@ -268,7 +301,11 @@ impl<'a, T> Iterator for BoundedIterator<'a, T> {
 /// Memory-efficient bounds checking
 pub fn check_bounds_u32(value: u32, max_value: u32, _context: &str) -> Result<()> {
     if value > max_value {
-        Err(Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Bounds check failed"))
+        Err(Error::new(
+            ErrorCategory::Parse,
+            codes::PARSE_ERROR,
+            "Bounds check failed",
+        ))
     } else {
         Ok(())
     }

@@ -159,10 +159,10 @@ impl<'a> wrt_foundation::traits::ToBytes for Parameter<'a> {
             Some(name) => {
                 writer.write_u8(1)?;
                 name.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             None => {
                 writer.write_u8(0)?;
-            }
+            },
         }
         writer.write_u8(self.param_type.to_u8())?;
         writer.write_u16_le(self.file_index)?;
@@ -224,7 +224,7 @@ impl<'a> ParameterList<'a> {
 
     /// Get all parameters
     pub fn parameters(&self) -> &[Parameter<'a>] {
-        self.parameters.as_slice()
+        self.parameters.as_slice().unwrap_or(&[])
     }
 
     /// Get parameter count
@@ -354,10 +354,10 @@ impl<'a> wrt_foundation::traits::ToBytes for InlinedFunction<'a> {
             Some(name) => {
                 writer.write_u8(1)?;
                 name.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             None => {
                 writer.write_u8(0)?;
-            }
+            },
         }
         writer.write_u32_le(self.abstract_origin)?;
         writer.write_u32_le(self.low_pc)?;
@@ -397,6 +397,7 @@ impl<'a> wrt_foundation::traits::FromBytes for InlinedFunction<'a> {
 
 /// Collection of inlined functions
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct InlinedFunctions<'a> {
     /// Inlined function entries
     entries: BoundedVec<
@@ -406,6 +407,7 @@ pub struct InlinedFunctions<'a> {
     >,
 }
 
+#[allow(dead_code)]
 impl<'a> InlinedFunctions<'a> {
     /// Create new inlined functions collection
     pub fn new() -> Self {

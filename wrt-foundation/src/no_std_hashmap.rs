@@ -344,8 +344,8 @@ mod tests {
         assert_eq!(map.get(&1).unwrap(), Some(1000));
 
         // Test removing a value
-        assert_eq!(map.remove("two").unwrap(), Some(2));
-        assert_eq!(map.get("two").unwrap(), None);
+        assert_eq!(map.remove(&2).unwrap(), Some(200));
+        assert_eq!(map.get(&2).unwrap(), None);
 
         // Test len and is_empty
         assert_eq!(map.len(), 2);

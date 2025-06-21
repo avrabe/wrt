@@ -63,11 +63,11 @@ Create a custom derive macro and attribute system for architectural components:
 
 **Documentation Generation**:
 
-Create an xtask command that extracts these annotations and generates PlantUML:
+Create a cargo-wrt command that extracts these annotations and generates PlantUML:
 
 .. code-block:: bash
 
-   cargo xtask generate-architecture-docs
+   cargo-wrt generate-architecture-docs  # (planned command)
 
 This would produce:
 
@@ -298,7 +298,7 @@ This would produce:
        - uses: actions/checkout@v4
        
        - name: Generate Architecture Diagrams
-         run: cargo xtask generate-architecture-docs
+         run: cargo-wrt generate-architecture-docs  # TODO: implement command
          
        - name: Validate Interface Contracts
          run: cargo test --test architecture_validation
@@ -310,7 +310,7 @@ This would produce:
          run: cargo test --test adr_validation
          
        - name: Check Documentation Coverage
-         run: cargo xtask check-doc-coverage
+         run: cargo-wrt check-doc-coverage  # TODO: implement command
          
        - name: Upload Generated Diagrams
          uses: actions/upload-artifact@v4
@@ -431,7 +431,7 @@ Benefits
 Example Output
 --------------
 
-Running `cargo xtask validate-architecture-docs` would produce:
+Running `cargo-wrt validate-architecture-docs` (planned command) would produce:
 
 .. code-block:: text
 

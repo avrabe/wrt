@@ -19,7 +19,6 @@
 //! - **InstanceResolver**: Maps component instances to runtime instances
 //! - **HostRegistry**: Manages host function registration and invocation
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]

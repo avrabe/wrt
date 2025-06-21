@@ -178,7 +178,7 @@ pub struct CoreInstance {
 impl Validatable for CoreInstance {
     fn validate(&self) -> Result<()> {
         match &self.instance_expr {
-            CoreInstanceExpr::Instantiate { module_idx, args } => {
+            CoreInstanceExpr::ModuleReference { module_idx, arg_refs } => {
                 // Basic validation: module_idx should be reasonable
                 if *module_idx > 10000 {
                     // Arbitrary reasonable limit
@@ -188,22 +188,24 @@ impl Validatable for CoreInstance {
                     ));
                 }
 
-                // Validate args
-                for arg in args {
-                    if arg.name.is_empty() {
+                // Validate arg references
+                for arg_ref in arg_refs {
+                    if arg_ref.name.is_empty() {
                         return Err(Error::validation_error(
-                            "Instantiate arg name cannot be empty",
+                            "Arg reference name cannot be empty",
                         ));
                     }
                 }
 
                 Ok(())
-            }
+            },
             CoreInstanceExpr::InlineExports(exports) => {
                 // Validate exports
                 for export in exports {
                     if export.name.is_empty() {
-                        return Err(Error::validation_error("Inline export name cannot be empty"));
+                        return Err(Error::validation_error(
+                            "Inline export name cannot be empty",
+                        ));
                     }
                     // Reasonable index limit
                     if export.idx > 100_000 {
@@ -215,31 +217,31 @@ impl Validatable for CoreInstance {
                 }
 
                 Ok(())
-            }
+            },
         }
     }
 }
 
-/// Core WebAssembly instance expression
+/// Core WebAssembly instance expression (format representation only)
 #[derive(Debug, Clone)]
 pub enum CoreInstanceExpr {
-    /// Instantiate a core module
-    Instantiate {
+    /// Reference to a module for instantiation (format-only, runtime handles actual instantiation)
+    ModuleReference {
         /// Module index
         module_idx: u32,
-        /// Instantiation arguments
-        args: Vec<CoreInstantiateArg>,
+        /// Format-only argument references
+        arg_refs: Vec<CoreArgReference>,
     },
     /// Collection of inlined exports
     InlineExports(Vec<CoreInlineExport>),
 }
 
-/// Core WebAssembly instantiation argument
+/// Core WebAssembly argument reference (format representation only)
 #[derive(Debug, Clone)]
-pub struct CoreInstantiateArg {
+pub struct CoreArgReference {
     /// Name of the argument
     pub name: String,
-    /// Instance index that provides the value
+    /// Instance index reference (format-only)
     pub instance_idx: u32,
 }
 
@@ -300,7 +302,7 @@ impl Validatable for CoreType {
                 }
 
                 Ok(())
-            }
+            },
             CoreTypeDefinition::Module { imports, exports } => {
                 // Validate imports
                 for (namespace, name, _) in imports {
@@ -320,7 +322,7 @@ impl Validatable for CoreType {
                 }
 
                 Ok(())
-            }
+            },
         }
     }
 }
@@ -388,28 +390,28 @@ pub struct Instance {
     pub instance_expr: InstanceExpr,
 }
 
-/// Component instance expression
+/// Component instance expression (format representation only)
 #[derive(Debug, Clone)]
 pub enum InstanceExpr {
-    /// Instantiate a component
-    Instantiate {
+    /// Reference to a component for instantiation (format-only, runtime handles actual instantiation)
+    ComponentReference {
         /// Component index
         component_idx: u32,
-        /// Instantiation arguments
-        args: Vec<InstantiateArg>,
+        /// Format-only argument references
+        arg_refs: Vec<InstantiateArgReference>,
     },
     /// Collection of inlined exports
     InlineExports(Vec<InlineExport>),
 }
 
-/// Component instantiation argument
+/// Component instantiation argument reference (format representation only)
 #[derive(Debug, Clone)]
-pub struct InstantiateArg {
+pub struct InstantiateArgReference {
     /// Name of the argument
     pub name: String,
-    /// Sort of the referenced item
+    /// Sort of the referenced item (format-only)
     pub sort: Sort,
-    /// Index within the sort
+    /// Index within the sort (format-only)
     pub idx: u32,
 }
 
@@ -565,7 +567,10 @@ pub struct TypeRegistry<P: wrt_foundation::MemoryProvider = NoStdProvider<1024>>
 impl<P: wrt_foundation::MemoryProvider + Clone + Default> TypeRegistry<P> {
     /// Create a new type registry
     pub fn new() -> Result<Self, wrt_foundation::bounded::CapacityError> {
-        Ok(Self { types: WasmVec::new(P::default())?, next_ref: 0 })
+        Ok(Self {
+            types: WasmVec::new(P::default())?,
+            next_ref: 0,
+        })
     }
 
     /// Add a type to the registry and return its reference
@@ -911,13 +916,23 @@ impl ImportName {
     /// Create a new import name with just namespace and name
     #[cfg(feature = "std")]
     pub fn new(namespace: String, name: String) -> Self {
-        Self { namespace, name, nested: Vec::new(), package: None }
+        Self {
+            namespace,
+            name,
+            nested: Vec::new(),
+            package: None,
+        }
     }
 
     /// Create a new import name with nested namespaces
     #[cfg(feature = "std")]
     pub fn with_nested(namespace: String, name: String, nested: Vec<String>) -> Self {
-        Self { namespace, name, nested, package: None }
+        Self {
+            namespace,
+            name,
+            nested,
+            package: None,
+        }
     }
 
     /// Add package reference to an import name
@@ -941,12 +956,24 @@ impl ImportName {
 impl ExportName {
     /// Create a new export name
     pub fn new(name: String) -> Self {
-        Self { name, is_resource: false, semver: None, integrity: None, nested: Vec::new() }
+        Self {
+            name,
+            is_resource: false,
+            semver: None,
+            integrity: None,
+            nested: Vec::new(),
+        }
     }
 
     /// Create a new export name with nested namespaces
     pub fn with_nested(name: String, nested: Vec<String>) -> Self {
-        Self { name, is_resource: false, semver: None, integrity: None, nested }
+        Self {
+            name,
+            is_resource: false,
+            semver: None,
+            integrity: None,
+            nested,
+        }
     }
 
     /// Mark as a resource export
@@ -1052,7 +1079,10 @@ pub enum ConstValue {
 impl Validatable for Instance {
     fn validate(&self) -> Result<()> {
         match &self.instance_expr {
-            InstanceExpr::Instantiate { component_idx, args } => {
+            InstanceExpr::ComponentReference {
+                component_idx,
+                arg_refs,
+            } => {
                 // Basic validation: component_idx should be reasonable
                 if *component_idx > 10000 {
                     // Arbitrary reasonable limit
@@ -1062,27 +1092,29 @@ impl Validatable for Instance {
                     ));
                 }
 
-                // Validate args
-                for arg in args {
-                    if arg.name.is_empty() {
+                // Validate arg references
+                for arg_ref in arg_refs {
+                    if arg_ref.name.is_empty() {
                         return Err(Error::validation_error(
-                            "Instantiate arg name cannot be empty",
+                            "Arg reference name cannot be empty",
                         ));
                     }
                 }
 
                 Ok(())
-            }
+            },
             InstanceExpr::InlineExports(exports) => {
                 // Validate exports
                 for export in exports {
                     if export.name.is_empty() {
-                        return Err(Error::validation_error("Inline export name cannot be empty"));
+                        return Err(Error::validation_error(
+                            "Inline export name cannot be empty",
+                        ));
                     }
                 }
 
                 Ok(())
-            }
+            },
         }
     }
 }
@@ -1090,7 +1122,9 @@ impl Validatable for Instance {
 impl Validatable for Alias {
     fn validate(&self) -> Result<()> {
         match &self.target {
-            AliasTarget::CoreInstanceExport { instance_idx, name, .. } => {
+            AliasTarget::CoreInstanceExport {
+                instance_idx, name, ..
+            } => {
                 if *instance_idx > 10000 {
                     return Err(validation_error!(
                         "Instance index {} seems unreasonably large",
@@ -1103,8 +1137,10 @@ impl Validatable for Alias {
                 }
 
                 Ok(())
-            }
-            AliasTarget::InstanceExport { instance_idx, name, .. } => {
+            },
+            AliasTarget::InstanceExport {
+                instance_idx, name, ..
+            } => {
                 if *instance_idx > 10000 {
                     return Err(validation_error!(
                         "Instance index {} seems unreasonably large",
@@ -1117,7 +1153,7 @@ impl Validatable for Alias {
                 }
 
                 Ok(())
-            }
+            },
             AliasTarget::Outer { count, idx, .. } => {
                 if *count > 10 {
                     return Err(validation_error!(
@@ -1131,7 +1167,7 @@ impl Validatable for Alias {
                 }
 
                 Ok(())
-            }
+            },
         }
     }
 }
@@ -1158,7 +1194,7 @@ impl Validatable for ComponentType {
                 }
 
                 Ok(())
-            }
+            },
             ComponentTypeDefinition::Instance { exports } => {
                 // Validate exports
                 for (name, _) in exports {
@@ -1168,7 +1204,7 @@ impl Validatable for ComponentType {
                 }
 
                 Ok(())
-            }
+            },
             ComponentTypeDefinition::Function { params, results } => {
                 // Basic validation: reasonable limits on params and results
                 if params.len() > 1000 {
@@ -1193,15 +1229,15 @@ impl Validatable for ComponentType {
                 }
 
                 Ok(())
-            }
+            },
             ComponentTypeDefinition::Value(_) => {
                 // Simple value types don't need further validation
                 Ok(())
-            }
+            },
             ComponentTypeDefinition::Resource { .. } => {
                 // Resource types are validated elsewhere
                 Ok(())
-            }
+            },
         }
     }
 }
@@ -1209,7 +1245,9 @@ impl Validatable for ComponentType {
 impl Validatable for Canon {
     fn validate(&self) -> Result<()> {
         match &self.operation {
-            CanonOperation::Lift { func_idx, type_idx, .. } => {
+            CanonOperation::Lift {
+                func_idx, type_idx, ..
+            } => {
                 if *func_idx > 10000 {
                     return Err(validation_error!(
                         "Function index {} seems unreasonably large",
@@ -1225,7 +1263,7 @@ impl Validatable for Canon {
                 }
 
                 Ok(())
-            }
+            },
             CanonOperation::Lower { func_idx, .. } => {
                 if *func_idx > 10000 {
                     return Err(validation_error!(
@@ -1235,7 +1273,7 @@ impl Validatable for Canon {
                 }
 
                 Ok(())
-            }
+            },
             // Other operations have simpler validation requirements
             _ => Ok(()),
         }
@@ -1314,7 +1352,10 @@ impl Validatable for Export {
 
         // Index should be reasonable
         if self.idx > 10000 {
-            return Err(validation_error!("Export index {} seems unreasonably large", self.idx));
+            return Err(validation_error!(
+                "Export index {} seems unreasonably large",
+                self.idx
+            ));
         }
 
         Ok(())
@@ -1341,7 +1382,7 @@ impl Validatable for Value {
                             idx
                         ));
                     }
-                }
+                },
                 ValueExpression::GlobalInit { global_idx } => {
                     if *global_idx > 10000 {
                         return Err(validation_error!(
@@ -1349,7 +1390,7 @@ impl Validatable for Value {
                             global_idx
                         ));
                     }
-                }
+                },
                 ValueExpression::FunctionCall { func_idx, args } => {
                     if *func_idx > 10000 {
                         return Err(validation_error!(
@@ -1364,10 +1405,10 @@ impl Validatable for Value {
                             args.len()
                         ));
                     }
-                }
+                },
                 ValueExpression::Const(_) => {
                     // Constants are validated elsewhere
-                }
+                },
             }
         }
 

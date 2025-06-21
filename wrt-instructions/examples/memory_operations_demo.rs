@@ -113,6 +113,10 @@ impl MemoryOperations for MockMemory {
 }
 
 fn main() -> Result<()> {
+    // Initialize global memory system first
+    wrt_foundation::memory_init::MemoryInitializer::initialize()
+        .expect("Failed to initialize memory system");
+
     println!("WebAssembly Memory Operations Demo");
     println!("==================================");
     
@@ -189,6 +193,9 @@ fn main() -> Result<()> {
     println!("\n✓ All memory operations completed successfully!");
     println!("✓ The MemoryOperations trait successfully bridges wrt-instructions and wrt-runtime!");
     
+    // Memory cleanup happens automatically via RAII
+    println!("\nMemory operations demo completed successfully!");
+    
     Ok(())
 }
 
@@ -252,12 +259,3 @@ mod tests {
     }
 }
 
-fn main() -> Result<()> {
-    println!("=== Memory Operations Demo ===");
-    
-    let demo = MemoryOperationsDemo::new();
-    demo.demo_memory_operations()?;
-    
-    println!("Demo completed successfully!");
-    Ok(())
-}

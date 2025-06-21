@@ -7,6 +7,7 @@
 //! This module interfaces with QNX's arena allocation system to provide
 //! WebAssembly memory that is both efficient and well-integrated with the OS.
 
+
 use core::{
     fmt::{self, Debug},
     ptr::NonNull,

@@ -19,7 +19,7 @@
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use wrt_error::Error as WrtError; // Added for the Result return type
-// Use WrtOnce from wrt-sync crate
+                                  // Use WrtOnce from wrt-sync crate
 use wrt_sync::once::WrtOnce;
 
 use crate::traits::importance; // Added this import
@@ -83,6 +83,48 @@ pub enum Type {
     CollectionWrite,
     /// Collection peek operation
     CollectionPeek,
+    
+    // WebAssembly-specific operation types
+    /// Simple WebAssembly constants (i32.const, nop)
+    WasmSimpleConstant,
+    /// Local variable access (local.get, local.set, local.tee)
+    WasmLocalAccess,
+    /// Global variable access (global.get, global.set)
+    WasmGlobalAccess,
+    /// Simple arithmetic (i32.add, i32.sub, i32.and, i32.or)
+    WasmSimpleArithmetic,
+    /// Complex arithmetic (i32.mul, i32.div, i32.rem)
+    WasmComplexArithmetic,
+    /// Floating point arithmetic (f32.add, f64.mul)
+    WasmFloatArithmetic,
+    /// Comparison operations (i32.eq, i32.lt, f32.gt)
+    WasmComparison,
+    /// Simple control flow (br, br_if, return)
+    WasmSimpleControl,
+    /// Complex control flow (br_table, call_indirect)
+    WasmComplexControl,
+    /// Function calls (call)
+    WasmFunctionCall,
+    /// Memory load operations (i32.load, f32.load)
+    WasmMemoryLoad,
+    /// Memory store operations (i32.store, f32.store)
+    WasmMemoryStore,
+    /// Memory management (memory.grow, memory.size)
+    WasmMemoryManagement,
+    /// Table access operations (table.get, table.set)
+    WasmTableAccess,
+    /// Type conversion operations (i32.wrap_i64, f32.convert_i32_s)
+    WasmTypeConversion,
+    /// SIMD operations (v128.add, i32x4.splat)
+    WasmSimdOperation,
+    /// Atomic operations (i32.atomic.load, i32.atomic.rmw.add)
+    WasmAtomicOperation,
+    /// Stream operations (create, poll, yield, close)
+    StreamOperation,
+    /// Stream creation
+    StreamCreate,
+    /// Future operations (compose, chain, select)
+    FutureOperation,
 }
 
 impl Type {
@@ -116,6 +158,28 @@ impl Type {
             Type::CollectionRead => 3,
             Type::CollectionWrite => 7,
             Type::CollectionPeek => 3,
+            
+            // WebAssembly instruction costs based on execution complexity
+            Type::WasmSimpleConstant => 1,     // i32.const, nop - very fast
+            Type::WasmLocalAccess => 1,        // local.get/set - register access
+            Type::WasmGlobalAccess => 2,       // global.get/set - memory access
+            Type::WasmSimpleArithmetic => 1,   // i32.add, i32.sub, bitwise ops
+            Type::WasmComplexArithmetic => 3,  // i32.mul, i32.div - more cycles
+            Type::WasmFloatArithmetic => 4,    // f32/f64 operations - FPU
+            Type::WasmComparison => 1,         // i32.eq, i32.lt - simple compare
+            Type::WasmSimpleControl => 2,      // br, br_if, return - branch
+            Type::WasmComplexControl => 8,     // br_table, call_indirect - complex dispatch
+            Type::WasmFunctionCall => 10,      // call - function call overhead
+            Type::WasmMemoryLoad => 5,         // i32.load - memory access + decode
+            Type::WasmMemoryStore => 6,        // i32.store - memory write + encode
+            Type::WasmMemoryManagement => 50,  // memory.grow - expensive allocation
+            Type::WasmTableAccess => 3,        // table.get/set - indirect access
+            Type::WasmTypeConversion => 2,     // type casts and conversions
+            Type::WasmSimdOperation => 6,      // SIMD operations - parallel execution
+            Type::WasmAtomicOperation => 15,   // atomic ops - synchronization overhead
+            Type::StreamOperation => 5,        // General stream operations
+            Type::StreamCreate => 10,          // Stream creation
+            Type::FutureOperation => 8,        // Future composition operations
         }
     }
 
@@ -148,6 +212,31 @@ impl Type {
             | Type::Other => importance::READ,
             Type::CollectionRead | Type::CollectionPeek => importance::READ,
             Type::CollectionWrite => importance::MUTATION,
+            
+            // WebAssembly instruction importance levels
+            Type::WasmSimpleConstant
+            | Type::WasmLocalAccess
+            | Type::WasmSimpleArithmetic
+            | Type::WasmComparison
+            | Type::WasmSimpleControl => importance::READ,
+            
+            Type::WasmGlobalAccess
+            | Type::WasmComplexArithmetic
+            | Type::WasmFloatArithmetic
+            | Type::WasmComplexControl
+            | Type::WasmFunctionCall
+            | Type::WasmMemoryLoad
+            | Type::WasmTableAccess
+            | Type::WasmTypeConversion
+            | Type::WasmSimdOperation => importance::MUTATION,
+            
+            Type::WasmMemoryStore
+            | Type::WasmMemoryManagement
+            | Type::WasmAtomicOperation => importance::CRITICAL,
+            
+            Type::StreamOperation
+            | Type::StreamCreate
+            | Type::FutureOperation => importance::MUTATION,
         }
     }
 
@@ -366,6 +455,64 @@ impl Counter {
             }
             Type::CollectionIterate => {
                 self.collection_iterates.fetch_add(1, Ordering::Relaxed);
+            }
+            // WASM-specific operations
+            Type::WasmSimpleConstant => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmLocalAccess => {
+                self.memory_reads.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmGlobalAccess => {
+                self.memory_reads.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmSimpleArithmetic => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmComplexArithmetic => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmFloatArithmetic => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmComparison => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmSimpleControl => {
+                self.control_flows.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmComplexControl => {
+                self.control_flows.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmFunctionCall => {
+                self.function_calls.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmMemoryLoad => {
+                self.memory_reads.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmMemoryStore => {
+                self.memory_writes.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmMemoryManagement => {
+                self.memory_grows.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmTableAccess => {
+                self.memory_reads.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmTypeConversion => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmSimdOperation => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::WasmAtomicOperation => {
+                self.memory_writes.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::StreamOperation | Type::StreamCreate => {
+                self.other_ops.fetch_add(1, Ordering::Relaxed);
+            }
+            Type::FutureOperation => {
+                self.other_ops.fetch_add(1, Ordering::Relaxed);
             }
         };
 

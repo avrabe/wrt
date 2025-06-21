@@ -5,6 +5,7 @@ use wrt_foundation::{
     NoStdProvider,
 };
 
+use crate::bounded_debug_infra;
 /// Runtime memory inspection implementation
 /// Provides safe memory access and heap analysis capabilities
 use crate::runtime_api::{DebugMemory, RuntimeState};
@@ -57,9 +58,10 @@ pub struct HeapAllocation {
 /// Memory inspector for runtime debugging
 pub struct MemoryInspector<'a> {
     /// Memory regions
-    regions: BoundedVec<MemoryRegion, 16, NoStdProvider<1024>>,
+    regions: BoundedVec<MemoryRegion, 16, crate::bounded_debug_infra::DebugProvider>,
     /// Binary std/no_std choice
-    allocations: BoundedVec<HeapAllocation, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>>,
+    allocations:
+        BoundedVec<HeapAllocation, MAX_DWARF_FILE_TABLE, crate::bounded_debug_infra::DebugProvider>,
     /// Reference to debug memory interface
     memory: Option<&'a dyn DebugMemory>,
 }
@@ -91,7 +93,9 @@ impl<'a> MemoryInspector<'a> {
 
     /// Find which region contains an address
     pub fn find_region(&self, addr: u32) -> Option<&MemoryRegion> {
-        self.regions.iter().find(|r| addr >= r.start && addr < r.start.saturating_add(r.size))
+        self.regions
+            .iter()
+            .find(|r| addr >= r.start && addr < r.start.saturating_add(r.size))
     }
 
     /// Check if an address is valid
@@ -108,7 +112,11 @@ impl<'a> MemoryInspector<'a> {
         let memory = self.memory?;
         let data = memory.read_bytes(addr, len)?;
 
-        Some(MemoryView { address: addr, data, region: self.find_region(addr) })
+        Some(MemoryView {
+            address: addr,
+            data,
+            region: self.find_region(addr),
+        })
     }
 
     /// Read a null-terminated string
@@ -129,7 +137,10 @@ impl<'a> MemoryInspector<'a> {
         }
 
         let data = memory.read_bytes(addr, len)?;
-        Some(CStringView { address: addr, data })
+        Some(CStringView {
+            address: addr,
+            data,
+        })
     }
 
     /// Get heap statistics
@@ -174,7 +185,11 @@ impl<'a> MemoryInspector<'a> {
 
     /// Dump memory in hex format
     pub fn dump_hex(&self, addr: u32, len: usize) -> MemoryDump {
-        MemoryDump { inspector: self, address: addr, length: len }
+        MemoryDump {
+            inspector: self,
+            address: addr,
+            length: len,
+        }
     }
 
     /// Analyze stack usage

@@ -16,7 +16,11 @@ fn test_memory_optimized_parsing() {
     let result = decode_module_with_provider(&wasm_bytes, provider);
 
     // Should parse without error (even if empty)
-    assert!(result.is_ok(), "Failed to parse minimal WASM module: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Failed to parse minimal WASM module: {:?}",
+        result
+    );
 }
 
 #[cfg(feature = "std")]
@@ -33,5 +37,9 @@ fn test_memory_optimized_parsing_std() {
     let result = from_binary(&wasm_bytes);
 
     // Should parse without error (even if empty)
-    assert!(result.is_ok(), "Failed to parse minimal WASM module: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Failed to parse minimal WASM module: {:?}",
+        result
+    );
 }

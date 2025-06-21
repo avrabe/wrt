@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Crate Prelude
 // SW-REQ-ID: REQ_PLATFORM_001
@@ -22,7 +23,7 @@ pub use crate::macos_sync::{MacOsFutex, MacOsFutexBuilder};
 // Re-export sync trait
 pub use crate::{
     memory::{
-        NoStdProvider, NoStdProviderBuilder, PageAllocator, VerificationLevel, WASM_PAGE_SIZE,
+        NoStdProvider, PageAllocator, VerificationLevel, WASM_PAGE_SIZE,
     },
     memory_optimizations::{
         MemoryOptimization, PlatformMemoryOptimizer, PlatformOptimizedProviderBuilder,

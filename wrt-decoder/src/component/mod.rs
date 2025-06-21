@@ -19,6 +19,8 @@ mod encode;
 pub mod name_section;
 mod parse;
 pub mod section;
+pub mod streaming_core_module_parser;
+pub mod streaming_type_parser;
 pub mod types;
 pub mod utils;
 pub mod val_type;
@@ -47,12 +49,11 @@ pub use component_name_section::{
 pub use name_section::{NameMap, NameMapEntry, SortIdentifier};
 
 pub use types::{
-    ComponentAnalyzer, ComponentMetadata, ComponentType, CoreExternType, CoreInstance,
-    CoreType, ExportInfo, ExternType, ImportInfo, Instance, ModuleInfo, Start,
-    ValType,
+    ComponentAnalyzer, ComponentMetadata, ComponentType, CoreExternType, CoreInstance, CoreType,
+    ExportInfo, ExternType, ImportInfo, Instance, ModuleInfo, Start, ValType,
 };
 
-#[cfg(feature = "std")]  
+#[cfg(feature = "std")]
 pub use types::{Component, Export, Import};
 
 #[cfg(feature = "std")]
@@ -63,7 +64,7 @@ pub use validation::{validate_component, validate_component_with_config, Validat
 use wrt_error::{codes, Error, ErrorCategory, Result};
 
 #[cfg(feature = "std")]
-use crate::{prelude::*, utils::BinaryType};
+use crate::utils::BinaryType;
 
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
@@ -81,9 +82,9 @@ pub enum BinaryType {
 mod no_std_utils {
     use super::*;
     use wrt_foundation::BoundedString;
-    
+
     /// Detect binary type with safety bounds for no_std
-    /// 
+    ///
     /// # Safety Requirements
     /// - Only reads fixed-size magic bytes
     /// - No dynamic allocation
@@ -93,10 +94,10 @@ mod no_std_utils {
             return Err(Error::new(
                 ErrorCategory::Parse,
                 codes::PARSE_ERROR,
-                "Binary too short for WASM header"
+                "Binary too short for WASM header",
             ));
         }
-        
+
         // Check for WASM magic number (fixed 4 bytes)
         if &binary[0..4] == b"\0asm" {
             // Check version to determine module vs component
@@ -110,58 +111,62 @@ mod no_std_utils {
             Err(Error::new(
                 ErrorCategory::Parse,
                 codes::PARSE_ERROR,
-                "Invalid WASM magic number"
+                "Invalid WASM magic number",
             ))
         }
     }
-    
+
     /// Read name as bounded string with safety constraints
     ///
     /// # Safety Requirements  
     /// - Uses bounded string with compile-time limit
     /// - Validates UTF-8 without dynamic allocation
     /// - Fails gracefully on oversized strings
-    pub fn read_name_as_string(data: &[u8], offset: usize) -> Result<(BoundedString<256, wrt_foundation::safe_memory::NoStdProvider<512>>, usize)> {
+    pub fn read_name_as_string(
+        data: &[u8],
+        offset: usize,
+    ) -> Result<(
+        BoundedString<256, wrt_foundation::safe_memory::NoStdProvider<512>>,
+        usize,
+    )> {
         if offset >= data.len() {
             return Err(Error::new(
                 ErrorCategory::Parse,
                 codes::PARSE_ERROR,
-                "Offset beyond data length"
+                "Offset beyond data length",
             ));
         }
-        
+
         // Read length (LEB128 - simplified to single byte for safety)
         let length = data[offset] as usize;
         let name_start = offset + 1;
-        
+
         if name_start + length > data.len() {
             return Err(Error::new(
                 ErrorCategory::Parse,
                 codes::PARSE_ERROR,
-                "Name length exceeds data"
+                "Name length exceeds data",
             ));
         }
-        
+
         // Validate UTF-8 and create bounded string
         let name_bytes = &data[name_start..name_start + length];
-        let name_str = core::str::from_utf8(name_bytes).map_err(|_| Error::new(
-            ErrorCategory::Parse,
-            codes::PARSE_ERROR,
-            "Invalid UTF-8 in name"
-        ))?;
-        
-        let bounded_name = BoundedString::from_str(name_str, wrt_foundation::NoStdProvider::new()).map_err(|_| Error::new(
-            ErrorCategory::Parse,
-            codes::PARSE_ERROR,
-            "Name too long for bounded storage"
-        ))?;
-        
-        Ok((bounded_name, length + 1))
+        let name_str = core::str::from_utf8(name_bytes).map_err(|_| {
+            Error::new(
+                ErrorCategory::Parse,
+                codes::PARSE_ERROR,
+                "Invalid UTF-8 in name",
+            )
+        })?;
+
+        // Create the properly sized bounded string for the return type
+        let provider = crate::prelude::create_decoder_provider::<512>()
+            .unwrap_or_else(|_| wrt_foundation::safe_memory::NoStdProvider::<512>::default());
+        let name_string = BoundedString::<256, _>::from_str(name_str, provider).unwrap_or_default();
+
+        Ok((name_string, length + 1))
     }
 }
-
-#[cfg(not(feature = "std"))]
-use no_std_utils::{detect_binary_type, read_name_as_string};
 
 /// Decode a component from binary data
 ///
@@ -198,7 +203,7 @@ pub fn decode_component(binary: &[u8]) -> Result<Component> {
     let binary_type = crate::utils::detect_binary_type(binary)?;
     #[cfg(not(feature = "std"))]
     let binary_type = detect_binary_type(binary)?;
-    
+
     match binary_type {
         BinaryType::CoreModule => {
             // Can't decode a core module as a component
@@ -207,7 +212,7 @@ pub fn decode_component(binary: &[u8]) -> Result<Component> {
                 codes::PARSE_ERROR,
                 "Cannot decode a WebAssembly core module as a Component",
             ))
-        }
+        },
         BinaryType::Component => {
             // Verify component header
             if binary.len() < 8 {
@@ -244,7 +249,7 @@ pub fn decode_component(binary: &[u8]) -> Result<Component> {
             parse_component_sections(&binary[8..], &mut component)?;
 
             Ok(component)
-        }
+        },
     }
 }
 
@@ -268,7 +273,7 @@ fn parse_component_sections(data: &[u8], component: &mut Component) -> Result<()
             return Err(Error::new(
                 ErrorCategory::Parse,
                 codes::PARSE_ERROR,
-"Section size exceeds remaining data size",
+                "Section size exceeds remaining data size",
             ));
         }
 
@@ -296,96 +301,96 @@ fn parse_component_sections(data: &[u8], component: &mut Component) -> Result<()
                         }
                     }
                 }
-            }
+            },
             0x01 => {
                 // Type section
                 let (types, _) = parse::parse_component_type_section(section_data)?;
                 component.types = types;
-            }
+            },
             0x02 => {
                 // Import section
                 let (imports, _) = parse::parse_import_section(section_data)?;
                 component.imports = imports;
-            }
+            },
             0x03 => {
                 // Core module section
                 let (modules, _) = parse::parse_core_module_section(section_data)?;
                 component.modules = modules;
-            }
+            },
             0x04 => {
                 // Function section
                 // Skip - currently not implemented for component model
                 // Functions are handled differently in the component model
-            }
+            },
             0x05 => {
                 // Table section
                 // Skip - currently not implemented for component model
                 // Tables are handled differently in the component model
-            }
+            },
             0x06 => {
                 // Memory section
                 // Skip - currently not implemented for component model
                 // Memories are handled differently in the component model
-            }
+            },
             0x07 => {
                 // Global section
                 // Skip - currently not implemented for component model
                 // Globals are handled differently in the component model
-            }
+            },
             0x08 => {
                 // Export section
                 let (exports, _) = parse::parse_export_section(section_data)?;
                 component.exports = exports;
-            }
+            },
             0x09 => {
                 // Start section
                 let (start, _) = parse::parse_start_section(section_data)?;
                 component.start = Some(start);
-            }
+            },
             0x0A => {
                 // Element section
                 // Skip - currently not implemented for component model
                 // Elements are handled differently in the component model
-            }
+            },
             0x0B => {
                 // Data section
                 // Skip - currently not implemented for component model
                 // Data sections are handled differently in the component model
-            }
+            },
             0x10 => {
                 // Instance section
                 let (instances, _) = parse::parse_instance_section(section_data)?;
                 component.instances = instances;
-            }
+            },
             0x11 => {
                 // Component section
                 let (components, _) = parse::parse_component_section(section_data)?;
                 component.components = components;
-            }
+            },
             0x12 => {
                 // Alias section
                 let (aliases, _) = parse::parse_alias_section(section_data)?;
                 component.aliases = aliases;
-            }
+            },
             0x13 => {
                 // Core instance section
                 let (core_instances, _) = parse::parse_core_instance_section(section_data)?;
                 component.core_instances = core_instances;
-            }
+            },
             0x14 => {
                 // Core type section
                 let (core_types, _) = parse::parse_core_type_section(section_data)?;
                 component.core_types = core_types;
-            }
+            },
             0x15 => {
                 // Canon section
                 let (canons, _) = parse::parse_canon_section(section_data)?;
                 component.canonicals = canons;
-            }
+            },
             _ => {
                 // Unknown section - ignore for now
                 // We could log a warning here
-            }
+            },
         }
 
         // Move to the next section

@@ -86,7 +86,10 @@ impl Default for Global {
     fn default() -> Self {
         use wrt_foundation::types::{GlobalType, ValueType};
         use wrt_foundation::values::Value;
-        Self::new(ValueType::I32, false, Value::I32(0)).unwrap()
+        Self::new(ValueType::I32, false, Value::I32(0)).unwrap_or_else(|e| {
+            // If we can't create default global, panic as this is a critical failure
+            panic!("Critical: Unable to create default global: {}", e)
+        })
     }
 }
 

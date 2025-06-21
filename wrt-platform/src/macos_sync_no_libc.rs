@@ -11,7 +11,7 @@
 //! macOS-specific `FutexLike` implementation using direct syscalls without
 //! libc.
 
-use core::{marker::PhantomData, sync::atomic::AtomicU32};
+use core::{marker::PhantomData, sync::atomic::AtomicU32, time::Duration};
 
 use wrt_error::{Error, ErrorCategory, Result};
 
@@ -47,6 +47,13 @@ pub struct MacOsFutex {
     /// Safety: We're carefully managing the lifetime of the value
     _marker: PhantomData<*mut ()>,
 }
+
+// Safety: MacOsFutex can be shared between threads safely because:
+// 1. AtomicU32 is thread-safe
+// 2. The padding is just data
+// 3. The PhantomData doesn't affect safety
+unsafe impl Send for MacOsFutex {}
+unsafe impl Sync for MacOsFutex {}
 
 impl MacOsFutex {
     /// Creates a new `MacOsFutex` with the given initial value.
@@ -144,16 +151,16 @@ impl MacOsFutexBuilder {
 }
 
 impl FutexLike for MacOsFutex {
-    fn wait(&self, expected: u32, timeout_us: Option<u32>) -> Result<TimeoutResult> {
+    fn wait(&self, expected: u32, timeout: Option<Duration>) -> Result<()> {
         let addr = &self.value as *const AtomicU32 as *const u32;
         let operation = ULF_WAIT;
 
         // Convert timeout to the format required by _ulock_wait
-        let timeout_param = match timeout_us {
-            Some(0) => 0, // Immediate timeout (try once)
-            Some(timeout) => {
+        let timeout_param = match timeout {
+            Some(duration) if duration.as_micros() == 0 => 0, // Immediate timeout (try once)
+            Some(duration) => {
                 // Add the ULF_WAIT_TIMEOUT flag to indicate a timeout is provided
-                ULF_WAIT_TIMEOUT | timeout
+                ULF_WAIT_TIMEOUT | (duration.as_micros() as u32)
             }
             None => ULOCK_WAIT_TIMEOUT_INFINITE, // Infinite timeout
         };
@@ -165,26 +172,18 @@ impl FutexLike for MacOsFutex {
         let result = unsafe { Self::ulock_wait(operation, addr, expected as u64, timeout_param) };
 
         match result {
-            0 => Ok(TimeoutResult::Notified), // Woken up by a notify call
+            0 => Ok(()), // Woken up by a notify call or value changed
             -1 => {
                 // Check errno - in a real implementation we'd use the real errno value
                 // For now, assume ETIMEDOUT (60) if a timeout was specified
-                if timeout_us.is_some() && timeout_us != Some(ULOCK_WAIT_TIMEOUT_INFINITE) {
-                    Ok(TimeoutResult::TimedOut)
+                if timeout.is_some() {
+                    Err(Error::system_error("Operation timed out"))
                 } else {
                     // Other error
-                    Err(Error::new(
-                        ErrorCategory::System, 1,
-                        
-                        "Failed to wait on futex",
-                    ))
+                    Err(Error::system_error("Failed to wait on futex"))
                 }
             }
-            _ => Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "Unexpected error waiting on futex",
-            )),
+            _ => Err(Error::system_error("Unexpected error waiting on futex")),
         }
     }
 
@@ -209,11 +208,4 @@ impl FutexLike for MacOsFutex {
         }
     }
 
-    fn notify_all(&self) -> Result<()> {
-        self.wake(u32::MAX)
-    }
-
-    fn notify_one(&self) -> Result<()> {
-        self.wake(1)
-    }
 }

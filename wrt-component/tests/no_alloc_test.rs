@@ -4,7 +4,6 @@
 //! environments, particularly in pure no_std without allocation.
 
 // For testing in a no_std environment
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Binary std/no_std choice
 #[cfg(test)]
@@ -26,7 +25,10 @@ mod no_alloc_tests {
     fn test_section_id_conversion() {
         // Test conversion from u8 to ComponentSectionId
         assert_eq!(ComponentSectionId::from(0), ComponentSectionId::Custom);
-        assert_eq!(ComponentSectionId::from(1), ComponentSectionId::ComponentType);
+        assert_eq!(
+            ComponentSectionId::from(1),
+            ComponentSectionId::ComponentType
+        );
         assert_eq!(ComponentSectionId::from(2), ComponentSectionId::CoreModule);
         assert_eq!(ComponentSectionId::from(3), ComponentSectionId::Instance);
         assert_eq!(ComponentSectionId::from(4), ComponentSectionId::Component);
@@ -103,8 +105,11 @@ mod no_alloc_tests {
     #[test]
     fn test_section_info() {
         // Create a section info
-        let section_info =
-            ComponentSectionInfo { id: ComponentSectionId::Export, size: 100, offset: 200 };
+        let section_info = ComponentSectionInfo {
+            id: ComponentSectionId::Export,
+            size: 100,
+            offset: 200,
+        };
 
         // Check properties
         assert_eq!(section_info.id, ComponentSectionId::Export);

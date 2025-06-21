@@ -1,7 +1,7 @@
-//! Unified Execution Agent for WebAssembly Runtime
+//! Unified Execution Engine for WebAssembly Runtime
 //!
-//! This module provides a unified execution agent that consolidates functionality
-//! from ComponentExecutionEngine, AsyncExecutionEngine, StacklessEngine, and CfiExecutionEngine.
+//! This module provides a unified execution engine that consolidates functionality
+//! from various execution modes (synchronous, asynchronous, stackless, and CFI-protected).
 //! It provides a single, cohesive interface for WebAssembly execution with support for:
 //! - Synchronous and asynchronous execution
 //! - Stackless execution for memory-constrained environments  
@@ -16,7 +16,7 @@ use core::{mem, fmt};
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
     prelude::*,
-    traits::DefaultMemoryProvider,
+    safe_memory::NoStdProvider,
 };
 
 #[cfg(feature = "std")]
@@ -75,13 +75,13 @@ pub struct CoreExecutionState {
     #[cfg(feature = "std")]
     call_stack: Vec<UnifiedCallFrame>,
     #[cfg(not(feature = "std"))]
-    call_stack: BoundedVec<UnifiedCallFrame, MAX_CALL_STACK_DEPTH, DefaultMemoryProvider>,
+    call_stack: BoundedVec<UnifiedCallFrame, MAX_CALL_STACK_DEPTH, NoStdProvider::<65536, NoStdProvider<65536>>>,
     
     /// Operand stack for value operations
     #[cfg(feature = "std")]
     operand_stack: Vec<Value>,
     #[cfg(not(feature = "std"))]
-    operand_stack: BoundedVec<Value, MAX_OPERAND_STACK_SIZE, DefaultMemoryProvider>,
+    operand_stack: BoundedVec<Value, MAX_OPERAND_STACK_SIZE, NoStdProvider::<65536, NoStdProvider<65536>>>,
     
     /// Current execution mode
     execution_mode: ExecutionMode,
@@ -110,7 +110,7 @@ pub struct AsyncExecutionState {
     #[cfg(feature = "std")]
     executions: Vec<AsyncExecution>,
     #[cfg(not(feature = "std"))]
-    executions: BoundedVec<AsyncExecution, MAX_CONCURRENT_EXECUTIONS, DefaultMemoryProvider>,
+    executions: BoundedVec<AsyncExecution, MAX_CONCURRENT_EXECUTIONS, NoStdProvider::<65536, NoStdProvider<65536>>>,
     
     /// Next execution ID
     next_execution_id: u64,
@@ -119,7 +119,7 @@ pub struct AsyncExecutionState {
     #[cfg(feature = "std")]
     context_pool: Vec<AsyncExecutionContext>,
     #[cfg(not(feature = "std"))]
-    context_pool: BoundedVec<AsyncExecutionContext, 16, DefaultMemoryProvider>,
+    context_pool: BoundedVec<AsyncExecutionContext, 16, NoStdProvider::<65536, NoStdProvider<65536>>>,
 }
 
 /// CFI execution state for security protection
@@ -147,7 +147,7 @@ pub struct StacklessExecutionState {
     #[cfg(feature = "std")]
     labels: Vec<Label>,
     #[cfg(not(feature = "std"))]
-    labels: BoundedVec<Label, 128, DefaultMemoryProvider>,
+    labels: BoundedVec<Label, 128, NoStdProvider::<65536, NoStdProvider<65536>>>,
     /// Stackless execution mode
     stackless_mode: bool,
 }
@@ -160,12 +160,12 @@ pub struct UnifiedCallFrame {
     /// Function index
     pub function_index: u32,
     /// Function name (for async and debugging)
-    pub function_name: BoundedString<128, DefaultMemoryProvider>,
+    pub function_name: BoundedString<128, NoStdProvider::<65536>>,
     /// Local variables
     #[cfg(feature = "std")]
     pub locals: Vec<Value>,
     #[cfg(not(feature = "std"))]
-    pub locals: BoundedVec<Value, 64, DefaultMemoryProvider>,
+    pub locals: BoundedVec<Value, 64, NoStdProvider::<65536, NoStdProvider<65536>>>,
     /// Return address
     pub return_address: Option<usize>,
     /// Async state for this frame
@@ -315,13 +315,13 @@ pub struct WaitSet {
     #[cfg(feature = "std")]
     pub futures: Vec<FutureHandle>,
     #[cfg(not(feature = "std"))]
-    pub futures: BoundedVec<FutureHandle, 16, DefaultMemoryProvider>,
+    pub futures: BoundedVec<FutureHandle, 16, NoStdProvider::<65536, NoStdProvider<65536>>>,
     
     /// Streams to wait for
     #[cfg(feature = "std")]
     pub streams: Vec<StreamHandle>,
     #[cfg(not(feature = "std"))]
-    pub streams: BoundedVec<StreamHandle, 16, DefaultMemoryProvider>,
+    pub streams: BoundedVec<StreamHandle, 16, NoStdProvider::<65536, NoStdProvider<65536>>>,
 }
 
 /// Shadow stack entry for CFI protection
@@ -381,7 +381,7 @@ pub struct AsyncExecution {
 #[derive(Debug, Clone)]
 pub struct AsyncExecutionContext {
     pub component_instance: u32,
-    pub function_name: BoundedString<128, DefaultMemoryProvider>,
+    pub function_name: BoundedString<128, NoStdProvider::<65536>>,
     pub memory_views: MemoryViews,
 }
 
@@ -418,7 +418,7 @@ pub struct MemoryPermissions {
 #[derive(Debug, Clone)]
 pub enum AsyncOperation {
     FunctionCall {
-        name: BoundedString<128, DefaultMemoryProvider>,
+        name: BoundedString<128, NoStdProvider::<65536>>,
         args: Vec<Value>,
     },
     StreamRead {
@@ -440,7 +440,7 @@ pub enum AsyncOperation {
         wait_set: WaitSet,
     },
     SpawnSubtask {
-        function: BoundedString<128, DefaultMemoryProvider>,
+        function: BoundedString<128, NoStdProvider::<65536>>,
         args: Vec<Value>,
     },
 }
@@ -458,7 +458,7 @@ pub struct AsyncExecutionResult {
 impl UnifiedExecutionAgent {
     /// Create a new unified execution agent
     pub fn new(config: AgentConfiguration) -> Self {
-        let provider = DefaultMemoryProvider::default();
+        let provider = NoStdProvider::<65536>::default();
         
         Self {
             core_state: CoreExecutionState {
@@ -583,7 +583,7 @@ impl UnifiedExecutionAgent {
             locals: args.to_vec(),
             #[cfg(not(feature = "std"))]
             locals: {
-                let mut locals = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+                let mut locals = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
                 for arg in args.iter().take(64) {
                     let _ = locals.push(arg.clone());
                 }
@@ -632,7 +632,11 @@ impl UnifiedExecutionAgent {
         #[cfg(not(feature = "std"))]
         {
             self.core_state.call_stack.push(frame).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Call stack overflow".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Call stack overflow"
+                )
             })?;
         }
 
@@ -646,7 +650,11 @@ impl UnifiedExecutionAgent {
         
         let result = self.core_state.runtime_bridge
             .execute_component_function(frame.instance_id, &function_name, &component_values)
-            .map_err(|e| wrt_foundation::WrtError::Runtime(BoundedString::from_str("Component operation result").unwrap_or_default().into()))?;
+            .map_err(|e| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Runtime,
+                wrt_error::codes::RUNTIME_ERROR,
+                "Component operation result"
+            ))?;
 
         // Pop frame
         #[cfg(feature = "std")]
@@ -727,7 +735,11 @@ impl UnifiedExecutionAgent {
         #[cfg(not(feature = "std"))]
         {
             self.async_state.executions.push(async_execution).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many async executions".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many async executions"
+                )
             })?;
         }
 
@@ -824,11 +836,15 @@ impl UnifiedExecutionAgent {
     }
 
     #[cfg(not(feature = "std"))]
-    fn convert_values_to_component(&self, values: &[Value]) -> WrtResult<BoundedVec<Value, 16, DefaultMemoryProvider>> {
-        let mut component_values = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+    fn convert_values_to_component(&self, values: &[Value]) -> Wrtcore::result::Result<BoundedVec<Value, 16, NoStdProvider::<65536, NoStdProvider<65536>>>> {
+        let mut component_values = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
         for value in values.iter().take(16) {
             component_values.push(value.clone()).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many component values".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many component values"
+                )
             })?;
         }
         Ok(component_values)

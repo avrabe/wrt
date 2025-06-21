@@ -9,7 +9,7 @@
 
 use wrt_foundation::{
     BoundedQueue, BoundedMap, BoundedSet, BoundedDeque, BoundedBitSet,
-    BoundedBuilder, StringBuilder, ResourceBuilder, MemoryBuilder, NoStdProviderBuilder,
+    BoundedBuilder, StringBuilder, ResourceBuilder, MemoryBuilder,
     VerificationLevel, NoStdProvider, bounded::{BoundedVec, BoundedString, WasmName},
 };
 

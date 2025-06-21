@@ -64,11 +64,11 @@ fn example_stream(
             Ok(None) => {
                 println!("    Stream empty (would block)");
                 break;
-            }
+            },
             Err(e) => {
                 println!("    Error reading: {:?}", e);
                 break;
-            }
+            },
         }
     }
 

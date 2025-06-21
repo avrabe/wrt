@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "std")]
 fn demo_async_context() -> Result<(), Box<dyn std::error::Error>> {
     // Note: These would be the actual API calls once compilation issues are resolved
-    
+
     println!("  • Creating async context...");
     // let context = wrt_component::AsyncContext::new();
     println!("    ✓ Context created");
@@ -349,7 +349,7 @@ fn demo_fixed_length_lists() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "std")]
 fn demonstrate_async_patterns() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nAdvanced Async Patterns:");
-    
+
     // Pattern 1: Async context with scoped execution
     println!("  • Scoped async execution pattern...");
     // wrt_component::with_async_context! {
@@ -357,15 +357,15 @@ fn demonstrate_async_patterns() -> Result<(), Box<dyn std::error::Error>> {
     //     {
     //         // Set context for this scope
     //         wrt_component::async_context_canonical_builtins::set_typed_context_value(
-    //             "operation_id", 
+    //             "operation_id",
     //             "op_12345"
     //         )?;
-    //         
+    //
     //         // Execute task in this context
     //         let task_id = wrt_component::task_helpers::with_task(|| {
     //             Ok(ComponentValue::String("Operation completed".to_string()))
     //         })?;
-    //         
+    //
     //         Ok(())
     //     }
     // }?;
@@ -412,11 +412,11 @@ mod tests {
     fn test_async_feature_integration() {
         // This test would verify that all async features work together
         // Note: Currently disabled due to dependency compilation issues
-        
+
         // Test async context + task management
         // Test waitable sets + error contexts
         // Test error propagation through async boundaries
-        
+
         println!("Integration test would run here once dependencies are resolved");
     }
 

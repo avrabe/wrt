@@ -56,10 +56,10 @@ fn main() {
 
                 // Make the commit hash available to the test code
                 println!("cargo:rustc-env=WASM_TESTSUITE_COMMIT={hash}");
-            }
+            },
             Err(e) => {
                 println!("cargo:warning=Failed to get commit hash: {e}");
-            }
+            },
         }
 
         // Make the testsuite path available to the test code
@@ -106,8 +106,13 @@ fn check_internet_connection() -> bool {
 }
 
 fn clone_testsuite(path: &Path) -> io::Result<()> {
-    let status =
-        Command::new("git").args(["clone", TESTSUITE_REPO_URL, path.to_str().expect("Path conversion failed")]).status()?;
+    let status = Command::new("git")
+        .args([
+            "clone",
+            TESTSUITE_REPO_URL,
+            path.to_str().expect("Path conversion failed"),
+        ])
+        .status()?;
 
     if !status.success() {
         return Err(io::Error::other(format!(
@@ -120,8 +125,10 @@ fn clone_testsuite(path: &Path) -> io::Result<()> {
 }
 
 fn update_testsuite(path: &Path) -> io::Result<()> {
-    let status =
-        Command::new("git").args(["pull", "origin", "master"]).current_dir(path).status()?;
+    let status = Command::new("git")
+        .args(["pull", "origin", "master"])
+        .current_dir(path)
+        .status()?;
 
     if !status.success() {
         return Err(io::Error::other(format!(

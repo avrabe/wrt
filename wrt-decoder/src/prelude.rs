@@ -41,7 +41,7 @@ pub use std::{
 
 // No_std equivalents - use wrt-foundation types (Vec and String defined below with specific providers)
 #[cfg(not(feature = "std"))]
-pub use wrt_foundation::{BoundedMap as HashMap};
+pub use wrt_foundation::BoundedMap as HashMap;
 
 // Import synchronization primitives for no_std
 //#[cfg(not(feature = "std"))]
@@ -71,20 +71,26 @@ pub use wrt_format::{
 
 // Binary std/no_std choice
 #[cfg(feature = "std")]
-pub use wrt_format::state::{create_state_section, extract_state_section, StateSection};
+// pub use wrt_format::state::{create_state_section, extract_state_section, StateSection};
 // Binary std/no_std choice
 #[cfg(feature = "std")]
 pub use wrt_foundation::component_value::{ComponentValue, ValType};
 // Conversion utilities from wrt-foundation
 #[cfg(feature = "conversion")]
 pub use wrt_foundation::conversion::{ref_type_to_val_type, val_type_to_ref_type};
-// Re-export from wrt-foundation
+// Re-export clean types from wrt-foundation
 pub use wrt_foundation::{
     // SafeMemory types
     safe_memory::{SafeMemoryHandler, SafeSlice, SafeStack},
-    // Types
-    types::{BlockType, FuncType, GlobalType, MemoryType, RefType, TableType, ValueType},
+    // Legacy types for compatibility
+    types::{BlockType, RefType, ValueType},
     values::Value,
+};
+
+// Re-export clean types only when allocation is available
+#[cfg(any(feature = "std", feature = "alloc"))]
+pub use wrt_foundation::{
+    CleanFuncType, CleanGlobalType, CleanMemoryType, CleanTableType, CleanValType, CleanValue,
 };
 
 // Most re-exports temporarily disabled for demo
@@ -95,28 +101,53 @@ pub use crate::decoder_no_alloc;
 // Use our unified memory management system
 #[cfg(not(feature = "std"))]
 pub use wrt_foundation::{
-    BoundedString, BoundedVec,
     unified_types_simple::{DefaultTypes, EmbeddedTypes},
+    BoundedString, BoundedVec,
 };
+// For no_std mode, use explicit bounded types (no confusing aliases!)
+#[cfg(not(feature = "std"))]
+pub type DecoderVec<T> = BoundedVec<T, 256, wrt_foundation::NoStdProvider<4096>>;
+#[cfg(not(feature = "std"))]
+pub type DecoderString = BoundedString<256, wrt_foundation::NoStdProvider<4096>>;
 
-// For no_std mode, use concrete bounded types with fixed capacities
+// For std mode, provide the same types but using std collections
+#[cfg(feature = "std")]
+pub type DecoderVec<T> = Vec<T>;
+#[cfg(feature = "std")]
+pub type DecoderString = String;
+
+// Factory function for creating providers using capability system
 #[cfg(not(feature = "std"))]
-pub type Vec<T> = wrt_foundation::BoundedVec<T, 256, wrt_foundation::NoStdProvider<4096>>;
-#[cfg(not(feature = "std"))]
-pub type String = wrt_foundation::BoundedString<256, wrt_foundation::NoStdProvider<4096>>;
+pub fn create_decoder_provider<const N: usize>(
+) -> wrt_foundation::WrtResult<wrt_foundation::NoStdProvider<N>> {
+    use wrt_foundation::{CrateId, capabilities::MemoryFactory};
+    MemoryFactory::create::<N>(CrateId::Decoder)
+}
+
+// For std mode, provide a simple version
+#[cfg(feature = "std")]
+pub fn create_decoder_provider<const N: usize>(
+) -> wrt_foundation::WrtResult<wrt_foundation::NoStdProvider<N>> {
+    use wrt_foundation::NoStdProvider;
+    Ok(NoStdProvider::default())
+}
 
 // For no_std mode, provide a minimal ToString trait
 /// Minimal ToString trait for no_std environments
 #[cfg(not(feature = "std"))]
 pub trait ToString {
     /// Convert to string
-    fn to_string(&self) -> String;
+    fn to_string(&self) -> DecoderString;
 }
 
 #[cfg(not(feature = "std"))]
 impl ToString for &str {
-    fn to_string(&self) -> String {
-        String::from_str(self, wrt_foundation::safe_memory::NoStdProvider::<4096>::new()).unwrap_or_default()
+    fn to_string(&self) -> DecoderString {
+        if let Ok(provider) = create_decoder_provider::<4096>() {
+            DecoderString::from_str(self, provider).unwrap_or_default()
+        } else {
+            DecoderString::default()
+        }
     }
 }
 
@@ -128,11 +159,12 @@ macro_rules! format {
     ($($arg:tt)*) => {{
         // In pure no_std, return a simple bounded string
         use wrt_foundation::{BoundedString, NoStdProvider};
-        BoundedString::<256, NoStdProvider<512>>::from_str(
-            "formatted_string",
-            NoStdProvider::<512>::default(),
-        )
-        .unwrap_or_default()
+        if let Ok(provider) = $crate::prelude::create_decoder_provider::<512>() {
+            $crate::prelude::DecoderString::from_str("formatted_string", provider)
+                .unwrap_or_default()
+        } else {
+            $crate::prelude::DecoderString::default()
+        }
     }};
 }
 
@@ -152,43 +184,51 @@ pub mod binary {
 /// Binary utilities for no_std environments
 #[cfg(not(feature = "std"))]
 pub mod binary {
+    use super::create_decoder_provider;
     use wrt_foundation::{BoundedVec, NoStdProvider};
 
     /// Write LEB128 u32 in no_std mode
     pub fn write_leb128_u32(value: u32) -> BoundedVec<u8, 10, NoStdProvider<64>> {
-        let mut result = BoundedVec::new(NoStdProvider::<64>::default())
-            .expect("Failed to create bounded vec for LEB128");
-        let mut buffer = [0u8; 10];
-        // Simple LEB128 encoding for no_std
-        let mut bytes_written = 0;
-        let mut val = value;
-        loop {
-            let mut byte = (val & 0x7F) as u8;
-            val >>= 7;
-            if val != 0 {
-                byte |= 0x80;
+        if let Ok(provider) = create_decoder_provider::<64>() {
+            let mut result = BoundedVec::new(provider).expect("Failed to create bounded vec for LEB128");
+            let mut buffer = [0u8; 10];
+            // Simple LEB128 encoding for no_std
+            let mut bytes_written = 0;
+            let mut val = value;
+            loop {
+                let mut byte = (val & 0x7F) as u8;
+                val >>= 7;
+                if val != 0 {
+                    byte |= 0x80;
+                }
+                if bytes_written < buffer.len() {
+                    buffer[bytes_written] = byte;
+                    bytes_written += 1;
+                }
+                if val == 0 {
+                    break;
+                }
             }
-            if bytes_written < buffer.len() {
-                buffer[bytes_written] = byte;
-                bytes_written += 1;
-            }
-            if val == 0 {
-                break;
-            }
-        }
 
-        if bytes_written > 0 {
-            for i in 0..bytes_written {
-                let _ = result.push(buffer[i]);
+            if bytes_written > 0 {
+                for i in 0..bytes_written {
+                    let _ = result.push(buffer[i]);
+                }
             }
+            result
+        } else {
+            BoundedVec::default()
         }
-        result
     }
 
     /// Write string in no_std mode
     pub fn write_string(_s: &str) -> BoundedVec<u8, 256, NoStdProvider<512>> {
-        // Simplified no_std implementation
-        BoundedVec::new(NoStdProvider::<512>::default()).expect("Failed to create bounded vec for string")
+        if let Ok(provider) = create_decoder_provider::<512>() {
+            // Simplified no_std implementation
+            BoundedVec::new(provider).expect("Failed to create bounded vec for string")
+        } else {
+            BoundedVec::default()
+        }
     }
 
     /// Read LEB128 u32 from data with offset
@@ -254,7 +294,10 @@ pub mod binary {
             ));
         }
 
-        Ok((&data[name_start..name_start + length as usize], name_start + length as usize))
+        Ok((
+            &data[name_start..name_start + length as usize],
+            name_start + length as usize,
+        ))
     }
 }
 
@@ -277,23 +320,32 @@ pub trait BoundedVecExt<T, const N: usize, P: wrt_foundation::MemoryProvider> {
     fn is_empty(&self) -> bool;
 }
 
+#[cfg(not(feature = "std"))]
 impl<T, const N: usize, P> BoundedVecExt<T, N, P> for wrt_foundation::bounded::BoundedVec<T, N, P>
 where
-    T: wrt_foundation::traits::Checksummable + wrt_foundation::traits::ToBytes + wrt_foundation::traits::FromBytes + Default + Clone + PartialEq + Eq,
-    P: wrt_foundation::MemoryProvider + Clone + PartialEq + Eq + Default,
+    T: wrt_foundation::traits::Checksummable
+        + wrt_foundation::traits::ToBytes
+        + wrt_foundation::traits::FromBytes
+        + Default
+        + Clone
+        + PartialEq
+        + Eq,
+    P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq,
 {
     fn empty() -> Self {
         Self::new(P::default()).unwrap_or_default()
     }
-    
+
     fn try_push(&mut self, item: T) -> wrt_error::Result<()> {
-        self.push(item).map_err(|_e| wrt_error::Error::new(
-            wrt_error::ErrorCategory::Resource,
-            wrt_error::codes::CAPACITY_EXCEEDED,
-            "BoundedVec push failed: capacity exceeded"
-        ))
+        self.push(item).map_err(|_e| {
+            wrt_error::Error::new(
+                wrt_error::ErrorCategory::Resource,
+                wrt_error::codes::CAPACITY_EXCEEDED,
+                "BoundedVec push failed: capacity exceeded",
+            )
+        })
     }
-    
+
     fn is_empty(&self) -> bool {
         use wrt_foundation::traits::BoundedCapacity;
         self.len() == 0

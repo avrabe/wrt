@@ -30,7 +30,10 @@ impl LineInfo {
         &'a self,
         file_table: &'a crate::FileTable<'a>,
     ) -> LocationDisplay<'a> {
-        LocationDisplay { line_info: self, file_table }
+        LocationDisplay {
+            line_info: self,
+            file_table,
+        }
     }
 }
 
@@ -104,7 +107,9 @@ mod opcodes {
 
     pub const DW_LNE_END_SEQUENCE: u8 = 1;
     pub const DW_LNE_SET_ADDRESS: u8 = 2;
+    #[allow(dead_code)]
     pub const DW_LNE_DEFINE_FILE: u8 = 3;
+    #[allow(dead_code)]
     pub const DW_LNE_SET_DISCRIMINATOR: u8 = 4;
 }
 
@@ -252,46 +257,46 @@ impl LineNumberState {
                 self.basic_block = false;
                 self.prologue_end = false;
                 self.epilogue_begin = false;
-            }
+            },
             DW_LNS_ADVANCE_PC => {
                 let advance = cursor.read_uleb128()? as u32;
                 self.address += advance * self.minimum_instruction_length as u32;
-            }
+            },
             DW_LNS_ADVANCE_LINE => {
                 let advance = cursor.read_sleb128()? as i32;
                 self.line = (self.line as i32 + advance) as u32;
-            }
+            },
             DW_LNS_SET_FILE => {
                 self.file = cursor.read_uleb128()? as u16;
-            }
+            },
             DW_LNS_SET_COLUMN => {
                 self.column = cursor.read_uleb128()? as u16;
-            }
+            },
             DW_LNS_NEGATE_STMT => {
                 self.is_stmt = !self.is_stmt;
-            }
+            },
             DW_LNS_SET_BASIC_BLOCK => {
                 self.basic_block = true;
-            }
+            },
             DW_LNS_CONST_ADD_PC => {
                 let adjusted_opcode = 255 - self.opcode_base;
                 let address_increment = (adjusted_opcode / self.line_range) as u32
                     * self.minimum_instruction_length as u32;
                 self.address += address_increment;
-            }
+            },
             DW_LNS_FIXED_ADVANCE_PC => {
                 let advance = cursor.read_u16()? as u32;
                 self.address += advance;
-            }
+            },
             DW_LNS_SET_PROLOGUE_END => {
                 self.prologue_end = true;
-            }
+            },
             DW_LNS_SET_EPILOGUE_BEGIN => {
                 self.epilogue_begin = true;
-            }
+            },
             DW_LNS_SET_ISA => {
                 self.isa = cursor.read_uleb128()? as u32;
-            }
+            },
             _ => {
                 // Unknown opcode, skip its arguments
                 if opcode > 0 && opcode < self.opcode_base {
@@ -304,7 +309,7 @@ impl LineNumberState {
                         cursor.read_uleb128()?;
                     }
                 }
-            }
+            },
         }
 
         Ok(())
@@ -344,7 +349,7 @@ impl LineNumberState {
                     match extended_opcode {
                         opcodes::DW_LNE_END_SEQUENCE => {
                             self.end_sequence = true;
-                        }
+                        },
                         opcodes::DW_LNE_SET_ADDRESS => {
                             // Assume 4-byte addresses for WebAssembly
                             if remaining >= 4 {
@@ -352,21 +357,21 @@ impl LineNumberState {
                             } else {
                                 cursor.skip(remaining as usize)?;
                             }
-                        }
+                        },
                         _ => {
                             // Skip unknown extended opcodes
                             cursor.skip(remaining as usize)?;
-                        }
+                        },
                     }
-                }
+                },
                 1..=12 => {
                     // Standard opcodes
                     self.execute_standard_opcode(opcode, &mut cursor)?;
-                }
+                },
                 _ => {
                     // Special opcode
                     self.execute_special_opcode(opcode)?;
-                }
+                },
             }
 
             // Check if we've found the target

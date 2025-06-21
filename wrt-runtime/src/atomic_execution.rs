@@ -18,21 +18,24 @@ extern crate alloc;
 
 use crate::prelude::Debug;
 use crate::thread_manager::{ThreadManager, ThreadId, ThreadExecutionStats};
+use crate::bounded_runtime_infra::new_atomic_op_map;
 use wrt_error::{Error, ErrorCategory, Result, codes};
 use wrt_instructions::atomic_ops::{
     AtomicOp, AtomicLoadOp, AtomicStoreOp, AtomicRMWInstr, AtomicCmpxchgInstr,
     AtomicWaitNotifyOp, AtomicFence, AtomicRMWOp, MemoryOrdering,
 };
-use wrt_foundation::MemArg;
-use wrt_platform::sync::{AtomicU32, AtomicU64, AtomicUsize, Ordering as PlatformOrdering};
+use wrt_foundation::{MemArg, traits::BoundedCapacity};
+
+// Import platform abstractions from wrt-foundation PAI layer
+use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering as AtomicOrdering};
+use core::time::Duration;
+
 #[cfg(feature = "std")]
-use std::{vec::Vec, sync::Arc, time::Duration, collections::BTreeMap};
+use std::{vec::Vec, sync::Arc, collections::BTreeMap};
 #[cfg(not(feature = "std"))]
 use alloc::{vec::Vec, sync::Arc, collections::BTreeMap};
 #[cfg(all(not(feature = "std"), not(feature = "std")))]
 use wrt_foundation::bounded::BoundedVec;
-#[cfg(not(feature = "std"))]
-use wrt_platform::sync::Duration;
 
 // Type alias for return results
 /// Result vector type for std environments
@@ -42,10 +45,7 @@ pub type ResultVec = Vec<u32>;
 #[cfg(all(not(feature = "std"), not(feature = "std")))]
 pub type ResultVec = wrt_foundation::bounded::BoundedVec<u32, 256, wrt_foundation::safe_memory::NoStdProvider<1024>>;
 
-// Type alias for thread ID vectors  
-#[cfg(feature = "std")]
-type ThreadIdVec = Vec<ThreadId>;
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
+// Type alias for thread ID vectors - use bounded collections consistently
 type ThreadIdVec = wrt_foundation::bounded::BoundedVec<ThreadId, 64, wrt_foundation::safe_memory::NoStdProvider<1024>>;
 
 // Helper macro for creating Vec compatible with no_std
@@ -79,14 +79,14 @@ macro_rules! result_vec {
 }
 
 /// Conversion from WebAssembly memory ordering to platform ordering
-fn convert_memory_ordering(ordering: MemoryOrdering) -> PlatformOrdering {
+fn convert_memory_ordering(ordering: MemoryOrdering) -> AtomicOrdering {
     match ordering {
-        MemoryOrdering::Unordered => PlatformOrdering::Relaxed,
-        MemoryOrdering::SeqCst => PlatformOrdering::SeqCst,
-        MemoryOrdering::Release => PlatformOrdering::Release,
-        MemoryOrdering::Acquire => PlatformOrdering::Acquire,
-        MemoryOrdering::AcqRel => PlatformOrdering::AcqRel,
-        MemoryOrdering::Relaxed => PlatformOrdering::Relaxed,
+        MemoryOrdering::Unordered => AtomicOrdering::Relaxed,
+        MemoryOrdering::SeqCst => AtomicOrdering::SeqCst,
+        MemoryOrdering::Release => AtomicOrdering::Release,
+        MemoryOrdering::Acquire => AtomicOrdering::Acquire,
+        MemoryOrdering::AcqRel => AtomicOrdering::AcqRel,
+        MemoryOrdering::Relaxed => AtomicOrdering::Relaxed,
     }
 }
 
@@ -101,7 +101,7 @@ pub struct AtomicMemoryContext {
     pub thread_manager: ThreadManager,
     /// Wait/notify coordination data structures
     #[cfg(feature = "std")]
-    wait_queues: BTreeMap<u32, ThreadIdVec>,
+    wait_queues: crate::bounded_runtime_infra::BoundedAtomicOpMap<ThreadIdVec>,
     #[cfg(not(feature = "std"))]
     wait_queues: [(u32, [Option<ThreadId>; 8]); 16],  // Fixed arrays for no_std
     /// Atomic operation statistics
@@ -115,10 +115,7 @@ impl AtomicMemoryContext {
             memory_base,
             memory_size: AtomicUsize::new(memory_size),
             thread_manager,
-            #[cfg(feature = "std")]
-            wait_queues: BTreeMap::new(),
-            #[cfg(not(feature = "std"))]
-            wait_queues: [(0, [const { None }; 8]); 16],  // Fixed arrays for no_std
+            wait_queues: new_atomic_op_map()?,
             stats: AtomicExecutionStats::new(),
         })
     }
@@ -149,6 +146,42 @@ impl AtomicMemoryContext {
                 // Pop expected and replacement values from stack for compare-exchange operation
                 let expected = 0u64; // TODO: Should be popped from execution stack
                 let replacement = 0u64; // TODO: Should be popped from execution stack
+                self.execute_atomic_cmpxchg(cmpxchg_op, expected, replacement)
+            },
+            AtomicOp::WaitNotify(wait_notify_op) => self.execute_wait_notify(thread_id, wait_notify_op),
+            AtomicOp::Fence(fence) => {
+                self.execute_atomic_fence(fence)?;
+                Ok(result_vec![])
+            },
+        }
+    }
+    
+    /// Execute atomic operation with provided operands
+    pub fn execute_atomic_with_operands(&mut self, thread_id: ThreadId, op: AtomicOp, operands: &[u64]) -> Result<ResultVec> {
+        self.stats.total_operations += 1;
+        
+        // Update thread statistics
+        if let Ok(context) = self.thread_manager.get_thread_context_mut(thread_id) {
+            context.stats.record_atomic_operation();
+        }
+        
+        match op {
+            AtomicOp::Load(load_op) => self.execute_atomic_load(load_op),
+            AtomicOp::Store(store_op) => {
+                // Get value from operands
+                let value = operands.get(0).copied().unwrap_or(0u64);
+                self.execute_atomic_store(store_op, value)?;
+                Ok(result_vec![])
+            },
+            AtomicOp::RMW(rmw_op) => {
+                // Get value from operands
+                let value = operands.get(0).copied().unwrap_or(0u64);
+                self.execute_atomic_rmw(rmw_op, value)
+            },
+            AtomicOp::Cmpxchg(cmpxchg_op) => {
+                // Get expected and replacement values from operands
+                let expected = operands.get(0).copied().unwrap_or(0u64);
+                let replacement = operands.get(1).copied().unwrap_or(0u64);
                 self.execute_atomic_cmpxchg(cmpxchg_op, expected, replacement)
             },
             AtomicOp::WaitNotify(wait_notify_op) => self.execute_wait_notify(thread_id, wait_notify_op),
@@ -365,15 +398,15 @@ impl AtomicMemoryContext {
         self.stats.fence_operations += 1;
         
         // Execute memory fence with specified ordering
-        let ordering: PlatformOrdering = convert_memory_ordering(fence.ordering);
+        let ordering: AtomicOrdering = convert_memory_ordering(fence.ordering);
         
         // Platform-specific fence implementation
         match ordering {
-            PlatformOrdering::SeqCst => {
+            AtomicOrdering::SeqCst => {
                 // Full memory barrier
-                core::sync::atomic::fence(PlatformOrdering::SeqCst);
+                core::sync::atomic::fence(AtomicOrdering::SeqCst);
             },
-            PlatformOrdering::Relaxed => {
+            AtomicOrdering::Relaxed => {
                 // No fence needed for relaxed ordering
             },
             _ => {
@@ -388,7 +421,7 @@ impl AtomicMemoryContext {
     
     fn calculate_address(&self, memarg: MemArg) -> Result<usize> {
         let addr = memarg.offset as usize;
-        if addr >= self.memory_size.load(PlatformOrdering::Relaxed) {
+        if addr >= self.memory_size.load(AtomicOrdering::Relaxed) {
             return Err(Error::new(
                 ErrorCategory::Runtime,
                 codes::EXECUTION_ERROR,
@@ -591,7 +624,27 @@ impl AtomicMemoryContext {
         // Add thread to wait queue for this address
         #[cfg(feature = "std")]
         {
-            self.wait_queues.entry(addr as u32).or_insert_with(Vec::new).push(thread_id);
+            // BoundedMap API is different from HashMap - handle explicitly
+            let provider = wrt_foundation::safe_memory::NoStdProvider::<1024>::default();
+            let default_vec = wrt_foundation::bounded::BoundedVec::new(provider).map_err(|_| {
+                Error::runtime_error("Failed to create thread wait queue")
+            })?;
+            
+            match self.wait_queues.get(&(addr as u64))? {
+                Some(mut existing_vec) => {
+                    existing_vec.push(thread_id).map_err(|_| {
+                        Error::runtime_error("Thread wait queue capacity exceeded")
+                    })?;
+                    self.wait_queues.insert(addr as u64, existing_vec)?;
+                }
+                None => {
+                    let mut new_vec = default_vec;
+                    new_vec.push(thread_id).map_err(|_| {
+                        Error::runtime_error("Failed to add thread to wait queue")
+                    })?;
+                    self.wait_queues.insert(addr as u64, new_vec)?;
+                }
+            }
         }
         #[cfg(not(feature = "std"))]
         {
@@ -643,16 +696,16 @@ impl AtomicMemoryContext {
         
         #[cfg(feature = "std")]
         {
-            if let Some(queue) = self.wait_queues.get_mut(&(addr as u32)) {
+            if let Ok(Some(queue)) = self.wait_queues.get_mut(&(addr as u64)) {
                 let to_notify = core::cmp::min(count as usize, queue.len());
                 for _ in 0..to_notify {
-                    if let Some(_thread_id) = queue.pop() {
+                    if let Ok(Some(_thread_id)) = queue.pop() {
                         // In real implementation, would wake up the thread
                         notified += 1;
                     }
                 }
                 if queue.is_empty() {
-                    self.wait_queues.remove(&(addr as u32));
+                    self.wait_queues.remove(&(addr as u64))?;
                 }
             }
         }
@@ -754,8 +807,8 @@ mod tests {
     
     #[test]
     fn test_memory_ordering_conversion() {
-        assert_eq!(PlatformOrdering::from(MemoryOrdering::Unordered), PlatformOrdering::Relaxed);
-        assert_eq!(PlatformOrdering::from(MemoryOrdering::SeqCst), PlatformOrdering::SeqCst);
+        assert_eq!(AtomicOrdering::from(MemoryOrdering::Unordered), AtomicOrdering::Relaxed);
+        assert_eq!(AtomicOrdering::from(MemoryOrdering::SeqCst), AtomicOrdering::SeqCst);
     }
     
     #[cfg(feature = "std")]

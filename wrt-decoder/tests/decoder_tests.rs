@@ -5,7 +5,11 @@ type Result<T> = wrt_error::Result<T>;
 
 // Helper function to convert wat::Error to wrt_error::Error
 fn wat_to_wrt_error(e: wat::Error) -> Error {
-    Error::new(ErrorCategory::Runtime, codes::EXECUTION_ERROR, e.to_string())
+    Error::new(
+        ErrorCategory::Runtime,
+        codes::EXECUTION_ERROR,
+        e.to_string(),
+    )
 }
 
 #[test]

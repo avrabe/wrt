@@ -7,17 +7,15 @@
 extern crate alloc;
 
 use crate::prelude::{Debug, Eq, PartialEq};
+use crate::bounded_runtime_infra::{
+    BoundedBranchPredictionMap, BoundedFunctionPredictorMap, RuntimeProvider,
+    new_branch_prediction_map, new_function_predictor_map
+};
 use wrt_error::{Error, ErrorCategory, Result, codes};
-use wrt_foundation::traits::{BoundedCapacity, BytesWriter, LittleEndian};
-
-#[cfg(feature = "std")]
-use std::vec::Vec;
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
+use wrt_foundation::traits::{BoundedCapacity, BytesWriter, LittleEndian, Checksummable, ToBytes, FromBytes};
 
 /// Branch prediction hint indicating likelihood of branch being taken
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum BranchLikelihood {
     /// Branch is very unlikely to be taken (< 10% probability)
     VeryUnlikely,
@@ -64,6 +62,42 @@ impl BranchLikelihood {
     }
 }
 
+impl Checksummable for BranchLikelihood {
+    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
+        (*self as u8).update_checksum(checksum);
+    }
+}
+
+impl ToBytes for BranchLikelihood {
+    fn serialized_size(&self) -> usize {
+        1 // Single byte for enum discriminant
+    }
+
+    fn to_bytes_with_provider<PStream: wrt_foundation::MemoryProvider>(
+        &self,
+        writer: &mut wrt_foundation::traits::WriteStream<'_>,
+        _provider: &PStream,
+    ) -> wrt_foundation::Result<()> {
+        writer.write_u8(*self as u8)
+    }
+}
+
+impl FromBytes for BranchLikelihood {
+    fn from_bytes_with_provider<PStream: wrt_foundation::MemoryProvider>(
+        reader: &mut wrt_foundation::traits::ReadStream<'_>,
+        _provider: &PStream,
+    ) -> wrt_foundation::Result<Self> {
+        let value = reader.read_u8()?;
+        Ok(match value {
+            0 => BranchLikelihood::VeryUnlikely,
+            1 => BranchLikelihood::Unlikely,
+            2 => BranchLikelihood::Unknown,
+            3 => BranchLikelihood::Likely,
+            4 => BranchLikelihood::VeryLikely,
+            _ => BranchLikelihood::Unknown,
+        })
+    }
+}
 
 /// Branch prediction information for a specific instruction
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -176,55 +210,28 @@ impl wrt_foundation::traits::FromBytes for BranchPrediction {
 pub struct FunctionBranchPredictor {
     /// Function index
     pub function_index: u32,
-    /// Branch predictions indexed by instruction offset
-    #[cfg(feature = "std")]
-    predictions: std::collections::BTreeMap<u32, BranchPrediction>,
-    #[cfg(not(feature = "std"))]
-    predictions: wrt_foundation::BoundedVec<BranchPrediction, 256, wrt_foundation::NoStdProvider<1024>>,
+    /// Branch predictions indexed by instruction offset using bounded collections
+    predictions: BoundedBranchPredictionMap<BranchPrediction>,
 }
 
 impl FunctionBranchPredictor {
     /// Create new function branch predictor
-    #[must_use] pub fn new(function_index: u32) -> Self {
-        Self {
+    pub fn new(function_index: u32) -> Result<Self> {
+        Ok(Self {
             function_index,
-            #[cfg(feature = "std")]
-            predictions: std::collections::BTreeMap::new(),
-            #[cfg(not(feature = "std"))]
-            predictions: wrt_foundation::BoundedVec::new(wrt_foundation::NoStdProvider::<1024>::default()).unwrap(),
-        }
+            predictions: new_branch_prediction_map()?,
+        })
     }
     
     /// Add branch prediction for an instruction
     pub fn add_prediction(&mut self, prediction: BranchPrediction) -> Result<()> {
-        #[cfg(feature = "std")]
-        {
-            self.predictions.insert(prediction.instruction_offset, prediction);
-            Ok(())
-        }
-        #[cfg(not(any(feature = "std", )))]
-        {
-            self.predictions.push(prediction).map_err(|_| {
-                Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Too many branch predictions")
-            })
-        }
+        self.predictions.insert(prediction.instruction_offset, prediction)?;
+        Ok(())
     }
     
     /// Get branch prediction for instruction offset
     pub fn get_prediction(&self, instruction_offset: u32) -> Option<BranchPrediction> {
-        #[cfg(feature = "std")]
-        {
-            self.predictions.get(&instruction_offset).cloned()
-        }
-        #[cfg(not(feature = "std"))]
-        {
-            for prediction in &self.predictions {
-                if prediction.instruction_offset == instruction_offset {
-                    return Some(prediction);
-                }
-            }
-            None
-        }
+        self.predictions.get(&instruction_offset).ok().flatten().map(|pred| pred.clone())
     }
     
     /// Get predicted next instruction for current offset
@@ -249,10 +256,16 @@ impl FunctionBranchPredictor {
     /// Get all strong predictions (high confidence) for optimization
     #[cfg(feature = "std")]
     pub fn get_strong_predictions(&self) -> Vec<BranchPrediction> {
-        self.predictions.values()
-            .filter(|pred| pred.likelihood.is_strong_prediction())
-            .cloned()
-            .collect()
+        let mut strong_predictions = Vec::new();
+        
+        // Use the values iterator to get all predictions
+        for pred in self.predictions.values() {
+            if pred.likelihood.is_strong_prediction() {
+                strong_predictions.push(pred);
+            }
+        }
+        
+        strong_predictions
     }
     
     /// Count total number of predictions
@@ -306,29 +319,25 @@ impl wrt_foundation::traits::FromBytes for FunctionBranchPredictor {
 /// Module-level branch prediction system
 #[derive(Debug, Clone)]
 pub struct ModuleBranchPredictor {
-    /// Function predictors indexed by function index
-    #[cfg(feature = "std")]
-    function_predictors: std::collections::BTreeMap<u32, FunctionBranchPredictor>,
-    #[cfg(not(feature = "std"))]
-    function_predictors: wrt_foundation::BoundedVec<FunctionBranchPredictor, 1024, wrt_foundation::NoStdProvider<1024>>,
+    /// Function predictors indexed by function index using bounded collections
+    function_predictors: BoundedFunctionPredictorMap<FunctionBranchPredictor>,
 }
 
 impl ModuleBranchPredictor {
     /// Create new module branch predictor
-    #[must_use] pub fn new() -> Self {
-        Self {
-            #[cfg(feature = "std")]
-            function_predictors: std::collections::BTreeMap::new(),
-            #[cfg(not(feature = "std"))]
-            function_predictors: wrt_foundation::BoundedVec::new(wrt_foundation::NoStdProvider::<1024>::default()).unwrap(),
-        }
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            function_predictors: new_function_predictor_map()?,
+        })
     }
     
     /// Add function branch predictor
     pub fn add_function_predictor(&mut self, predictor: FunctionBranchPredictor) -> Result<()> {
         #[cfg(feature = "std")]
         {
-            self.function_predictors.insert(predictor.function_index, predictor);
+            self.function_predictors.insert(predictor.function_index, predictor).map_err(|_| {
+                Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Too many function predictors")
+            })?;
             Ok(())
         }
         #[cfg(not(any(feature = "std", )))]
@@ -343,13 +352,15 @@ impl ModuleBranchPredictor {
     pub fn get_function_predictor(&self, function_index: u32) -> Option<FunctionBranchPredictor> {
         #[cfg(feature = "std")]
         {
-            self.function_predictors.get(&function_index).cloned()
+            self.function_predictors.get(&function_index).ok().flatten().map(|pred| pred.clone())
         }
         #[cfg(not(feature = "std"))]
         {
-            for predictor in &self.function_predictors {
-                if predictor.function_index == function_index {
-                    return Some(predictor);
+            for i in 0..self.function_predictors.len() {
+                if let Ok(predictor) = self.function_predictors.get(i) {
+                    if predictor.function_index == function_index {
+                        return Some(predictor.clone());
+                    }
                 }
             }
             None
@@ -360,7 +371,7 @@ impl ModuleBranchPredictor {
     pub fn get_function_predictor_mut(&mut self, function_index: u32) -> Option<&mut FunctionBranchPredictor> {
         #[cfg(feature = "std")]
         {
-            self.function_predictors.get_mut(&function_index)
+            self.function_predictors.get_mut(&function_index).ok().flatten()
         }
         #[cfg(not(any(feature = "std", )))]
         {
@@ -417,12 +428,12 @@ impl ModuleBranchPredictor {
         branch_hints: &wrt_decoder::branch_hint_section::BranchHintSection,
         code_section: &[u8], // For analyzing branch targets
     ) -> Result<Self> {
-        let mut predictor = Self::new();
+        let mut predictor = Self::new()?;
         
         // Process each function's hints
         for func_idx in 0..branch_hints.function_count() {
             if let Some(hints) = branch_hints.get_function_hints(func_idx as u32) {
-                let mut func_predictor = FunctionBranchPredictor::new(func_idx as u32);
+                let mut func_predictor = FunctionBranchPredictor::new(func_idx as u32)?;
                 
                 // Convert hints to predictions
                 for (offset, hint) in hints.iter() {
@@ -463,22 +474,36 @@ impl ModuleBranchPredictor {
     pub fn total_prediction_count(&self) -> usize {
         #[cfg(feature = "std")]
         {
-            self.function_predictors.values()
-                .map(|pred| pred.prediction_count())
-                .sum()
+            let mut total = 0;
+            for predictor in self.function_predictors.values() {
+                total += predictor.prediction_count();
+            }
+            total
         }
         #[cfg(not(any(feature = "std", )))]
         {
-            self.function_predictors.iter()
-                .map(|pred| pred.prediction_count())
-                .sum()
+            let mut total = 0;
+            for i in 0..self.function_predictors.len() {
+                if let Ok(predictor) = self.function_predictors.get(i) {
+                    total += predictor.prediction_count();
+                }
+            }
+            total
         }
     }
 }
 
 impl Default for ModuleBranchPredictor {
     fn default() -> Self {
-        Self::new()
+        // Try to create normally, but if it fails, use a simple fallback
+        Self::new().unwrap_or_else(|_| {
+            // Fallback with basic structure - shouldn't happen in normal operation
+            // Use the type's default implementation which internally uses unwrap(),
+            // but we can't avoid this in the Default trait implementation
+            Self {
+                function_predictors: BoundedFunctionPredictorMap::default(),
+            }
+        })
     }
 }
 
@@ -504,6 +529,16 @@ impl PredictiveExecutionContext {
             predictor,
             prediction_stats: PredictionStats::new(),
         }
+    }
+    
+    /// Create new predictive execution context with new predictor
+    pub fn new_with_predictor() -> Result<Self> {
+        Ok(Self {
+            current_function: 0,
+            current_offset: 0,
+            predictor: ModuleBranchPredictor::new()?,
+            prediction_stats: PredictionStats::new(),
+        })
     }
     
     /// Update current execution position
@@ -635,7 +670,7 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn test_function_branch_predictor() {
-        let mut predictor = FunctionBranchPredictor::new(0);
+        let mut predictor = FunctionBranchPredictor::new(0).unwrap();
         
         let prediction = BranchPrediction::new(
             10,
@@ -654,8 +689,8 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn test_module_branch_predictor() {
-        let mut module_predictor = ModuleBranchPredictor::new();
-        let mut func_predictor = FunctionBranchPredictor::new(0);
+        let mut module_predictor = ModuleBranchPredictor::new().unwrap();
+        let mut func_predictor = FunctionBranchPredictor::new(0).unwrap();
         
         let prediction = BranchPrediction::new(
             10,

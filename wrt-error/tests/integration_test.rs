@@ -11,8 +11,11 @@ mod tests {
 
     #[test]
     fn test_error_creation() {
-        let error =
-            Error::new(ErrorCategory::Memory, codes::MEMORY_ACCESS_OUT_OF_BOUNDS, "Test error");
+        let error = Error::new(
+            ErrorCategory::Memory,
+            codes::MEMORY_ACCESS_OUT_OF_BOUNDS,
+            "Test error",
+        );
         assert!(error.is_memory_error());
         assert_eq!(error.code, codes::MEMORY_ACCESS_OUT_OF_BOUNDS);
     }

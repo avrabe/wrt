@@ -3,12 +3,12 @@
 //! This module provides basic AST node definitions that work with the current
 //! wrt-foundation constraints while still providing source location tracking.
 
-#[cfg(feature = "std")]
-use std::{vec::Vec, fmt, boxed::Box};
-#[cfg(all(not(feature = "std")))]
-use std::{vec::Vec, boxed::Box};
 #[cfg(not(feature = "std"))]
 use core::fmt;
+#[cfg(feature = "std")]
+use std::{boxed::Box, fmt, vec::Vec};
+#[cfg(all(not(feature = "std")))]
+use std::{boxed::Box, vec::Vec};
 
 use crate::wit_parser::{WitBoundedString, WitBoundedStringSmall};
 
@@ -26,12 +26,20 @@ pub struct SourceSpan {
 impl SourceSpan {
     /// Create a new source span
     pub const fn new(start: u32, end: u32, file_id: u32) -> Self {
-        Self { start, end, file_id }
+        Self {
+            start,
+            end,
+            file_id,
+        }
     }
 
     /// Create an empty span (used for synthetic nodes)
     pub const fn empty() -> Self {
-        Self { start: 0, end: 0, file_id: 0 }
+        Self {
+            start: 0,
+            end: 0,
+            file_id: 0,
+        }
     }
 
     /// Get the length of the span in bytes
@@ -46,7 +54,10 @@ impl SourceSpan {
 
     /// Merge two spans to create a span covering both
     pub fn merge(&self, other: &Self) -> Self {
-        assert_eq!(self.file_id, other.file_id, "Cannot merge spans from different files");
+        assert_eq!(
+            self.file_id, other.file_id,
+            "Cannot merge spans from different files"
+        );
         Self {
             start: self.start.min(other.start),
             end: self.end.max(other.end),
@@ -273,12 +284,11 @@ impl TypeExpr {
             Self::Primitive(p) => p.span,
             Self::Named(n) => n.span,
             #[cfg(feature = "std")]
-            Self::List(_, span) 
-            | Self::Option(_, span) 
-            | Self::Stream(_, span) 
+            Self::List(_, span)
+            | Self::Option(_, span)
+            | Self::Stream(_, span)
             | Self::Future(_, span) => *span,
-            Self::Own(_, span) 
-            | Self::Borrow(_, span) => *span,
+            Self::Own(_, span) | Self::Borrow(_, span) => *span,
             Self::Result(r) => r.span,
             Self::Tuple(t) => t.span,
         }

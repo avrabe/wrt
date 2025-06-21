@@ -53,7 +53,10 @@ mod tests {
             let error = Error::memory_error("Test memory access out of bounds: addr 100, len 32");
             assert!(error.is_memory_error());
             // Optionally, assert the message if it needs to be specific and static
-            assert_eq!(error.message, "Test memory access out of bounds: addr 100, len 32");
+            assert_eq!(
+                error.message,
+                "Test memory access out of bounds: addr 100, len 32"
+            );
         }
 
         #[test]

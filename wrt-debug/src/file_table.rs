@@ -23,7 +23,12 @@ pub struct FileEntry<'a> {
 // Implement required traits for BoundedVec compatibility
 impl<'a> Default for FileEntry<'a> {
     fn default() -> Self {
-        Self { path: DebugString::default(), dir_index: 0, mod_time: 0, size: 0 }
+        Self {
+            path: DebugString::default(),
+            dir_index: 0,
+            mod_time: 0,
+            size: 0,
+        }
     }
 }
 
@@ -141,11 +146,17 @@ impl<'a> FileTable<'a> {
 
         if file.dir_index == 0 {
             // File is relative to compilation directory
-            Some(FilePath { directory: None, filename: file.path })
+            Some(FilePath {
+                directory: None,
+                filename: file.path,
+            })
         } else {
             // File has explicit directory
             let directory = self.get_directory(file.dir_index)?;
-            Some(FilePath { directory: Some(directory), filename: file.path })
+            Some(FilePath {
+                directory: Some(directory),
+                filename: file.path,
+            })
         }
     }
 

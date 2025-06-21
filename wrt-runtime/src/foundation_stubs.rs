@@ -1,16 +1,14 @@
 // WRT - wrt-runtime
-// Module: Foundation Type Stubs (Agent D)
-// TEMPORARY - These stubs will be replaced by Agent A's work
+// Module: Foundation Type Stubs
 //
 // Copyright (c) 2025 The WRT Project Developers
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-//! Temporary stubs for Agent A's foundation types
+//! Foundation type stubs for runtime integration
 //! 
-//! These types allow Agent D to work independently while Agent A
-//! implements the unified type system. They will be removed during
-//! the final integration phase.
+//! These types provide the interface between the runtime
+//! and the unified type system implementation.
 
 #![allow(dead_code)] // Allow during stub phase
 
@@ -100,14 +98,17 @@ pub type LargeVec<T> = wrt_foundation::bounded::BoundedVec<T, 65536, wrt_foundat
 
 /// ASIL levels for safety context
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(Default)]
 pub enum AsilLevel {
-    #[default]
-    QM = 0,
-    AsilA = 1,
-    AsilB = 2,
-    AsilC = 3,
-    AsilD = 4,
+    /// QM: Quality Management (no ASIL requirement)
+    QM,
+    /// ASIL-A: Lowest safety criticality
+    A,
+    /// ASIL-B: Low safety criticality
+    B,
+    /// ASIL-C: Medium safety criticality
+    C,
+    /// ASIL-D: Highest safety criticality
+    D,
 }
 
 

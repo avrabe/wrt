@@ -387,9 +387,64 @@ impl WitParser {
         }
         
         #[cfg(not(any(feature = "std", )))]
-        Err(WitParseError::InvalidSyntax(
-            BoundedString::from_str("Parsing not supported in no_std", self.provider.clone()).unwrap()
-        ))
+        {
+            // Parse import statement using no_std compatible approach
+            let mut parts = BoundedVec::new(self.provider.clone()).map_err(|_| WitParseError::InvalidSyntax(
+                BoundedString::from_str("Failed to create parts vector", self.provider.clone()).unwrap()
+            ))?;
+            
+            // Split whitespace manually for no_std
+            let mut start = 0;
+            let bytes = line.as_bytes();
+            
+            for (i, &byte) in bytes.iter().enumerate() {
+                if byte.is_ascii_whitespace() {
+                    if start < i {
+                        if let Ok(part) = core::str::from_utf8(&bytes[start..i]) {
+                            if parts.push(part).is_err() {
+                                return Err(WitParseError::InvalidSyntax(
+                                    BoundedString::from_str("Too many import parts", self.provider.clone()).unwrap()
+                                ));
+                            }
+                        }
+                    }
+                    start = i + 1;
+                }
+            }
+            
+            // Add the last part
+            if start < bytes.len() {
+                if let Ok(part) = core::str::from_utf8(&bytes[start..]) {
+                    let _ = parts.push(part);
+                }
+            }
+            
+            if parts.len() < 3 {
+                return Err(WitParseError::InvalidSyntax(
+                    BoundedString::from_str("Invalid import syntax", self.provider.clone()).unwrap()
+                ));
+            }
+
+            let name = BoundedString::from_str(parts[1], self.provider.clone())
+                .map_err(|_| WitParseError::InvalidIdentifier(
+                    BoundedString::from_str(parts[1], self.provider.clone()).unwrap_or_default()
+                ))?;
+
+            let item_type = parts[2];
+            let item = match item_type {
+                "func" => {
+                    let func = self.parse_function(line)?;
+                    WitItem::Function(func)
+                }
+                _ => {
+                    return Err(WitParseError::InvalidSyntax(
+                        BoundedString::from_str("Unsupported import type", self.provider.clone()).unwrap()
+                    ));
+                }
+            };
+
+            Ok(WitImport { name, item })
+        }
     }
 
     fn parse_export(&mut self, line: &str) -> Result<WitExport, WitParseError> {
@@ -424,9 +479,64 @@ impl WitParser {
         }
         
         #[cfg(not(any(feature = "std", )))]
-        Err(WitParseError::InvalidSyntax(
-            BoundedString::from_str("Parsing not supported in no_std", self.provider.clone()).unwrap()
-        ))
+        {
+            // Parse export statement using no_std compatible approach
+            let mut parts = BoundedVec::new(self.provider.clone()).map_err(|_| WitParseError::InvalidSyntax(
+                BoundedString::from_str("Failed to create parts vector", self.provider.clone()).unwrap()
+            ))?;
+            
+            // Split whitespace manually for no_std
+            let mut start = 0;
+            let bytes = line.as_bytes();
+            
+            for (i, &byte) in bytes.iter().enumerate() {
+                if byte.is_ascii_whitespace() {
+                    if start < i {
+                        if let Ok(part) = core::str::from_utf8(&bytes[start..i]) {
+                            if parts.push(part).is_err() {
+                                return Err(WitParseError::InvalidSyntax(
+                                    BoundedString::from_str("Too many export parts", self.provider.clone()).unwrap()
+                                ));
+                            }
+                        }
+                    }
+                    start = i + 1;
+                }
+            }
+            
+            // Add the last part
+            if start < bytes.len() {
+                if let Ok(part) = core::str::from_utf8(&bytes[start..]) {
+                    let _ = parts.push(part);
+                }
+            }
+            
+            if parts.len() < 3 {
+                return Err(WitParseError::InvalidSyntax(
+                    BoundedString::from_str("Invalid export syntax", self.provider.clone()).unwrap()
+                ));
+            }
+
+            let name = BoundedString::from_str(parts[1], self.provider.clone())
+                .map_err(|_| WitParseError::InvalidIdentifier(
+                    BoundedString::from_str(parts[1], self.provider.clone()).unwrap_or_default()
+                ))?;
+
+            let item_type = parts[2];
+            let item = match item_type {
+                "func" => {
+                    let func = self.parse_function(line)?;
+                    WitItem::Function(func)
+                }
+                _ => {
+                    return Err(WitParseError::InvalidSyntax(
+                        BoundedString::from_str("Unsupported export type", self.provider.clone()).unwrap()
+                    ));
+                }
+            };
+
+            Ok(WitExport { name, item })
+        }
     }
 
     fn parse_function(&mut self, line: &str) -> Result<WitFunction, WitParseError> {
@@ -481,9 +591,62 @@ impl WitParser {
         }
         
         #[cfg(not(any(feature = "std", )))]
-        Err(WitParseError::InvalidSyntax(
-            BoundedString::from_str("Parsing not supported in no_std", self.provider.clone()).unwrap()
-        ))
+        {
+            // Parse type definition using no_std compatible approach
+            let mut parts = BoundedVec::new(self.provider.clone()).map_err(|_| WitParseError::InvalidSyntax(
+                BoundedString::from_str("Failed to create parts vector", self.provider.clone()).unwrap()
+            ))?;
+            
+            // Split by space for type definition (e.g., "type name value")
+            let mut start = 0;
+            let bytes = line.as_bytes();
+            let mut part_count = 0;
+            
+            for (i, &byte) in bytes.iter().enumerate() {
+                if byte == b' ' && part_count < 2 {
+                    if start < i {
+                        if let Ok(part) = core::str::from_utf8(&bytes[start..i]) {
+                            if parts.push(part).is_err() {
+                                return Err(WitParseError::InvalidSyntax(
+                                    BoundedString::from_str("Too many type def parts", self.provider.clone()).unwrap()
+                                ));
+                            }
+                            part_count += 1;
+                        }
+                    }
+                    start = i + 1;
+                }
+            }
+            
+            // Add the remaining part (the type definition)
+            if start < bytes.len() {
+                if let Ok(part) = core::str::from_utf8(&bytes[start..]) {
+                    let _ = parts.push(part);
+                }
+            }
+            
+            if parts.len() < 3 {
+                return Err(WitParseError::InvalidSyntax(
+                    BoundedString::from_str("Invalid type definition", self.provider.clone()).unwrap()
+                ));
+            }
+
+            let name = BoundedString::from_str(parts[1], self.provider.clone())
+                .map_err(|_| WitParseError::InvalidIdentifier(
+                    BoundedString::from_str(parts[1], self.provider.clone()).unwrap_or_default()
+                ))?;
+
+            let type_str = parts[2];
+            let is_resource = type_str.len() >= 8 && &type_str[..8] == "resource"; // Simplified starts_with for no_std
+            
+            let ty = self.parse_type(type_str)?;
+
+            Ok(WitTypeDef {
+                name: name.clone(),
+                ty: ty.clone(),
+                is_resource,
+            })
+        }
     }
 
     fn parse_type(&mut self, type_str: &str) -> Result<WitType, WitParseError> {
@@ -533,11 +696,41 @@ impl WitParser {
                 
                 #[cfg(not(any(feature = "std", )))]
                 {
-                    let name = BoundedString::from_str(type_str, self.provider.clone())
-                        .map_err(|_| WitParseError::InvalidIdentifier(
-                            BoundedString::from_str(type_str, self.provider.clone()).unwrap_or_default()
-                        ))?;
-                    Ok(WitType::Named(name))
+                    // Handle complex types in no_std environments
+                    let bytes = type_str.as_bytes();
+                    
+                    // Check for list<T>
+                    if bytes.len() > 6 && &bytes[..5] == b"list<" && bytes[bytes.len()-1] == b'>' {
+                        let inner = &type_str[5..type_str.len()-1];
+                        let inner_type = self.parse_type(inner)?;
+                        Ok(WitType::List(Box::new(inner_type)))
+                    }
+                    // Check for option<T>
+                    else if bytes.len() > 8 && &bytes[..7] == b"option<" && bytes[bytes.len()-1] == b'>' {
+                        let inner = &type_str[7..type_str.len()-1];
+                        let inner_type = self.parse_type(inner)?;
+                        Ok(WitType::Option(Box::new(inner_type)))
+                    }
+                    // Check for stream<T>
+                    else if bytes.len() > 8 && &bytes[..7] == b"stream<" && bytes[bytes.len()-1] == b'>' {
+                        let inner = &type_str[7..type_str.len()-1];
+                        let inner_type = self.parse_type(inner)?;
+                        Ok(WitType::Stream(Box::new(inner_type)))
+                    }
+                    // Check for future<T>
+                    else if bytes.len() > 8 && &bytes[..7] == b"future<" && bytes[bytes.len()-1] == b'>' {
+                        let inner = &type_str[7..type_str.len()-1];
+                        let inner_type = self.parse_type(inner)?;
+                        Ok(WitType::Future(Box::new(inner_type)))
+                    }
+                    // Handle named types
+                    else {
+                        let name = BoundedString::from_str(type_str, self.provider.clone())
+                            .map_err(|_| WitParseError::InvalidIdentifier(
+                                BoundedString::from_str(type_str, self.provider.clone()).unwrap_or_default()
+                            ))?;
+                        Ok(WitType::Named(name))
+                    }
                 }
             }
         }

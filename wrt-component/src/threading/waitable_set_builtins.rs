@@ -13,7 +13,6 @@
 //! This module provides implementation of the `waitable-set.*` built-in functions
 //! required by the WebAssembly Component Model for managing sets of waitable objects.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -265,8 +264,8 @@ impl WaitableSetImpl {
     }
 
     #[cfg(not(any(feature = "std", )))]
-    pub fn check_ready(&mut self) -> Result<BoundedVec<WaitableEntry, MAX_WAIT_RESULTS>, NoStdProvider<65536>> {
-        let mut ready = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+    pub fn check_ready(&mut self) -> core::result::Result<BoundedVec<WaitableEntry, MAX_WAIT_RESULTS, NoStdProvider<65536>>, NoStdProvider<65536>> {
+        let mut ready = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
         for (_, entry) in self.waitables.iter_mut() {
             if entry.check_ready() {
                 ready.push(entry.clone())
@@ -547,7 +546,7 @@ impl WaitableSetBuiltins {
     }
 
     #[cfg(not(any(feature = "std", )))]
-    pub fn waitable_set_poll_all(set_id: WaitableSetId) -> Result<BoundedVec<WaitableEntry, MAX_WAIT_RESULTS>, NoStdProvider<65536>> {
+    pub fn waitable_set_poll_all(set_id: WaitableSetId) -> core::result::Result<BoundedVec<WaitableEntry, MAX_WAIT_RESULTS, NoStdProvider<65536>>, NoStdProvider<65536>> {
         Self::with_registry_mut(|registry| {
             if let Some(set) = registry.get_set_mut(set_id) {
                 set.check_ready()

@@ -35,13 +35,13 @@ pub struct ResourceRepresentationManager {
     #[cfg(feature = "std")]
     representations: HashMap<TypeId, Box<dyn ResourceRepresentation>>,
     #[cfg(not(any(feature = "std", )))]
-    representations: BoundedVec<(TypeId, ResourceRepresentationEntry), MAX_RESOURCE_REPRESENTATIONS>,
+    representations: BoundedVec<(TypeId, ResourceRepresentationEntry), MAX_RESOURCE_REPRESENTATIONS, crate::bounded_component_infra::ComponentProvider>,
     
     /// Handle to resource mapping
     #[cfg(feature = "std")]
     handle_to_resource: HashMap<u32, ResourceEntry>,
     #[cfg(not(any(feature = "std", )))]
-    handle_to_resource: BoundedVec<(u32, ResourceEntry), MAX_RESOURCE_REPRESENTATIONS>,
+    handle_to_resource: BoundedVec<(u32, ResourceEntry), MAX_RESOURCE_REPRESENTATIONS, crate::bounded_component_infra::ComponentProvider>,
     
     /// Next representation ID
     next_representation_id: u32,
@@ -125,7 +125,7 @@ pub struct ResourceEntry {
 #[derive(Debug, Clone)]
 pub struct ResourceMetadata {
     /// Type name
-    pub type_name: BoundedString<64, NoStdProvider<65536>>,
+    pub type_name: BoundedString<64, crate::bounded_component_infra::ComponentProvider>,
     
     /// Creation timestamp
     pub created_at: u64,
@@ -174,16 +174,16 @@ pub struct ResourceRepresentationEntry {
 #[derive(Debug, Clone)]
 pub struct ConcreteResourceRepresentation {
     /// Type name
-    pub type_name: BoundedString<64, NoStdProvider<65536>>,
+    pub type_name: BoundedString<64, crate::bounded_component_infra::ComponentProvider>,
     
     /// Representation size
     pub size: usize,
     
     /// Valid handles
-    pub valid_handles: BoundedVec<u32, 64, NoStdProvider<65536>>,
+    pub valid_handles: BoundedVec<u32, 64, crate::bounded_component_infra::ComponentProvider>,
     
     /// Handle to representation mapping
-    pub handle_values: BoundedVec<(u32, RepresentationValue), 64>,
+    pub handle_values: BoundedVec<(u32, RepresentationValue), 64, crate::bounded_component_infra::ComponentProvider>,
 }
 
 /// Built-in representations for common types
@@ -195,7 +195,7 @@ pub struct FileHandleRepresentation {
     #[cfg(feature = "std")]
     file_descriptors: HashMap<u32, i32>,
     #[cfg(not(any(feature = "std", )))]
-    file_descriptors: BoundedVec<(u32, i32), 64>,
+    file_descriptors: BoundedVec<(u32, i32), 64, crate::bounded_component_infra::ComponentProvider>,
 }
 
 /// Memory buffer representation
@@ -205,7 +205,7 @@ pub struct MemoryBufferRepresentation {
     #[cfg(feature = "std")]
     buffers: HashMap<u32, (usize, usize)>, // (pointer, size)
     #[cfg(not(any(feature = "std", )))]
-    buffers: BoundedVec<(u32, (usize, usize)), 64>,
+    buffers: BoundedVec<(u32, (usize, usize)), 64, crate::bounded_component_infra::ComponentProvider>,
 }
 
 /// Network connection representation
@@ -215,7 +215,7 @@ pub struct NetworkConnectionRepresentation {
     #[cfg(feature = "std")]
     connections: HashMap<u32, NetworkConnection>,
     #[cfg(not(any(feature = "std", )))]
-    connections: BoundedVec<(u32, NetworkConnection), 32>,
+    connections: BoundedVec<(u32, NetworkConnection), 32, crate::bounded_component_infra::ComponentProvider>,
 }
 
 /// Network connection details
@@ -225,10 +225,10 @@ pub struct NetworkConnection {
     pub socket_fd: i32,
     
     /// Local address
-    pub local_addr: BoundedString<64, NoStdProvider<65536>>,
+    pub local_addr: BoundedString<64, crate::bounded_component_infra::ComponentProvider>,
     
     /// Remote address
-    pub remote_addr: BoundedString<64, NoStdProvider<65536>>,
+    pub remote_addr: BoundedString<64, crate::bounded_component_infra::ComponentProvider>,
     
     /// Connection state
     pub state: ConnectionState,
@@ -255,33 +255,41 @@ pub enum ConnectionState {
 
 impl ResourceRepresentationManager {
     /// Create new resource representation manager
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> WrtResult<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             representations: HashMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            representations: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            representations: {
+                use wrt_foundation::budget_aware_provider::CrateId;
+                use crate::bounded_component_infra::ComponentProvider;
+                BoundedVec::new(ComponentProvider::new(CrateId::Component)?)?
+            },
             
             #[cfg(feature = "std")]
             handle_to_resource: HashMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            handle_to_resource: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            handle_to_resource: {
+                use wrt_foundation::budget_aware_provider::CrateId;
+                use crate::bounded_component_infra::ComponentProvider;
+                BoundedVec::new(ComponentProvider::new(CrateId::Component)?)?
+            },
             
             next_representation_id: 1,
             stats: RepresentationStats::new(),
-        }
+        })
     }
     
     /// Create with common built-in representations
-    pub fn with_builtin_representations() -> Self {
-        let mut manager = Self::new();
+    pub fn with_builtin_representations() -> WrtResult<Self> {
+        let mut manager = Self::new()?;
         
         // Register built-in representations
-        let _ = manager.register_representation::<FileHandle>(Box::new(FileHandleRepresentation::new()));
-        let _ = manager.register_representation::<MemoryBuffer>(Box::new(MemoryBufferRepresentation::new()));
-        let _ = manager.register_representation::<NetworkHandle>(Box::new(NetworkConnectionRepresentation::new()));
+        let _ = manager.register_representation::<FileHandle>(Box::new(FileHandleRepresentation::new()?));
+        let _ = manager.register_representation::<MemoryBuffer>(Box::new(MemoryBufferRepresentation::new()?));
+        let _ = manager.register_representation::<NetworkHandle>(Box::new(NetworkConnectionRepresentation::new()?));
         
-        manager
+        Ok(manager)
     }
     
     /// Register a resource representation for a type
@@ -298,11 +306,14 @@ impl ResourceRepresentationManager {
         #[cfg(not(any(feature = "std", )))]
         {
             // Convert to concrete representation for no_std
+            use wrt_foundation::budget_aware_provider::CrateId;
+            use crate::bounded_component_infra::ComponentProvider;
+            
             let concrete = ConcreteResourceRepresentation {
                 type_name: BoundedString::from_str(representation.type_name()).unwrap_or_default(),
                 size: representation.representation_size(),
-                valid_handles: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-                handle_values: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                valid_handles: BoundedVec::new(ComponentProvider::new(CrateId::Component)?)?,
+                handle_values: BoundedVec::new(ComponentProvider::new(CrateId::Component)?)?,
             };
             
             let entry = ResourceRepresentationEntry {
@@ -623,13 +634,17 @@ impl ResourceRepresentationManager {
 
 impl FileHandleRepresentation {
     /// Create new file handle representation
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> WrtResult<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             file_descriptors: HashMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            file_descriptors: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            file_descriptors: {
+                use wrt_foundation::budget_aware_provider::CrateId;
+                use crate::bounded_component_infra::ComponentProvider;
+                BoundedVec::new(ComponentProvider::new(CrateId::Component)?)?
+            },
+        })
     }
 }
 
@@ -724,13 +739,17 @@ impl ResourceRepresentation for FileHandleRepresentation {
 
 impl MemoryBufferRepresentation {
     /// Create new memory buffer representation
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> WrtResult<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             buffers: HashMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            buffers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            buffers: {
+                use wrt_foundation::budget_aware_provider::CrateId;
+                use crate::bounded_component_infra::ComponentProvider;
+                BoundedVec::new(ComponentProvider::new(CrateId::Component)?)?
+            },
+        })
     }
 }
 
@@ -766,7 +785,9 @@ impl ResourceRepresentation for MemoryBufferRepresentation {
                     )
                 })?;
             
-            let mut fields = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            use wrt_foundation::budget_aware_provider::CrateId;
+            use crate::bounded_component_infra::ComponentProvider;
+            let mut fields = BoundedVec::new(ComponentProvider::new(CrateId::Component)?)?;
             fields.push(("pointer".to_string(), RepresentationValue::U64(ptr as u64))).unwrap();
             fields.push(("size".to_string(), RepresentationValue::U64(size as u64))).unwrap();
             
@@ -845,13 +866,17 @@ impl ResourceRepresentation for MemoryBufferRepresentation {
 
 impl NetworkConnectionRepresentation {
     /// Create new network connection representation
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> WrtResult<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             connections: HashMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            connections: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            connections: {
+                use wrt_foundation::budget_aware_provider::CrateId;
+                use crate::bounded_component_infra::ComponentProvider;
+                BoundedVec::new(ComponentProvider::new(CrateId::Component)?)?
+            },
+        })
     }
 }
 
@@ -889,7 +914,9 @@ impl ResourceRepresentation for NetworkConnectionRepresentation {
                     )
                 })?;
             
-            let mut fields = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            use wrt_foundation::budget_aware_provider::CrateId;
+            use crate::bounded_component_infra::ComponentProvider;
+            let mut fields = BoundedVec::new(ComponentProvider::new(CrateId::Component)?)?;
             fields.push(("socket_fd".to_string(), RepresentationValue::U32(conn.socket_fd as u32))).unwrap();
             fields.push(("local_addr".to_string(), RepresentationValue::String(conn.local_addr.to_string()))).unwrap();
             fields.push(("remote_addr".to_string(), RepresentationValue::String(conn.remote_addr.to_string()))).unwrap();

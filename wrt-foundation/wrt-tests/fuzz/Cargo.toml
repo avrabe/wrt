@@ -33,6 +33,10 @@ default = ["std"]
 std = []
 
 # Fuzz targets
+safety-asil-b = []
+safety-asil-c = ["safety-asil-b"]
+safety-asil-d = ["safety-asil-c"]
+
 [[bin]]
 name = "fuzz_bounded_vec"
 path = "fuzz_targets/fuzz_bounded_vec.rs"

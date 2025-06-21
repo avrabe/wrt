@@ -104,21 +104,23 @@ jobs:
           fi
           
           # If VERSIONS_TO_PASS can contain multiple space-separated versions (e.g. from input), ensure uniqueness.
-          # The xtask expects space-separated versions.
+          # The cargo-wrt expects space-separated versions.
           UNIQUE_VERSIONS=$(echo "$VERSIONS_TO_PASS" | xargs -n1 | sort -u | xargs)
           echo "VERSIONS_TO_BUILD=$UNIQUE_VERSIONS" >> $GITHUB_ENV
-          echo "Final list of versions to build for xtask: $UNIQUE_VERSIONS"
+          echo "Final list of versions to build for cargo-wrt: $UNIQUE_VERSIONS"
 
       - name: Generate code coverage for documentation
         run: |
           echo "Generating code coverage for documentation inclusion"
-          # Ensure xtask is compiled
-          cargo build --package xtask
+          # Ensure cargo-wrt is compiled and installed
+          cargo build --package cargo-wrt
+          cargo install --path cargo-wrt
           # Add Dagger to PATH
           export PATH="$HOME/.dagger/bin:$(pwd)/bin:$PATH"
           echo $PATH
-          # Run quick coverage analysis to generate coverage.json for docs
-          ./target/debug/xtask coverage
+          # Run coverage analysis in best-effort mode for documentation
+          echo "Running coverage analysis in best-effort mode..."
+          cargo-wrt coverage --html --best-effort
         env:
           RUST_LOG: info
           RUST_BACKTRACE: 1
@@ -128,11 +130,11 @@ jobs:
           # CI environment flag
           CI: true
 
-      - name: Build documentation via Dagger and xtask
+      - name: Build documentation via cargo-wrt
         run: |
           echo "Building documentation for versions: ${{ env.VERSIONS_TO_BUILD }}"
           export PATH="$HOME/.dagger/bin:$(pwd)/bin:$PATH"
-          ./target/debug/xtask publish-docs-dagger --versions "${{ env.VERSIONS_TO_BUILD }}" --output-dir ./docs_artifact_final
+          cargo-wrt docs --open --private --output-dir ./docs_output
         env:
           RUST_LOG: info
           RUST_BACKTRACE: 1
@@ -143,13 +145,60 @@ jobs:
           # CI environment flag
           CI: true
 
+      - name: Prepare documentation artifact
+        run: |
+          # Create the expected artifact directory
+          mkdir -p ./docs_artifact_final
+          
+          # Copy Sphinx HTML documentation if it exists
+          if [ -d "./docs_output/sphinx/html" ]; then
+            echo "📚 Found Sphinx documentation"
+            cp -r ./docs_output/sphinx/html/* ./docs_artifact_final/
+          elif [ -d "./docs/build/html" ]; then
+            echo "📚 Found Sphinx documentation (fallback path)"
+            cp -r ./docs/build/html/* ./docs_artifact_final/
+          fi
+          
+          # Copy Rust API documentation
+          if [ -d "./docs_output/doc" ]; then
+            echo "📖 Found Rust API documentation"
+            mkdir -p ./docs_artifact_final/api
+            cp -r ./docs_output/doc/* ./docs_artifact_final/api/
+          elif [ -d "./target/doc" ]; then
+            echo "📖 Found Rust API documentation (fallback path)"
+            mkdir -p ./docs_artifact_final/api
+            cp -r ./target/doc/* ./docs_artifact_final/api/
+          fi
+          
+          # Create a simple index.html if none exists
+          if [ ! -f "./docs_artifact_final/index.html" ]; then
+            echo "⚠️  No index.html found, creating redirect to API docs"
+            cat > ./docs_artifact_final/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="utf-8">
+              <title>WRT Documentation</title>
+              <meta http-equiv="refresh" content="0; url=api/wrt/index.html">
+          </head>
+          <body>
+              <p>Redirecting to <a href="api/wrt/index.html">WRT API Documentation</a>...</p>
+          </body>
+          </html>
+          EOF
+          fi
+          
+          # List what we're uploading
+          echo "📦 Documentation artifact contents:"
+          ls -la ./docs_artifact_final/
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './docs_artifact_final' # Path where Dagger pipeline (via xtask) exports the final result
+          path: './docs_artifact_final' # Path to the prepared documentation artifact
           
   # Deployment job
   deploy:

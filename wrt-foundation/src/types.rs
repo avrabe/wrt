@@ -19,16 +19,24 @@ use core::{
 extern crate alloc;
 
 // Use HashMap/HashSet in std mode, BTreeMap/BTreeSet in no_std mode
-#[cfg(feature = "std")]
-use std::collections::{HashMap as Map, HashSet as Set};
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
 use alloc::collections::{BTreeMap as Map, BTreeSet as Set};
+#[cfg(feature = "std")]
+use std::collections::{HashMap as Map, HashSet as Set};
 
 // String and Vec handling
-#[cfg(feature = "std")]
-use std::{string::{String, ToString}, vec::Vec};
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
-use alloc::{string::{String, ToString}, vec::Vec, format, vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+#[cfg(feature = "std")]
+use std::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 // Import error types
 use wrt_error::{Error, ErrorCategory};
@@ -159,9 +167,9 @@ pub enum ValueType {
     /// External reference
     ExternRef,
     /// Struct reference (WebAssembly 3.0 GC)
-    StructRef(u32),  // type index
+    StructRef(u32), // type index
     /// Array reference (WebAssembly 3.0 GC)
-    ArrayRef(u32),   // type index
+    ArrayRef(u32), // type index
 }
 
 impl core::fmt::Debug for ValueType {
@@ -176,12 +184,8 @@ impl core::fmt::Debug for ValueType {
             Self::I16x8 => write!(f, "I16x8"),
             Self::FuncRef => write!(f, "FuncRef"),
             Self::ExternRef => write!(f, "ExternRef"),
-            Self::StructRef(idx) => {
-                f.debug_tuple("StructRef").field(idx).finish()
-            }
-            Self::ArrayRef(idx) => {
-                f.debug_tuple("ArrayRef").field(idx).finish()
-            }
+            Self::StructRef(idx) => f.debug_tuple("StructRef").field(idx).finish(),
+            Self::ArrayRef(idx) => f.debug_tuple("ArrayRef").field(idx).finish(),
         }
     }
 }
@@ -191,7 +195,7 @@ impl ValueType {
     ///
     /// Uses the standardized conversion utility for consistency
     /// across all crates.
-    /// 
+    ///
     /// Note: StructRef and ArrayRef require additional type index data
     /// and should be parsed with `from_binary_with_index`.
     pub fn from_binary(byte: u8) -> Result<Self> {
@@ -575,11 +579,7 @@ pub struct MemArg {
 
 impl Default for MemArg {
     fn default() -> Self {
-        Self {
-            align_exponent: 0,
-            offset: 0,
-            memory_index: 0,
-        }
+        Self { align_exponent: 0, offset: 0, memory_index: 0 }
     }
 }
 
@@ -609,11 +609,7 @@ impl FromBytes for MemArg {
         let align_exponent = reader.read_u32_le()?;
         let offset = reader.read_u32_le()?;
         let memory_index = reader.read_u32_le()?;
-        Ok(Self {
-            align_exponent,
-            offset,
-            memory_index,
-        })
+        Ok(Self { align_exponent, offset, memory_index })
     }
 
     #[cfg(feature = "default-provider")]
@@ -711,9 +707,15 @@ impl Checksummable for ElementMode {
 pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + Eq + Default> {
     Unreachable,
     Nop,
-    Block { block_type_idx: u32 }, // Block with type index
-    Loop { block_type_idx: u32 },  // Loop with type index
-    If { block_type_idx: u32 },    // If with type index
+    Block {
+        block_type_idx: u32,
+    }, // Block with type index
+    Loop {
+        block_type_idx: u32,
+    }, // Loop with type index
+    If {
+        block_type_idx: u32,
+    }, // If with type index
     Else,
     End,
     Br(LabelIdx),
@@ -725,15 +727,15 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     Return,
     Call(FuncIdx),
     CallIndirect(TypeIdx, TableIdx),
-    
+
     // Tail call instructions (0x12 and 0x13 opcodes)
     ReturnCall(FuncIdx),
     ReturnCallIndirect(TypeIdx, TableIdx),
-    
+
     // Branch hinting instructions (0xD5 and 0xD6 opcodes)
     BrOnNull(LabelIdx),
     BrOnNonNull(LabelIdx),
-    
+
     // Type reflection instructions
     RefIsNull,
     RefAsNonNull,
@@ -750,7 +752,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64Const(i64),
     F32Const(u32), // bits representation
     F64Const(u64), // bits representation
-    
+
     // Memory operations
     I32Load(MemArg),
     I64Load(MemArg),
@@ -766,7 +768,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64Load16U(MemArg),
     I64Load32S(MemArg),
     I64Load32U(MemArg),
-    
+
     I32Store(MemArg),
     I64Store(MemArg),
     F32Store(MemArg),
@@ -776,30 +778,30 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64Store8(MemArg),
     I64Store16(MemArg),
     I64Store32(MemArg),
-    
+
     // Memory size and grow
-    MemorySize(u32), // memory index
-    MemoryGrow(u32), // memory index
-    MemoryFill(u32), // memory index
+    MemorySize(u32),      // memory index
+    MemoryGrow(u32),      // memory index
+    MemoryFill(u32),      // memory index
     MemoryCopy(u32, u32), // dst_mem, src_mem
     MemoryInit(u32, u32), // data_seg_idx, mem_idx
-    DataDrop(u32), // data segment index
-    
+    DataDrop(u32),        // data segment index
+
     // Table operations
-    TableGet(u32), // table index
-    TableSet(u32), // table index
-    TableSize(u32), // table index
-    TableGrow(u32), // table index
-    TableFill(u32), // table index
+    TableGet(u32),       // table index
+    TableSet(u32),       // table index
+    TableSize(u32),      // table index
+    TableGrow(u32),      // table index
+    TableFill(u32),      // table index
     TableCopy(u32, u32), // dst_table, src_table
     TableInit(u32, u32), // elem_seg_idx, table_idx
-    ElemDrop(u32), // element segment index
-    
+    ElemDrop(u32),       // element segment index
+
     // Stack operations
     Drop,
     Select,
     SelectWithType(BoundedVec<ValueType, 1, P>), // typed select
-    
+
     // Arithmetic operations
     I32Add,
     I32Sub,
@@ -816,7 +818,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I32ShrU,
     I32Rotl,
     I32Rotr,
-    
+
     I64Add,
     I64Sub,
     I64Mul,
@@ -832,7 +834,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64ShrU,
     I64Rotl,
     I64Rotr,
-    
+
     F32Add,
     F32Sub,
     F32Mul,
@@ -847,7 +849,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     F32Trunc,
     F32Nearest,
     F32Sqrt,
-    
+
     F64Add,
     F64Sub,
     F64Mul,
@@ -862,7 +864,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     F64Trunc,
     F64Nearest,
     F64Sqrt,
-    
+
     // Comparison operations
     I32Eq,
     I32Ne,
@@ -874,7 +876,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I32LeU,
     I32GeS,
     I32GeU,
-    
+
     I64Eq,
     I64Ne,
     I64LtS,
@@ -885,25 +887,25 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64LeU,
     I64GeS,
     I64GeU,
-    
+
     F32Eq,
     F32Ne,
     F32Lt,
     F32Gt,
     F32Le,
     F32Ge,
-    
+
     F64Eq,
     F64Ne,
     F64Lt,
     F64Gt,
     F64Le,
     F64Ge,
-    
+
     // Unary test operations
     I32Eqz,
     I64Eqz,
-    
+
     // Conversion operations
     I32WrapI64,
     I32TruncF32S,
@@ -930,18 +932,18 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64ReinterpretF64,
     F32ReinterpretI32,
     F64ReinterpretI64,
-    
+
     // Sign extension operations
     I32Extend8S,
     I32Extend16S,
     I64Extend8S,
     I64Extend16S,
     I64Extend32S,
-    
+
     // Reference operations
     RefNull(RefType),
     RefFunc(FuncIdx),
-    
+
     // Other operations
     I32Clz,
     I32Ctz,
@@ -949,91 +951,223 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64Clz,
     I64Ctz,
     I64Popcnt,
-    
+
     // Atomic memory operations (0xFE prefix in WebAssembly)
-    MemoryAtomicNotify { memarg: MemArg },
-    MemoryAtomicWait32 { memarg: MemArg },
-    MemoryAtomicWait64 { memarg: MemArg },
-    
+    MemoryAtomicNotify {
+        memarg: MemArg,
+    },
+    MemoryAtomicWait32 {
+        memarg: MemArg,
+    },
+    MemoryAtomicWait64 {
+        memarg: MemArg,
+    },
+
     // Atomic loads
-    I32AtomicLoad { memarg: MemArg },
-    I64AtomicLoad { memarg: MemArg },
-    I32AtomicLoad8U { memarg: MemArg },
-    I32AtomicLoad16U { memarg: MemArg },
-    I64AtomicLoad8U { memarg: MemArg },
-    I64AtomicLoad16U { memarg: MemArg },
-    I64AtomicLoad32U { memarg: MemArg },
-    
+    I32AtomicLoad {
+        memarg: MemArg,
+    },
+    I64AtomicLoad {
+        memarg: MemArg,
+    },
+    I32AtomicLoad8U {
+        memarg: MemArg,
+    },
+    I32AtomicLoad16U {
+        memarg: MemArg,
+    },
+    I64AtomicLoad8U {
+        memarg: MemArg,
+    },
+    I64AtomicLoad16U {
+        memarg: MemArg,
+    },
+    I64AtomicLoad32U {
+        memarg: MemArg,
+    },
+
     // Atomic stores
-    I32AtomicStore { memarg: MemArg },
-    I64AtomicStore { memarg: MemArg },
-    I32AtomicStore8 { memarg: MemArg },
-    I32AtomicStore16 { memarg: MemArg },
-    I64AtomicStore8 { memarg: MemArg },
-    I64AtomicStore16 { memarg: MemArg },
-    I64AtomicStore32 { memarg: MemArg },
-    
+    I32AtomicStore {
+        memarg: MemArg,
+    },
+    I64AtomicStore {
+        memarg: MemArg,
+    },
+    I32AtomicStore8 {
+        memarg: MemArg,
+    },
+    I32AtomicStore16 {
+        memarg: MemArg,
+    },
+    I64AtomicStore8 {
+        memarg: MemArg,
+    },
+    I64AtomicStore16 {
+        memarg: MemArg,
+    },
+    I64AtomicStore32 {
+        memarg: MemArg,
+    },
+
     // Atomic read-modify-write operations
-    I32AtomicRmwAdd { memarg: MemArg },
-    I64AtomicRmwAdd { memarg: MemArg },
-    I32AtomicRmw8AddU { memarg: MemArg },
-    I32AtomicRmw16AddU { memarg: MemArg },
-    I64AtomicRmw8AddU { memarg: MemArg },
-    I64AtomicRmw16AddU { memarg: MemArg },
-    I64AtomicRmw32AddU { memarg: MemArg },
-    
-    I32AtomicRmwSub { memarg: MemArg },
-    I64AtomicRmwSub { memarg: MemArg },
-    I32AtomicRmw8SubU { memarg: MemArg },
-    I32AtomicRmw16SubU { memarg: MemArg },
-    I64AtomicRmw8SubU { memarg: MemArg },
-    I64AtomicRmw16SubU { memarg: MemArg },
-    I64AtomicRmw32SubU { memarg: MemArg },
-    
-    I32AtomicRmwAnd { memarg: MemArg },
-    I64AtomicRmwAnd { memarg: MemArg },
-    I32AtomicRmw8AndU { memarg: MemArg },
-    I32AtomicRmw16AndU { memarg: MemArg },
-    I64AtomicRmw8AndU { memarg: MemArg },
-    I64AtomicRmw16AndU { memarg: MemArg },
-    I64AtomicRmw32AndU { memarg: MemArg },
-    
-    I32AtomicRmwOr { memarg: MemArg },
-    I64AtomicRmwOr { memarg: MemArg },
-    I32AtomicRmw8OrU { memarg: MemArg },
-    I32AtomicRmw16OrU { memarg: MemArg },
-    I64AtomicRmw8OrU { memarg: MemArg },
-    I64AtomicRmw16OrU { memarg: MemArg },
-    I64AtomicRmw32OrU { memarg: MemArg },
-    
-    I32AtomicRmwXor { memarg: MemArg },
-    I64AtomicRmwXor { memarg: MemArg },
-    I32AtomicRmw8XorU { memarg: MemArg },
-    I32AtomicRmw16XorU { memarg: MemArg },
-    I64AtomicRmw8XorU { memarg: MemArg },
-    I64AtomicRmw16XorU { memarg: MemArg },
-    I64AtomicRmw32XorU { memarg: MemArg },
-    
-    I32AtomicRmwXchg { memarg: MemArg },
-    I64AtomicRmwXchg { memarg: MemArg },
-    I32AtomicRmw8XchgU { memarg: MemArg },
-    I32AtomicRmw16XchgU { memarg: MemArg },
-    I64AtomicRmw8XchgU { memarg: MemArg },
-    I64AtomicRmw16XchgU { memarg: MemArg },
-    I64AtomicRmw32XchgU { memarg: MemArg },
-    
+    I32AtomicRmwAdd {
+        memarg: MemArg,
+    },
+    I64AtomicRmwAdd {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8AddU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16AddU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8AddU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16AddU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32AddU {
+        memarg: MemArg,
+    },
+
+    I32AtomicRmwSub {
+        memarg: MemArg,
+    },
+    I64AtomicRmwSub {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8SubU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16SubU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8SubU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16SubU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32SubU {
+        memarg: MemArg,
+    },
+
+    I32AtomicRmwAnd {
+        memarg: MemArg,
+    },
+    I64AtomicRmwAnd {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8AndU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16AndU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8AndU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16AndU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32AndU {
+        memarg: MemArg,
+    },
+
+    I32AtomicRmwOr {
+        memarg: MemArg,
+    },
+    I64AtomicRmwOr {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8OrU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16OrU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8OrU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16OrU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32OrU {
+        memarg: MemArg,
+    },
+
+    I32AtomicRmwXor {
+        memarg: MemArg,
+    },
+    I64AtomicRmwXor {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8XorU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16XorU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8XorU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16XorU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32XorU {
+        memarg: MemArg,
+    },
+
+    I32AtomicRmwXchg {
+        memarg: MemArg,
+    },
+    I64AtomicRmwXchg {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8XchgU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16XchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8XchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16XchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32XchgU {
+        memarg: MemArg,
+    },
+
     // Atomic compare-exchange operations
-    I32AtomicRmwCmpxchg { memarg: MemArg },
-    I64AtomicRmwCmpxchg { memarg: MemArg },
-    I32AtomicRmw8CmpxchgU { memarg: MemArg },
-    I32AtomicRmw16CmpxchgU { memarg: MemArg },
-    I64AtomicRmw8CmpxchgU { memarg: MemArg },
-    I64AtomicRmw16CmpxchgU { memarg: MemArg },
-    I64AtomicRmw32CmpxchgU { memarg: MemArg },
-    
+    I32AtomicRmwCmpxchg {
+        memarg: MemArg,
+    },
+    I64AtomicRmwCmpxchg {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8CmpxchgU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16CmpxchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8CmpxchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16CmpxchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32CmpxchgU {
+        memarg: MemArg,
+    },
+
     // Atomic fence
     AtomicFence,
-    
+
     #[doc(hidden)]
     _Phantom(core::marker::PhantomData<P>),
 }
@@ -1156,7 +1290,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0x44]);
                 val.update_checksum(checksum);
             }
-            
+
             // Memory operations
             Instruction::I32Load(memarg) => {
                 checksum.update_slice(&[0x28]);
@@ -1198,7 +1332,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0x40]);
                 mem_idx.update_checksum(checksum);
             }
-            
+
             // Arithmetic operations
             Instruction::I32Add => checksum.update_slice(&[0x6A]),
             Instruction::I32Sub => checksum.update_slice(&[0x6B]),
@@ -1207,16 +1341,16 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
             Instruction::I32DivU => checksum.update_slice(&[0x6E]),
             Instruction::I64Add => checksum.update_slice(&[0x7C]),
             Instruction::I64Sub => checksum.update_slice(&[0x7D]),
-            
+
             // Comparison operations
             Instruction::I32Eq => checksum.update_slice(&[0x46]),
             Instruction::I32Ne => checksum.update_slice(&[0x47]),
             Instruction::I32LtS => checksum.update_slice(&[0x48]),
-            
+
             // Stack operations
             Instruction::Drop => checksum.update_slice(&[0x1A]),
             Instruction::Select => checksum.update_slice(&[0x1B]),
-            
+
             // Atomic memory operations (0xFE prefix in WebAssembly)
             Instruction::MemoryAtomicNotify { memarg } => {
                 checksum.update_slice(&[0xFE, 0x00]);
@@ -1230,7 +1364,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0xFE, 0x02]);
                 memarg.update_checksum(checksum);
             }
-            
+
             // Atomic loads
             Instruction::I32AtomicLoad { memarg } => {
                 checksum.update_slice(&[0xFE, 0x10]);
@@ -1260,7 +1394,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0xFE, 0x16]);
                 memarg.update_checksum(checksum);
             }
-            
+
             // Atomic stores
             Instruction::I32AtomicStore { memarg } => {
                 checksum.update_slice(&[0xFE, 0x17]);
@@ -1290,7 +1424,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0xFE, 0x1d]);
                 memarg.update_checksum(checksum);
             }
-            
+
             // Atomic read-modify-write operations
             Instruction::I32AtomicRmwAdd { memarg } => {
                 checksum.update_slice(&[0xFE, 0x1e]);
@@ -1320,7 +1454,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0xFE, 0x24]);
                 memarg.update_checksum(checksum);
             }
-            
+
             Instruction::I32AtomicRmwSub { memarg } => {
                 checksum.update_slice(&[0xFE, 0x25]);
                 memarg.update_checksum(checksum);
@@ -1349,7 +1483,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0xFE, 0x2b]);
                 memarg.update_checksum(checksum);
             }
-            
+
             Instruction::I32AtomicRmwAnd { memarg } => {
                 checksum.update_slice(&[0xFE, 0x2c]);
                 memarg.update_checksum(checksum);
@@ -1378,7 +1512,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0xFE, 0x32]);
                 memarg.update_checksum(checksum);
             }
-            
+
             Instruction::I32AtomicRmwOr { memarg } => {
                 checksum.update_slice(&[0xFE, 0x33]);
                 memarg.update_checksum(checksum);
@@ -1407,7 +1541,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0xFE, 0x39]);
                 memarg.update_checksum(checksum);
             }
-            
+
             Instruction::I32AtomicRmwXor { memarg } => {
                 checksum.update_slice(&[0xFE, 0x3a]);
                 memarg.update_checksum(checksum);
@@ -1436,7 +1570,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0xFE, 0x40]);
                 memarg.update_checksum(checksum);
             }
-            
+
             Instruction::I32AtomicRmwXchg { memarg } => {
                 checksum.update_slice(&[0xFE, 0x41]);
                 memarg.update_checksum(checksum);
@@ -1465,7 +1599,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0xFE, 0x47]);
                 memarg.update_checksum(checksum);
             }
-            
+
             // Atomic compare-exchange operations
             Instruction::I32AtomicRmwCmpxchg { memarg } => {
                 checksum.update_slice(&[0xFE, 0x48]);
@@ -1495,12 +1629,12 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                 checksum.update_slice(&[0xFE, 0x4e]);
                 memarg.update_checksum(checksum);
             }
-            
+
             // Atomic fence
             Instruction::AtomicFence => {
                 checksum.update_slice(&[0xFE, 0x03]);
             }
-            
+
             // All other instructions - use a placeholder checksum for now
             _ => {
                 // For now, just use a simple placeholder
@@ -1581,7 +1715,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
             }
             Instruction::RefIsNull => writer.write_u8(0xD1)?, // ref.is_null opcode
             Instruction::RefAsNonNull => writer.write_u8(0xD3)?, // ref.as_non_null opcode
-            Instruction::RefEq => writer.write_u8(0xD2)?, // ref.eq opcode
+            Instruction::RefEq => writer.write_u8(0xD2)?,     // ref.eq opcode
             Instruction::LocalGet(idx) => {
                 writer.write_u8(0x20)?;
                 writer.write_u32_le(*idx)?;
@@ -1626,7 +1760,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x02)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             // Atomic loads
             Instruction::I32AtomicLoad { memarg } => {
                 writer.write_u8(0xFE)?;
@@ -1663,7 +1797,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x16)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             // Atomic stores
             Instruction::I32AtomicStore { memarg } => {
                 writer.write_u8(0xFE)?;
@@ -1700,7 +1834,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x1d)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             // Atomic read-modify-write operations
             Instruction::I32AtomicRmwAdd { memarg } => {
                 writer.write_u8(0xFE)?;
@@ -1737,7 +1871,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x24)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             Instruction::I32AtomicRmwSub { memarg } => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x25)?;
@@ -1773,7 +1907,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x2b)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             Instruction::I32AtomicRmwAnd { memarg } => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x2c)?;
@@ -1809,7 +1943,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x32)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             Instruction::I32AtomicRmwOr { memarg } => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x33)?;
@@ -1845,7 +1979,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x39)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             Instruction::I32AtomicRmwXor { memarg } => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x3a)?;
@@ -1881,7 +2015,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x40)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             Instruction::I32AtomicRmwXchg { memarg } => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x41)?;
@@ -1917,7 +2051,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x47)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             // Atomic compare-exchange operations
             Instruction::I32AtomicRmwCmpxchg { memarg } => {
                 writer.write_u8(0xFE)?;
@@ -1954,13 +2088,13 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x4e)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             // Atomic fence
             Instruction::AtomicFence => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x03)?;
             }
-            
+
             // ... many more instructions
             Instruction::_Phantom(_) => {
                 // This variant should not be serialized
@@ -1969,7 +2103,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 )
                 .into());
             }
-            
+
             // Catch-all for all other instruction variants
             _ => {
                 // For now, return an error for unimplemented instructions
@@ -3200,7 +3334,9 @@ pub enum AggregateType<P: MemoryProvider + Default + Clone + core::fmt::Debug + 
     Array(ArrayType),
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default for AggregateType<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default
+    for AggregateType<P>
+{
     fn default() -> Self {
         Self::Array(ArrayType::default())
     }
@@ -3238,7 +3374,9 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> St
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default for StructType<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default
+    for StructType<P>
+{
     fn default() -> Self {
         let provider = P::default();
         Self::new(provider, false).expect("Default StructType creation failed")
@@ -3284,10 +3422,7 @@ impl FieldType {
 
 impl Default for FieldType {
     fn default() -> Self {
-        Self {
-            storage_type: StorageType::default(),
-            mutable: false,
-        }
+        Self { storage_type: StorageType::default(), mutable: false }
     }
 }
 
@@ -3358,7 +3493,9 @@ impl PackedType {
 }
 
 // Implement serialization traits for the new types
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Checksummable for StructType<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Checksummable
+    for StructType<P>
+{
     fn update_checksum(&self, checksum: &mut Checksum) {
         self.fields.update_checksum(checksum);
         checksum.update(self.final_type as u8);
@@ -3423,11 +3560,13 @@ impl FromBytes for FieldType {
         let mutable = match mutable_byte {
             0 => false,
             1 => true,
-            _ => return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid boolean flag for FieldType.mutable",
-            )),
+            _ => {
+                return Err(Error::new(
+                    ErrorCategory::Parse,
+                    codes::INVALID_VALUE,
+                    "Invalid boolean flag for FieldType.mutable",
+                ))
+            }
         };
         Ok(FieldType { storage_type, mutable })
     }
@@ -3524,11 +3663,13 @@ impl FromBytes for ArrayType {
         let final_type = match final_byte {
             0 => false,
             1 => true,
-            _ => return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid boolean flag for ArrayType.final_type",
-            )),
+            _ => {
+                return Err(Error::new(
+                    ErrorCategory::Parse,
+                    codes::INVALID_VALUE,
+                    "Invalid boolean flag for ArrayType.final_type",
+                ))
+            }
         };
         Ok(ArrayType { element_type, final_type })
     }
@@ -3540,7 +3681,9 @@ impl FromBytes for ArrayType {
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> ToBytes for StructType<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> ToBytes
+    for StructType<P>
+{
     fn to_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         &self,
         writer: &mut WriteStream<'a>,
@@ -3558,21 +3701,27 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> To
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> FromBytes for StructType<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> FromBytes
+    for StructType<P>
+{
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
     ) -> WrtResult<Self> {
-        let fields = BoundedVec::<FieldType, MAX_STRUCT_FIELDS, P>::from_bytes_with_provider(reader, provider)?;
+        let fields = BoundedVec::<FieldType, MAX_STRUCT_FIELDS, P>::from_bytes_with_provider(
+            reader, provider,
+        )?;
         let final_byte = reader.read_u8()?;
         let final_type = match final_byte {
             0 => false,
             1 => true,
-            _ => return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid boolean flag for StructType.final_type",
-            )),
+            _ => {
+                return Err(Error::new(
+                    ErrorCategory::Parse,
+                    codes::INVALID_VALUE,
+                    "Invalid boolean flag for StructType.final_type",
+                ))
+            }
         };
         Ok(StructType { fields, final_type })
     }
@@ -3586,7 +3735,9 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Fr
 
 /// Placeholder for element segment
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ElementSegment<P: MemoryProvider + Default + Clone + PartialEq + Eq = DefaultMemoryProvider> {
+pub struct ElementSegment<
+    P: MemoryProvider + Default + Clone + PartialEq + Eq = DefaultMemoryProvider,
+> {
     /// Table index
     pub table_index: u32,
     /// Offset expression
@@ -3607,7 +3758,8 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for ElementSe
 
 /// Placeholder for data segment
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataSegment<P: MemoryProvider + Default + Clone + PartialEq + Eq = DefaultMemoryProvider> {
+pub struct DataSegment<P: MemoryProvider + Default + Clone + PartialEq + Eq = DefaultMemoryProvider>
+{
     /// Memory index
     pub memory_index: u32,
     /// Offset expression

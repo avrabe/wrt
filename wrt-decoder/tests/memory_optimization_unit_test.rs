@@ -62,7 +62,10 @@ mod tests {
         assert!(result.is_err());
 
         // Binary std/no_std choice
-        println!("Successfully rejected malicious allocation of {} items", malicious_count);
+        println!(
+            "Successfully rejected malicious allocation of {} items",
+            malicious_count
+        );
     }
 }
 

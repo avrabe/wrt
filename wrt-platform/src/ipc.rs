@@ -4,6 +4,7 @@
 //! that can be specialized for different platforms (QNX message passing,
 //! Linux domain sockets, Windows named pipes, etc.).
 
+
 use core::{fmt::Debug, time::Duration};
 
 #[cfg(not(feature = "std"))]
@@ -126,19 +127,19 @@ impl IpcServerBuilder {
 pub fn create_platform_channel(_name: &str) -> Result<Box<dyn IpcChannel>> {
     #[cfg(target_os = "nto")]
     {
-        super::qnx_ipc::QnxChannel::create_server(name)
+        super::qnx_ipc::QnxChannel::create_server(_name)
             .map(|ch| Box::new(ch) as Box<dyn IpcChannel>)
     }
 
     #[cfg(target_os = "linux")]
     {
-        super::linux_ipc::LinuxDomainSocket::create_server(name)
+        super::linux_ipc::LinuxDomainSocket::create_server(_name)
             .map(|ch| Box::new(ch) as Box<dyn IpcChannel>)
     }
 
     #[cfg(target_os = "windows")]
     {
-        super::windows_ipc::WindowsNamedPipe::create_server(name)
+        super::windows_ipc::WindowsNamedPipe::create_server(_name)
             .map(|ch| Box::new(ch) as Box<dyn IpcChannel>)
     }
 

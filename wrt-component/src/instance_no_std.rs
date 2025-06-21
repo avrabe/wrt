@@ -35,7 +35,7 @@ impl InstanceValue {
             Error::new(ErrorCategory::Parameter, codes::VALIDATION_ERROR, "Instance name too long")
         })?;
 
-        let mut bounded_exports = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let mut bounded_exports = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
         for export in exports {
             bounded_exports.push(export.clone()).map_err(|_| {
                 Error::new(
@@ -141,7 +141,7 @@ pub struct InstanceCollection {
 impl InstanceCollection {
     /// Creates a new empty instance collection
     pub fn new() -> Self {
-        Self { instances: BoundedVec::new(DefaultMemoryProvider::default()).unwrap() }
+        Self { instances: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap() }
     }
 
     /// Adds an instance to the collection

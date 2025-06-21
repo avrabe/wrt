@@ -1,6 +1,6 @@
 //! Tests for SafeStack
 
-#![cfg(all(test, ))] // Binary std/no_std choice
+#![cfg(all(test,))] // Binary std/no_std choice
 
 // This import is for no_std, but if no no_std tests use it from this file, it
 // might still be warned.

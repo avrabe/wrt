@@ -204,11 +204,11 @@ impl ComponentMemoryManager {
             #[cfg(feature = "std")]
             memories: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            memories: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            memories: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             sharing_policies: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            sharing_policies: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            sharing_policies: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             total_allocated: 0,
             max_memory: 256 * 1024 * 1024, // 256MB default
         }
@@ -231,8 +231,10 @@ impl ComponentMemoryManager {
         // Check memory limits
         let initial_size = limits.min as usize * WASM_PAGE_SIZE;
         if self.total_allocated + initial_size > self.max_memory {
-            return Err(wrt_foundation::WrtError::ResourceExhausted(
-                "Memory limit exceeded".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Resource,
+                wrt_error::codes::RESOURCE_EXHAUSTED,
+                "Memory limit exceeded"
             ));
         }
 
@@ -240,12 +242,16 @@ impl ComponentMemoryManager {
         #[cfg(feature = "std")]
         let data = vec![0u8; initial_size];
         #[cfg(not(any(feature = "std", )))]
-        let mut data = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let mut data = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
         #[cfg(not(any(feature = "std", )))]
         {
             for _ in 0..initial_size {
                 data.push(0u8).map_err(|_| {
-                    wrt_foundation::WrtError::ResourceExhausted("Memory allocation failed".into())
+                    wrt_foundation::Error::new(
+                        wrt_foundation::ErrorCategory::Resource,
+                        wrt_error::codes::RESOURCE_EXHAUSTED,
+                        "Memory allocation failed"
+                    )
                 })?;
             }
         }
@@ -266,7 +272,11 @@ impl ComponentMemoryManager {
         #[cfg(not(any(feature = "std", )))]
         {
             self.memories.push(memory).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many memories".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many memories"
+                )
             })?;
         }
 
@@ -294,19 +304,29 @@ impl ComponentMemoryManager {
     ) -> WrtResult<Vec<u8>> {
         let memory = self
             .get_memory(memory_id)
-            .ok_or_else(|| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .ok_or_else(|| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?;
 
         // Check permissions
         if !self.check_read_permission(memory_id, instance_id)? {
-            return Err(wrt_foundation::WrtError::PermissionDenied(
-                "Read permission denied".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Runtime,
+                wrt_error::codes::RUNTIME_ERROR,
+                "Read permission denied"
             ));
         }
 
         // Check bounds
         let end_offset = offset as usize + size as usize;
         if end_offset > memory.data.len() {
-            return Err(wrt_foundation::WrtError::invalid_input("Invalid input"));
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ));
         }
 
         // Read data
@@ -343,7 +363,11 @@ impl ComponentMemoryManager {
 
         let memory = self
             .get_memory_mut(memory_id)
-            .ok_or_else(|| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .ok_or_else(|| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?;
 
         // Check bounds
         let end_offset = offset as usize + data.len();
@@ -374,12 +398,18 @@ impl ComponentMemoryManager {
     ) -> WrtResult<u32> {
         let memory = self
             .get_memory_mut(memory_id)
-            .ok_or_else(|| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .ok_or_else(|| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?;
 
         // Check permissions
         if !self.check_write_permission(memory_id, instance_id)? {
-            return Err(wrt_foundation::WrtError::PermissionDenied(
-                "Write permission denied".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Runtime,
+                wrt_error::codes::RUNTIME_ERROR,
+                "Write permission denied"
             ));
         }
 
@@ -389,15 +419,21 @@ impl ComponentMemoryManager {
         // Check limits
         if let Some(max) = memory.limits.max {
             if new_pages > max as usize {
-                return Err(wrt_foundation::WrtError::invalid_input("Invalid input"));
+                return Err(wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid input"
+                ));
             }
         }
 
         // Check global memory limit
         let additional_size = pages as usize * WASM_PAGE_SIZE;
         if self.total_allocated + additional_size > self.max_memory {
-            return Err(wrt_foundation::WrtError::ResourceExhausted(
-                "Memory limit exceeded".into(),
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Resource,
+                wrt_error::codes::RESOURCE_EXHAUSTED,
+                "Memory limit exceeded"
             ));
         }
 
@@ -411,7 +447,11 @@ impl ComponentMemoryManager {
         {
             for _ in 0..additional_size {
                 memory.data.push(0u8).map_err(|_| {
-                    wrt_foundation::WrtError::ResourceExhausted("Memory allocation failed".into())
+                    wrt_foundation::Error::new(
+                        wrt_foundation::ErrorCategory::Resource,
+                        wrt_error::codes::RESOURCE_EXHAUSTED,
+                        "Memory allocation failed"
+                    )
                 })?;
             }
         }
@@ -424,7 +464,11 @@ impl ComponentMemoryManager {
     fn check_read_permission(&self, memory_id: u32, instance_id: Option<u32>) -> WrtResult<bool> {
         let memory = self
             .get_memory(memory_id)
-            .ok_or_else(|| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .ok_or_else(|| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?;
 
         if !memory.permissions.read {
             return Ok(false);
@@ -449,7 +493,11 @@ impl ComponentMemoryManager {
     fn check_write_permission(&self, memory_id: u32, instance_id: Option<u32>) -> WrtResult<bool> {
         let memory = self
             .get_memory(memory_id)
-            .ok_or_else(|| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .ok_or_else(|| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?;
 
         if !memory.permissions.write {
             return Ok(false);
@@ -502,7 +550,11 @@ impl ComponentMemoryManager {
         #[cfg(not(any(feature = "std", )))]
         {
             self.sharing_policies.push(policy).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many sharing policies".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many sharing policies"
+                )
             })
         }
     }
@@ -525,11 +577,11 @@ impl ComponentTableManager {
             #[cfg(feature = "std")]
             tables: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            tables: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            tables: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
             #[cfg(feature = "std")]
             sharing_policies: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            sharing_policies: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            sharing_policies: BoundedVec::new(NoStdProvider::<65536>::default()).unwrap(),
         }
     }
 
@@ -546,12 +598,16 @@ impl ComponentTableManager {
         #[cfg(feature = "std")]
         let elements = vec![TableElement::Null; limits.min as usize];
         #[cfg(not(any(feature = "std", )))]
-        let mut elements = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let mut elements = BoundedVec::new(NoStdProvider::<65536>::default()).unwrap();
         #[cfg(not(any(feature = "std", )))]
         {
             for _ in 0..limits.min {
                 elements.push(TableElement::Null).map_err(|_| {
-                    wrt_foundation::WrtError::ResourceExhausted("Table allocation failed".into())
+                    wrt_foundation::Error::new(
+                        wrt_foundation::ErrorCategory::Resource,
+                        wrt_error::codes::RESOURCE_EXHAUSTED,
+                        "Table allocation failed"
+                    )
                 })?;
             }
         }
@@ -565,7 +621,11 @@ impl ComponentTableManager {
         #[cfg(not(any(feature = "std", )))]
         {
             self.tables.push(table).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many tables".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many tables"
+                )
             })?;
         }
 
@@ -586,10 +646,18 @@ impl ComponentTableManager {
     pub fn get_element(&self, table_id: u32, index: u32) -> WrtResult<&TableElement> {
         let table = self
             .get_table(table_id)
-            .ok_or_else(|| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .ok_or_else(|| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?;
 
         table.elements.get(index as usize).ok_or_else(|| {
-            wrt_foundation::WrtError::invalid_input("Invalid input")
+            wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            )
         })
     }
 
@@ -602,10 +670,18 @@ impl ComponentTableManager {
     ) -> WrtResult<()> {
         let table = self
             .get_table_mut(table_id)
-            .ok_or_else(|| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .ok_or_else(|| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?;
 
         if index as usize >= table.elements.len() {
-            return Err(wrt_foundation::WrtError::invalid_input("Invalid input"));
+            return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ));
         }
 
         table.elements[index as usize] = element;
@@ -616,7 +692,11 @@ impl ComponentTableManager {
     pub fn grow_table(&mut self, table_id: u32, size: u32, init: TableElement) -> WrtResult<u32> {
         let table = self
             .get_table_mut(table_id)
-            .ok_or_else(|| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .ok_or_else(|| wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ))?;
 
         let current_size = table.elements.len();
         let new_size = current_size + size as usize;
@@ -624,7 +704,11 @@ impl ComponentTableManager {
         // Check limits
         if let Some(max) = table.limits.max {
             if new_size > max as usize {
-                return Err(wrt_foundation::WrtError::invalid_input("Invalid input"));
+                return Err(wrt_foundation::Error::new(
+                wrt_foundation::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Invalid input"
+            ));
             }
         }
 
@@ -637,7 +721,11 @@ impl ComponentTableManager {
         {
             for _ in 0..size {
                 table.elements.push(init.clone()).map_err(|_| {
-                    wrt_foundation::WrtError::ResourceExhausted("Table allocation failed".into())
+                    wrt_foundation::Error::new(
+                        wrt_foundation::ErrorCategory::Resource,
+                        wrt_error::codes::RESOURCE_EXHAUSTED,
+                        "Table allocation failed"
+                    )
                 })?;
             }
         }
@@ -655,7 +743,11 @@ impl ComponentTableManager {
         #[cfg(not(any(feature = "std", )))]
         {
             self.sharing_policies.push(policy).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many sharing policies".into())
+                wrt_foundation::Error::new(
+                    wrt_foundation::ErrorCategory::Resource,
+                    wrt_error::codes::RESOURCE_EXHAUSTED,
+                    "Too many sharing policies"
+                )
             })
         }
     }

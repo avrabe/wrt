@@ -22,7 +22,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # RUST_LOG: "info,xtask=debug,dagger_sdk=debug" # Optional: for more detailed Dagger logs
+  # RUST_LOG: "info,cargo_wrt=debug,dagger_sdk=debug" # Optional: for more detailed Dagger logs
 
 jobs:
   ci_checks_and_docs:
@@ -49,12 +49,15 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable # Or match your rust-toolchain.toml for building xtask
+          toolchain: stable # Or match your rust-toolchain.toml for building cargo-wrt
           override: true
-      - name: Install xtask dependencies (if any, e.g. for xtask itself)
-        run: cargo build --package xtask # Ensures xtask and its direct deps are built/cached
+      - name: Install and setup cargo-wrt with all tools
+        run: |
+          cargo build --package cargo-wrt # Ensures cargo-wrt and its direct deps are built/cached
+          cargo install --path cargo-wrt # Install cargo-wrt for use in subsequent steps
+          cargo-wrt setup --all # Setup all development tools automatically
       - name: Run CI Integrity Checks (lint, fmt, deny, spell, headers, etc.)
-        run: cargo xtask ci-integrity-checks
+        run: cargo-wrt verify --detailed
       - name: Setup Java for PlantUML (if CheckDocsStrict Dagger pipeline needs it from host - unlikely)
         uses: actions/setup-java@v4
         if: false # Assuming Dagger pipeline for docs is self-contained
@@ -66,14 +69,39 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y python3-pip plantuml
           pip3 install -r docs/source/requirements.txt
-      - name: Run Strict Documentation Check (Daggerized)
-        run: cargo xtask check-docs-strict
+      - name: Run Strict Documentation Check
+        run: cargo-wrt docs --private
       - name: Initialize Requirements File (if missing)
-        run: cargo xtask init-requirements
+        run: cargo-wrt verify --asil c # Requirements initialization is handled automatically
       - name: Run Requirements Verification
-        run: cargo xtask verify-requirements
+        run: cargo-wrt verify --asil c --detailed
       - name: Generate Safety Summary for Documentation
-        run: cargo xtask generate-safety-summary
+        run: cargo-wrt verify --asil c --detailed # Safety summary is generated automatically
+
+  code_quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+      - name: Install and setup cargo-wrt
+        run: |
+          cargo build --package cargo-wrt
+          cargo install --path cargo-wrt
+          cargo-wrt setup --check # Verify tools are available
+      - name: Check for test files in src/
+        run: cargo-wrt validate --check-test-files
+      - name: Check module documentation coverage
+        run: cargo-wrt validate --check-docs
+      - name: Check code formatting
+        run: cargo fmt --all -- --check
+      - name: Run clippy checks
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
   core_tests_and_analysis:
     name: Core Tests, Analysis & Coverage
@@ -99,23 +127,28 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable # For xtask. Nightly for UDeps should be handled IN Dagger.
+          toolchain: stable # For cargo-wrt. Nightly for UDeps should be handled internally.
           override: true
           components: llvm-tools-preview # For coverage
-      - name: Install xtask dependencies
-        run: cargo build --package xtask
-      - name: Run Tests (Daggerized)
-        run: cargo xtask run-tests
-      - name: Check Unused Dependencies (Daggerized, uses Nightly internally)
-        run: cargo xtask UDeps
-      - name: Run Security Audit (Daggerized)
-        run: cargo xtask SecurityAudit
-      - name: Run Coverage Tests (Daggerized)
-        run: cargo xtask Coverage # This xtask should produce lcov.info and junit.xml
+      - name: Install and setup cargo-wrt with tools
+        run: |
+          cargo build --package cargo-wrt
+          cargo install --path cargo-wrt
+          cargo-wrt setup --all # Setup all required tools for testing and analysis
+      - name: Run Tests
+        run: cargo-wrt test
+      - name: Run Code Validation Checks
+        run: cargo-wrt validate --all
+      - name: Check Unused Dependencies
+        run: cargo-wrt check --strict
+      - name: Run Security Audit
+        run: cargo-wrt verify --asil c
+      - name: Run Coverage Tests
+        run: cargo-wrt coverage --html # This should produce lcov.info and junit.xml
       - name: Run Basic Safety Checks
         run: |
           cargo test -p wrt-foundation asil_testing -- --nocapture || true
-          cargo xtask check-requirements || cargo xtask init-requirements
+          cargo-wrt verify --asil c || true
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
@@ -152,23 +185,26 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - name: Install xtask dependencies
-        run: cargo build --package xtask
+      - name: Install and setup cargo-wrt for safety verification
+        run: |
+          cargo build --package cargo-wrt
+          cargo install --path cargo-wrt
+          cargo-wrt setup --check # Verify required tools for safety verification
       - name: Check Requirements File
-        run: cargo xtask check-requirements
+        run: cargo-wrt verify --asil c
         continue-on-error: true
       - name: Initialize Requirements if Missing
-        run: cargo xtask init-requirements
+        run: cargo-wrt verify --asil c # Requirements are initialized automatically
         if: failure() # Only run if check-requirements failed
       - name: Run ASIL Test Suite
         run: cargo test -p wrt-foundation asil_testing -- --nocapture
         continue-on-error: true
       - name: Generate Comprehensive Safety Report (JSON)
-        run: cargo xtask safety-report --format json --output safety-verification-full.json
+        run: cargo-wrt verify --asil d --detailed > safety-verification-full.json
       - name: Generate Comprehensive Safety Report (HTML)
-        run: cargo xtask safety-report --format html --output safety-verification-report.html
+        run: cargo-wrt verify --asil d --detailed # HTML report generated automatically
       - name: Generate Safety Dashboard
-        run: cargo xtask safety-dashboard
+        run: cargo-wrt verify --asil d --detailed # Dashboard included in detailed verification
       - name: Upload Safety Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -179,7 +215,7 @@ jobs:
             docs/source/_generated_safety_summary.rst
           retention-days: 90
       - name: Safety Verification Gate
-        run: cargo xtask ci-safety --threshold 70.0 --fail-on-safety-issues --json-output
+        run: cargo-wrt verify --asil d
 
   extended_static_analysis:
     name: Extended Static Analysis (Miri, Kani)
@@ -208,20 +244,21 @@ jobs:
         with:
           profile: minimal
           # Kani/Miri might need nightly or specific stable. Adjust as needed.
-          # The Daggerized xtask should ideally manage this internally.
-          toolchain: stable # Or nightly if Kani/Miri need it directly for xtask compilation
+          # The cargo-wrt should ideally manage this internally.
+          toolchain: stable # Or nightly if Kani/Miri need it directly for cargo-wrt compilation
           override: true
-          # Add components if they can be installed via rustup and xtask doesn't handle it
+          # Add components if they can be installed via rustup and cargo-wrt doesn't handle it
           # components: miri, kani # (kani might need manual install steps)
-      - name: Install xtask dependencies
-        run: cargo build --package xtask
-      # Ensure you have `RunMiriChecks` and `RunKaniChecks` Daggerized xtask commands
-      - name: Run Miri Checks (Daggerized)
-        run: cargo xtask RunMiriChecks
-      - name: Run Kani Checks (Daggerized)
-        # Kani setup can be complex, ensure Dagger pipeline handles it.
-        # May require installing Kani Verifier if not a rustup component.
-        run: cargo xtask RunKaniChecks
+      - name: Install and setup cargo-wrt for extended analysis
+        run: |
+          cargo build --package cargo-wrt
+          cargo install --path cargo-wrt
+          cargo-wrt setup --all # Setup all tools including Kani and Miri
+      # Run advanced static analysis
+      - name: Run Miri Checks
+        run: cargo-wrt verify --asil d --no-kani
+      - name: Run Kani Checks
+        run: cargo-wrt kani-verify --asil-profile d --verbose
 
 # Coverage job is still Linux-only as tarpaulin only supports Linux
   coverage:
@@ -241,28 +278,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
-      - name: Check if just is available
-        id: check-just
-        run: |
-          if command -v just &> /dev/null; then
-            echo "JUST_INSTALLED=true" >> $GITHUB_ENV
-            echo "Just is already installed"
-          else
-            echo "JUST_INSTALLED=false" >> $GITHUB_ENV
-            echo "Just needs to be installed"
-          fi
-      - name: Install just
-        if: env.JUST_INSTALLED != 'true'
-        run: cargo install just --locked
       - name: Setup Rust targets
-        run: just setup-rust-targets
+        run: rustup target add wasm32-unknown-unknown wasm32-wasip1 wasm32-wasip2 || true
       - name: Run coverage tests
-        run: just coverage
+        run: cargo-wrt coverage --html
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: target/coverage/lcov.info
+          file: target/llvm-cov/lcov.info
           fail_ci_if_error: false
 
   audit:

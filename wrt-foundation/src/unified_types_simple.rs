@@ -65,7 +65,7 @@ impl PlatformCapacities {
     }
 
     pub const fn validate(&self) -> bool {
-        self.small_capacity > 0 
+        self.small_capacity > 0
             && self.medium_capacity > self.small_capacity
             && self.large_capacity > self.medium_capacity
             && self.memory_provider_size >= self.large_capacity / 8
@@ -78,8 +78,8 @@ pub struct UnifiedTypes<const SMALL: usize, const MEDIUM: usize, const LARGE: us
     _phantom: PhantomData<()>,
 }
 
-impl<const SMALL: usize, const MEDIUM: usize, const LARGE: usize> 
-    UnifiedTypes<SMALL, MEDIUM, LARGE> 
+impl<const SMALL: usize, const MEDIUM: usize, const LARGE: usize>
+    UnifiedTypes<SMALL, MEDIUM, LARGE>
 {
     pub const fn validate_configuration() -> bool {
         SMALL > 0 && MEDIUM > SMALL && LARGE > MEDIUM

@@ -48,8 +48,14 @@ fn test_standalone_name_section() {
     let original = TestComponentNameSection {
         component_name: Some("test_component".to_string()),
         sort_names: vec![
-            (Sort::Function, vec![(0, "func1".to_string()), (1, "func2".to_string())]),
-            (Sort::Instance, vec![(0, "instance1".to_string()), (1, "instance2".to_string())]),
+            (
+                Sort::Function,
+                vec![(0, "func1".to_string()), (1, "func2".to_string())],
+            ),
+            (
+                Sort::Instance,
+                vec![(0, "instance1".to_string()), (1, "instance2".to_string())],
+            ),
         ],
         import_names: Vec::new(),
         export_names: Vec::new(),
@@ -136,7 +142,9 @@ fn test_custom_section_with_name() {
 
     // Custom section
     binary.push(binary::COMPONENT_CUSTOM_SECTION_ID);
-    binary.extend_from_slice(&binary::write_leb128_u32(custom_section_content.len() as u32));
+    binary.extend_from_slice(&binary::write_leb128_u32(
+        custom_section_content.len() as u32
+    ));
     binary.extend_from_slice(&custom_section_content);
 
     // Decode the binary

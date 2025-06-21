@@ -7,7 +7,11 @@
 #[cfg(not(feature = "std"))]
 use wrt_foundation::bounded::{BoundedString, BoundedVec};
 
-use crate::prelude::*;
+#[cfg(feature = "std")]
+use std::collections::HashMap;
+#[cfg(not(feature = "std"))]
+// HashMap disabled for no_std
+
 
 /// Maximum number of active resources in pure no_std environments
 #[cfg(not(feature = "std"))]
@@ -80,7 +84,7 @@ pub struct ResourceMetadata {
     #[cfg(feature = "std")]
     pub user_data: Option<Vec<u8>>,
     #[cfg(not(feature = "std"))]
-    pub user_data: Option<BoundedVec<u8, 256>, NoStdProvider<65536>>,
+    pub user_data: Option<BoundedVec<u8, 256, NoStdProvider<65536>>, NoStdProvider<65536>>,
 }
 
 /// Resource lifecycle manager
@@ -92,21 +96,22 @@ pub struct ResourceLifecycleManager {
     resources: HashMap<ResourceHandle, Resource>,
     #[cfg(not(feature = "std"))]
     resources:
-        wrt_foundation::no_std_hashmap::SimpleHashMap<ResourceHandle, Resource, MAX_RESOURCES>,
+        wrt_foundation::SimpleHashMap<ResourceHandle, Resource, MAX_RESOURCES, NoStdProvider<65536>>,
     /// Borrow tracking
     #[cfg(feature = "std")]
     borrows: HashMap<ResourceHandle, Vec<BorrowInfo>>,
     #[cfg(not(feature = "std"))]
-    borrows: wrt_foundation::no_std_hashmap::SimpleHashMap<
+    borrows: wrt_foundation::SimpleHashMap<
         ResourceHandle,
         BoundedVec<BorrowInfo, MAX_BORROWS_PER_RESOURCE, NoStdProvider<65536>>,
         MAX_RESOURCES,
+        NoStdProvider<65536>,
     >,
     /// Resource type registry
     #[cfg(feature = "std")]
     types: HashMap<u32, ResourceType>,
     #[cfg(not(feature = "std"))]
-    types: wrt_foundation::no_std_hashmap::SimpleHashMap<u32, ResourceType, 256>,
+    types: wrt_foundation::SimpleHashMap<u32, ResourceType, 256, NoStdProvider<65536>>,
     /// Lifecycle hooks
     hooks: LifecycleHooks,
     /// Metrics
@@ -137,15 +142,15 @@ pub struct BorrowFlags {
 #[derive(Default)]
 pub struct LifecycleHooks {
     /// Called when a resource is created
-    pub on_create: Option<fn(&Resource) -> Result<()>>,
+    pub on_create: Option<fn(&Resource) -> Result<(), Error>>,
     /// Called when a resource is destroyed
-    pub on_destroy: Option<fn(&Resource) -> Result<()>>,
+    pub on_destroy: Option<fn(&Resource) -> Result<(), Error>>,
     /// Called when a resource is borrowed
-    pub on_borrow: Option<fn(&Resource, &BorrowInfo) -> Result<()>>,
+    pub on_borrow: Option<fn(&Resource, &BorrowInfo) -> Result<(), Error>>,
     /// Called when a borrow is released
-    pub on_release: Option<fn(&Resource, &BorrowInfo) -> Result<()>>,
+    pub on_release: Option<fn(&Resource, &BorrowInfo) -> Result<(), Error>>,
     /// Called when ownership is transferred
-    pub on_transfer: Option<fn(&Resource, u32, u32) -> Result<()>>,
+    pub on_transfer: Option<fn(&Resource, u32, u32) -> Result<(), Error>>,
 }
 
 /// Resource lifecycle metrics
@@ -172,18 +177,9 @@ impl ResourceLifecycleManager {
     pub fn new() -> Self {
         Self {
             next_handle: 1, // 0 is reserved for invalid handle
-            #[cfg(feature = "std")]
             resources: HashMap::new(),
-            #[cfg(not(feature = "std"))]
-            resources: wrt_foundation::no_std_hashmap::SimpleHashMap::new(),
-            #[cfg(feature = "std")]
             borrows: HashMap::new(),
-            #[cfg(not(feature = "std"))]
-            borrows: wrt_foundation::no_std_hashmap::SimpleHashMap::new(),
-            #[cfg(feature = "std")]
             types: HashMap::new(),
-            #[cfg(not(feature = "std"))]
-            types: wrt_foundation::no_std_hashmap::SimpleHashMap::new(),
             hooks: LifecycleHooks::default(),
             metrics: ResourceMetrics::default(),
         }

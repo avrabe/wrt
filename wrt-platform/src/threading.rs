@@ -3,6 +3,7 @@
 //! This module provides safe abstractions for mapping WebAssembly threads to
 //! native platform threads with proper resource controls and isolation.
 
+
 use core::{
     fmt::Debug,
     sync::atomic::{AtomicUsize, Ordering},
@@ -175,6 +176,14 @@ impl core::fmt::Debug for ThreadHandle {
 }
 
 impl ThreadHandle {
+    /// Create a new thread handle
+    pub fn new(id: u64, platform_handle: Box<dyn PlatformThreadHandle>) -> Self {
+        Self {
+            id,
+            platform_handle,
+        }
+    }
+
     /// Get thread ID
     pub fn id(&self) -> u64 {
         self.id
@@ -440,6 +449,7 @@ impl ResourceTracker {
 }
 
 /// Create platform-specific thread pool
+#[cfg(feature = "threading")]
 pub fn create_thread_pool(_config: &ThreadPoolConfig) -> Result<Box<dyn PlatformThreadPool>> {
     #[cfg(target_os = "nto")]
     {
@@ -447,7 +457,7 @@ pub fn create_thread_pool(_config: &ThreadPoolConfig) -> Result<Box<dyn Platform
             .map(|pool| Box::new(pool) as Box<dyn PlatformThreadPool>)
     }
     
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "threading", target_os = "linux"))]
     {
         super::linux_threading::LinuxThreadPool::new(_config)
             .map(|pool| Box::new(pool) as Box<dyn PlatformThreadPool>)
@@ -455,7 +465,7 @@ pub fn create_thread_pool(_config: &ThreadPoolConfig) -> Result<Box<dyn Platform
     
     #[cfg(all(feature = "threading", not(target_os = "nto"), not(target_os = "linux")))]
     {
-        super::generic_threading::GenericThreadPool::new(_config)
+        super::generic_threading::GenericThreadPool::new(_config.clone())
             .map(|pool| Box::new(pool) as Box<dyn PlatformThreadPool>)
     }
     

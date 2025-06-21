@@ -100,7 +100,10 @@ fn analyze_module(binary: &[u8]) -> Result<()> {
             _ => "Unknown",
         };
 
-        println!("Section {}: {} (size: {})", section_id, section_name, section_size);
+        println!(
+            "Section {}: {} (size: {})",
+            section_id, section_name, section_size
+        );
 
         // Analyze custom section
         if section_id == 0 {
@@ -154,7 +157,7 @@ fn analyze_module(binary: &[u8]) -> Result<()> {
                         // Function import
                         let (_, bytes_read) = binary::read_leb128_u32(binary, import_offset)?;
                         import_offset += bytes_read;
-                    }
+                    },
                     1 => {
                         // Table import
                         import_offset += 1; // element type
@@ -172,7 +175,7 @@ fn analyze_module(binary: &[u8]) -> Result<()> {
                                         + binary::leb128_size(binary, import_offset + 1)?,
                                 )?;
                         }
-                    }
+                    },
                     2 => {
                         // Memory import
                         if binary[import_offset] & 0x01 == 0 {
@@ -189,16 +192,16 @@ fn analyze_module(binary: &[u8]) -> Result<()> {
                                         + binary::leb128_size(binary, import_offset + 1)?,
                                 )?;
                         }
-                    }
+                    },
                     3 => {
                         // Global import
                         import_offset += 1; // value type
                         import_offset += 1; // mutability
-                    }
+                    },
                     _ => {
                         // Unknown kind, can't parse further
                         break;
-                    }
+                    },
                 }
 
                 println!("    Import {}: {}.{} ({})", i, module, name, kind_name);
@@ -286,7 +289,7 @@ fn parse_name_section(module: &Module) -> Result<()> {
                         // Module name
                         let (name, _) = binary::read_string(data, offset)?;
                         println!("Module name: {}", name);
-                    }
+                    },
                     1 => {
                         // Function names
                         let (count, bytes_read) = binary::read_leb128_u32(data, offset)?;
@@ -311,7 +314,7 @@ fn parse_name_section(module: &Module) -> Result<()> {
 
                             println!("  Function {}: {}", index, name);
                         }
-                    }
+                    },
                     2 => {
                         // Local names
                         let (count, bytes_read) = binary::read_leb128_u32(data, offset)?;
@@ -357,10 +360,10 @@ fn parse_name_section(module: &Module) -> Result<()> {
                                 println!("    Local {}: {}", local_index, name);
                             }
                         }
-                    }
+                    },
                     _ => {
                         println!("Unknown name subsection type: {}", name_type);
-                    }
+                    },
                 }
 
                 offset = subsection_end;
@@ -403,15 +406,20 @@ fn analyze_memory_usage(module: &Module) -> Result<()> {
     println!("Data segments: {}", data_segments.len());
 
     for (i, data) in data_segments.iter().enumerate() {
-        println!("  Data {}: memory={}, size={} bytes", i, data.memory_index, data.data.len());
+        println!(
+            "  Data {}: memory={}, size={} bytes",
+            i,
+            data.memory_index,
+            data.data.len()
+        );
 
         match &data.offset {
             wrt_decoder::DataSegmentOffset::Active(expr) => {
                 println!("    mode: active, offset expression: {:?}", expr);
-            }
+            },
             wrt_decoder::DataSegmentOffset::Passive => {
                 println!("    mode: passive");
-            }
+            },
         }
 
         // Print a short preview of the data content
@@ -464,7 +472,10 @@ fn analyze_component(binary: &[u8]) -> Result<()> {
     if !exports.is_empty() {
         println!("\nComponent Exports:");
         for export in &exports {
-            println!("  {}: {} (index: {})", export.name, export.kind, export.index);
+            println!(
+                "  {}: {} (index: {})",
+                export.name, export.kind, export.index
+            );
         }
     }
 
@@ -507,7 +518,10 @@ fn analyze_binary_format(binary: &[u8]) -> Result<()> {
     let magic = &binary[0..4];
     let version = u32::from_le_bytes([binary[4], binary[5], binary[6], binary[7]]);
 
-    println!("Magic bytes: {:02x} {:02x} {:02x} {:02x}", magic[0], magic[1], magic[2], magic[3]);
+    println!(
+        "Magic bytes: {:02x} {:02x} {:02x} {:02x}",
+        magic[0], magic[1], magic[2], magic[3]
+    );
     println!("Version: {}", version);
 
     // Identify binary type
@@ -588,8 +602,11 @@ fn analyze_binary_format(binary: &[u8]) -> Result<()> {
         if magic == b"\0asm" { &module_section_names } else { &component_section_names };
 
     for (id, count) in section_counts.iter() {
-        let name =
-            if *id < section_names.len() as u8 { section_names[*id as usize] } else { "Unknown" };
+        let name = if *id < section_names.len() as u8 {
+            section_names[*id as usize]
+        } else {
+            "Unknown"
+        };
 
         println!("  Section {}: {} (count: {})", id, name, count);
     }
@@ -645,10 +662,10 @@ fn main() -> Result<()> {
                 analyze_module(&binary)?;
                 parse_name_section(&module)?;
                 analyze_memory_usage(&module)?;
-            }
+            },
             Err(e) => {
                 println!("\nError: Failed to decode as WebAssembly module: {}", e);
-            }
+            },
         }
     }
 

@@ -4,6 +4,7 @@
 
 //! DWARF .debug_info section parsing
 
+use crate::bounded_debug_infra;
 #[cfg(feature = "std")]
 use std::vec::Vec;
 #[cfg(all(not(feature = "std")))]
@@ -69,7 +70,11 @@ pub struct DebugInfoParser<'a> {
     /// String table for name resolution
     string_table: Option<StringTable<'a>>,
     /// Function cache
-    functions: BoundedVec<FunctionInfo<'a>, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>>,
+    functions: BoundedVec<
+        FunctionInfo<'a>,
+        MAX_DWARF_FILE_TABLE,
+        crate::bounded_debug_infra::DebugProvider,
+    >,
     /// Inlined functions
     inlined_functions: InlinedFunctions<'a>,
     /// Current compilation unit index
@@ -135,7 +140,12 @@ impl<'a> DebugInfoParser<'a> {
         let abbrev_offset = cursor.read_u32()?;
         let address_size = cursor.read_u8()?;
 
-        Ok(CompilationUnitHeader { unit_length, version, abbrev_offset, address_size })
+        Ok(CompilationUnitHeader {
+            unit_length,
+            version,
+            abbrev_offset,
+            address_size,
+        })
     }
 
     /// Parse DIEs (Debugging Information Entries)
@@ -154,29 +164,33 @@ impl<'a> DebugInfoParser<'a> {
             }
 
             let abbrev = self.abbrev_table.find(abbrev_code).ok_or_else(|| {
-                Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Abbreviation not found")
+                Error::new(
+                    ErrorCategory::Parse,
+                    codes::PARSE_ERROR,
+                    "Abbreviation not found",
+                )
             })?;
 
             // Handle specific tags we care about
             match abbrev.tag {
                 tags::DW_TAG_SUBPROGRAM => {
                     self.parse_function(cursor, abbrev, header)?;
-                }
+                },
                 tags::DW_TAG_INLINED_SUBROUTINE => {
                     self.parse_inlined_function(cursor, abbrev, header)?;
-                }
+                },
                 tags::DW_TAG_FORMAL_PARAMETER => {
                     // Parameters are handled as children of functions
                     self.skip_die_attributes(cursor, abbrev, header)?;
-                }
+                },
                 tags::DW_TAG_COMPILE_UNIT => {
                     self.current_cu += 1;
                     self.skip_die_attributes(cursor, abbrev, header)?;
-                }
+                },
                 _ => {
                     // Skip other DIEs
                     self.skip_die_attributes(cursor, abbrev, header)?;
-                }
+                },
             }
 
             // Skip children if any
@@ -216,41 +230,41 @@ impl<'a> DebugInfoParser<'a> {
                             if let Some(ref string_table) = self.string_table {
                                 func.name = string_table.get_string(str_offset);
                             }
-                        }
+                        },
                         AttributeForm::String => {
                             // Inline string - read directly from debug_info
                             if let Ok(debug_str) = crate::strings::read_inline_string(cursor) {
                                 func.name = Some(debug_str);
                             }
-                        }
+                        },
                         _ => {
                             self.skip_attribute_value(cursor, &attr_spec.form, header)?;
-                        }
+                        },
                     }
-                }
+                },
                 attributes::DW_AT_LOW_PC => {
                     if header.address_size == 4 {
                         func.low_pc = cursor.read_u32()?;
                     } else {
                         cursor.skip(header.address_size as usize)?;
                     }
-                }
+                },
                 attributes::DW_AT_HIGH_PC => {
                     if header.address_size == 4 {
                         func.high_pc = cursor.read_u32()?;
                     } else {
                         cursor.skip(header.address_size as usize)?;
                     }
-                }
+                },
                 attributes::DW_AT_DECL_FILE => {
                     func.file_index = cursor.read_uleb128()? as u16;
-                }
+                },
                 attributes::DW_AT_DECL_LINE => {
                     func.line = cursor.read_uleb128()? as u32;
-                }
+                },
                 _ => {
                     self.skip_attribute_value(cursor, &attr_spec.form, header)?;
-                }
+                },
             }
         }
 
@@ -329,59 +343,59 @@ impl<'a> DebugInfoParser<'a> {
             AttributeForm::Block1 => {
                 let len = cursor.read_u8()? as usize;
                 cursor.skip(len)?;
-            }
+            },
             AttributeForm::Block2 => {
                 let len = cursor.read_u16()? as usize;
                 cursor.skip(len)?;
-            }
+            },
             AttributeForm::Block4 => {
                 let len = cursor.read_u32()? as usize;
                 cursor.skip(len)?;
-            }
+            },
             AttributeForm::Data1 | AttributeForm::Ref1 | AttributeForm::Flag => {
                 cursor.skip(1)?;
-            }
+            },
             AttributeForm::Data2 | AttributeForm::Ref2 => {
                 cursor.skip(2)?;
-            }
+            },
             AttributeForm::Data4
             | AttributeForm::Ref4
             | AttributeForm::Strp
             | AttributeForm::SecOffset => {
                 cursor.skip(4)?;
-            }
+            },
             AttributeForm::Data8 | AttributeForm::Ref8 | AttributeForm::RefSig8 => {
                 cursor.skip(8)?;
-            }
+            },
             AttributeForm::String => {
                 // Skip null-terminated string
                 while cursor.read_u8()? != 0 {}
-            }
+            },
             AttributeForm::Block | AttributeForm::Exprloc => {
                 let len = cursor.read_uleb128()? as usize;
                 cursor.skip(len)?;
-            }
+            },
             AttributeForm::Sdata | AttributeForm::Udata | AttributeForm::RefUdata => {
                 cursor.read_uleb128()?;
-            }
+            },
             AttributeForm::RefAddr => {
                 cursor.skip(header.address_size as usize)?;
-            }
+            },
             AttributeForm::FlagPresent => {
                 // No data to skip
-            }
+            },
             AttributeForm::Indirect => {
                 let actual_form = cursor.read_uleb128()? as u16;
                 let form = AttributeForm::from_u16(actual_form);
                 self.skip_attribute_value(cursor, &form, header)?;
-            }
+            },
             AttributeForm::Unknown(_) => {
                 return Err(Error::new(
                     ErrorCategory::Parse,
                     codes::PARSE_ERROR,
                     "Unknown attribute form",
                 ));
-            }
+            },
         }
         Ok(())
     }
@@ -463,31 +477,31 @@ impl<'a> DebugInfoParser<'a> {
                         if let Some(ref string_table) = self.string_table {
                             param.name = string_table.get_string(str_offset);
                         }
-                    }
+                    },
                     AttributeForm::String => {
                         if let Ok(debug_str) = crate::strings::read_inline_string(cursor) {
                             param.name = Some(debug_str);
                         }
-                    }
+                    },
                     _ => {
                         self.skip_attribute_value(cursor, &attr_spec.form, header)?;
-                    }
+                    },
                 },
                 attributes::DW_AT_TYPE => {
                     // For now, just mark as having a type
                     // Full type resolution would require following type references
                     self.skip_attribute_value(cursor, &attr_spec.form, header)?;
                     param.param_type = BasicType::Unknown;
-                }
+                },
                 attributes::DW_AT_DECL_FILE => {
                     param.file_index = cursor.read_uleb128()? as u16;
-                }
+                },
                 attributes::DW_AT_DECL_LINE => {
                     param.line = cursor.read_uleb128()? as u32;
-                }
+                },
                 _ => {
                     self.skip_attribute_value(cursor, &attr_spec.form, header)?;
-                }
+                },
             }
         }
 
@@ -517,33 +531,33 @@ impl<'a> DebugInfoParser<'a> {
             match attr_spec.name {
                 attributes::DW_AT_ABSTRACT_ORIGIN => {
                     inlined.abstract_origin = cursor.read_u32()?;
-                }
+                },
                 attributes::DW_AT_LOW_PC => {
                     if header.address_size == 4 {
                         inlined.low_pc = cursor.read_u32()?;
                     } else {
                         cursor.skip(header.address_size as usize)?;
                     }
-                }
+                },
                 attributes::DW_AT_HIGH_PC => {
                     if header.address_size == 4 {
                         inlined.high_pc = cursor.read_u32()?;
                     } else {
                         cursor.skip(header.address_size as usize)?;
                     }
-                }
+                },
                 attributes::DW_AT_CALL_FILE => {
                     inlined.call_file = cursor.read_uleb128()? as u16;
-                }
+                },
                 attributes::DW_AT_CALL_LINE => {
                     inlined.call_line = cursor.read_uleb128()? as u32;
-                }
+                },
                 attributes::DW_AT_CALL_COLUMN => {
                     inlined.call_column = cursor.read_uleb128()? as u16;
-                }
+                },
                 _ => {
                     self.skip_attribute_value(cursor, &attr_spec.form, header)?;
-                }
+                },
             }
         }
 

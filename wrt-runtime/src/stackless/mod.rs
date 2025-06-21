@@ -7,7 +7,7 @@
 //! The stackless engine uses a state machine approach to track execution state
 //! and allows for pausing and resuming execution at any point.
 
-mod engine;
+pub mod engine;
 pub mod extensions;
 mod frame;
 
