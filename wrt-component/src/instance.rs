@@ -2,9 +2,10 @@
 //!
 //! This module provides the instance types for component instances.
 
-use std::{string::String, vec::Vec};
 #[cfg(feature = "std")]
 use std::{string::String, vec::Vec};
+#[cfg(not(feature = "std"))]
+use alloc::{string::String, vec::Vec};
 
 use wrt_format::component::ComponentTypeDefinition;
 

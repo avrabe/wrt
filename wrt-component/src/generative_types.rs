@@ -1,24 +1,28 @@
-#[cfg(not(feature = "std"))]
-use std::{collections::BTreeMap, vec::Vec};
 #[cfg(feature = "std")]
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, vec::Vec};
+#[cfg(not(feature = "std"))]
+use alloc::{collections::BTreeMap, vec::Vec};
 
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use wrt_foundation::{
-    bounded_collections::{BoundedVec, MAX_GENERATIVE_TYPES},
+    bounded::{BoundedVec, MAX_GENERATIVE_TYPES},
     component_value::ComponentValue,
-    resource::{ResourceHandle, ResourceType},
+    resource::ResourceType,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 use crate::{
+    bounded_component_infra::ComponentProvider,
+    resource_management::ResourceHandle,
     type_bounds::{RelationResult, TypeBoundsChecker},
     types::{ComponentError, ComponentInstanceId, ResourceId, TypeId},
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GenerativeResourceType {
-    pub base_type: ResourceType,
+    pub base_type: ResourceType<ComponentProvider>,
     pub instance_id: ComponentInstanceId,
     pub unique_type_id: TypeId,
     pub generation: u32,
@@ -40,8 +44,8 @@ pub enum BoundKind {
 pub struct GenerativeTypeRegistry {
     next_type_id: AtomicU32,
     instance_types:
-        BTreeMap<ComponentInstanceId, BoundedVec<GenerativeResourceType, MAX_GENERATIVE_TYPES>, NoStdProvider<65536>>,
-    type_bounds: BTreeMap<TypeId, BoundedVec<TypeBound, MAX_GENERATIVE_TYPES>, NoStdProvider<65536>>,
+        BTreeMap<ComponentInstanceId, BoundedVec<GenerativeResourceType, MAX_GENERATIVE_TYPES>>,
+    type_bounds: BTreeMap<TypeId, BoundedVec<TypeBound, MAX_GENERATIVE_TYPES>>,
     resource_mappings: BTreeMap<ResourceHandle, GenerativeResourceType>,
     bounds_checker: TypeBoundsChecker,
 }
@@ -59,16 +63,20 @@ impl GenerativeTypeRegistry {
 
     pub fn create_generative_type(
         &mut self,
-        base_type: ResourceType,
+        base_type: ResourceType<ComponentProvider>,
         instance_id: ComponentInstanceId,
-    ) -> Result<GenerativeResourceType, ComponentError> {
+    ) -> core::result::Result<GenerativeResourceType, ComponentError> {
         let unique_type_id = TypeId(self.next_type_id.fetch_add(1, Ordering::SeqCst));
 
         let generative_type =
             GenerativeResourceType { base_type, instance_id, unique_type_id, generation: 0 };
 
         let instance_types =
-            self.instance_types.entry(instance_id).or_insert_with(|| BoundedVec::new(DefaultMemoryProvider::default()).unwrap());
+            self.instance_types.entry(instance_id).or_insert_with(|| {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)
+                    .expect("Failed to allocate memory for instance types");
+                BoundedVec::new(provider).expect("Failed to create BoundedVec")
+            });
 
         instance_types
             .push(generative_type.clone())
@@ -89,8 +97,12 @@ impl GenerativeTypeRegistry {
         &mut self,
         type_id: TypeId,
         bound: TypeBound,
-    ) -> Result<(), ComponentError> {
-        let bounds = self.type_bounds.entry(type_id).or_insert_with(|| BoundedVec::new(DefaultMemoryProvider::default()).unwrap());
+    ) -> core::result::Result<(), ComponentError> {
+        let bounds = self.type_bounds.entry(type_id).or_insert_with(|| {
+            let provider = safe_managed_alloc!(65536, CrateId::Component)
+                .expect("Failed to allocate memory for type bounds");
+            BoundedVec::new(provider).expect("Failed to create BoundedVec")
+        });
 
         bounds.push(bound.clone()).map_err(|_| ComponentError::TooManyTypeBounds)?;
 
@@ -127,7 +139,7 @@ impl GenerativeTypeRegistry {
         &mut self,
         handle: ResourceHandle,
         generative_type: GenerativeResourceType,
-    ) -> Result<(), ComponentError> {
+    ) -> core::result::Result<(), ComponentError> {
         if self.resource_mappings.contains_key(&handle) {
             return Err(ComponentError::ResourceHandleAlreadyExists);
         }
@@ -178,11 +190,11 @@ impl GenerativeTypeRegistry {
         }
     }
 
-    pub fn infer_type_relations(&mut self) -> Result<usize, ComponentError> {
+    pub fn infer_type_relations(&mut self) -> core::result::Result<usize, ComponentError> {
         self.bounds_checker.infer_relations()
     }
 
-    pub fn validate_type_consistency(&self) -> Result<(), ComponentError> {
+    pub fn validate_type_consistency(&self) -> core::result::Result<(), ComponentError> {
         self.bounds_checker.validate_consistency()
     }
 
@@ -195,7 +207,7 @@ impl GenerativeTypeRegistry {
     }
 
     #[cfg(feature = "std")]
-    pub fn validate_type_system(&mut self) -> Result<(), ComponentError> {
+    pub fn validate_type_system(&mut self) -> core::result::Result<(), ComponentError> {
         self.infer_type_relations()?;
         self.validate_type_consistency()?;
 
@@ -235,9 +247,9 @@ impl GenerativeTypeRegistry {
         false
     }
 
-    fn is_resource_subtype(&self, sub_type: &ResourceType, super_type: &ResourceType) -> bool {
+    fn is_resource_subtype(&self, sub_type: &ResourceType<ComponentProvider>, super_type: &ResourceType<ComponentProvider>) -> bool {
         match (sub_type, super_type) {
-            (ResourceType::Handle(sub_h), ResourceType::Handle(super_h)) => {
+            (ResourceType<ComponentProvider>::Handle(sub_h), ResourceType<ComponentProvider>::Handle(super_h)) => {
                 sub_h.type_name() == super_h.type_name()
             }
             _ => false,
@@ -259,7 +271,7 @@ mod tests {
     #[test]
     fn test_generative_type_registry_creation() {
         let mut registry = GenerativeTypeRegistry::new();
-        let base_type = ResourceType::Handle(ResourceHandle::new(42));
+        let base_type = ResourceType<ComponentProvider>::Handle(ResourceHandle::new(42));
         let instance_id = ComponentInstanceId(1);
 
         let result = registry.create_generative_type(base_type.clone(), instance_id);
@@ -275,7 +287,7 @@ mod tests {
     #[test]
     fn test_unique_type_ids_across_instances() {
         let mut registry = GenerativeTypeRegistry::new();
-        let base_type = ResourceType::Handle(ResourceHandle::new(42));
+        let base_type = ResourceType<ComponentProvider>::Handle(ResourceHandle::new(42));
         let instance1 = ComponentInstanceId(1);
         let instance2 = ComponentInstanceId(2);
 
@@ -304,7 +316,7 @@ mod tests {
     #[test]
     fn test_resource_handle_registration() {
         let mut registry = GenerativeTypeRegistry::new();
-        let base_type = ResourceType::Handle(ResourceHandle::new(42));
+        let base_type = ResourceType<ComponentProvider>::Handle(ResourceHandle::new(42));
         let instance_id = ComponentInstanceId(1);
         let handle = ResourceHandle::new(100);
 
@@ -317,7 +329,7 @@ mod tests {
     #[test]
     fn test_instance_cleanup() {
         let mut registry = GenerativeTypeRegistry::new();
-        let base_type = ResourceType::Handle(ResourceHandle::new(42));
+        let base_type = ResourceType<ComponentProvider>::Handle(ResourceHandle::new(42));
         let instance_id = ComponentInstanceId(1);
 
         let gen_type = registry.create_generative_type(base_type, instance_id).unwrap();

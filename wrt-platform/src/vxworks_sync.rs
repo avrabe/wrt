@@ -1,3 +1,4 @@
+
 use crate::FutexLike;
 use core::sync::atomic::{AtomicU32, Ordering};
 use core::time::Duration;
@@ -97,20 +98,16 @@ impl VxWorksFutex {
             let sem_id = unsafe { semBCreate(options, 0) }; // Start empty
 
             if sem_id == 0 {
-                return Err(Error::new(
-                    ErrorKind::Platform,
-                    "Failed to create VxWorks semaphore for LKM context"
+                return Err(Error::runtime_execution_error("
                 ));
             }
 
             self.sem_id = Some(sem_id);
         }
         
-        #[cfg(not(target_os = "vxworks"))]
+        #[cfg(not(target_os = "))]
         {
-            return Err(Error::new(
-                ErrorKind::Platform,
-                "VxWorks semaphore not supported on this platform"
+            return Err(Error::runtime_execution_error("
             ));
         }
 
@@ -119,26 +116,22 @@ impl VxWorksFutex {
 
     /// Initialize POSIX semaphore for RTP context
     fn init_posix_semaphore(&mut self, initial_value: u32) -> Result<(), Error> {
-        #[cfg(target_os = "vxworks")]
+        #[cfg(target_os = ")]
         {
             let mut posix_sem = PosixSem { _data: [0; 16] };
             
             let result = unsafe { sem_init(&mut posix_sem, 0, initial_value) };
             if result != 0 {
-                return Err(Error::new(
-                    ErrorKind::Platform,
-                    "Failed to create POSIX semaphore for RTP context"
+                return Err(Error::runtime_execution_error("
                 ));
             }
 
             self.posix_sem = Some(posix_sem);
         }
         
-        #[cfg(not(target_os = "vxworks"))]
+        #[cfg(not(target_os = "))]
         {
-            return Err(Error::new(
-                ErrorKind::Platform,
-                "POSIX semaphore not supported on this platform"
+            return Err(Error::runtime_execution_error("
             ));
         }
 
@@ -147,7 +140,7 @@ impl VxWorksFutex {
 
     /// Convert duration to VxWorks ticks
     fn duration_to_ticks(duration: Duration) -> i32 {
-        #[cfg(target_os = "vxworks")]
+        #[cfg(target_os = ")]
         {
             let ticks_per_sec = unsafe { sysClkRateGet() } as u64;
             let total_ms = duration.as_millis() as u64;
@@ -197,9 +190,7 @@ impl FutexLike for VxWorksFutex {
                         
                         let result = unsafe { semTake(sem_id, timeout_ticks) };
                         if result != OK {
-                            return Err(Error::new(
-                                ErrorKind::Platform,
-                                "VxWorks semTake failed in LKM context"
+                            return Err(Error::runtime_execution_error("
                             ));
                         }
                     }
@@ -215,8 +206,7 @@ impl FutexLike for VxWorksFutex {
                                 if result != 0 {
                                     return Err(Error::new(
                                         ErrorKind::Platform,
-                                        "POSIX sem_timedwait failed in RTP context"
-                                    ));
+                                        "));
                                 }
                             }
                             None => {
@@ -224,9 +214,7 @@ impl FutexLike for VxWorksFutex {
                                     sem_wait(posix_sem as *const _ as *mut _)
                                 };
                                 if result != 0 {
-                                    return Err(Error::new(
-                                        ErrorKind::Platform,
-                                        "POSIX sem_wait failed in RTP context"
+                                    return Err(Error::runtime_execution_error("
                                     ));
                                 }
                             }
@@ -236,11 +224,9 @@ impl FutexLike for VxWorksFutex {
             }
         }
         
-        #[cfg(not(target_os = "vxworks"))]
+        #[cfg(not(target_os = "))]
         {
-            return Err(Error::new(
-                ErrorKind::Platform,
-                "VxWorks futex wait not supported on this platform"
+            return Err(Error::runtime_execution_error("
             ));
         }
 
@@ -248,16 +234,14 @@ impl FutexLike for VxWorksFutex {
     }
 
     fn wake_one(&self) -> Result<u32, Error> {
-        #[cfg(target_os = "vxworks")]
+        #[cfg(target_os = ")]
         {
             match self.context {
                 VxWorksContext::Lkm => {
                     if let Some(sem_id) = self.sem_id {
                         let result = unsafe { semGive(sem_id) };
                         if result != OK {
-                            return Err(Error::new(
-                                ErrorKind::Platform,
-                                "VxWorks semGive failed in LKM context"
+                            return Err(Error::runtime_execution_error("
                             ));
                         }
                         return Ok(1); // Woke one task
@@ -271,7 +255,7 @@ impl FutexLike for VxWorksFutex {
                         if result != 0 {
                             return Err(Error::new(
                                 ErrorKind::Platform,
-                                "POSIX sem_post failed in RTP context"
+                                "Failed to post POSIX semaphore",
                             ));
                         }
                         return Ok(1); // Woke one task
@@ -282,10 +266,7 @@ impl FutexLike for VxWorksFutex {
         
         #[cfg(not(target_os = "vxworks"))]
         {
-            return Err(Error::new(
-                ErrorKind::Platform,
-                "VxWorks futex wake not supported on this platform"
-            ));
+            return Err(Error::runtime_execution_error("VxWorks futex wake not supported on this platform"));
         }
 
         Ok(0)
@@ -299,19 +280,15 @@ impl FutexLike for VxWorksFutex {
                     if let Some(sem_id) = self.sem_id {
                         let result = unsafe { semFlush(sem_id) };
                         if result != OK {
-                            return Err(Error::new(
-                                ErrorKind::Platform,
-                                "VxWorks semFlush failed in LKM context"
-                            ));
+                            return Err(Error::runtime_execution_error("Failed to flush VxWorks semaphore"));
                         }
                         // semFlush wakes all waiting tasks, but we don't know how many
                         return Ok(u32::MAX); // Indicate potentially many tasks woken
                     }
                 }
                 VxWorksContext::Rtp => {
-                    // POSIX semaphores don't have a direct "wake all" operation
-                    // We need to post enough times to wake potential waiters
-                    // This is a best-effort implementation
+                    // POSIX semaphores don't have a direct wake-all operation
+                    // We'll post multiple times to simulate it
                     let mut woken = 0;
                     if let Some(ref posix_sem) = self.posix_sem {
                         // Post up to a reasonable number of times
@@ -333,10 +310,7 @@ impl FutexLike for VxWorksFutex {
         
         #[cfg(not(target_os = "vxworks"))]
         {
-            return Err(Error::new(
-                ErrorKind::Platform,
-                "VxWorks futex wake_all not supported on this platform"
-            ));
+            return Err(Error::runtime_execution_error("VxWorks futex wake_all not supported on this platform"));
         }
 
         Ok(0)
@@ -363,7 +337,7 @@ impl FutexLike for VxWorksFutex {
 
 impl Drop for VxWorksFutex {
     fn drop(&mut self) {
-        #[cfg(target_os = "vxworks")]
+        #[cfg(target_os = ")]
         {
             match self.context {
                 VxWorksContext::Lkm => {

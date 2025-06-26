@@ -13,18 +13,73 @@
 
 extern crate alloc;
 
-use crate::prelude::{Debug, Eq, PartialEq};
+use crate::prelude::{BoundedVec, Debug, Eq, PartialEq};
 use crate::thread_manager::{ThreadId, ThreadState};
 use wrt_error::{Error, ErrorCategory, Result, codes};
-use wrt_platform::sync::{Mutex, Condvar};
+
+// Import platform abstractions
+use core::time::Duration;
+
 #[cfg(feature = "std")]
-use std::{vec::Vec, collections::BTreeMap, sync::Arc, time::{Duration, Instant}};
+use std::{sync::{Arc, Mutex, Condvar}, time::Instant};
 #[cfg(not(feature = "std"))]
-use alloc::{vec::Vec, collections::BTreeMap, sync::Arc};
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
-use wrt_foundation::{bounded::BoundedVec, traits::BoundedCapacity};
+use crate::prelude::{Arc, Mutex};
+
+// Platform-specific Condvar - only available with platform-sync
+#[cfg(all(not(feature = "std"), feature = "platform-sync"))]
+use wrt_platform::sync::Condvar;
+
+// Stub timeout result for no_std
+#[cfg(all(not(feature = "std"), not(feature = "platform-sync")))]
+struct WaitTimeoutResult(bool);
+
+#[cfg(all(not(feature = "std"), not(feature = "platform-sync")))]
+impl WaitTimeoutResult {
+    fn timed_out(&self) -> bool {
+        self.0
+    }
+}
+
+// Stub Condvar for no_std without platform-sync
+#[cfg(all(not(feature = "std"), not(feature = "platform-sync")))]
+struct Condvar;
+
+#[cfg(all(not(feature = "std"), not(feature = "platform-sync")))]
+impl Condvar {
+    fn new() -> Self { Self }
+    
+    fn wait<'a, T>(&self, _guard: crate::prelude::MutexGuard<'a, T>) -> Result<crate::prelude::MutexGuard<'a, T>> {
+        // For safety-critical systems without platform sync, we return immediately
+        // indicating that blocking operations are not supported.
+        // The runtime should handle this by using polling or other non-blocking mechanisms.
+        Err(Error::not_supported_would_block("Blocking wait not supported in no_std without platform-sync - use polling"))
+    }
+    
+    fn wait_timeout<'a, T>(&self, guard: crate::prelude::MutexGuard<'a, T>, _timeout: Duration) 
+        -> Result<(crate::prelude::MutexGuard<'a, T>, WaitTimeoutResult)> {
+        // Timeout-based wait also not supported without platform sync
+        // Return immediately with timeout indication
+        Ok((guard, WaitTimeoutResult(true)))
+    }
+    
+    fn notify_one(&self) -> Result<()> {
+        // Notification is a no-op when there's no actual blocking
+        // In a real system, this would set a flag that waiters could poll
+        Ok(())
+    }
+    
+    fn notify_all(&self) -> Result<()> {
+        // Notification is a no-op when there's no actual blocking
+        // In a real system, this would set a flag that waiters could poll
+        Ok(())
+    }
+}
+
+use crate::bounded_runtime_infra::{
+    BoundedWaitQueueVec, RuntimeProvider, new_thread_vec
+};
 #[cfg(not(feature = "std"))]
-use wrt_platform::sync::Duration;
+use wrt_foundation::traits::BoundedCapacity;
 
 /// Wait queue identifier
 pub type WaitQueueId = u64;
@@ -104,7 +159,7 @@ impl WaitQueue {
             #[cfg(feature = "std")]
             enqueue_time: Instant::now(),
             #[cfg(not(feature = "std"))]
-            enqueue_time: wrt_platform::time::current_time_ns(),
+            enqueue_time: 0, // Time tracking not available without platform support
             timeout,
             priority,
         };
@@ -138,11 +193,7 @@ impl WaitQueue {
                 self.stats.current_waiters += 1;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_EXHAUSTED,
-                    "Wait queue is full"
-                ))
+                Err(Error::resource_exhausted("Wait queue is full"))
             }
         }
     }
@@ -211,14 +262,12 @@ impl WaitQueue {
     }
     
     /// Check for expired timeouts and remove them
-    pub fn process_timeouts(&mut self) -> Vec<ThreadId> {
+    pub fn process_timeouts(&mut self) -> Result<Vec<ThreadId>> {
         #[cfg(feature = "std")]
         let mut timed_out = std::vec::Vec::new();
         #[cfg(all(not(feature = "std"), not(feature = "std")))]
-        let mut timed_out: wrt_foundation::bounded::BoundedVec<u32, 256, wrt_foundation::safe_memory::NoStdProvider<1024>> = match wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()) {
-            Ok(vec) => vec,
-            Err(_) => return Vec::new(), // Return empty Vec on failure
-        };
+        let provider = wrt_foundation::safe_managed_alloc!(1024, wrt_foundation::budget_aware_provider::CrateId::Runtime)?;
+        let mut timed_out: wrt_foundation::bounded::BoundedVec<u32, 256, wrt_foundation::safe_memory::NoStdProvider<1024>> = wrt_foundation::bounded::BoundedVec::new(provider)?;
         
         #[cfg(feature = "std")]
         {
@@ -260,15 +309,15 @@ impl WaitQueue {
         
         // Convert the result to the expected return type
         #[cfg(feature = "std")]
-        return timed_out;
+        return Ok(timed_out);
         #[cfg(all(not(feature = "std"), not(feature = "std")))]
         {
             // Convert BoundedVec to Vec (our type alias)
             let mut result = Vec::new();
             for item in &timed_out {
-                let () = result.push(item);
+                result.push(*item);
             }
-            result
+            Ok(result)
         }
     }
     
@@ -286,11 +335,9 @@ impl WaitQueue {
 /// Wait queue manager for coordinating multiple queues
 #[derive(Debug)]
 pub struct WaitQueueManager {
-    /// All active wait queues
-    #[cfg(feature = "std")]
-    queues: BTreeMap<WaitQueueId, WaitQueue>,
-    #[cfg(not(feature = "std"))]
-    queues: [(WaitQueueId, Option<WaitQueue>); 256], // Fixed size for no_std
+    /// All active wait queues - using fixed array for now until WaitQueue implements required traits
+    // TODO: Replace with BoundedVec once WaitQueue implements Checksummable, ToBytes, FromBytes
+    queues: [(WaitQueueId, Option<WaitQueue>); 32],
     /// Next queue ID to assign
     next_queue_id: WaitQueueId,
     /// Global statistics
@@ -301,10 +348,7 @@ impl WaitQueueManager {
     /// Create new wait queue manager
     #[must_use] pub fn new() -> Self {
         Self {
-            #[cfg(feature = "std")]
-            queues: BTreeMap::new(),
-            #[cfg(not(feature = "std"))]
-            queues: core::array::from_fn(|_| (0, None)),
+            queues: Default::default(),
             next_queue_id: 1,
             global_stats: WaitQueueGlobalStats::new(),
         }
@@ -319,7 +363,13 @@ impl WaitQueueManager {
         
         #[cfg(feature = "std")]
         {
-            self.queues.insert(queue_id, queue);
+            // Find empty slot in array
+            for i in 0..self.queues.len() {
+                if self.queues[i].1.is_none() {
+                    self.queues[i] = (queue_id, Some(queue));
+                    break;
+                }
+            }
         }
         #[cfg(not(feature = "std"))]
         {
@@ -428,15 +478,19 @@ impl WaitQueueManager {
     pub fn destroy_queue(&mut self, queue_id: WaitQueueId) -> Result<()> {
         #[cfg(feature = "std")]
         {
-            if self.queues.remove(&queue_id).is_some() {
+            let mut found = false;
+            for i in 0..self.queues.len() {
+                if self.queues[i].0 == queue_id && self.queues[i].1.is_some() {
+                    self.queues[i].1 = None;
+                    found = true;
+                    break;
+                }
+            }
+            if found {
                 self.global_stats.active_queues -= 1;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Validation,
-                    codes::INVALID_ARGUMENT,
-                    "Wait queue not found"
-                ))
+                Err(Error::validation_invalid_argument("Wait queue not found"))
             }
         }
         #[cfg(not(feature = "std"))]
@@ -450,37 +504,35 @@ impl WaitQueueManager {
                 }
             }
             
-            Err(Error::new(
-                ErrorCategory::Validation,
-                codes::INVALID_ARGUMENT,
-                "Wait queue not found"
-            ))
+            Err(Error::validation_invalid_argument("Wait queue not found"))
         }
     }
     
     /// Process timeouts for all queues
-    pub fn process_all_timeouts(&mut self) -> u64 {
+    pub fn process_all_timeouts(&mut self) -> Result<u64> {
         let mut total_timeouts = 0u64;
         
         #[cfg(feature = "std")]
         {
-            for queue in self.queues.values_mut() {
-                let timed_out = queue.process_timeouts();
-                total_timeouts += timed_out.len() as u64;
+            for i in 0..self.queues.len() {
+                if let Some(ref mut queue) = self.queues[i].1 {
+                    let timed_out = queue.process_timeouts()?;
+                    total_timeouts += timed_out.len() as u64;
+                }
             }
         }
         #[cfg(not(feature = "std"))]
         {
             for (_id, slot) in &mut self.queues {
                 if let Some(queue) = slot {
-                    let timed_out = queue.process_timeouts();
+                    let timed_out = queue.process_timeouts()?;
                     total_timeouts += timed_out.len() as u64;
                 }
             }
         }
         
         self.global_stats.total_timeouts += total_timeouts;
-        total_timeouts
+        Ok(total_timeouts)
     }
     
     // Private helper methods
@@ -488,9 +540,14 @@ impl WaitQueueManager {
     fn get_queue_mut(&mut self, queue_id: WaitQueueId) -> Result<&mut WaitQueue> {
         #[cfg(feature = "std")]
         {
-            self.queues.get_mut(&queue_id).ok_or_else(|| {
-                Error::new(ErrorCategory::Validation, codes::INVALID_ARGUMENT, "Wait queue not found")
-            })
+            for i in 0..self.queues.len() {
+                if self.queues[i].0 == queue_id {
+                    if let Some(ref mut queue) = self.queues[i].1 {
+                        return Ok(queue);
+                    }
+                }
+            }
+            Err(Error::validation_invalid_argument("Wait queue not found"))
         }
         #[cfg(not(feature = "std"))]
         {
@@ -502,11 +559,7 @@ impl WaitQueueManager {
                 }
             }
             
-            Err(Error::new(
-                ErrorCategory::Validation,
-                codes::INVALID_ARGUMENT,
-                "Wait queue not found"
-            ))
+            Err(Error::validation_invalid_argument("Wait queue not found"))
         }
     }
 }

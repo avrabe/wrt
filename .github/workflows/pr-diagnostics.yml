@@ -1,0 +1,441 @@
+name: PR Diagnostic Analysis
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  diagnostic-analysis:
+    name: Analyze Build Diagnostics
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout PR
+      uses: actions/checkout@v4
+      with:
+        # Fetch full history for diff analysis
+        fetch-depth: 0
+        
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+        
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+          
+    - name: Install cargo-wrt
+      run: |
+        cargo install --path cargo-wrt --force
+        
+    - name: Get base branch diagnostics
+      id: base-diagnostics
+      run: |
+        # Checkout base branch to get baseline
+        git checkout ${{ github.event.pull_request.base.sha }}
+        
+        # Run analysis on base branch
+        cargo-wrt build --output json --cache --clear-cache > base-diagnostics.json || true
+        cargo-wrt check --output json --cache > base-check.json || true
+        
+        # Store baseline
+        cp base-diagnostics.json baseline-build.json
+        cp base-check.json baseline-check.json
+        
+        echo "base_errors=$(jq '.summary.errors' baseline-build.json)" >> $GITHUB_OUTPUT
+        echo "base_warnings=$(jq '.summary.warnings' baseline-build.json)" >> $GITHUB_OUTPUT
+        
+    - name: Return to PR branch
+      run: |
+        git checkout ${{ github.event.pull_request.head.sha }}
+        
+    - name: Analyze PR diagnostics
+      id: pr-diagnostics  
+      run: |
+        # Run full analysis on PR branch
+        cargo-wrt build --output json --cache --clear-cache > pr-diagnostics.json || true
+        cargo-wrt check --output json --cache > pr-check.json || true
+        
+        # Extract metrics
+        PR_ERRORS=$(jq '.summary.errors' pr-diagnostics.json)
+        PR_WARNINGS=$(jq '.summary.warnings' pr-diagnostics.json)
+        
+        echo "pr_errors=$PR_ERRORS" >> $GITHUB_OUTPUT
+        echo "pr_warnings=$PR_WARNINGS" >> $GITHUB_OUTPUT
+        
+        # Calculate differences
+        BASE_ERRORS=${{ steps.base-diagnostics.outputs.base_errors }}
+        BASE_WARNINGS=${{ steps.base-diagnostics.outputs.base_warnings }}
+        
+        ERROR_DIFF=$((PR_ERRORS - BASE_ERRORS))
+        WARNING_DIFF=$((PR_WARNINGS - BASE_WARNINGS))
+        
+        echo "error_diff=$ERROR_DIFF" >> $GITHUB_OUTPUT
+        echo "warning_diff=$WARNING_DIFF" >> $GITHUB_OUTPUT
+        
+    - name: Generate diff analysis
+      id: diff-analysis
+      run: |
+        # Create a comprehensive script to analyze PR impact
+        cat > analyze_pr_changes.py << 'EOF'
+        import json
+        import subprocess
+        import sys
+        
+        def get_changed_files():
+            """Get list of files changed in this PR"""
+            result = subprocess.run([
+                'git', 'diff', '--name-only', 
+                '${{ github.event.pull_request.base.sha }}..HEAD'
+            ], capture_output=True, text=True)
+            return result.stdout.strip().split('\n') if result.stdout.strip() else []
+        
+        def load_diagnostics(file_path):
+            """Load diagnostics from JSON file"""
+            try:
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                return data.get('diagnostics', [])
+            except (FileNotFoundError, json.JSONDecodeError):
+                return []
+        
+        def create_diagnostic_key(diag):
+            """Create a unique key for diagnostic comparison"""
+            return f"{diag['file']}:{diag['range']['start']['line']}:{diag['range']['start']['character']}:{diag['severity']}:{diag.get('code', 'no-code')}"
+        
+        def analyze_pr_impact(base_diagnostics, pr_diagnostics, changed_files):
+            """Analyze the impact of PR changes"""
+            # Create sets for comparison
+            base_diag_keys = {create_diagnostic_key(d): d for d in base_diagnostics}
+            pr_diag_keys = {create_diagnostic_key(d): d for d in pr_diagnostics}
+            
+            # Find new diagnostics (in PR but not in base)
+            new_diagnostic_keys = set(pr_diag_keys.keys()) - set(base_diag_keys.keys())
+            new_diagnostics = [pr_diag_keys[key] for key in new_diagnostic_keys]
+            
+            # Categorize new diagnostics
+            new_in_changed_files = []
+            new_in_unchanged_files = []
+            
+            for diag in new_diagnostics:
+                file_path = diag['file']
+                if any(file_path.startswith(changed_file) for changed_file in changed_files):
+                    new_in_changed_files.append(diag)
+                else:
+                    new_in_unchanged_files.append(diag)
+            
+            # Also get all diagnostics in changed files (for existing error context)
+            all_in_changed_files = []
+            for diag in pr_diagnostics:
+                file_path = diag['file']
+                if any(file_path.startswith(changed_file) for changed_file in changed_files):
+                    all_in_changed_files.append(diag)
+            
+            return {
+                'new_in_changed_files': new_in_changed_files,
+                'new_in_unchanged_files': new_in_unchanged_files,
+                'all_in_changed_files': all_in_changed_files,
+                'summary': {
+                    'new_errors_changed_files': len([d for d in new_in_changed_files if d['severity'] == 'error']),
+                    'new_warnings_changed_files': len([d for d in new_in_changed_files if d['severity'] == 'warning']),
+                    'new_errors_unchanged_files': len([d for d in new_in_unchanged_files if d['severity'] == 'error']),
+                    'new_warnings_unchanged_files': len([d for d in new_in_unchanged_files if d['severity'] == 'warning']),
+                    'total_errors_changed_files': len([d for d in all_in_changed_files if d['severity'] == 'error']),
+                    'total_warnings_changed_files': len([d for d in all_in_changed_files if d['severity'] == 'warning']),
+                    'changed_files_affected': len(set(d['file'] for d in all_in_changed_files)),
+                    'unchanged_files_affected': len(set(d['file'] for d in new_in_unchanged_files)),
+                }
+            }
+        
+        # Get changed files
+        changed_files = get_changed_files()
+        print(f"Changed files: {changed_files}")
+        
+        # Load diagnostics
+        base_diagnostics = load_diagnostics('baseline-build.json')
+        pr_diagnostics = load_diagnostics('pr-diagnostics.json')
+        
+        print(f"Base diagnostics: {len(base_diagnostics)}")
+        print(f"PR diagnostics: {len(pr_diagnostics)}")
+        
+        # Analyze impact
+        analysis = analyze_pr_impact(base_diagnostics, pr_diagnostics, changed_files)
+        
+        # Save detailed results
+        with open('pr-impact-analysis.json', 'w') as f:
+            json.dump(analysis, f, indent=2)
+        
+        # Also save the legacy format for backward compatibility
+        legacy_format = {
+            'diagnostics': analysis['all_in_changed_files'],
+            'summary': {
+                'total': len(analysis['all_in_changed_files']),
+                'errors': analysis['summary']['total_errors_changed_files'],
+                'warnings': analysis['summary']['total_warnings_changed_files'],
+                'files_affected': analysis['summary']['changed_files_affected']
+            }
+        }
+        
+        with open('pr-changed-diagnostics.json', 'w') as f:
+            json.dump(legacy_format, f, indent=2)
+        
+        print(f"Analysis summary: {analysis['summary']}")
+        EOF
+        
+        python analyze_pr_changes.py
+        
+        # Store detailed analysis results
+        NEW_ERRORS_CHANGED=$(jq '.summary.new_errors_changed_files' pr-impact-analysis.json)
+        NEW_WARNINGS_CHANGED=$(jq '.summary.new_warnings_changed_files' pr-impact-analysis.json)
+        NEW_ERRORS_UNCHANGED=$(jq '.summary.new_errors_unchanged_files' pr-impact-analysis.json)
+        NEW_WARNINGS_UNCHANGED=$(jq '.summary.new_warnings_unchanged_files' pr-impact-analysis.json)
+        TOTAL_ERRORS_CHANGED=$(jq '.summary.total_errors_changed_files' pr-impact-analysis.json)
+        TOTAL_WARNINGS_CHANGED=$(jq '.summary.total_warnings_changed_files' pr-impact-analysis.json)
+        CHANGED_FILES_AFFECTED=$(jq '.summary.changed_files_affected' pr-impact-analysis.json)
+        UNCHANGED_FILES_AFFECTED=$(jq '.summary.unchanged_files_affected' pr-impact-analysis.json)
+        
+        echo "new_errors_changed=$NEW_ERRORS_CHANGED" >> $GITHUB_OUTPUT
+        echo "new_warnings_changed=$NEW_WARNINGS_CHANGED" >> $GITHUB_OUTPUT
+        echo "new_errors_unchanged=$NEW_ERRORS_UNCHANGED" >> $GITHUB_OUTPUT
+        echo "new_warnings_unchanged=$NEW_WARNINGS_UNCHANGED" >> $GITHUB_OUTPUT
+        echo "total_errors_changed=$TOTAL_ERRORS_CHANGED" >> $GITHUB_OUTPUT
+        echo "total_warnings_changed=$TOTAL_WARNINGS_CHANGED" >> $GITHUB_OUTPUT
+        echo "changed_files_affected=$CHANGED_FILES_AFFECTED" >> $GITHUB_OUTPUT
+        echo "unchanged_files_affected=$UNCHANGED_FILES_AFFECTED" >> $GITHUB_OUTPUT
+        
+        # Legacy outputs for backward compatibility
+        echo "changed_errors=$TOTAL_ERRORS_CHANGED" >> $GITHUB_OUTPUT
+        echo "changed_warnings=$TOTAL_WARNINGS_CHANGED" >> $GITHUB_OUTPUT
+        echo "files_affected=$CHANGED_FILES_AFFECTED" >> $GITHUB_OUTPUT
+        
+    - name: Generate PR comment
+      id: generate-comment
+      run: |
+        cat > pr_comment.md << EOF
+        ## 🔍 Build Diagnostics Report
+        
+        ### Summary
+        | Metric | Base Branch | This PR | Change |
+        |--------|-------------|---------|---------|
+        | **Errors** | ${{ steps.base-diagnostics.outputs.base_errors }} | ${{ steps.pr-diagnostics.outputs.pr_errors }} | **${{ steps.pr-diagnostics.outputs.error_diff }}** |
+        | **Warnings** | ${{ steps.base-diagnostics.outputs.base_warnings }} | ${{ steps.pr-diagnostics.outputs.pr_warnings }} | **${{ steps.pr-diagnostics.outputs.warning_diff }}** |
+        
+        ### 🎯 Impact Analysis
+        
+        #### Issues in Files You Modified
+        - **${{ steps.diff-analysis.outputs.new_errors_changed }}** new errors introduced by your changes
+        - **${{ steps.diff-analysis.outputs.new_warnings_changed }}** new warnings introduced by your changes
+        - **${{ steps.diff-analysis.outputs.total_errors_changed }}** total errors in modified files
+        - **${{ steps.diff-analysis.outputs.total_warnings_changed }}** total warnings in modified files
+        - **${{ steps.diff-analysis.outputs.changed_files_affected }}** files you modified
+        
+        #### Cascading Issues (Your Changes Breaking Other Files)
+        - **${{ steps.diff-analysis.outputs.new_errors_unchanged }}** new errors in unchanged files
+        - **${{ steps.diff-analysis.outputs.new_warnings_unchanged }}** new warnings in unchanged files
+        - **${{ steps.diff-analysis.outputs.unchanged_files_affected }}** unchanged files now affected
+        
+        > **Note**: "Cascading issues" are errors in files you didn't modify, caused by your changes (e.g., breaking API changes, dependency issues).
+        
+        EOF
+        
+        # Add error details if there are errors in changed files
+        if [ "${{ steps.diff-analysis.outputs.changed_errors }}" -gt 0 ]; then
+          echo "### ❌ Errors in Modified Files" >> pr_comment.md
+          echo "" >> pr_comment.md
+          
+          # Extract errors and format them
+          jq -r '.diagnostics[] | select(.severity == "error") | "**\(.file):\(.range.start.line + 1):\(.range.start.character + 1)** - \(.message) (\(.code // "no-code"))"' pr-changed-diagnostics.json | head -10 >> pr_comment.md
+          
+          if [ "$(jq '.diagnostics | map(select(.severity == "error")) | length' pr-changed-diagnostics.json)" -gt 10 ]; then
+            echo "" >> pr_comment.md
+            echo "_... and $(( $(jq '.diagnostics | map(select(.severity == "error")) | length' pr-changed-diagnostics.json) - 10 )) more errors_" >> pr_comment.md
+          fi
+        fi
+        
+        # Add warning details if there are warnings in changed files
+        if [ "${{ steps.diff-analysis.outputs.changed_warnings }}" -gt 0 ]; then
+          echo "" >> pr_comment.md
+          echo "### ⚠️ Warnings in Modified Files" >> pr_comment.md
+          echo "" >> pr_comment.md
+          
+          # Extract warnings and format them
+          jq -r '.diagnostics[] | select(.severity == "warning") | "**\(.file):\(.range.start.line + 1):\(.range.start.character + 1)** - \(.message) (\(.code // "no-code"))"' pr-changed-diagnostics.json | head -5 >> pr_comment.md
+          
+          if [ "$(jq '.diagnostics | map(select(.severity == "warning")) | length' pr-changed-diagnostics.json)" -gt 5 ]; then
+            echo "" >> pr_comment.md
+            echo "_... and $(( $(jq '.diagnostics | map(select(.severity == "warning")) | length' pr-changed-diagnostics.json) - 5 )) more warnings_" >> pr_comment.md
+          fi
+        fi
+        
+        # Add cascading errors section
+        if [ "${{ steps.diff-analysis.outputs.new_errors_unchanged }}" -gt 0 ]; then
+          echo "" >> pr_comment.md
+          echo "### 💥 Cascading Errors (Your Changes Breaking Other Files)" >> pr_comment.md
+          echo "" >> pr_comment.md
+          echo "These errors are in files you didn't modify, but were caused by your changes:" >> pr_comment.md
+          echo "" >> pr_comment.md
+          
+          # Extract cascading errors
+          jq -r '.new_in_unchanged_files[] | select(.severity == "error") | "**\(.file):\(.range.start.line + 1):\(.range.start.character + 1)** - \(.message) (\(.code // "no-code"))"' pr-impact-analysis.json | head -10 >> pr_comment.md
+          
+          if [ "$(jq '.new_in_unchanged_files | map(select(.severity == "error")) | length' pr-impact-analysis.json)" -gt 10 ]; then
+            echo "" >> pr_comment.md
+            echo "_... and $(( $(jq '.new_in_unchanged_files | map(select(.severity == "error")) | length' pr-impact-analysis.json) - 10 )) more cascading errors_" >> pr_comment.md
+          fi
+        fi
+        
+        # Add cascading warnings section
+        if [ "${{ steps.diff-analysis.outputs.new_warnings_unchanged }}" -gt 0 ]; then
+          echo "" >> pr_comment.md
+          echo "### ⚠️ Cascading Warnings (Your Changes Affecting Other Files)" >> pr_comment.md
+          echo "" >> pr_comment.md
+          echo "These warnings are in files you didn't modify:" >> pr_comment.md
+          echo "" >> pr_comment.md
+          
+          # Extract cascading warnings
+          jq -r '.new_in_unchanged_files[] | select(.severity == "warning") | "**\(.file):\(.range.start.line + 1):\(.range.start.character + 1)** - \(.message) (\(.code // "no-code"))"' pr-impact-analysis.json | head -5 >> pr_comment.md
+          
+          if [ "$(jq '.new_in_unchanged_files | map(select(.severity == "warning")) | length' pr-impact-analysis.json)" -gt 5 ]; then
+            echo "" >> pr_comment.md
+            echo "_... and $(( $(jq '.new_in_unchanged_files | map(select(.severity == "warning")) | length' pr-impact-analysis.json) - 5 )) more cascading warnings_" >> pr_comment.md
+          fi
+        fi
+
+        # Add success message if no issues at all
+        if [ "${{ steps.diff-analysis.outputs.total_errors_changed }}" -eq 0 ] && [ "${{ steps.diff-analysis.outputs.total_warnings_changed }}" -eq 0 ] && [ "${{ steps.diff-analysis.outputs.new_errors_unchanged }}" -eq 0 ] && [ "${{ steps.diff-analysis.outputs.new_warnings_unchanged }}" -eq 0 ]; then
+          echo "" >> pr_comment.md
+          echo "### ✅ No Issues Detected" >> pr_comment.md
+          echo "Perfect! Your changes don't introduce any new errors or warnings, and don't break any existing code." >> pr_comment.md
+        elif [ "${{ steps.diff-analysis.outputs.new_errors_unchanged }}" -eq 0 ] && [ "${{ steps.diff-analysis.outputs.new_warnings_unchanged }}" -eq 0 ]; then
+          echo "" >> pr_comment.md
+          echo "### ✅ No Cascading Issues" >> pr_comment.md
+          echo "Good! Your changes don't break any existing code in other files." >> pr_comment.md
+        fi
+        
+        # Add detailed analysis info
+        echo "" >> pr_comment.md
+        echo "---" >> pr_comment.md
+        echo "" >> pr_comment.md
+        echo "📊 **Full diagnostic data available in workflow artifacts**" >> pr_comment.md
+        echo "" >> pr_comment.md
+        echo "🔧 **To reproduce locally:**" >> pr_comment.md
+        echo '```bash' >> pr_comment.md
+        echo "# Install cargo-wrt" >> pr_comment.md
+        echo "cargo install --path cargo-wrt" >> pr_comment.md
+        echo "" >> pr_comment.md
+        echo "# Analyze your changes" >> pr_comment.md
+        echo "cargo-wrt build --output json --filter-severity error" >> pr_comment.md
+        echo "cargo-wrt check --output json --filter-severity warning" >> pr_comment.md
+        echo '```' >> pr_comment.md
+        
+    - name: Upload diagnostic artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: pr-diagnostics
+        path: |
+          pr-diagnostics.json
+          pr-check.json
+          pr-changed-diagnostics.json
+          pr-impact-analysis.json
+          baseline-build.json
+          baseline-check.json
+        retention-days: 30
+        
+    - name: Comment on PR
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const comment = fs.readFileSync('pr_comment.md', 'utf8');
+          
+          // Check if we already have a comment from this workflow
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          
+          const botComment = comments.find(comment => 
+            comment.user.type === 'Bot' && 
+            comment.body.includes('🔍 Build Diagnostics Report')
+          );
+          
+          if (botComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: comment
+            });
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
+          }
+          
+    - name: Set check status
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const errorsChanged = ${{ steps.diff-analysis.outputs.new_errors_changed }};
+          const warningsChanged = ${{ steps.diff-analysis.outputs.new_warnings_changed }};
+          const errorsUnchanged = ${{ steps.diff-analysis.outputs.new_errors_unchanged }};
+          const warningsUnchanged = ${{ steps.diff-analysis.outputs.new_warnings_unchanged }};
+          
+          const totalNewErrors = errorsChanged + errorsUnchanged;
+          const totalNewWarnings = warningsChanged + warningsUnchanged;
+          
+          let conclusion = 'success';
+          let title = '✅ No build issues introduced';
+          let summary = 'Your changes don\'t introduce any new build errors or warnings.';
+          
+          if (totalNewErrors > 0) {
+            conclusion = 'failure';
+            const cascadingInfo = errorsUnchanged > 0 ? ` (including ${errorsUnchanged} cascading errors)` : '';
+            title = `❌ ${totalNewErrors} new error(s)${cascadingInfo}`;
+            summary = `Your changes introduce ${totalNewErrors} new error(s) that need to be fixed.`;
+            if (errorsUnchanged > 0) {
+              summary += ` ${errorsUnchanged} of these are in files you didn't modify (cascading errors).`;
+            }
+          } else if (totalNewWarnings > 0) {
+            conclusion = 'neutral';
+            const cascadingInfo = warningsUnchanged > 0 ? ` (including ${warningsUnchanged} cascading warnings)` : '';
+            title = `⚠️ ${totalNewWarnings} new warning(s)${cascadingInfo}`;
+            summary = `Your changes introduce ${totalNewWarnings} new warning(s) that should be reviewed.`;
+            if (warningsUnchanged > 0) {
+              summary += ` ${warningsUnchanged} of these are in files you didn't modify.`;
+            }
+          }
+          
+          await github.rest.checks.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            name: 'Build Diagnostics',
+            head_sha: context.sha,
+            status: 'completed',
+            conclusion: conclusion,
+            output: {
+              title: title,
+              summary: summary,
+              text: `Errors: ${totalNewErrors}\nWarnings: ${totalNewWarnings}\n\nSee PR comments for detailed breakdown.`
+            }
+          });

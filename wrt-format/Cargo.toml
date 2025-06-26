@@ -25,11 +25,27 @@ optional = true
 [features]
 default = []
 # Binary choice: std OR no_std (no alloc middle ground)
-std = ["wrt-foundation/std"]
+std = ["wrt-foundation/std", "wrt-foundation/wrt-allocator"]
 # This crate is no_std by default, this feature is a no-op for compatibility
 no_std = []
+
+# Allocation support for no_std environments
+alloc = ["wrt-foundation/alloc"]
 optimize = ["wrt-foundation/optimize"]
-safety = ["wrt-foundation/safety"]
+
+# Safety level presets using capability-based features
+qm = ["wrt-foundation/dynamic-allocation"]
+asil-a = ["wrt-foundation/bounded-collections"]
+asil-b = ["wrt-foundation/bounded-collections"]
+asil-c = ["wrt-foundation/static-memory-safety"]
+asil-d = ["wrt-foundation/asil-d"]
+
+# Legacy compatibility features
+safe-memory = ["asil-b"]
+safety-asil-b = ["asil-b"]
+safety-asil-c = ["asil-c"]
+safety-asil-d = ["asil-d"]
+
 # The 'kani' feature enables formal verification with the Kani verifier
 kani = ["dep:kani-verifier"]
 
@@ -60,8 +76,6 @@ component-model-all = [
 # Type conversion feature
 conversion = []
 
-# Safe memory implementations
-safe-memory = ["wrt-foundation/safe-memory"]
 
 # LSP (Language Server Protocol) support
 lsp = ["std"]
@@ -70,9 +84,9 @@ lsp = ["std"]
 wit-parsing = []
 
 # Disable panic handler for library builds to avoid conflicts
-disable-panic-handler = ["wrt-foundation/disable-panic-handler"]
 
 # Config for linting
+
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)', 'cfg(kani)', 'cfg(coverage)', 'cfg(doc)'] }
 # Rule 1
@@ -85,7 +99,7 @@ unsafe_code = "forbid"
 # Rule 1: Language subset
 inline_asm_x86_att_syntax = "deny"
 transmute_ptr_to_ref = "deny"
-type_id = "deny"
+# type_id lint removed - not a valid clippy lint
 dyn_trait = "deny"
 float_arithmetic = "deny"
 # Rule 2: Unsafe usage

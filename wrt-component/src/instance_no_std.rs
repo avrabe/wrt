@@ -11,6 +11,10 @@
 
 use wrt_format::component::ComponentTypeDefinition;
 use wrt_foundation::bounded::{BoundedString, BoundedVec, MAX_WASM_NAME_LENGTH};
+use wrt_foundation::{
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use crate::{export::Export, prelude::*};
 
@@ -25,24 +29,21 @@ pub struct InstanceValue {
     /// Instance type
     pub ty: ComponentTypeDefinition,
     /// Instance exports
-    pub exports: BoundedVec<Export, MAX_INSTANCE_EXPORTS, NoStdProvider<65536>>,
+    pub exports: BoundedVec<Export, MAX_INSTANCE_EXPORTS>,
 }
 
 impl InstanceValue {
     /// Creates a new instance value
     pub fn new(name: &str, ty: ComponentTypeDefinition, exports: &[Export]) -> Result<Self> {
         let bounded_name = BoundedString::from_str(name).map_err(|_| {
-            Error::new(ErrorCategory::Parameter, codes::VALIDATION_ERROR, "Instance name too long")
+            Error::parameter_validation_error("Instance name too long")
         })?;
 
-        let mut bounded_exports = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let mut bounded_exports = BoundedVec::new(provider)?;
         for export in exports {
             bounded_exports.push(export.clone()).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Capacity,
-                    codes::CAPACITY_EXCEEDED,
-                    "Maximum number of exports exceeded",
-                )
+                Error::capacity_exceeded("Maximum number of exports exceeded")
             })?;
         }
 
@@ -108,19 +109,11 @@ impl InstanceValueBuilder {
     /// Builds the instance value
     pub fn build(self) -> Result<InstanceValue> {
         let name = self.name.ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Parameter,
-                codes::VALIDATION_ERROR,
-                "Instance name is required",
-            )
+            Error::parameter_validation_error("Instance name is required")
         })?;
 
         let ty = self.ty.ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Parameter,
-                codes::VALIDATION_ERROR,
-                "Instance type is required",
-            )
+            Error::parameter_validation_error("Instance type is required")
         })?;
 
         InstanceValue::new(&name, ty, &self.exports)
@@ -135,23 +128,20 @@ impl Default for InstanceValueBuilder {
 
 /// A collection of instances with bounded capacity
 pub struct InstanceCollection {
-    instances: BoundedVec<InstanceValue, MAX_INSTANCE_EXPORTS, NoStdProvider<65536>>,
+    instances: BoundedVec<InstanceValue, MAX_INSTANCE_EXPORTS>,
 }
 
 impl InstanceCollection {
     /// Creates a new empty instance collection
-    pub fn new() -> Self {
-        Self { instances: BoundedVec::new(DefaultMemoryProvider::default()).unwrap() }
+    pub fn new() -> Result<Self> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        Ok(Self { instances: BoundedVec::new(provider)? })
     }
 
     /// Adds an instance to the collection
     pub fn add_instance(&mut self, instance: InstanceValue) -> Result<()> {
         self.instances.push(instance).map_err(|_| {
-            Error::new(
-                ErrorCategory::Capacity,
-                codes::CAPACITY_EXCEEDED,
-                "Maximum number of instances exceeded",
-            )
+            Error::capacity_exceeded("Maximum number of instances exceeded")
         })
     }
 
@@ -183,7 +173,7 @@ impl InstanceCollection {
 
 impl Default for InstanceCollection {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create default InstanceCollection")
     }
 }
 
@@ -253,7 +243,7 @@ mod tests {
             .unwrap();
 
         // Create a collection and add the instances
-        let mut collection = InstanceCollection::new();
+        let mut collection = InstanceCollection::new().unwrap();
         assert!(collection.is_empty());
 
         collection.add_instance(instance1).unwrap();

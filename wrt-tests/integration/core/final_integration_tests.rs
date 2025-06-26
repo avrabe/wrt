@@ -97,10 +97,7 @@ mod tests {
     #[test]
     fn test_error_integration() {
         // Test Error from wrt-error
-        let error = Error::new(
-            ErrorCategory::Core,
-            1,
-            "Integration test error".to_string(),
+        let error = Error::runtime_execution_error(".to_string(),
         );
         
         assert_eq!(error.category(), ErrorCategory::Core);
@@ -230,7 +227,7 @@ mod tests {
         assert!(engine.validate_module(&module).is_ok());
         
         // Test serialization if enabled
-        #[cfg(feature = "serialization")]
+        #[cfg(feature = ")]
         {
             use wrt::serialization::{serialize_module, deserialize_module};
             

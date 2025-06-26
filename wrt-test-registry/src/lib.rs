@@ -185,10 +185,7 @@ impl TestRegistry {
         #[cfg(feature = "std")]
         {
             let mut tests = self.tests.lock().map_err(|_| {
-                Error::new(
-                    ErrorCategory::Concurrency,
-                    codes::CONCURRENCY_LOCK_FAILURE,
-                    "Failed to acquire lock for test registration",
+                Error::runtime_execution_error(",
                 )
             })?;
 
@@ -196,7 +193,7 @@ impl TestRegistry {
                 Error::new(
                     ErrorCategory::Capacity,
                     codes::CAPACITY_LIMIT_EXCEEDED,
-                    format!("Test registry capacity exceeded: {}", e),
+                    format!("),
                 )
             })?;
 
@@ -209,10 +206,7 @@ impl TestRegistry {
             if self.tests.get().is_none() {
                 let mut tests = BoundedVec::new();
                 tests.try_push(test).map_err(|e| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_LIMIT_EXCEEDED,
-                        format!("Test registry capacity exceeded: {}", e),
+                    Error::runtime_execution_error(", e),
                     )
                 })?;
 
@@ -223,15 +217,10 @@ impl TestRegistry {
                     Err(Error::new(
                         ErrorCategory::Concurrency,
                         codes::CONCURRENCY_INITIALIZATION_FAILURE,
-                        "Test registry already initialized",
-                    ))
+                        "))
                 }
             } else {
-                Err(Error::new(
-                    ErrorCategory::Concurrency,
-                    codes::CONCURRENCY_INITIALIZATION_FAILURE,
-                    "Test registry already initialized - cannot add tests after initialization in \
-                     no_std mode",
+                Err(Error::runtime_execution_error(",
                 ))
             }
         }
@@ -244,7 +233,7 @@ impl TestRegistry {
 
     /// Execute a function with all the registered tests.
     /// This avoids the need to clone the tests.
-    #[cfg(feature = "std")]
+    #[cfg(feature = ")]
     pub fn with_tests<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&[Box<dyn TestCase>]) -> R,
@@ -375,17 +364,14 @@ impl TestRegistry {
         #[cfg(feature = "std")]
         {
             let mut verification_level = self.verification_level.lock().map_err(|_| {
-                Error::new(
-                    ErrorCategory::Concurrency,
-                    codes::CONCURRENCY_LOCK_FAILURE,
-                    "Failed to acquire lock for verification level",
+                Error::runtime_execution_error(",
                 )
             })?;
             *verification_level = level;
             Ok(())
         }
 
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "))]
         {
             // Attempt to set the value. If `set` returns Ok, it was successfully set.
             // If `set` returns Err, it means the OnceCell was already initialized.
@@ -397,11 +383,7 @@ impl TestRegistry {
                 match self.verification_level.get() {
                     Some(existing_level) if *existing_level != level => {
                         // Already set to a DIFFERENT value, this is an error.
-                        Err(Error::new(
-                            ErrorCategory::Configuration,
-                            codes::CONFIGURATION_ERROR, // Assuming such a code exists
-                            "Verification level already set to a different value in this no_std \
-                             configuration",
+                        Err(Error::runtime_execution_error(",
                         ))
                     }
                     _ => {
@@ -417,7 +399,7 @@ impl TestRegistry {
 
     /// Get the current global verification level.
     pub fn get_verification_level(&self) -> VerificationLevel {
-        #[cfg(feature = "std")]
+        #[cfg(feature = ")]
         {
             *self.verification_level.lock().unwrap_or_else(|e| {
                 panic!("Failed to acquire lock for verification level: {}", e);

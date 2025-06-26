@@ -40,7 +40,6 @@
 //! manager.transfer_ownership(file_handle, target_instance_id)?;
 //! ```
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]
@@ -365,11 +364,7 @@ impl ResourceTable {
         ownership: ResourceOwnership,
     ) -> Result<ResourceHandle> {
         if self.resources.len() >= MAX_RESOURCES_PER_INSTANCE {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_EXHAUSTED,
-                "Maximum resources per instance exceeded",
-            ));
+            return Err(Error::resource_exhausted("Maximum resources per instance exceeded"));
         }
 
         let handle = ResourceHandle::new(self.next_handle);
@@ -420,11 +415,7 @@ impl ResourceTable {
     /// Drop a resource from this table
     pub fn drop_resource(&mut self, handle: ResourceHandle) -> Result<()> {
         let resource = self.resources.remove(&handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::RESOURCE_NOT_FOUND,
-                "Resource handle not found",
-            )
+            Error::resource_not_found("Resource handle not found")
         })?;
 
         // Update type mappings
@@ -444,11 +435,7 @@ impl ResourceTable {
     /// Borrow a resource to another instance
     pub fn borrow_resource(&mut self, handle: ResourceHandle, borrower: InstanceId) -> Result<()> {
         let resource = self.resources.get_mut(&handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::RESOURCE_NOT_FOUND,
-                "Resource handle not found",
-            )
+            Error::resource_not_found("Resource handle not found")
         })?;
 
         match resource.state {
@@ -461,10 +448,7 @@ impl ResourceTable {
                 self.stats.borrowed_resources += 1;
                 Ok(())
             }
-            _ => Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_STATE,
-                "Resource not in a borrowable state",
+            _ => Err(Error::runtime_invalid_state("Resource not in a borrowable state"),
             )),
         }
     }
@@ -472,11 +456,7 @@ impl ResourceTable {
     /// Return a borrowed resource
     pub fn return_resource(&mut self, handle: ResourceHandle) -> Result<()> {
         let resource = self.resources.get_mut(&handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::RESOURCE_NOT_FOUND,
-                "Resource handle not found",
-            )
+            Error::resource_not_found("Resource handle not found")
         })?;
 
         match resource.state {
@@ -492,10 +472,7 @@ impl ResourceTable {
                 }
                 Ok(())
             }
-            _ => Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_STATE,
-                "Resource is not borrowed",
+            _ => Err(Error::runtime_invalid_state("Resource is not borrowed"),
             )),
         }
     }
@@ -575,11 +552,7 @@ impl ResourceManager {
         needs_finalization: bool,
     ) -> Result<ResourceTypeId> {
         if self.resource_types.len() >= MAX_RESOURCE_TYPES {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_EXHAUSTED,
-                "Maximum resource types exceeded",
-            ));
+            return Err(Error::resource_exhausted("Maximum resource types exceeded"));
         }
 
         let type_id = ResourceTypeId::new(self.next_type_id);
@@ -609,10 +582,7 @@ impl ResourceManager {
     /// Create a resource table for an instance
     pub fn create_instance_table(&mut self, instance_id: InstanceId) -> Result<()> {
         if self.instance_tables.contains_key(&instance_id) {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::DUPLICATE_INSTANCE,
-                "Instance table already exists",
+            return Err(Error::runtime_execution_error(",
             ));
         }
 
@@ -633,11 +603,7 @@ impl ResourceManager {
             }
             Ok(())
         } else {
-            Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INSTANCE_NOT_FOUND,
-                "Instance table not found",
-            ))
+            Err(Error::instance_not_found("))
         }
     }
 
@@ -663,20 +629,13 @@ impl ResourceManager {
     ) -> Result<ResourceHandle> {
         // Validate resource type exists
         if !self.resource_types.contains_key(&resource_type) {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::TYPE_NOT_FOUND,
-                "Resource type not found",
+            return Err(Error::runtime_execution_error(",
             ));
         }
 
         // Get instance table
         let table = self.instance_tables.get_mut(&instance_id).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::INSTANCE_NOT_FOUND,
-                "Instance table not found",
-            )
+            Error::instance_not_found(")
         })?;
 
         // Create resource
@@ -697,37 +656,22 @@ impl ResourceManager {
         to_instance: InstanceId,
     ) -> Result<ResourceHandle> {
         if !self.config.allow_cross_instance_sharing {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::OPERATION_NOT_ALLOWED,
-                "Cross-instance sharing is disabled",
+            return Err(Error::runtime_execution_error(",
             ));
         }
 
         // Remove from source table
         let source_table = self.instance_tables.get_mut(&from_instance).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::INSTANCE_NOT_FOUND,
-                "Source instance not found",
-            )
+            Error::instance_not_found(")
         })?;
 
         let resource = source_table.resources.remove(&handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::RESOURCE_NOT_FOUND,
-                "Resource not found in source instance",
-            )
+            Error::resource_not_found("Resource not found in source instance")
         })?;
 
         // Add to target table
         let target_table = self.instance_tables.get_mut(&to_instance).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::INSTANCE_NOT_FOUND,
-                "Target instance not found",
-            )
+            Error::instance_not_found("Target instance not found")
         })?;
 
         let new_handle = target_table.create_resource(
@@ -754,35 +698,25 @@ impl ResourceManager {
         borrower_instance: InstanceId,
     ) -> Result<ResourceHandle> {
         if !self.config.allow_borrowing {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::OPERATION_NOT_ALLOWED,
-                "Resource borrowing is disabled",
+            return Err(Error::runtime_execution_error(",
             ));
         }
 
         // Check if resource type supports borrowing
         let owner_table = self.instance_tables.get(&owner_instance).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::INSTANCE_NOT_FOUND,
-                "Owner instance not found",
-            )
+            Error::instance_not_found(")
         })?;
 
         let resource = owner_table.get_resource(handle).ok_or_else(|| {
-            Error::new(ErrorCategory::Runtime, codes::RESOURCE_NOT_FOUND, "Resource not found")
+            Error::resource_not_found("Resource not found")
         })?;
 
         let resource_type = self.get_resource_type(resource.resource_type).ok_or_else(|| {
-            Error::new(ErrorCategory::Runtime, codes::TYPE_NOT_FOUND, "Resource type not found")
+            Error::type_not_found("Resource type not found")
         })?;
 
         if !resource_type.borrowable {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::OPERATION_NOT_ALLOWED,
-                "Resource type does not support borrowing",
+            return Err(Error::runtime_execution_error(",
             ));
         }
 
@@ -792,11 +726,7 @@ impl ResourceManager {
 
         // Create borrowed reference in borrower table
         let borrower_table = self.instance_tables.get_mut(&borrower_instance).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::INSTANCE_NOT_FOUND,
-                "Borrower instance not found",
-            )
+            Error::instance_not_found(")
         })?;
 
         let borrowed_handle = borrower_table.create_resource(
@@ -816,28 +746,17 @@ impl ResourceManager {
     ) -> Result<()> {
         // Get borrowed resource info
         let borrower_table = self.instance_tables.get_mut(&borrower_instance).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::INSTANCE_NOT_FOUND,
-                "Borrower instance not found",
-            )
+            Error::instance_not_found("Borrower instance not found")
         })?;
 
         let borrowed_resource = borrower_table.get_resource(borrowed_handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::RESOURCE_NOT_FOUND,
-                "Borrowed resource not found",
-            )
+            Error::resource_not_found("Borrowed resource not found")
         })?;
 
         let (owner_instance, owner_handle) = match borrowed_resource.ownership {
             ResourceOwnership::Borrowed { owner, owner_handle } => (owner, owner_handle),
             _ => {
-                return Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::INVALID_STATE,
-                    "Resource is not borrowed",
+                return Err(Error::runtime_invalid_state("Resource is not borrowed"),
                 ))
             }
         };
@@ -847,11 +766,7 @@ impl ResourceManager {
 
         // Return in owner table
         let owner_table = self.instance_tables.get_mut(&owner_instance).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::INSTANCE_NOT_FOUND,
-                "Owner instance not found",
-            )
+            Error::instance_not_found("Owner instance not found")
         })?;
 
         owner_table.return_resource(owner_handle)?;
@@ -896,31 +811,19 @@ impl ResourceManager {
         for resource in table.resources.values() {
             // Check resource type exists
             if !self.resource_types.contains_key(&resource.resource_type) {
-                return Err(Error::new(
-                    ErrorCategory::Validation,
-                    codes::VALIDATION_ERROR,
-                    "Resource references unknown type",
-                ));
+                return Err(Error::validation_error("Resource references unknown type"));
             }
 
             // Check ownership consistency
             match resource.ownership {
                 ResourceOwnership::Owned => {
                     if resource.owner_instance != table.instance_id {
-                        return Err(Error::new(
-                            ErrorCategory::Validation,
-                            codes::VALIDATION_ERROR,
-                            "Owned resource has incorrect owner",
-                        ));
+                        return Err(Error::validation_error("Owned resource has incorrect owner"));
                     }
                 }
                 ResourceOwnership::Borrowed { owner, .. } => {
                     if !self.instance_tables.contains_key(&owner) {
-                        return Err(Error::new(
-                            ErrorCategory::Validation,
-                            codes::VALIDATION_ERROR,
-                            "Borrowed resource references unknown owner",
-                        ));
+                        return Err(Error::validation_error("Borrowed resource references unknown owner"));
                     }
                 }
             }

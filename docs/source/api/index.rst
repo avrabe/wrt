@@ -1,7 +1,11 @@
 API Documentation
 =================
 
-This section contains the API documentation for all WRT libraries and components.
+This section contains the API documentation for all PulseEngine libraries and components.
+
+.. warning::
+   **Development Status**: Many APIs shown here represent the intended design. 
+   Implementation status varies by component - see individual crate documentation for details.
 
 .. note::
    The following references are automatically generated during the complete documentation build process.

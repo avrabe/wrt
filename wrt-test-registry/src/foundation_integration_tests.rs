@@ -170,34 +170,34 @@ pub fn test_platform_capacities(config: &TestConfig) -> TestResult {
 /// Test error standardization across foundation types
 pub fn test_foundation_errors(config: &TestConfig) -> TestResult {
     // Test safety error helpers
-    let safety_violation = wrt_error::helpers::safety_violation_error("Test violation");
+    let safety_violation = wrt_error::Error::safety_violation("Test violation");
     assert_eq_test!(safety_violation.category, ErrorCategory::Safety);
 
-    let memory_corruption = wrt_error::helpers::memory_corruption_error("Test corruption");
+    let memory_corruption = wrt_error::Error::memory_corruption("Test corruption");
     assert_eq_test!(memory_corruption.category, ErrorCategory::Safety);
 
-    let verification_failed = wrt_error::helpers::verification_failed_error("Test verification");
+    let verification_failed = wrt_error::Error::verification_failed("Test verification");
     assert_eq_test!(verification_failed.category, ErrorCategory::Safety);
 
     // Test unified type errors
-    let config_error = wrt_error::helpers::unified_type_config_error("Test config");
+    let config_error = wrt_error::Error::unified_type_config("Test config");
     assert_eq_test!(config_error.category, ErrorCategory::Type);
 
-    let capacity_error = wrt_error::helpers::platform_capacity_mismatch_error("Test capacity");
+    let capacity_error = wrt_error::Error::platform_capacity_mismatch("Test capacity");
     assert_eq_test!(capacity_error.category, ErrorCategory::Capacity);
 
     // Test memory system errors
-    let alloc_error = wrt_error::helpers::memory_allocation_failed_error("Test allocation");
+    let alloc_error = wrt_error::Error::memory_allocation_failed("Test allocation");
     assert_eq_test!(alloc_error.category, ErrorCategory::Memory);
 
-    let provider_error = wrt_error::helpers::memory_provider_capacity_exceeded_error("Test provider");
+    let provider_error = wrt_error::Error::memory_provider_capacity_exceeded("Test provider");
     assert_eq_test!(provider_error.category, ErrorCategory::Capacity);
 
     // Test bounded collection errors
-    let bounded_error = wrt_error::helpers::bounded_collection_capacity_exceeded_error("Test bounded");
+    let bounded_error = wrt_error::Error::bounded_collection_capacity_exceeded("Test bounded");
     assert_eq_test!(bounded_error.category, ErrorCategory::Capacity);
 
-    let conversion_error = wrt_error::helpers::bounded_collection_conversion_error("Test conversion");
+    let conversion_error = wrt_error::Error::bounded_collection_conversion("Test conversion");
     assert_eq_test!(conversion_error.category, ErrorCategory::Type);
 
     Ok(())

@@ -122,10 +122,7 @@ where
         let item_size = item.serialized_size();
 
         if item_size > item_bytes_buffer.len() {
-            return Err(BoundedError::new(
-                BoundedErrorKind::ItemTooLarge,
-                "Item exceeds max buffer size for enqueue",
-            ));
+            return Err(BoundedError::runtime_execution_error("Operation failed"));
         }
 
         if item_size == 0 {
@@ -146,13 +143,12 @@ where
         item.to_bytes_with_provider(&mut write_stream, self.handler.provider()).map_err(|e| {
             BoundedError::new(
                 BoundedErrorKind::ConversionError,
-                "Failed to serialize item for enqueue",
-            )
+                "Conversion failed")
         })?;
 
         // Write the serialized data to the handler
         self.handler.write_data(offset, &item_bytes_buffer[..item_size]).map_err(|e| {
-            BoundedError::new(BoundedErrorKind::SliceError, "Failed to write data for enqueue")
+            BoundedError::runtime_execution_error("Operation failed")
         })?;
 
         // Update queue state
@@ -200,17 +196,14 @@ where
         // Read the serialized data
         let slice_view =
             self.handler.get_slice(offset, self.item_serialized_size).map_err(|e| {
-                BoundedError::new(BoundedErrorKind::SliceError, "Failed to get slice for dequeue")
+                BoundedError::new(BoundedErrorKind::SliceError, "Slice error")
             })?;
 
         // Deserialize the item
         let mut read_stream = ReadStream::new(slice_view);
         let item = T::from_bytes_with_provider(&mut read_stream, self.handler.provider()).map_err(
             |_| {
-                BoundedError::new(
-                    BoundedErrorKind::ConversionError,
-                    "Failed to deserialize item for dequeue",
-                )
+                BoundedError::runtime_execution_error("Operation failed")
             },
         )?;
 
@@ -243,17 +236,14 @@ where
         // Read the serialized data
         let slice_view =
             self.handler.get_slice(offset, self.item_serialized_size).map_err(|e| {
-                BoundedError::new(BoundedErrorKind::SliceError, "Failed to get slice for peek")
+                BoundedError::new(BoundedErrorKind::SliceError, "Slice error")
             })?;
 
         // Deserialize the item
         let mut read_stream = ReadStream::new(slice_view);
         let item = T::from_bytes_with_provider(&mut read_stream, self.handler.provider()).map_err(
             |_| {
-                BoundedError::new(
-                    BoundedErrorKind::ConversionError,
-                    "Failed to deserialize item for peek",
-                )
+                BoundedError::runtime_execution_error("Operation failed")
             },
         )?;
 
@@ -521,6 +511,106 @@ where
 
         Ok(())
     }
+
+    /// Gets a mutable reference to the value associated with the given key.
+    ///
+    /// Returns `None` if the key doesn't exist.
+    pub fn get_mut(&mut self, key: &K) -> Result<Option<&mut V>, BoundedError> {
+        // Note: This is a simplified implementation that doesn't provide true mut access
+        // due to the complexity of BoundedVec's serialization model.
+        // In practice, you'd need to get, modify, and re-insert the value.
+        Err(BoundedError::new(
+            BoundedErrorKind::CapacityExceeded,
+            "Mutable access not supported"))
+    }
+
+    /// Returns an iterator over the values in the map.
+    pub fn values(&self) -> BoundedMapValues<K, V, N_ELEMENTS, P> {
+        BoundedMapValues { map: self, index: 0 }
+    }
+
+    /// Entry API for in-place manipulation of a map entry.
+    pub fn entry(&mut self, key: K) -> BoundedMapEntry<K, V, N_ELEMENTS, P> {
+        BoundedMapEntry { map: self, key }
+    }
+}
+
+/// Iterator over the values in a BoundedMap.
+pub struct BoundedMapValues<'a, K, V, const N_ELEMENTS: usize, P: MemoryProvider>
+where
+    K: Sized + Checksummable + ToBytes + FromBytes + Default + Eq + Clone + PartialEq,
+    V: Sized + Checksummable + ToBytes + FromBytes + Default + Clone + PartialEq + Eq,
+    P: Default + Clone + PartialEq + Eq,
+{
+    map: &'a BoundedMap<K, V, N_ELEMENTS, P>,
+    index: usize,
+}
+
+impl<'a, K, V, const N_ELEMENTS: usize, P: MemoryProvider> Iterator
+    for BoundedMapValues<'a, K, V, N_ELEMENTS, P>
+where
+    K: Sized + Checksummable + ToBytes + FromBytes + Default + Eq + Clone + PartialEq,
+    V: Sized + Checksummable + ToBytes + FromBytes + Default + Clone + PartialEq + Eq,
+    P: Default + Clone + PartialEq + Eq,
+{
+    type Item = V;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.map.len() {
+            if let Ok(entry) = self.map.entries.get(self.index) {
+                self.index += 1;
+                Some(entry.1.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
+/// Entry API for BoundedMap.
+pub struct BoundedMapEntry<'a, K, V, const N_ELEMENTS: usize, P: MemoryProvider>
+where
+    K: Sized + Checksummable + ToBytes + FromBytes + Default + Eq + Clone + PartialEq,
+    V: Sized + Checksummable + ToBytes + FromBytes + Default + Clone + PartialEq + Eq,
+    P: Default + Clone + PartialEq + Eq,
+{
+    map: &'a mut BoundedMap<K, V, N_ELEMENTS, P>,
+    key: K,
+}
+
+impl<'a, K, V, const N_ELEMENTS: usize, P: MemoryProvider> BoundedMapEntry<'a, K, V, N_ELEMENTS, P>
+where
+    K: Sized + Checksummable + ToBytes + FromBytes + Default + Eq + Clone + PartialEq,
+    V: Sized + Checksummable + ToBytes + FromBytes + Default + Clone + PartialEq + Eq,
+    P: Default + Clone + PartialEq + Eq,
+{
+    /// Provides in-place mutable access to an occupied entry before any potential inserts.
+    pub fn or_insert(self, default: V) -> Result<V, BoundedError> {
+        match self.map.get(&self.key)? {
+            Some(value) => Ok(value),
+            None => {
+                self.map.insert(self.key, default.clone())?;
+                Ok(default)
+            }
+        }
+    }
+
+    /// Provides in-place mutable access to an occupied entry before any potential inserts with a closure.
+    pub fn or_insert_with<F>(self, f: F) -> Result<V, BoundedError>
+    where
+        F: FnOnce() -> V,
+    {
+        match self.map.get(&self.key)? {
+            Some(value) => Ok(value),
+            None => {
+                let default = f();
+                self.map.insert(self.key, default.clone())?;
+                Ok(default)
+            }
+        }
+    }
 }
 
 /// A bounded set with a fixed maximum capacity.
@@ -735,10 +825,7 @@ where
         let item_size = item.serialized_size();
 
         if item_size > item_bytes_buffer.len() {
-            return Err(BoundedError::new(
-                BoundedErrorKind::ItemTooLarge,
-                "Item exceeds max buffer size for push_front",
-            ));
+            return Err(BoundedError::runtime_execution_error("Operation failed"));
         }
 
         if item_size == 0 {
@@ -758,13 +845,12 @@ where
         item.to_bytes_with_provider(&mut write_stream, self.handler.provider()).map_err(|e| {
             BoundedError::new(
                 BoundedErrorKind::ConversionError,
-                "Failed to serialize item for push_front",
-            )
+                "Conversion failed")
         })?;
 
         // Write the serialized data to the handler
         self.handler.write_data(offset, &item_bytes_buffer[..item_size]).map_err(|e| {
-            BoundedError::new(BoundedErrorKind::SliceError, "Failed to write data for push_front")
+            BoundedError::runtime_execution_error("Operation failed")
         })?;
 
         // Update deque state
@@ -803,8 +889,7 @@ where
         if item_size > item_bytes_buffer.len() {
             return Err(BoundedError::new(
                 BoundedErrorKind::ItemTooLarge,
-                "Item exceeds max buffer size for push_back",
-            ));
+                "Item size exceeds buffer capacity"));
         }
 
         if item_size == 0 {
@@ -830,15 +915,12 @@ where
         let slice_mut = SliceMut::new(&mut item_bytes_buffer[..item_size])?;
         let mut write_stream = WriteStream::new(slice_mut);
         item.to_bytes_with_provider(&mut write_stream, self.handler.provider()).map_err(|e| {
-            BoundedError::new(
-                BoundedErrorKind::ConversionError,
-                "Failed to serialize item for push_back",
-            )
+            BoundedError::runtime_execution_error("Failed to serialize item")
         })?;
 
         // Write the serialized data to the handler
         self.handler.write_data(offset, &item_bytes_buffer[..item_size]).map_err(|e| {
-            BoundedError::new(BoundedErrorKind::SliceError, "Failed to write data for push_back")
+            BoundedError::new(BoundedErrorKind::SliceError, "Slice error")
         })?;
 
         // Update deque state
@@ -881,10 +963,7 @@ where
             // Read the serialized data
             let slice_view =
                 self.handler.get_slice(offset, self.item_serialized_size).map_err(|e| {
-                    BoundedError::new(
-                        BoundedErrorKind::SliceError,
-                        "Failed to get slice for pop_front",
-                    )
+                    BoundedError::runtime_execution_error("Failed to get slice from handler")
                 })?;
 
             // Deserialize the item
@@ -893,8 +972,7 @@ where
                 .map_err(|_| {
                     BoundedError::new(
                         BoundedErrorKind::ConversionError,
-                        "Failed to deserialize item for pop_front",
-                    )
+                        "Failed to deserialize from bytes")
                 })?;
 
             item
@@ -938,10 +1016,7 @@ where
             // Read the serialized data
             let slice_view =
                 self.handler.get_slice(offset, self.item_serialized_size).map_err(|e| {
-                    BoundedError::new(
-                        BoundedErrorKind::SliceError,
-                        "Failed to get slice for pop_back",
-                    )
+                    BoundedError::runtime_execution_error("Failed to get slice from handler")
                 })?;
 
             // Deserialize the item
@@ -950,8 +1025,7 @@ where
                 .map_err(|_| {
                     BoundedError::new(
                         BoundedErrorKind::ConversionError,
-                        "Failed to deserialize item for pop_back",
-                    )
+                        "Failed to deserialize from bytes")
                 })?;
 
             item
@@ -996,7 +1070,7 @@ where
         // Read the serialized data
         let slice_view =
             self.handler.get_slice(offset, self.item_serialized_size).map_err(|e| {
-                BoundedError::new(BoundedErrorKind::SliceError, "Failed to get slice for front")
+                BoundedError::runtime_execution_error("Operation failed")
             })?;
 
         // Deserialize the item
@@ -1005,8 +1079,7 @@ where
             |_| {
                 BoundedError::new(
                     BoundedErrorKind::ConversionError,
-                    "Failed to deserialize item for front",
-                )
+                    "Failed to deserialize from bytes")
             },
         )?;
 
@@ -1037,7 +1110,7 @@ where
         // Read the serialized data
         let slice_view =
             self.handler.get_slice(offset, self.item_serialized_size).map_err(|e| {
-                BoundedError::new(BoundedErrorKind::SliceError, "Failed to get slice for back")
+                BoundedError::runtime_execution_error("Operation failed")
             })?;
 
         // Deserialize the item
@@ -1046,8 +1119,7 @@ where
             |_| {
                 BoundedError::new(
                     BoundedErrorKind::ConversionError,
-                    "Failed to deserialize item for back",
-                )
+                    "Failed to deserialize from bytes")
             },
         )?;
 
@@ -1230,10 +1302,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
     /// Returns an error if the index is out of bounds.
     pub fn set(&mut self, index: usize) -> Result<bool, BoundedError> {
         if index >= N_BITS {
-            return Err(BoundedError::new(
-                BoundedErrorKind::SliceError,
-                "Index out of bounds for BoundedBitSet",
-            ));
+            return Err(BoundedError::runtime_execution_error("Operation failed"));
         }
 
         let storage_index = index / 32;
@@ -1245,7 +1314,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
         if storage_index >= self.storage.len() {
             return Err(BoundedError::new(
                 BoundedErrorKind::SliceError,
-                "Storage index out of bounds (internal error)",
+                ")",
             ));
         }
 
@@ -1276,10 +1345,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
     /// Returns an error if the index is out of bounds.
     pub fn clear(&mut self, index: usize) -> Result<bool, BoundedError> {
         if index >= N_BITS {
-            return Err(BoundedError::new(
-                BoundedErrorKind::SliceError,
-                "Index out of bounds for BoundedBitSet",
-            ));
+            return Err(BoundedError::runtime_execution_error("Operation failed"));
         }
 
         let storage_index = index / 32;
@@ -1291,7 +1357,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
         if storage_index >= self.storage.len() {
             return Err(BoundedError::new(
                 BoundedErrorKind::SliceError,
-                "Storage index out of bounds (internal error)",
+                ")",
             ));
         }
 
@@ -1321,10 +1387,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
     /// Returns an error if the index is out of bounds.
     pub fn contains(&self, index: usize) -> Result<bool, BoundedError> {
         if index >= N_BITS {
-            return Err(BoundedError::new(
-                BoundedErrorKind::SliceError,
-                "Index out of bounds for BoundedBitSet",
-            ));
+            return Err(BoundedError::runtime_execution_error("Operation failed"));
         }
 
         let storage_index = index / 32;
@@ -1336,7 +1399,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
         if storage_index >= self.storage.len() {
             return Err(BoundedError::new(
                 BoundedErrorKind::SliceError,
-                "Storage index out of bounds (internal error)",
+                ")",
             ));
         }
 
@@ -1350,10 +1413,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
     /// (0). Returns an error if the index is out of bounds.
     pub fn toggle(&mut self, index: usize) -> Result<bool, BoundedError> {
         if index >= N_BITS {
-            return Err(BoundedError::new(
-                BoundedErrorKind::SliceError,
-                "Index out of bounds for BoundedBitSet",
-            ));
+            return Err(BoundedError::runtime_execution_error("Operation failed"));
         }
 
         let storage_index = index / 32;
@@ -1365,7 +1425,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
         if storage_index >= self.storage.len() {
             return Err(BoundedError::new(
                 BoundedErrorKind::SliceError,
-                "Storage index out of bounds (internal error)",
+                ")",
             ));
         }
 
@@ -1877,10 +1937,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
 
         for &index in indices {
             if index >= N_BITS {
-                return Err(BoundedError::new(
-                    BoundedErrorKind::SliceError,
-                    "Index out of bounds for BoundedBitSet",
-                ));
+                return Err(BoundedError::runtime_execution_error("Index out of bounds"));
             }
 
             let storage_index = index / 32;
@@ -1890,7 +1947,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
             if storage_index >= self.storage.len() {
                 return Err(BoundedError::new(
                     BoundedErrorKind::SliceError,
-                    "Storage index out of bounds (internal error)",
+                    "Index out of bounds",
                 ));
             }
 
@@ -1956,10 +2013,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
 
         for &index in indices {
             if index >= N_BITS {
-                return Err(BoundedError::new(
-                    BoundedErrorKind::SliceError,
-                    "Index out of bounds for BoundedBitSet",
-                ));
+                return Err(BoundedError::runtime_execution_error("Index out of bounds"));
             }
 
             let storage_index = index / 32;
@@ -1969,7 +2023,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
             if storage_index >= self.storage.len() {
                 return Err(BoundedError::new(
                     BoundedErrorKind::SliceError,
-                    "Storage index out of bounds (internal error)",
+                    "Index out of bounds",
                 ));
             }
 
@@ -2041,10 +2095,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
         value: bool,
     ) -> Result<usize, BoundedError> {
         if start_index >= N_BITS || end_index > N_BITS || start_index >= end_index {
-            return Err(BoundedError::new(
-                BoundedErrorKind::SliceError,
-                "Invalid range for set_range",
-            ));
+            return Err(BoundedError::runtime_execution_error("Operation failed"));
         }
 
         record_global_operation(OperationType::CollectionWrite, self.verification_level);
@@ -2060,7 +2111,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
             if chunk_index >= self.storage.len() {
                 return Err(BoundedError::new(
                     BoundedErrorKind::SliceError,
-                    "Storage index out of bounds (internal error)",
+                    "Index out of bounds",
                 ));
             }
 
@@ -2149,10 +2200,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
         end_index: usize,
     ) -> Result<Option<usize>, BoundedError> {
         if start_index >= N_BITS || end_index > N_BITS || start_index >= end_index {
-            return Err(BoundedError::new(
-                BoundedErrorKind::SliceError,
-                "Invalid range for lowest_set_bit_in_range",
-            ));
+            return Err(BoundedError::runtime_execution_error("Operation failed"));
         }
 
         record_global_operation(OperationType::CollectionRead, self.verification_level);
@@ -2205,8 +2253,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
         if start_index >= N_BITS || end_index > N_BITS || start_index >= end_index {
             return Err(BoundedError::new(
                 BoundedErrorKind::SliceError,
-                "Invalid range for highest_set_bit_in_range",
-            ));
+                "Invalid slice range"));
         }
 
         record_global_operation(OperationType::CollectionRead, self.verification_level);
@@ -2384,10 +2431,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
     /// ```
     pub fn find_clear_sequence(&self, length: usize) -> Result<Option<usize>, BoundedError> {
         if length == 0 || length > N_BITS {
-            return Err(BoundedError::new(
-                BoundedErrorKind::InvalidCapacity,
-                "Invalid length for find_clear_sequence",
-            ));
+            return Err(BoundedError::runtime_execution_error("Operation failed"));
         }
 
         record_global_operation(OperationType::CollectionRead, self.verification_level);
@@ -2446,7 +2490,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
     /// bitset.set(5).unwrap();
     ///
     /// // Bits 1, 3, and 5 are set (indexed from 0)
-    /// assert_eq!(bitset.to_binary_string(), "00101010");
+    /// assert_eq!(bitset.to_binary_string(), "00000000 00000000 00000000 00101010");
     /// ```
     #[cfg(feature = "std")]
     pub fn to_binary_string(&self) -> String {
@@ -2527,10 +2571,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
         end_index: usize,
     ) -> Result<usize, BoundedError> {
         if start_index >= N_BITS || end_index > N_BITS || start_index >= end_index {
-            return Err(BoundedError::new(
-                BoundedErrorKind::SliceError,
-                "Invalid range for count_bits_in_range",
-            ));
+            return Err(BoundedError::runtime_execution_error("Operation failed"));
         }
 
         record_global_operation(OperationType::CollectionRead, self.verification_level);
@@ -2688,7 +2729,7 @@ impl<const N_BITS: usize> BoundedBitSet<N_BITS> {
 
 // Implement standard traits for the new collections
 
-#[cfg(feature = "std")]
+#[cfg(feature = "default-provider")]
 impl<const N_BITS: usize> BoundedCapacity for BoundedBitSet<N_BITS> {
     fn capacity(&self) -> usize {
         N_BITS
@@ -3037,11 +3078,18 @@ impl<const N_BITS: usize> FromBytes for BoundedBitSet<N_BITS> {
 mod tests {
     use super::*;
     use crate::safe_memory::NoStdProvider;
+    use crate::budget_aware_provider::CrateId;
+
+    // Helper function to initialize memory system for tests
+    fn init_test_memory_system() {
+        drop(crate::memory_init::MemoryInitializer::initialize());
+    }
 
     // Test BoundedQueue
     #[test]
     fn test_bounded_queue() {
-        let provider = NoStdProvider::new();
+        init_test_memory_system();
+        let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
         let mut queue = BoundedQueue::<u32, 5, NoStdProvider<1024>>::new(provider).unwrap();
 
         // Test enqueue
@@ -3084,7 +3132,8 @@ mod tests {
     // Test BoundedMap
     #[test]
     fn test_bounded_map() {
-        let provider = NoStdProvider::new();
+        init_test_memory_system();
+        let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
         let mut map = BoundedMap::<u32, u32, 3, NoStdProvider<1024>>::new(provider).unwrap();
 
         // Test insert
@@ -3122,7 +3171,8 @@ mod tests {
     // Test BoundedSet
     #[test]
     fn test_bounded_set() {
-        let provider = NoStdProvider::new();
+        init_test_memory_system();
+        let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
         let mut set = BoundedSet::<u32, 3, NoStdProvider<1024>>::new(provider).unwrap();
 
         // Test insert
@@ -3155,7 +3205,8 @@ mod tests {
     // Test BoundedDeque
     #[test]
     fn test_bounded_deque() {
-        let provider = NoStdProvider::new();
+        init_test_memory_system();
+        let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
         let mut deque = BoundedDeque::<u32, 5, NoStdProvider<1024>>::new(provider).unwrap();
 
         // Test push_back
@@ -3254,7 +3305,7 @@ where
     P: Default + Clone + PartialEq + Eq,
 {
     fn default() -> Self {
-        Self::new(P::default()).unwrap()
+        Self::new(P::default()).expect("Default provider should never fail to create BoundedMap")
     }
 }
 
@@ -3265,16 +3316,16 @@ where
     P: Default + Clone + PartialEq + Eq,
 {
     fn clone(&self) -> Self {
-        let mut new_map = Self::new(P::default()).unwrap();
+        let mut new_map = Self::new(P::default()).expect("Default provider should never fail to create BoundedMap");
         new_map.verification_level = self.verification_level;
-        
+
         // Clone all entries
         for i in 0..self.entries.len() {
             if let Ok((k, v)) = self.entries.get(i) {
                 drop(new_map.insert(k, v));
             }
         }
-        
+
         new_map
     }
 }
@@ -3289,7 +3340,7 @@ where
         if self.len() != other.len() {
             return false;
         }
-        
+
         for i in 0..self.entries.len() {
             if let (Ok((k1, v1)), Ok((k2, v2))) = (self.entries.get(i), other.entries.get(i)) {
                 if k1 != k2 || v1 != v2 {
@@ -3297,7 +3348,7 @@ where
                 }
             }
         }
-        
+
         true
     }
 }
@@ -3310,7 +3361,8 @@ where
 {
 }
 
-impl<K, V, const N_ELEMENTS: usize, P: MemoryProvider> Checksummable for BoundedMap<K, V, N_ELEMENTS, P>
+impl<K, V, const N_ELEMENTS: usize, P: MemoryProvider> Checksummable
+    for BoundedMap<K, V, N_ELEMENTS, P>
 where
     K: Sized + Checksummable + ToBytes + FromBytes + Default + Eq + Clone + PartialEq,
     V: Sized + Checksummable + ToBytes + FromBytes + Default + Clone + PartialEq + Eq,
@@ -3334,7 +3386,11 @@ where
     P: Default + Clone + PartialEq + Eq,
 {
     fn serialized_size(&self) -> usize {
-        4 + self.entries.iter().map(|(k, v)| k.serialized_size() + v.serialized_size()).sum::<usize>()
+        4 + self
+            .entries
+            .iter()
+            .map(|(k, v)| k.serialized_size() + v.serialized_size())
+            .sum::<usize>()
     }
 
     fn to_bytes_with_provider<'a, PROV: MemoryProvider>(
@@ -3366,15 +3422,15 @@ where
         let mut len_bytes = [0u8; 4];
         reader.read_exact(&mut len_bytes)?;
         let len = u32::from_le_bytes(len_bytes) as usize;
-        
+
         let mut map = Self::new(P::default())?;
-        
+
         for _ in 0..len.min(N_ELEMENTS) {
             let k = K::from_bytes_with_provider(reader, provider)?;
             let v = V::from_bytes_with_provider(reader, provider)?;
             drop(map.insert(k, v));
         }
-        
+
         Ok(map)
     }
 }

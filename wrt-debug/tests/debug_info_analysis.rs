@@ -97,11 +97,18 @@ mod debug_info_analysis {
 
         // Test our cursor implementation
         let cursor_data = &MOCK_DEBUG_LINE[0..8];
-        let unit_length =
-            u32::from_le_bytes([cursor_data[0], cursor_data[1], cursor_data[2], cursor_data[3]]);
+        let unit_length = u32::from_le_bytes([
+            cursor_data[0],
+            cursor_data[1],
+            cursor_data[2],
+            cursor_data[3],
+        ]);
         let version = u16::from_le_bytes([cursor_data[4], cursor_data[5]]);
 
-        println!("✓ Raw DWARF parsing: unit_length={}, version={}", unit_length, version);
+        println!(
+            "✓ Raw DWARF parsing: unit_length={}, version={}",
+            unit_length, version
+        );
 
         // Analyze what information we can extract
         analyze_line_numbers();

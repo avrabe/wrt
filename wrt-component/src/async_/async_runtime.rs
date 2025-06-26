@@ -15,6 +15,9 @@ use std::{boxed::Box, collections::VecDeque, vec::Vec};
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
     prelude::*,
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 use crate::{
@@ -300,39 +303,41 @@ pub enum TaskExecutionResult {
 
 impl AsyncRuntime {
     /// Create new async runtime
-    pub fn new() -> Self {
-        Self {
-            scheduler: TaskScheduler::new(),
-            reactor: Reactor::new(),
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            scheduler: TaskScheduler::new()?,
+            reactor: Reactor::new()?
             #[cfg(feature = "std")]
             streams: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            streams: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            streams: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             #[cfg(feature = "std")]
             futures: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            futures: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            futures: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             config: RuntimeConfig::default(),
             stats: RuntimeStats::new(),
             is_running: false,
-        }
+        })
     }
 
     /// Create new async runtime with custom configuration
-    pub fn with_config(config: RuntimeConfig) -> Self {
-        let mut runtime = Self::new();
+    pub fn with_config(config: RuntimeConfig) -> Result<Self> {
+        let mut runtime = Self::new()?;
         runtime.config = config;
-        runtime
+        Ok(runtime)
     }
 
     /// Start the async runtime
     pub fn start(&mut self) -> Result<()> {
         if self.is_running {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::EXECUTION_ERROR,
-                "Runtime is already running"
-            ));
+            return Err(Error::async_executor_state_violation("Runtime is already running"));
         }
 
         self.is_running = true;
@@ -343,11 +348,7 @@ impl AsyncRuntime {
     /// Stop the async runtime
     pub fn stop(&mut self) -> Result<()> {
         if !self.is_running {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::EXECUTION_ERROR,
-                "Runtime is not running"
-            ));
+            return Err(Error::async_executor_state_violation("Runtime is not running"));
         }
 
         self.is_running = false;
@@ -393,11 +394,7 @@ impl AsyncRuntime {
             
             if let Some(timeout) = timeout_us {
                 if self.get_current_time() - start_time > timeout {
-                    return Err(Error::new(
-                        ErrorCategory::Runtime,
-                        wrt_error::codes::EXECUTION_ERROR,
-                        "Runtime timeout"
-                    ));
+                    return Err(Error::async_timeout_error("Runtime timeout"));
                 }
             }
         }
@@ -433,15 +430,14 @@ impl AsyncRuntime {
             #[cfg(feature = "std")]
             tasks: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            tasks: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            tasks: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).unwrap()
+            },
         };
         
         self.streams.push(entry).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many streams"
-            )
+            Error::async_executor_state_violation("Too many streams")
         })?;
         
         Ok(handle)
@@ -457,15 +453,14 @@ impl AsyncRuntime {
             #[cfg(feature = "std")]
             tasks: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            tasks: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            tasks: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).unwrap()
+            },
         };
         
         self.futures.push(entry).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many futures"
-            )
+            Error::async_executor_state_violation("Too many futures")
         })?;
         
         Ok(handle)
@@ -484,11 +479,7 @@ impl AsyncRuntime {
     /// Update runtime configuration
     pub fn update_config(&mut self, config: RuntimeConfig) -> Result<()> {
         if self.is_running && config.max_concurrent_tasks < self.stats.active_tasks as usize {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::EXECUTION_ERROR,
-                "Cannot reduce max concurrent tasks below current active count"
-            ));
+            return Err(Error::async_executor_state_violation("Cannot reduce max concurrent tasks below current active count"));
         }
         
         self.config = config;
@@ -505,18 +496,24 @@ impl AsyncRuntime {
 impl TaskScheduler {
     /// Create new task scheduler
     pub fn new() -> Self {
-        Self {
+        Ok(Self {
             #[cfg(feature = "std")]
             ready_queue: VecDeque::new(),
             #[cfg(not(any(feature = "std", )))]
-            ready_queue: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            ready_queue: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             #[cfg(feature = "std")]
             waiting_tasks: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            waiting_tasks: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            waiting_tasks: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             current_time: 0,
             task_manager: TaskManager::new(),
-        }
+        })
     }
 
     /// Schedule a task for execution
@@ -534,11 +531,7 @@ impl TaskScheduler {
         #[cfg(not(any(feature = "std", )))]
         {
             self.ready_queue.push(task).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    wrt_error::codes::RESOURCE_EXHAUSTED,
-                    "Ready queue full"
-                )
+                Error::async_executor_state_violation("Ready queue full")
             })?;
         }
         
@@ -575,11 +568,7 @@ impl TaskScheduler {
                         timeout_us: Some(self.current_time + 1_000_000), // 1 second timeout
                     };
                     self.waiting_tasks.push(waiting_task).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Resource,
-                            wrt_error::codes::RESOURCE_EXHAUSTED,
-                            "Waiting tasks list full"
-                        )
+                        Error::async_executor_state_violation("Waiting tasks list full")
                     })?;
                 }
                 TaskExecutionResult::Failed(_error) => {
@@ -721,17 +710,23 @@ impl TaskScheduler {
 
 impl Reactor {
     /// Create new reactor
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             pending_events: VecDeque::new(),
             #[cfg(not(any(feature = "std", )))]
-            pending_events: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            pending_events: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             #[cfg(feature = "std")]
             event_handlers: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            event_handlers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            event_handlers: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
+        })
     }
 
     /// Process pending events
@@ -756,11 +751,7 @@ impl Reactor {
     /// Add event to pending queue
     pub fn add_event(&mut self, event: ReactorEvent) -> Result<()> {
         self.pending_events.push(event).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Event queue full"
-            )
+            Error::async_executor_state_violation("Event queue full")
         })
     }
 
@@ -797,23 +788,7 @@ impl RuntimeStats {
     }
 }
 
-impl Default for AsyncRuntime {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Default for TaskScheduler {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Default for Reactor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// Default implementations removed - constructors now return Result types
 
 impl fmt::Display for StreamOperation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -852,7 +827,7 @@ mod tests {
 
     #[test]
     fn test_async_runtime_creation() {
-        let runtime = AsyncRuntime::new();
+        let runtime = AsyncRuntime::new().unwrap();
         assert!(!runtime.is_running);
         assert_eq!(runtime.streams.len(), 0);
         assert_eq!(runtime.futures.len(), 0);
@@ -860,7 +835,7 @@ mod tests {
 
     #[test]
     fn test_runtime_start_stop() {
-        let mut runtime = AsyncRuntime::new();
+        let mut runtime = AsyncRuntime::new().unwrap();
         
         assert!(runtime.start().is_ok());
         assert!(runtime.is_running);
@@ -871,7 +846,7 @@ mod tests {
 
     #[test]
     fn test_spawn_task() {
-        let mut runtime = AsyncRuntime::new();
+        let mut runtime = AsyncRuntime::new().unwrap();
         runtime.start().unwrap();
         
         let task_fn = TaskFunction::Custom {
@@ -886,7 +861,7 @@ mod tests {
 
     #[test]
     fn test_register_stream() {
-        let mut runtime = AsyncRuntime::new();
+        let mut runtime = AsyncRuntime::new().unwrap();
         let stream = Stream::new(StreamHandle(1), ValType::U32);
         
         let handle = runtime.register_stream(stream).unwrap();
@@ -896,7 +871,7 @@ mod tests {
 
     #[test]
     fn test_register_future() {
-        let mut runtime = AsyncRuntime::new();
+        let mut runtime = AsyncRuntime::new().unwrap();
         let future = Future::new(FutureHandle(1), ValType::String);
         
         let handle = runtime.register_future(future).unwrap();
@@ -906,7 +881,7 @@ mod tests {
 
     #[test]
     fn test_task_scheduler() {
-        let mut scheduler = TaskScheduler::new();
+        let mut scheduler = TaskScheduler::new().unwrap();
         assert!(scheduler.is_idle());
         
         let task = ScheduledTask {
@@ -925,8 +900,8 @@ mod tests {
 
     #[test]
     fn test_reactor() {
-        let mut reactor = Reactor::new();
-        let mut scheduler = TaskScheduler::new();
+        let mut reactor = Reactor::new().unwrap();
+        let mut scheduler = TaskScheduler::new().unwrap();
         
         let event = ReactorEvent {
             id: 1,
@@ -944,14 +919,14 @@ mod tests {
         config.max_concurrent_tasks = 64;
         config.task_time_slice_us = 500;
         
-        let runtime = AsyncRuntime::with_config(config.clone());
+        let runtime = AsyncRuntime::with_config(config.clone()).unwrap();
         assert_eq!(runtime.config.max_concurrent_tasks, 64);
         assert_eq!(runtime.config.task_time_slice_us, 500);
     }
 
     #[test]
     fn test_runtime_stats() {
-        let runtime = AsyncRuntime::new();
+        let runtime = AsyncRuntime::new().unwrap();
         let stats = runtime.get_stats();
         
         assert_eq!(stats.tasks_created, 0);

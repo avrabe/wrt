@@ -42,11 +42,7 @@ impl RuntimeMemoryManager {
     pub fn initialize(safety_level: SafetyLevel) -> Result<Self> {
         // Step 1: Discover platform limits
         let platform_limits = discover_platform_limits()
-            .map_err(|_| Error::new(
-                ErrorCategory::Platform,
-                codes::PLATFORM_ERROR,
-                "Failed to discover platform memory limits"
-            ))?;
+            .map_err(|_| Error::platform_error("Failed to discover platform memory limits"))?;
 
         // Step 2: Initialize global memory system with platform limits
         #[cfg(feature = "platform-memory")]
@@ -79,11 +75,7 @@ impl RuntimeMemoryManager {
         component_safety_level: SafetyLevel,
     ) -> Result<Vec<Box<[u8]>>> {
         if self.phase != InitializationPhase::Startup && self.phase != InitializationPhase::PreAllocation {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ERROR,
-                "Cannot pre-allocate: initialization phase complete"
-            ));
+            return Err(Error::memory_error("Cannot pre-allocate: initialization phase complete"));
         }
 
         self.phase = InitializationPhase::PreAllocation;
@@ -113,11 +105,7 @@ impl RuntimeMemoryManager {
     /// The system enters runtime mode.
     pub fn lock_system(mut self) -> Result<LockedRuntimeMemoryManager> {
         if self.phase == InitializationPhase::Locked || self.phase == InitializationPhase::Runtime {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ERROR,
-                "System already locked"
-            ));
+            return Err(Error::memory_error("System already locked"));
         }
 
         // Lock the memory system
@@ -199,11 +187,7 @@ impl RuntimeExecutionManager {
     pub fn verify_system_integrity(&self) -> Result<()> {
         // Verify memory system is still locked
         if !wrt_foundation::memory_enforcement::is_memory_system_locked() {
-            return Err(Error::new(
-                ErrorCategory::Safety,
-                codes::SAFETY_VIOLATION,
-                "Memory system lock compromised"
-            ));
+            return Err(Error::safety_violation("Memory system lock compromised"));
         }
 
         // Additional integrity checks based on safety level
@@ -226,11 +210,7 @@ impl RuntimeExecutionManager {
         let expected_total: usize = self.allocated_components.iter().map(|(_, size)| *size).sum();
         
         if stats.allocated > expected_total {
-            return Err(Error::new(
-                ErrorCategory::Safety,
-                codes::SAFETY_VIOLATION,
-                "Unexpected memory allocation detected"
-            ));
+            return Err(Error::safety_violation("Unexpected memory allocation detected"));
         }
 
         Ok(())

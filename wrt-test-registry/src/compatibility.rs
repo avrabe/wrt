@@ -122,10 +122,10 @@ pub fn register_compatibility_tests() {
 fn test_error_handling(_config: &TestConfig) -> TestResult {
     // Create errors with different categories
     let validation_error =
-        Error::new(ErrorCategory::Validation, codes::VALIDATION_ERROR, "Test validation error");
+        Error::validation_error("Test validation error");
 
     let memory_error =
-        Error::new(ErrorCategory::Memory, codes::MEMORY_ACCESS_OUT_OF_BOUNDS, "Test memory error");
+        Error::memory_access_out_of_bounds("Test memory error");
 
     // Check error categories
     assert_eq_test!(validation_error.category(), ErrorCategory::Validation);

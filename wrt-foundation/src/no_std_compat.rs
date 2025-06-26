@@ -76,22 +76,14 @@ where
     T: Sized + Checksummable + crate::traits::ToBytes + crate::traits::FromBytes + Default + Clone + PartialEq + Eq,
 {
     BoundedVec::new(NoStdProvider::default()).map_err(|e| {
-        crate::Error::new(
-            crate::ErrorCategory::Memory,
-            crate::codes::MEMORY_ALLOCATION_ERROR,
-            "Failed to create BoundedVec",
-        )
+        crate::Error::runtime_execution_error("Failed to create bounded vector with default provider")
     })
 }
 
 /// Helper to create an empty `BoundedString` with default provider  
 pub fn create_bounded_string() -> crate::WrtResult<BoundedString<256, NoStdProvider<256>>> {
-    BoundedString::from_str_truncate("", NoStdProvider::default()).map_err(|e| {
-        crate::Error::new(
-            crate::ErrorCategory::Memory,
-            crate::codes::MEMORY_ALLOCATION_ERROR,
-            "Failed to create BoundedString",
-        )
+    BoundedString::from_str_truncate("").map_err(|e| {
+        crate::Error::runtime_execution_error("Failed to create empty bounded string")
     })
 }
 
@@ -101,8 +93,7 @@ pub fn create_bounded_string_from(s: &str) -> crate::WrtResult<BoundedString<256
         crate::Error::new(
             crate::ErrorCategory::Parse,
             crate::codes::SERIALIZATION_ERROR,
-            "Failed to create BoundedString from str",
-        )
+            "Failed to create bounded string from input string")
     })
 }
 

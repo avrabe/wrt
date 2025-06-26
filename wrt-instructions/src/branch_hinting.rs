@@ -7,7 +7,7 @@
 //! These operations support the WebAssembly branch hinting proposal
 //! and work across std, `no_std+alloc`, and pure `no_std` environments.
 
-use crate::prelude::{Debug, Eq, PartialEq, PureInstruction};
+use crate::prelude::{Debug, Eq, PartialEq};
 use wrt_error::{Error, Result};
 use wrt_foundation::{
     types::{LabelIdx, ValueType},

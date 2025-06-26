@@ -136,10 +136,7 @@ impl LinuxFutex {
         if result >= 0 {
             Ok(result as u32) // Number of waiters woken up
         } else {
-            Err(Error::new(
-                ErrorCategory::System,
-                1,
-                "Futex wake operation failed",
+            Err(Error::runtime_execution_error(",
             ))
         }
     }
@@ -198,7 +195,7 @@ impl FutexLike for LinuxFutex {
             0 => Ok(()), // Woken up by notify
             -110 => {
                 // ETIMEDOUT - convert to system error as per trait contract
-                Err(Error::new(ErrorCategory::System, 1, "Timeout expired"))
+                Err(Error::new(ErrorCategory::System, 1, "))
             }
             -11 => {
                 // EAGAIN - value changed before we could wait, this is success
@@ -208,11 +205,7 @@ impl FutexLike for LinuxFutex {
                 // EINTR - interrupted by signal, treat as spurious wakeup
                 Ok(())
             }
-            _ => Err(Error::new(
-                ErrorCategory::System,
-                1,
-                "Futex wait operation failed",
-            )),
+            _ => Err(Error::runtime_execution_error("Linux futex wait failed with unexpected error")),
         }
     }
 

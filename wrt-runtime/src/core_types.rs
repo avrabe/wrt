@@ -165,7 +165,7 @@ impl ExecutionContext {
     /// Push a value onto the value stack
     pub fn push_value(&mut self, value: Value) -> Result<()> {
         self.value_stack.push(value).map_err(|_| {
-            Error::new(ErrorCategory::Runtime, codes::CAPACITY_EXCEEDED, "Value stack capacity exceeded")
+            Error::runtime_execution_error("Value stack capacity exceeded")
         })
     }
     

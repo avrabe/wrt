@@ -5,7 +5,7 @@ use crate::{
     virtualization::{Capability, ResourceUsage, VirtualizationManager},
 };
 // Placeholder types
-pub type ComponentInstanceId = u32;
+pub use crate::types::ComponentInstanceId;
 pub type ResourceHandle = u32;
 pub type ValType = u32;
 use core::{
@@ -16,7 +16,9 @@ use core::{
 use wrt_foundation::{
     bounded_collections::{BoundedHashMap, BoundedVec},
     component_value::ComponentValue,
-    safe_memory::SafeMemory,
+    safe_memory::{SafeMemory, NoStdProvider},
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 use wrt_platform::{
     advanced_sync::{Priority, PriorityInheritanceMutex},
@@ -57,7 +59,29 @@ impl fmt::Display for ThreadSpawnError {
 #[cfg(feature = "std")]
 impl std::error::Error for ThreadSpawnError {}
 
-pub type ThreadSpawnResult<T> = Result<T, ThreadSpawnError>;
+// Conversion to wrt_error::Error for unified error handling
+impl From<ThreadSpawnError> for wrt_error::Error {
+    fn from(err: ThreadSpawnError) -> Self {
+        match err.kind {
+            ThreadSpawnErrorKind::ResourceLimitExceeded => 
+                Self::component_thread_spawn_failed("Thread spawn resource limit exceeded"),
+            ThreadSpawnErrorKind::InvalidConfiguration => 
+                Self::component_resource_lifecycle_error("Invalid thread configuration"),
+            ThreadSpawnErrorKind::SpawnFailed => 
+                Self::component_thread_spawn_failed("Thread spawn failed"),
+            ThreadSpawnErrorKind::JoinFailed => 
+                Self::component_resource_lifecycle_error("Thread join failed"),
+            ThreadSpawnErrorKind::ThreadNotFound => 
+                Self::component_resource_lifecycle_error("Thread not found"),
+            ThreadSpawnErrorKind::CapabilityDenied => 
+                Self::component_capability_denied("Thread spawn capability denied"),
+            ThreadSpawnErrorKind::VirtualizationError => 
+                Self::component_virtualization_error("Thread spawn virtualization error"),
+        }
+    }
+}
+
+pub type ThreadSpawnResult<T> = wrt_error::Result<T>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ThreadId(u32);
@@ -82,16 +106,26 @@ pub struct ThreadConfiguration {
     pub capabilities: BoundedVec<Capability, 16, NoStdProvider<65536>>,
 }
 
-impl Default for ThreadConfiguration {
-    fn default() -> Self {
-        Self {
+impl ThreadConfiguration {
+    pub fn new() -> wrt_error::Result<Self> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        Ok(Self {
             stack_size: DEFAULT_STACK_SIZE,
             priority: None,
             name: None,
             detached: false,
             cpu_affinity: None,
-            capabilities: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            capabilities: BoundedVec::new(provider).map_err(|_| {
+                wrt_error::Error::resource_exhausted("Failed to create capabilities vector")
+            })?,
+        })
+    }
+}
+
+impl Default for ThreadConfiguration {
+    fn default() -> Self {
+        // Use new() which properly handles allocation or panic in development
+        Self::new().expect("ThreadConfiguration allocation should not fail in default construction")
     }
 }
 
@@ -136,11 +170,14 @@ pub struct ComponentThreadManager {
 }
 
 impl ComponentThreadManager {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> wrt_error::Result<Self> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        Ok(Self {
             threads: BoundedHashMap::new(),
             component_threads: BoundedHashMap::new(),
-            spawn_requests: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            spawn_requests: BoundedVec::new(provider).map_err(|_| {
+                wrt_error::Error::resource_exhausted("Failed to create spawn requests vector")
+            })?,
             next_thread_id: AtomicU32::new(1),
             task_manager: TaskManager::new(),
             virt_manager: None,
@@ -148,7 +185,7 @@ impl ComponentThreadManager {
             max_threads_per_component: MAX_THREADS_PER_COMPONENT,
             global_thread_limit: 256,
             active_thread_count: AtomicU32::new(0),
-        }
+        })
     }
 
     pub fn with_virtualization(mut self, virt_manager: VirtualizationManager) -> Self {
@@ -187,16 +224,15 @@ impl ComponentThreadManager {
     }
 
     pub fn join_thread(&mut self, thread_id: ThreadId) -> ThreadSpawnResult<ThreadResult> {
-        let handle = self.threads.get(&thread_id).ok_or_else(|| ThreadSpawnError {
-            kind: ThreadSpawnErrorKind::ThreadNotFound,
-            message: "Component not found",
+        let handle = self.threads.get(&thread_id).ok_or_else(|| {
+            wrt_error::Error::runtime_execution_error(",
+            )
         })?;
 
         if handle.detached {
-            return Err(ThreadSpawnError {
-                kind: ThreadSpawnErrorKind::JoinFailed,
-                message: "Cannot join detached thread".to_string(),
-            });
+            return Err(wrt_error::Error::new(wrt_error::ErrorCategory::ComponentRuntime,
+                wrt_error::codes::COMPONENT_THREAD_JOIN_FAILED,
+                "));
         }
 
         #[cfg(feature = "std")]
@@ -504,14 +540,15 @@ impl ComponentThreadManager {
         _component_id: ComponentInstanceId,
         _function_name: &str,
         _arguments: &[ComponentValue],
-    ) -> Result<Option<ComponentValue>, String> {
+    ) -> core::result::Result<Option<ComponentValue>, String> {
         Ok(Some(ComponentValue::I32(42)))
     }
 }
 
 impl Default for ComponentThreadManager {
     fn default() -> Self {
-        Self::new()
+        // Use new() which properly handles allocation or panic in development
+        Self::new().expect("ComponentThreadManager allocation should not fail in default construction")
     }
 }
 
@@ -624,10 +661,13 @@ mod tests {
         let mut manager = ComponentThreadManager::new();
         let component_id = ComponentInstanceId::new(1);
 
+        let provider = safe_managed_alloc!(65536, CrateId::Component).unwrap();
+        let arguments = BoundedVec::new(provider).unwrap();
+        
         let request = ThreadSpawnRequest {
             component_id,
             function_name: "test_function".to_string(),
-            arguments: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            arguments,
             configuration: ThreadConfiguration::default(),
             return_type: Some(ValType::I32),
         };

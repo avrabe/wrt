@@ -80,6 +80,9 @@ extern crate alloc;
 // Include prelude for unified imports
 pub mod prelude;
 
+// Bounded infrastructure for intercept collections
+pub mod bounded_intercept;
+
 // Include built-in interception module
 pub mod builtins;
 
@@ -532,7 +535,10 @@ impl LinkInterceptor {
     ///
     /// * `&str` - The interceptor name
     #[must_use] pub fn name(&self) -> &str {
-        self.name
+        #[cfg(feature = "std")]
+        return &self.name;
+        #[cfg(not(feature = "std"))]
+        return self.name;
     }
 
     /// Gets the first strategy in this interceptor
@@ -609,11 +615,7 @@ impl LinkInterceptor {
                 Modification::Replace { offset, data } => {
                     let end_offset = offset + data.len();
                     if end_offset > modified_data.len() {
-                        return Err(Error::new(
-                            wrt_error::ErrorCategory::Validation,
-                            wrt_error::codes::VALIDATION_ERROR,
-                            "Replacement range out of bounds",
-                        ));
+                        return Err(Error::runtime_execution_error("Replace range exceeds data length"));
                     }
 
                     // Fixed version without borrowing issues
@@ -627,8 +629,7 @@ impl LinkInterceptor {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Validation,
                             wrt_error::codes::VALIDATION_ERROR,
-                            "Insertion offset out of bounds",
-                        ));
+                            "Insert offset exceeds data length"));
                     }
 
                     modified_data.splice(start..start, data.iter().cloned());
@@ -637,11 +638,7 @@ impl LinkInterceptor {
                     let start = *offset;
                     let end = start + length;
                     if end > modified_data.len() {
-                        return Err(Error::new(
-                            wrt_error::ErrorCategory::Validation,
-                            wrt_error::codes::VALIDATION_ERROR,
-                            "Removal range out of bounds",
-                        ));
+                        return Err(Error::runtime_execution_error("Remove range exceeds data length"));
                     }
 
                     modified_data.drain(start..end);
@@ -654,7 +651,6 @@ impl LinkInterceptor {
 }
 
 /// Result of an interception operation
-#[cfg(feature = "std")]
 #[derive(Debug, Clone)]
 pub struct InterceptionResult {
     /// Whether the data has been modified

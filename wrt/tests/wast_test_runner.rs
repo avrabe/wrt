@@ -1,11 +1,11 @@
 //! WAST Test Runner Integration
-//! 
-//! This module provides a comprehensive WAST test infrastructure that integrates
-//! with the existing wrt-test-registry framework. It supports all WAST directive
-//! types and provides proper categorization, error handling, and resource management.
+//!
+//! This module provides a comprehensive WAST test infrastructure that
+//! integrates with the existing wrt-test-registry framework. It supports all
+//! WAST directive types and provides proper categorization, error handling, and
+//! resource management.
 
 #![cfg(test)]
-#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "std")]
 use std::{
@@ -14,17 +14,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[cfg(not(feature = "std"))]
-use wrt_foundation::bounded::{BoundedHashMap as HashMap, BoundedVec};
-
 use wast::{
     core::{NanPattern, WastArgCore, WastRetCore},
     parser::{self, ParseBuffer},
     Wast, WastArg, WastDirective, WastExecute, WastRet,
 };
-
-use wrt::{Error, Module, StacklessEngine, Value, Result};
-use wrt_test_registry::{TestCase, TestConfig, TestRegistry, TestResult, TestSuite, TestRunner};
+use wrt::{Error, Module, Result, StacklessEngine, Value};
+#[cfg(not(feature = "std"))]
+use wrt_foundation::bounded::{BoundedHashMap as HashMap, BoundedVec};
+use wrt_test_registry::{TestCase, TestConfig, TestRegistry, TestResult, TestRunner, TestSuite};
 
 /// WAST Test Runner that integrates with the existing test infrastructure
 pub struct WastTestRunner {
@@ -135,31 +133,43 @@ impl WastTestRunner {
         match directive {
             WastDirective::Module(ref mut wast_module) => {
                 self.handle_module_directive(engine, wast_module)
-            }
-            WastDirective::AssertReturn { span: _, exec, results } => {
-                self.handle_assert_return_directive(engine, exec, results)
-            }
-            WastDirective::AssertTrap { span: _, exec, message } => {
-                self.handle_assert_trap_directive(engine, exec, message)
-            }
-            WastDirective::AssertInvalid { span: _, module, message } => {
-                self.handle_assert_invalid_directive(module, message)
-            }
-            WastDirective::AssertMalformed { span: _, module, message } => {
-                self.handle_assert_malformed_directive(module, message)
-            }
-            WastDirective::AssertUnlinkable { span: _, module, message } => {
-                self.handle_assert_unlinkable_directive(module, message)
-            }
-            WastDirective::AssertExhaustion { span: _, exec, message } => {
-                self.handle_assert_exhaustion_directive(engine, exec, message)
-            }
-            WastDirective::Register { span: _, name, module } => {
-                self.handle_register_directive(name, module)
-            }
-            WastDirective::Invoke(exec) => {
-                self.handle_invoke_directive(engine, exec)
-            }
+            },
+            WastDirective::AssertReturn {
+                span: _,
+                exec,
+                results,
+            } => self.handle_assert_return_directive(engine, exec, results),
+            WastDirective::AssertTrap {
+                span: _,
+                exec,
+                message,
+            } => self.handle_assert_trap_directive(engine, exec, message),
+            WastDirective::AssertInvalid {
+                span: _,
+                module,
+                message,
+            } => self.handle_assert_invalid_directive(module, message),
+            WastDirective::AssertMalformed {
+                span: _,
+                module,
+                message,
+            } => self.handle_assert_malformed_directive(module, message),
+            WastDirective::AssertUnlinkable {
+                span: _,
+                module,
+                message,
+            } => self.handle_assert_unlinkable_directive(module, message),
+            WastDirective::AssertExhaustion {
+                span: _,
+                exec,
+                message,
+            } => self.handle_assert_exhaustion_directive(engine, exec, message),
+            WastDirective::Register {
+                span: _,
+                name,
+                module,
+            } => self.handle_register_directive(name, module),
+            WastDirective::Invoke(exec) => self.handle_invoke_directive(engine, exec),
             _ => {
                 // Handle any other directive types
                 Ok(WastDirectiveInfo {
@@ -168,7 +178,7 @@ impl WastTestRunner {
                     requires_module_state: false,
                     modifies_engine_state: false,
                 })
-            }
+            },
         }
     }
 
@@ -248,11 +258,13 @@ impl WastTestRunner {
                     requires_module_state: true,
                     modifies_engine_state: false,
                 })
-            }
+            },
             _ => {
                 self.stats.failed += 1;
-                Err(Error::Validation("Unsupported execution type for assert_return".into()))
-            }
+                Err(Error::Validation(
+                    "Unsupported execution type for assert_return".into(),
+                ))
+            },
         }
     }
 
@@ -279,14 +291,15 @@ impl WastTestRunner {
                             "Expected trap '{}' but execution succeeded",
                             expected_message
                         )))
-                    }
+                    },
                     Err(error) => {
                         // Check if the error message matches expectations
                         let error_msg = error.to_string().to_lowercase();
                         let expected_msg = expected_message.to_lowercase();
-                        
-                        if error_msg.contains(&expected_msg) || 
-                           contains_trap_keyword(&error_msg, &expected_msg) {
+
+                        if error_msg.contains(&expected_msg)
+                            || contains_trap_keyword(&error_msg, &expected_msg)
+                        {
                             self.stats.passed += 1;
                             Ok(WastDirectiveInfo {
                                 test_type: WastTestType::ErrorHandling,
@@ -301,13 +314,15 @@ impl WastTestRunner {
                                 expected_message, error
                             )))
                         }
-                    }
+                    },
                 }
-            }
+            },
             _ => {
                 self.stats.failed += 1;
-                Err(Error::Validation("Unsupported execution type for assert_trap".into()))
-            }
+                Err(Error::Validation(
+                    "Unsupported execution type for assert_trap".into(),
+                ))
+            },
         }
     }
 
@@ -330,13 +345,14 @@ impl WastTestRunner {
                             "Expected invalid module '{}' but validation succeeded",
                             expected_message
                         )))
-                    }
+                    },
                     Err(error) => {
                         let error_msg = error.to_string().to_lowercase();
                         let expected_msg = expected_message.to_lowercase();
-                        
-                        if error_msg.contains(&expected_msg) || 
-                           contains_validation_keyword(&error_msg, &expected_msg) {
+
+                        if error_msg.contains(&expected_msg)
+                            || contains_validation_keyword(&error_msg, &expected_msg)
+                        {
                             self.stats.passed += 1;
                             Ok(WastDirectiveInfo {
                                 test_type: WastTestType::ErrorHandling,
@@ -351,16 +367,17 @@ impl WastTestRunner {
                                 expected_message, error
                             )))
                         }
-                    }
+                    },
                 }
-            }
+            },
             Err(encode_error) => {
                 // Encoding failed, which is also acceptable for invalid modules
                 let error_msg = encode_error.to_string().to_lowercase();
                 let expected_msg = expected_message.to_lowercase();
-                
-                if error_msg.contains(&expected_msg) || 
-                   contains_validation_keyword(&error_msg, &expected_msg) {
+
+                if error_msg.contains(&expected_msg)
+                    || contains_validation_keyword(&error_msg, &expected_msg)
+                {
                     self.stats.passed += 1;
                     Ok(WastDirectiveInfo {
                         test_type: WastTestType::ErrorHandling,
@@ -375,7 +392,7 @@ impl WastTestRunner {
                         expected_message, encode_error
                     )))
                 }
-            }
+            },
         }
     }
 
@@ -395,13 +412,14 @@ impl WastTestRunner {
                     "Expected malformed module '{}' but encoding succeeded",
                     expected_message
                 )))
-            }
+            },
             Err(encode_error) => {
                 let error_msg = encode_error.to_string().to_lowercase();
                 let expected_msg = expected_message.to_lowercase();
-                
-                if error_msg.contains(&expected_msg) || 
-                   contains_malformed_keyword(&error_msg, &expected_msg) {
+
+                if error_msg.contains(&expected_msg)
+                    || contains_malformed_keyword(&error_msg, &expected_msg)
+                {
                     self.stats.passed += 1;
                     Ok(WastDirectiveInfo {
                         test_type: WastTestType::ErrorHandling,
@@ -416,7 +434,7 @@ impl WastTestRunner {
                         expected_message, encode_error
                     )))
                 }
-            }
+            },
         }
     }
 
@@ -442,13 +460,14 @@ impl WastTestRunner {
                                     "Expected unlinkable module '{}' but linking succeeded",
                                     expected_message
                                 )))
-                            }
+                            },
                             Err(error) => {
                                 let error_msg = error.to_string().to_lowercase();
                                 let expected_msg = expected_message.to_lowercase();
-                                
-                                if error_msg.contains(&expected_msg) || 
-                                   contains_linking_keyword(&error_msg, &expected_msg) {
+
+                                if error_msg.contains(&expected_msg)
+                                    || contains_linking_keyword(&error_msg, &expected_msg)
+                                {
                                     self.stats.passed += 1;
                                     Ok(WastDirectiveInfo {
                                         test_type: WastTestType::ErrorHandling,
@@ -463,16 +482,17 @@ impl WastTestRunner {
                                         expected_message, error
                                     )))
                                 }
-                            }
+                            },
                         }
-                    }
+                    },
                     Err(error) => {
                         // Module loading failed, which might also indicate unlinkable
                         let error_msg = error.to_string().to_lowercase();
                         let expected_msg = expected_message.to_lowercase();
-                        
-                        if error_msg.contains(&expected_msg) || 
-                           contains_linking_keyword(&error_msg, &expected_msg) {
+
+                        if error_msg.contains(&expected_msg)
+                            || contains_linking_keyword(&error_msg, &expected_msg)
+                        {
                             self.stats.passed += 1;
                             Ok(WastDirectiveInfo {
                                 test_type: WastTestType::ErrorHandling,
@@ -487,16 +507,16 @@ impl WastTestRunner {
                                 expected_message, error
                             )))
                         }
-                    }
+                    },
                 }
-            }
+            },
             Err(encode_error) => {
                 self.stats.failed += 1;
                 Err(Error::Validation(format!(
                     "Module encoding failed before linking test: {}",
                     encode_error
                 )))
-            }
+            },
         }
     }
 
@@ -526,13 +546,14 @@ impl WastTestRunner {
                             "Expected resource exhaustion '{}' but execution succeeded",
                             expected_message
                         )))
-                    }
+                    },
                     Err(error) => {
                         let error_msg = error.to_string().to_lowercase();
                         let expected_msg = expected_message.to_lowercase();
-                        
-                        if error_msg.contains(&expected_msg) || 
-                           contains_exhaustion_keyword(&error_msg, &expected_msg) {
+
+                        if error_msg.contains(&expected_msg)
+                            || contains_exhaustion_keyword(&error_msg, &expected_msg)
+                        {
                             self.stats.passed += 1;
                             Ok(WastDirectiveInfo {
                                 test_type: WastTestType::Resource,
@@ -547,13 +568,15 @@ impl WastTestRunner {
                                 expected_message, error
                             )))
                         }
-                    }
+                    },
                 }
-            }
+            },
             _ => {
                 self.stats.failed += 1;
-                Err(Error::Validation("Unsupported execution type for assert_exhaustion".into()))
-            }
+                Err(Error::Validation(
+                    "Unsupported execution type for assert_exhaustion".into(),
+                ))
+            },
         }
     }
 
@@ -580,7 +603,8 @@ impl WastTestRunner {
 
         #[cfg(not(feature = "std"))]
         {
-            // In no_std mode, we can't maintain a registry, but we can still track the directive
+            // In no_std mode, we can't maintain a registry, but we can still track the
+            // directive
             if self.current_module.is_some() {
                 self.stats.passed += 1;
                 return Ok(WastDirectiveInfo {
@@ -593,7 +617,9 @@ impl WastTestRunner {
         }
 
         self.stats.failed += 1;
-        Err(Error::Validation("No module available for registration".into()))
+        Err(Error::Validation(
+            "No module available for registration".into(),
+        ))
     }
 
     /// Handle invoke directive (standalone function call)
@@ -618,11 +644,13 @@ impl WastTestRunner {
                     requires_module_state: true,
                     modifies_engine_state: true,
                 })
-            }
+            },
             _ => {
                 self.stats.failed += 1;
-                Err(Error::Validation("Unsupported execution type for invoke".into()))
-            }
+                Err(Error::Validation(
+                    "Unsupported execution type for invoke".into(),
+                ))
+            },
         }
     }
 
@@ -635,8 +663,8 @@ impl WastTestRunner {
         let buf = ParseBuffer::new(&contents)
             .map_err(|e| Error::Parse(format!("Failed to create parse buffer: {}", e)))?;
 
-        let wast: Wast =
-            parser::parse(&buf).map_err(|e| Error::Parse(format!("Failed to parse WAST: {}", e)))?;
+        let wast: Wast = parser::parse(&buf)
+            .map_err(|e| Error::Parse(format!("Failed to parse WAST: {}", e)))?;
 
         let module = Module::new()?;
         let mut engine = StacklessEngine::new();
@@ -645,11 +673,11 @@ impl WastTestRunner {
             match self.execute_directive(&mut engine, &mut directive) {
                 Ok(_) => {
                     // Test passed, stats already updated in execute_directive
-                }
+                },
                 Err(e) => {
                     eprintln!("WAST directive failed: {}", e);
                     // Error stats already updated in execute_directive
-                }
+                },
             }
         }
 
@@ -661,8 +689,8 @@ impl WastTestRunner {
         let buf = ParseBuffer::new(content)
             .map_err(|e| Error::Parse(format!("Failed to create parse buffer: {}", e)))?;
 
-        let wast: Wast =
-            parser::parse(&buf).map_err(|e| Error::Parse(format!("Failed to parse WAST: {}", e)))?;
+        let wast: Wast = parser::parse(&buf)
+            .map_err(|e| Error::Parse(format!("Failed to parse WAST: {}", e)))?;
 
         let module = Module::new()?;
         let mut engine = StacklessEngine::new();
@@ -671,13 +699,13 @@ impl WastTestRunner {
             match self.execute_directive(&mut engine, &mut directive) {
                 Ok(_) => {
                     // Test passed, stats already updated in execute_directive
-                }
+                },
                 Err(e) => {
                     // In no_std mode, we can't use eprintln!, so we just continue
                     #[cfg(feature = "std")]
                     eprintln!("WAST directive failed: {}", e);
                     // Error stats already updated in execute_directive
-                }
+                },
             }
         }
 
@@ -733,7 +761,7 @@ fn compare_wasm_values(actual: &Value, expected: &Value) -> bool {
             } else {
                 (a - e).abs() < 1e-6
             }
-        }
+        },
         (Value::F64(a), Value::F64(e)) => {
             if e.is_nan() {
                 a.is_nan()
@@ -742,7 +770,7 @@ fn compare_wasm_values(actual: &Value, expected: &Value) -> bool {
             } else {
                 (a - e).abs() < 1e-9
             }
-        }
+        },
         (Value::V128(a), Value::V128(e)) => a == e,
         (a, e) => a == e,
     }
@@ -751,57 +779,88 @@ fn compare_wasm_values(actual: &Value, expected: &Value) -> bool {
 // Helper functions for error message classification
 fn contains_trap_keyword(error_msg: &str, expected_msg: &str) -> bool {
     let trap_keywords = [
-        "divide by zero", "integer overflow", "invalid conversion", "unreachable",
-        "out of bounds", "undefined element", "uninitialized", "trap"
+        "divide by zero",
+        "integer overflow",
+        "invalid conversion",
+        "unreachable",
+        "out of bounds",
+        "undefined element",
+        "uninitialized",
+        "trap",
     ];
-    
-    trap_keywords.iter().any(|keyword| 
-        error_msg.contains(keyword) || expected_msg.contains(keyword)
-    )
+
+    trap_keywords
+        .iter()
+        .any(|keyword| error_msg.contains(keyword) || expected_msg.contains(keyword))
 }
 
 fn contains_validation_keyword(error_msg: &str, expected_msg: &str) -> bool {
     let validation_keywords = [
-        "type mismatch", "unknown", "invalid", "malformed", "validation",
-        "expected", "duplicate", "import", "export"
+        "type mismatch",
+        "unknown",
+        "invalid",
+        "malformed",
+        "validation",
+        "expected",
+        "duplicate",
+        "import",
+        "export",
     ];
-    
-    validation_keywords.iter().any(|keyword|
-        error_msg.contains(keyword) || expected_msg.contains(keyword)
-    )
+
+    validation_keywords
+        .iter()
+        .any(|keyword| error_msg.contains(keyword) || expected_msg.contains(keyword))
 }
 
 fn contains_malformed_keyword(error_msg: &str, expected_msg: &str) -> bool {
     let malformed_keywords = [
-        "malformed", "unexpected end", "invalid", "encoding", "format",
-        "binary", "section", "leb128"
+        "malformed",
+        "unexpected end",
+        "invalid",
+        "encoding",
+        "format",
+        "binary",
+        "section",
+        "leb128",
     ];
-    
-    malformed_keywords.iter().any(|keyword|
-        error_msg.contains(keyword) || expected_msg.contains(keyword)
-    )
+
+    malformed_keywords
+        .iter()
+        .any(|keyword| error_msg.contains(keyword) || expected_msg.contains(keyword))
 }
 
 fn contains_linking_keyword(error_msg: &str, expected_msg: &str) -> bool {
     let linking_keywords = [
-        "unknown import", "incompatible import", "link", "import", "export",
-        "module", "instantiation", "missing"
+        "unknown import",
+        "incompatible import",
+        "link",
+        "import",
+        "export",
+        "module",
+        "instantiation",
+        "missing",
     ];
-    
-    linking_keywords.iter().any(|keyword|
-        error_msg.contains(keyword) || expected_msg.contains(keyword)
-    )
+
+    linking_keywords
+        .iter()
+        .any(|keyword| error_msg.contains(keyword) || expected_msg.contains(keyword))
 }
 
 fn contains_exhaustion_keyword(error_msg: &str, expected_msg: &str) -> bool {
     let exhaustion_keywords = [
-        "stack overflow", "call stack exhausted", "out of fuel", "limit exceeded",
-        "resource", "exhausted", "overflow", "fuel"
+        "stack overflow",
+        "call stack exhausted",
+        "out of fuel",
+        "limit exceeded",
+        "resource",
+        "exhausted",
+        "overflow",
+        "fuel",
     ];
-    
-    exhaustion_keywords.iter().any(|keyword|
-        error_msg.contains(keyword) || expected_msg.contains(keyword)
-    )
+
+    exhaustion_keywords
+        .iter()
+        .any(|keyword| error_msg.contains(keyword) || expected_msg.contains(keyword))
 }
 
 // Integration with test registry
@@ -815,7 +874,7 @@ impl Default for WastTestRunner {
 #[cfg(feature = "std")]
 pub fn register_wast_tests() {
     let registry = TestRegistry::global();
-    
+
     // Register a test suite for WAST file execution
     let test_case = wrt_test_registry::TestCaseImpl {
         name: "wast_testsuite_runner",
@@ -840,7 +899,7 @@ fn run_wast_testsuite_tests() -> wrt_test_registry::TestResult {
         Some(path) => path,
         None => {
             return wrt_test_registry::TestResult::Ok(());
-        }
+        },
     };
 
     let testsuite_dir = Path::new(&testsuite_path);
@@ -855,7 +914,7 @@ fn run_wast_testsuite_tests() -> wrt_test_registry::TestResult {
     // Run a subset of basic tests for demonstration
     let test_files = [
         "i32.wast",
-        "i64.wast", 
+        "i64.wast",
         "f32.wast",
         "f64.wast",
         "const.wast",
@@ -868,13 +927,15 @@ fn run_wast_testsuite_tests() -> wrt_test_registry::TestResult {
             total_files += 1;
             match runner.run_wast_file(&file_path) {
                 Ok(stats) => {
-                    println!("✓ {} - {} passed, {} failed", 
-                        file_name, stats.passed, stats.failed);
-                }
+                    println!(
+                        "✓ {} - {} passed, {} failed",
+                        file_name, stats.passed, stats.failed
+                    );
+                },
                 Err(e) => {
                     eprintln!("✗ {} - Error: {}", file_name, e);
                     failed_files += 1;
-                }
+                },
             }
         }
     }
@@ -884,12 +945,14 @@ fn run_wast_testsuite_tests() -> wrt_test_registry::TestResult {
         wrt_test_registry::TestResult::Ok(())
     } else {
         wrt_test_registry::TestResult::Err(format!(
-            "{}/{} WAST files failed", failed_files, total_files
+            "{}/{} WAST files failed",
+            failed_files, total_files
         ))
     }
 }
 
-/// Utility function to get the test suite path from environment variables (std only)
+/// Utility function to get the test suite path from environment variables (std
+/// only)
 #[cfg(feature = "std")]
 fn get_testsuite_path() -> Option<String> {
     std::env::var("WASM_TESTSUITE").ok()
@@ -918,13 +981,22 @@ mod tests {
         // Test exact values
         assert!(compare_wasm_values(&Value::I32(42), &Value::I32(42)));
         assert!(!compare_wasm_values(&Value::I32(42), &Value::I32(43)));
-        
+
         // Test NaN handling
-        assert!(compare_wasm_values(&Value::F32(f32::NAN), &Value::F32(f32::NAN)));
-        assert!(!compare_wasm_values(&Value::F32(1.0), &Value::F32(f32::NAN)));
-        
+        assert!(compare_wasm_values(
+            &Value::F32(f32::NAN),
+            &Value::F32(f32::NAN)
+        ));
+        assert!(!compare_wasm_values(
+            &Value::F32(1.0),
+            &Value::F32(f32::NAN)
+        ));
+
         // Test tolerance for floats
-        assert!(compare_wasm_values(&Value::F32(1.0), &Value::F32(1.0000001)));
+        assert!(compare_wasm_values(
+            &Value::F32(1.0),
+            &Value::F32(1.0000001)
+        ));
     }
 
     #[test]

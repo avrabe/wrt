@@ -4,7 +4,11 @@
 // SPDX-License-Identifier: MIT
 
 use wrt_error::kinds::PoisonedLockError;
-use wrt_foundation::bounded::BoundedVec;
+use wrt_foundation::{
+    bounded::BoundedVec,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use super::{ResourceId, ResourceTable};
 use crate::prelude::*;
@@ -21,7 +25,7 @@ pub const MAX_ARENA_RESOURCES: usize = 64;
 #[derive(Clone)]
 pub struct ResourceArena<'a> {
     /// Handles to resources managed by this arena - using BoundedVec for no_std
-    resources: BoundedVec<u32, MAX_ARENA_RESOURCES, NoStdProvider<65536>>,
+    resources: BoundedVec<u32, MAX_ARENA_RESOURCES>,
     /// The resource table used for actual resource management
     table: &'a Mutex<ResourceTable>,
     /// Name of this arena, for debugging
@@ -31,12 +35,26 @@ pub struct ResourceArena<'a> {
 impl<'a> ResourceArena<'a> {
     /// Create a new resource arena with the given resource table
     pub fn new(table: &'a Mutex<ResourceTable>) -> Result<Self> {
-        Ok(Self { resources: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(), table, name: None })
+        Ok(Self { 
+            resources: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            }, 
+            table, 
+            name: None 
+        })
     }
 
     /// Create a new resource arena with the given name
     pub fn new_with_name(table: &'a Mutex<ResourceTable>, name: &'a str) -> Result<Self> {
-        Ok(Self { resources: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(), table, name: Some(name) })
+        Ok(Self { 
+            resources: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            }, 
+            table, 
+            name: Some(name) 
+        })
     }
 
     /// Create a resource in this arena
@@ -49,28 +67,17 @@ impl<'a> ResourceArena<'a> {
         data: Box<dyn Any + Send + Sync>,
     ) -> Result<u32> {
         let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Component not found"),
             )
         })?;
 
         let handle = table.create_resource(type_idx, data)?;
         // Add to arena's resources, checking capacity
         if self.resources.len() >= MAX_ARENA_RESOURCES {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                &format!("Maximum arena resources reached: {}", MAX_ARENA_RESOURCES)
-            ));
+            return Err(Error::runtime_execution_error("Maximum arena resources reached: {}"));
         }
         self.resources.push(handle).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Failed to add resource to arena"
-            )
+            Error::resource_error("Failed to add resource to arena")
         })?;
 
         Ok(handle)
@@ -84,10 +91,7 @@ impl<'a> ResourceArena<'a> {
         name: &str,
     ) -> Result<u32> {
         let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                "Resource table lock poisoned"
+            Error::runtime_poisoned_lock("Resource table lock poisoned")
             )
         })?;
 
@@ -105,20 +109,12 @@ impl<'a> ResourceArena<'a> {
         if self.resources.len() >= MAX_ARENA_RESOURCES {
             // Clean up the resource we just created since we can't track it
             let _ = table.drop_resource(handle);
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                &format!("Maximum arena resources reached: {}", MAX_ARENA_RESOURCES)
-            ));
+            return Err(Error::runtime_execution_error("Maximum arena resources reached: {}"));
         }
         self.resources.push(handle).map_err(|_| {
             // Clean up the resource we just created since we can't track it
             let _ = table.drop_resource(handle);
-            Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Component not found",
-            )
+            Error::resource_error("Component not found")
         })?;
 
         Ok(handle)
@@ -127,10 +123,7 @@ impl<'a> ResourceArena<'a> {
     /// Get access to a resource
     pub fn get_resource(&self, handle: u32) -> Result<Box<Mutex<super::Resource>>> {
         let table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Component not found"),
             )
         })?;
 
@@ -147,10 +140,7 @@ impl<'a> ResourceArena<'a> {
 
         // Then check if it exists in the table
         let table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Component not found"),
             )
         })?;
 
@@ -177,19 +167,12 @@ impl<'a> ResourceArena<'a> {
     pub fn drop_resource(&mut self, handle: u32) -> Result<()> {
         // First remove it from our tracking
         if !self.remove_resource(handle) {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Component not found",
-            ));
+            return Err(Error::resource_error("Component not found"));
         }
 
         // Then drop it from the table
         let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Component not found"),
             )
         })?;
 
@@ -203,10 +186,7 @@ impl<'a> ResourceArena<'a> {
         }
 
         let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Component not found"),
             )
         })?;
 
@@ -273,7 +253,7 @@ mod tests {
     #[test]
     fn test_create_and_release() {
         // Create a resource table
-        let table = Mutex::new(ResourceTable::new());
+        let table = Mutex::new(ResourceTable::new().unwrap());
 
         // Create an arena
         let mut arena = ResourceArena::new(&table).unwrap();
@@ -304,7 +284,7 @@ mod tests {
     #[test]
     fn test_drop_specific_resource() {
         // Create a resource table
-        let table = Mutex::new(ResourceTable::new());
+        let table = Mutex::new(ResourceTable::new().unwrap());
 
         // Create an arena
         let mut arena = ResourceArena::new(&table).unwrap();
@@ -329,7 +309,7 @@ mod tests {
     #[test]
     fn test_auto_release_on_drop() {
         // Create a resource table
-        let table = Mutex::new(ResourceTable::new());
+        let table = Mutex::new(ResourceTable::new().unwrap());
 
         // Create resources in a scope
         {
@@ -350,7 +330,7 @@ mod tests {
     #[test]
     fn test_named_resource() {
         // Create a resource table
-        let table = Mutex::new(ResourceTable::new());
+        let table = Mutex::new(ResourceTable::new().unwrap());
 
         // Create an arena with name
         let mut arena = ResourceArena::new_with_name(&table, "test-arena").unwrap();
@@ -371,7 +351,7 @@ mod tests {
     #[test]
     fn test_resource_capacity() {
         // Create a resource table
-        let table = Mutex::new(ResourceTable::new());
+        let table = Mutex::new(ResourceTable::new().unwrap());
 
         // Create an arena
         let mut arena = ResourceArena::new(&table).unwrap();

@@ -1,6 +1,9 @@
 use wrt_foundation::{
     bounded::{BoundedVec, MAX_DWARF_FILE_TABLE},
-    BoundedCapacity, NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+    safe_memory::NoStdProvider,
+    BoundedCapacity,
 };
 
 /// File table support for resolving file indices to paths
@@ -23,7 +26,12 @@ pub struct FileEntry<'a> {
 // Implement required traits for BoundedVec compatibility
 impl<'a> Default for FileEntry<'a> {
     fn default() -> Self {
-        Self { path: DebugString::default(), dir_index: 0, mod_time: 0, size: 0 }
+        Self {
+            path: DebugString::default(),
+            dir_index: 0,
+            mod_time: 0,
+            size: 0,
+        }
     }
 }
 
@@ -96,11 +104,16 @@ impl<'a> FileTable<'a> {
     /// Create a new empty file table
     pub fn new() -> Self {
         // BoundedVec::new returns a Result, so we need to handle it
-        let directories =
-            BoundedVec::new(NoStdProvider::<{ MAX_DWARF_FILE_TABLE * 32 }>::default())
-                .expect("Failed to create directories BoundedVec");
-        let files = BoundedVec::new(NoStdProvider::<{ MAX_DWARF_FILE_TABLE * 64 }>::default())
-            .expect("Failed to create files BoundedVec");
+        let directories = {
+            let provider = safe_managed_alloc!({ MAX_DWARF_FILE_TABLE * 32 }, CrateId::Debug)
+                .unwrap_or_else(|_| NoStdProvider::<{ MAX_DWARF_FILE_TABLE * 32 }>::default());
+            BoundedVec::new(provider).expect("Failed to create directories BoundedVec")
+        };
+        let files = {
+            let provider = safe_managed_alloc!({ MAX_DWARF_FILE_TABLE * 64 }, CrateId::Debug)
+                .unwrap_or_else(|_| NoStdProvider::<{ MAX_DWARF_FILE_TABLE * 64 }>::default());
+            BoundedVec::new(provider).expect("Failed to create files BoundedVec")
+        };
         Self { directories, files }
     }
 
@@ -141,11 +154,17 @@ impl<'a> FileTable<'a> {
 
         if file.dir_index == 0 {
             // File is relative to compilation directory
-            Some(FilePath { directory: None, filename: file.path })
+            Some(FilePath {
+                directory: None,
+                filename: file.path,
+            })
         } else {
             // File has explicit directory
             let directory = self.get_directory(file.dir_index)?;
-            Some(FilePath { directory: Some(directory), filename: file.path })
+            Some(FilePath {
+                directory: Some(directory),
+                filename: file.path,
+            })
         }
     }
 

@@ -4,12 +4,14 @@
 //! for the Kani model checker to verify the correctness of
 //! the interceptor implementation.
 
+
 // Only compile Kani verification code when documentation is being generated
 // or when explicitly running cargo kani. This prevents interference with
 // coverage testing.
-#[cfg(any(doc, feature = "kani"))]
+#[cfg(all(feature = "kani", feature = "std"))]
 pub mod proofs {
     use std::sync::Arc;
+    use std::vec::Vec;
 
     use wrt_error::Result;
     use wrt_foundation::values::Value;
@@ -123,7 +125,7 @@ pub mod proofs {
 
         let args = vec![Value::I32(10)];
         let result = interceptor.intercept_call("target", "func", args.clone(), |_| {
-            Err(wrt_error::Error::new(wrt_error::kinds::ExecutionError("Test error".to_string())))
+            Err(wrt_error::Error::runtime_execution_error("Test error")))
         });
 
         assert!(result.is_err());
@@ -131,5 +133,5 @@ pub mod proofs {
 }
 
 // Expose the verification module in docs but not for normal compilation
-#[cfg(any(doc, feature = "kani"))]
+#[cfg(all(feature = "kani", feature = "std"))]
 pub use proofs::*;

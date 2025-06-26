@@ -254,7 +254,7 @@ Advanced Runtime Requirements
 
 .. req:: Advanced Threading Support
    :id: REQ_FUNC_031
-   :status: implemented
+   :status: partial
    
    The interpreter shall implement advanced threading capabilities including:
    - Task manager with cancellation support

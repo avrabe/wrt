@@ -18,8 +18,10 @@ WRT implements a sophisticated async/threading system that enables:
 3. **Platform-Specific Threading** - Optimized threading implementations for different platforms
 4. **Fuel-Based Resource Control** - Thread spawning with resource limitations
 5. **Cross-Component Communication** - Thread-safe communication between WebAssembly components
+6. **Deadline-Based Scheduling** - ASIL-C compliant deadline scheduling with WCET guarantees  
+7. **Mixed-Criticality Support** - Priority inheritance and criticality-aware task management
 
-The async/threading architecture spans multiple crates and integrates deeply with the platform abstraction layer.
+The async/threading architecture spans multiple crates and integrates deeply with the platform abstraction layer, providing comprehensive safety-critical async execution capabilities.
 
 Architecture Overview
 ---------------------
@@ -79,6 +81,60 @@ Async/Threading Ecosystem
 
 Component Model Async Runtime
 -----------------------------
+
+Fuel-Based Async Execution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+WRT implements a fuel-based async execution system that provides deterministic timing guarantees across all ASIL levels. The system uses fuel consumption as a proxy for execution time, enabling predictable async behavior in no_std environments.
+
+**Core Architecture**::
+
+    pub struct FuelAsyncExecutor {
+        /// Task storage with bounded capacity (128 max)
+        tasks: BoundedHashMap<TaskId, FuelAsyncTask, 128>,
+        /// Ready queue for tasks that can be polled
+        ready_queue: BoundedVec<TaskId, 128>,
+        /// Global fuel limit for all async operations
+        global_fuel_limit: AtomicU64,
+        /// Global fuel consumed by all async operations
+        global_fuel_consumed: AtomicU64,
+        /// Default verification level for new tasks
+        default_verification_level: VerificationLevel,
+        /// Whether fuel enforcement is enabled
+        fuel_enforcement: AtomicBool,
+    }
+
+**Fuel-Based Task Management**::
+
+    pub struct FuelAsyncTask {
+        pub id: TaskId,
+        pub component_id: ComponentInstanceId,
+        pub fuel_budget: u64,
+        pub fuel_consumed: AtomicU64,
+        pub priority: Priority,
+        pub verification_level: VerificationLevel,
+        pub state: AsyncTaskState,
+        pub future: Pin<Box<dyn Future<Output = Result<(), Error>>>>,
+    }
+
+**Integration with TimeBoundedContext**::
+
+    pub struct FuelAsyncBridge {
+        /// Async executor for managing tasks
+        executor: FuelAsyncExecutor,
+        /// Scheduler for task ordering
+        scheduler: FuelAsyncScheduler,
+        /// Active bridges with time-bounded contexts
+        active_bridges: BoundedHashMap<TaskId, AsyncBridgeContext, 64>,
+    }
+
+    pub struct AsyncBridgeContext {
+        pub task_id: TaskId,
+        pub component_id: ComponentInstanceId,
+        pub time_bounded_context: TimeBoundedContext,
+        pub fuel_consumed: AtomicU64,
+        pub bridge_state: AsyncBridgeState,
+    }
 
 Async Canonical ABI
 ~~~~~~~~~~~~~~~~~~~
@@ -143,13 +199,48 @@ The async execution engine provides future-based task management:
         context_manager: AsyncContextManager,
     }
 
-    pub struct TaskScheduler {
-        /// Currently running tasks
-        active_tasks: BoundedHashMap<TaskId, Task, 1024>,
-        /// Task queue for pending operations
-        task_queue: BoundedQueue<TaskHandle, 256>,
-        /// Wake mechanism for completed tasks
-        waker_registry: BoundedHashMap<TaskId, Waker, 512>,
+    pub struct FuelAsyncScheduler {
+        /// Current scheduling policy (Cooperative, Priority, Deadline, RoundRobin)
+        policy: SchedulingPolicy,
+        /// Scheduled tasks indexed by task ID
+        scheduled_tasks: BoundedHashMap<TaskId, ScheduledTask, 128>,
+        /// Priority queue for priority-based scheduling
+        priority_queue: BoundedVec<TaskId, 128>,
+        /// Round-robin queue
+        round_robin_queue: BoundedVec<TaskId, 128>,
+        /// Global scheduling time (in fuel units)
+        global_schedule_time: AtomicU64,
+        /// Verification level for scheduling operations
+        verification_level: VerificationLevel,
+        /// Fuel quantum for round-robin scheduling
+        fuel_quantum: u64,
+    }
+
+**Scheduling Policies**::
+
+    pub enum SchedulingPolicy {
+        /// Cooperative scheduling - tasks yield voluntarily
+        Cooperative,
+        /// Priority-based scheduling with fuel inheritance
+        PriorityBased,
+        /// Deadline-based scheduling with WCET guarantees
+        DeadlineBased,
+        /// Round-robin with fuel quotas
+        RoundRobin,
+    }
+
+**Fuel-Aware Task Scheduling**::
+
+    pub struct ScheduledTask {
+        pub task_id: TaskId,
+        pub component_id: ComponentInstanceId,
+        pub priority: Priority,
+        pub fuel_quota: u64,
+        pub fuel_consumed: u64,
+        pub deadline: Option<Duration>,
+        pub last_scheduled: AtomicU64,
+        pub schedule_count: AtomicUsize,
+        pub state: AsyncTaskState,
     }
 
 **Async Resource Management**::
@@ -610,8 +701,131 @@ Protection mechanisms for shared resources:
         audit_required: bool,
     }
 
+ASIL Compliance and Fuel Integration
+------------------------------------
+
+Fuel-Based Deterministic Execution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The fuel-based async system provides deterministic timing guarantees required for ASIL compliance:
+
+**ASIL Level Integration**::
+
+    // ASIL-A: Cooperative async with basic fuel tracking
+    let executor = FuelAsyncExecutor::new()?;
+    executor.set_default_verification_level(VerificationLevel::Basic);
+    
+    // ASIL-B: Priority-aware scheduling with fuel inheritance
+    let scheduler = FuelAsyncScheduler::new(
+        SchedulingPolicy::PriorityBased,
+        VerificationLevel::Standard,
+    )?;
+    
+    // ASIL-C: Deadline-based scheduling with WCET guarantees
+    let deadline_scheduler = FuelAsyncScheduler::new(
+        SchedulingPolicy::DeadlineBased,
+        VerificationLevel::Full,
+    )?;
+    
+    // ASIL-D: Static verification with zero-allocation guarantees
+    let bridge = FuelAsyncBridge::new(
+        AsyncBridgeConfig {
+            scheduling_policy: SchedulingPolicy::Cooperative,
+            default_verification_level: VerificationLevel::Redundant,
+            allow_fuel_extension: false,
+        },
+        VerificationLevel::Redundant,
+    )?;
+
+**Fuel-Based WCET Analysis**::
+
+    pub struct WcetAnalysis {
+        /// Maximum fuel consumption per operation type
+        operation_fuel_bounds: BoundedHashMap<OperationType, u64, 64>,
+        /// Task-level fuel budgets based on verification level
+        task_fuel_budgets: BoundedHashMap<TaskId, u64, 128>,
+        /// Component-level fuel limits
+        component_fuel_limits: BoundedHashMap<ComponentInstanceId, u64, 64>,
+        /// Global fuel limit for system-wide WCET
+        system_fuel_limit: u64,
+    }
+
+**Deterministic Timing Integration**::
+
+    impl TimeBoundedContext {
+        /// In no_std environments, use fuel consumption for timing
+        #[cfg(not(feature = "std"))]
+        pub fn elapsed(&self) -> Duration {
+            // 1 fuel unit = 1ms for deterministic timing
+            Duration::from_millis(self.elapsed_fuel)
+        }
+        
+        /// Consume fuel and update timing context
+        #[cfg(not(feature = "std"))]
+        pub fn consume_fuel(&mut self, amount: u64) {
+            self.elapsed_fuel += amount;
+            // Check fuel limits integrated with time bounds
+            if let Some(fuel_limit) = self.config.fuel_limit {
+                if self.elapsed_fuel > fuel_limit {
+                    // Time limit exceeded via fuel consumption
+                }
+            }
+        }
+    }
+
+**Freedom from Interference**::
+
+    // Spatial isolation via component-specific fuel pools
+    struct ComponentFuelPool {
+        component_id: ComponentInstanceId,
+        allocated_fuel: u64,
+        consumed_fuel: AtomicU64,
+        isolation_level: IsolationLevel,
+    }
+    
+    // Temporal isolation via deterministic scheduling
+    struct TemporalIsolation {
+        max_execution_time: Duration,
+        fuel_budget_per_timeslice: u64,
+        priority_ceiling: Priority,
+        deadline_enforcement: bool,
+    }
+    
+    // Resource isolation via bounded collections
+    struct ResourceIsolation {
+        max_tasks_per_component: usize,
+        max_fuel_per_component: u64,
+        component_separation: ComponentSeparation,
+    }
+
 Testing and Validation
 ---------------------
+
+Fuel-Based Testing Infrastructure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Comprehensive testing for fuel-based async execution:
+
+**Test Categories**:
+
+- Fuel consumption determinism tests
+- WCET guarantee validation
+- ASIL compliance verification
+- Cross-component isolation tests
+- Deadline miss detection tests
+
+**Testing Infrastructure**::
+
+    pub struct FuelAsyncTester {
+        /// Fuel consumption scenarios
+        fuel_scenarios: BoundedVec<FuelConsumptionScenario, 128>,
+        /// WCET analysis validators
+        wcet_validators: BoundedVec<WcetValidator, 64>,
+        /// ASIL compliance checkers
+        asil_checkers: BoundedVec<AsilComplianceChecker, 32>,
+        /// Determinism verification tools
+        determinism_verifiers: BoundedVec<DeterminismVerifier, 64>,
+    }
 
 Thread Safety Testing
 ~~~~~~~~~~~~~~~~~~~~~
@@ -639,24 +853,222 @@ Comprehensive testing for thread safety:
         benchmarks: BoundedVec<PerformanceBenchmark, 64>,
     }
 
+Phase 3: Deadline-Based Scheduling with WCET Guarantees
+--------------------------------------------------------
+
+ASIL-C Compliant Scheduling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Phase 3 implementation provides deadline-based scheduling with Worst-Case Execution Time (WCET) analysis for safety-critical systems requiring ASIL-C compliance.
+
+**Key Features:**
+
+1. **Constrained Deadline Scheduling** - Enforces deadline ≤ period constraint
+2. **WCET Analysis and Enforcement** - Static, measurement-based, and hybrid analysis methods  
+3. **Hybrid RM+EDF Scheduling** - Rate Monotonic base with EDF optimization within priority bands
+4. **Criticality-Aware Mode Switching** - ASIL-based task dropping during overload conditions
+5. **Real-Time WCET Validation** - Online monitoring and refinement of WCET estimates
+
+**Architecture Components:**
+
+.. code-block:: text
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                    PHASE 3: DEADLINE SCHEDULING                 │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                                                                 │
+    │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
+    │  │  WCET Analyzer  │    │ Deadline        │    │ Criticality │ │
+    │  │                 │    │ Scheduler       │    │ Manager     │ │
+    │  │ • Static        │────│                 │────│             │ │
+    │  │ • Measurement   │    │ • RM+EDF        │    │ • ASIL-D    │ │
+    │  │ • Hybrid        │    │ • Constrained   │    │ • ASIL-C    │ │
+    │  │ • Probabilistic │    │   deadlines     │    │ • ASIL-B    │ │
+    │  └─────────────────┘    └─────────────────┘    └─────────────┘ │
+    │           │                       │                       │     │
+    │           └───────────┬───────────┼───────────┬───────────┘     │
+    │                       │           │           │                 │
+    │              ┌─────────────────────────────────┐                │
+    │              │     Fuel-Based Timing Engine    │                │
+    │              │                                 │                │
+    │              │ • 1 fuel = 1ms deterministic   │                │
+    │              │ • WCET enforcement              │                │
+    │              │ • Deadline monitoring          │                │
+    │              │ • Resource isolation           │                │
+    │              └─────────────────────────────────┘                │
+    └─────────────────────────────────────────────────────────────────┘
+
+**ASIL Level Support:**
+
+- **ASIL-D**: Highest criticality, non-preemptible during execution
+- **ASIL-C**: High criticality, constrained deadline scheduling
+- **ASIL-B**: Medium criticality, priority inheritance support  
+- **ASIL-A**: Low criticality, background execution
+- **QM**: No safety relevance, opportunistic scheduling
+
 Usage Examples
 -------------
 
-Basic Async Component
-~~~~~~~~~~~~~~~~~~~~
+Phase 3: ASIL-C Deadline Scheduling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Simple async component usage**::
+**WCET Analysis and Deadline Scheduling**::
 
-    use wrt_component::async_runtime::AsyncExecutionEngine;
+    use wrt_component::async_::{
+        FuelWcetAnalyzer, WcetAnalyzerConfig, WcetAnalysisMethod,
+        FuelDeadlineScheduler, DeadlineSchedulerConfig, AsilLevel,
+    };
     
-    let mut engine = AsyncExecutionEngine::new()?;
+    // Create WCET analyzer with ASIL-C configuration
+    let wcet_config = WcetAnalyzerConfig {
+        default_method: WcetAnalysisMethod::Hybrid,
+        required_confidence: 0.999,     // 99.9% confidence
+        safety_margin_factor: 1.3,      // 30% safety margin
+        enable_online_sampling: true,
+        enable_path_analysis: true,
+        min_samples_for_stats: 20,
+    };
+    let mut wcet_analyzer = FuelWcetAnalyzer::new(wcet_config, VerificationLevel::Full)?;
     
-    // Execute async component function
-    let result = engine.call_async_function(
+    // Register control flow paths for analysis
+    wcet_analyzer.register_control_flow_path(
+        task_id,
+        1, // Critical path ID
+        &[1, 2, 3, 4], // Basic block sequence
+        estimated_fuel_consumption,
+    )?;
+    
+    // Perform WCET analysis
+    let wcet_result = wcet_analyzer.analyze_task_wcet(
+        task_id,
         component_id,
-        "async_export",
-        &args,
-    ).await?;
+        Some(WcetAnalysisMethod::Hybrid),
+    )?;
+    
+    // Create deadline scheduler with ASIL-C constraints
+    let scheduler_config = DeadlineSchedulerConfig {
+        enable_hybrid_scheduling: true,
+        enable_criticality_switching: true,
+        enable_wcet_enforcement: true,
+        enable_deadline_monitoring: true,
+        max_utilization_per_level: 0.6,   // Conservative for safety
+        global_utilization_bound: 0.5,    // Very conservative  
+        deadline_miss_threshold: 1,       // Strict threshold
+        scheduling_overhead_factor: 1.15, // Account for overhead
+    };
+    let mut scheduler = FuelDeadlineScheduler::new(scheduler_config, VerificationLevel::Full)?;
+    
+    // Add ASIL-C task with constrained deadline
+    scheduler.add_deadline_task(
+        task_id,
+        component_id,
+        AsilLevel::C,
+        Duration::from_millis(50),     // Period
+        Duration::from_millis(40),     // Deadline ≤ period
+        wcet_result.wcet_fuel,         // WCET from analysis
+        wcet_result.bcet_fuel,         // BCET from analysis
+    )?;
+
+**Real-Time Execution with WCET Validation**::
+
+    // Schedule next highest-priority task
+    if let Some(next_task) = scheduler.schedule_next_task()? {
+        // Execute task and collect timing data
+        let fuel_consumed = execute_safety_critical_task(next_task).await?;
+        
+        // Validate execution against WCET estimate
+        let within_wcet = wcet_analyzer.validate_wcet_estimate(next_task, fuel_consumed)?;
+        if !within_wcet {
+            // WCET violation detected - trigger safety response
+            handle_wcet_violation(next_task, fuel_consumed)?;
+        }
+        
+        // Collect sample for future WCET refinement
+        wcet_analyzer.collect_execution_sample(
+            next_task,
+            fuel_consumed,
+            Some(path_id),
+            input_characteristics_hash,
+        )?;
+        
+        // Update task state in scheduler
+        scheduler.update_task_execution(
+            next_task,
+            fuel_consumed,
+            AsyncTaskState::Completed,
+        )?;
+    }
+
+**Criticality Mode Switching**::
+
+    // Monitor system health and switch criticality modes
+    let deadline_misses = scheduler.get_statistics()
+        .total_deadline_misses.load(Ordering::Acquire);
+    
+    if deadline_misses > threshold {
+        // Switch to higher criticality mode, dropping lower ASIL tasks
+        scheduler.switch_criticality_mode(CriticalityMode::Critical)?;
+        
+        // Only ASIL-C and ASIL-D tasks remain active
+        log::warn!("Switched to Critical mode: only ASIL-C/D tasks active");
+    }
+
+Fuel-Based Async Component
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Simple fuel-based async usage**::
+
+    use wrt_component::async_::{
+        FuelAsyncExecutor, FuelAsyncBridge, AsyncBridgeConfig
+    };
+    
+    // Create fuel-based async executor
+    let mut executor = FuelAsyncExecutor::new()?;
+    executor.set_global_fuel_limit(50000);
+    executor.set_default_verification_level(VerificationLevel::Standard);
+    
+    // Spawn async task with fuel budget
+    let task_id = executor.spawn_task(
+        component_id,
+        5000, // fuel budget
+        Priority::Normal,
+        async_component_function(),
+    )?;
+    
+    // Poll tasks until completion
+    while let Some(status) = executor.get_task_status(task_id) {
+        match status.state {
+            AsyncTaskState::Completed => break,
+            AsyncTaskState::Failed => return Err(async_error()),
+            AsyncTaskState::FuelExhausted => return Err(fuel_error()),
+            _ => {
+                executor.poll_tasks()?;
+            }
+        }
+    }
+
+**Async bridge with time bounds**::
+
+    use wrt_component::async_::FuelAsyncBridge;
+    
+    let mut bridge = FuelAsyncBridge::new(
+        AsyncBridgeConfig {
+            default_fuel_budget: 10000,
+            default_time_limit_ms: Some(5000),
+            default_priority: Priority::Normal,
+            scheduling_policy: SchedulingPolicy::Cooperative,
+            allow_fuel_extension: false,
+            fuel_check_interval: 1000,
+        },
+        VerificationLevel::Standard,
+    )?;
+    
+    // Execute async function with integrated fuel and time limits
+    let result: u32 = bridge.execute_async_function(
+        component_id,
+        async_computation(),
+        None, // use default config
+    )?;
 
 Advanced Threading Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

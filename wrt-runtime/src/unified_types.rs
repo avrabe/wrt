@@ -250,10 +250,7 @@ where
     
     fn allocate(&mut self, size: usize) -> core::result::Result<&mut [u8], Self::Error> {
         if self.allocated_bytes + size > self.max_memory {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::INSUFFICIENT_MEMORY,
-                "Allocation would exceed platform memory limits",
+            return Err(Error::runtime_execution_error(",
             ));
         }
         
@@ -263,8 +260,7 @@ where
         Err(Error::new(
             ErrorCategory::Memory,
             codes::NOT_IMPLEMENTED,
-            "Actual memory allocation not implemented in type system",
-        ))
+            "))
     }
     
     fn deallocate(&mut self, ptr: &mut [u8]) -> core::result::Result<(), Self::Error> {

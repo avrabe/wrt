@@ -7,58 +7,38 @@ Getting Started
    :align: right
    :alt: WRT Logo
 
-Welcome to WRT (WebAssembly Runtime)! This guide will help you install and set up WRT on various platforms, from development environments to embedded systems.
+Welcome to PulseEngine (WRT Edition)! This guide will help you install and set up PulseEngine on various platforms, from development environments to embedded systems.
 
 .. contents:: On this page
    :local:
    :depth: 2
 
-Prerequisites
-=============
-
-WRT requires the following to build and run:
-
-* **Rust**: Version 1.86.0 or newer (stable channel)
-* **just**: Command runner for build automation
-* **Git**: For source code management
-* **Platform-specific tools**: Varies by target platform
-
 Quick Start
 ===========
 
-For most development scenarios, follow these steps:
+For comprehensive installation instructions including prerequisites, platform-specific notes, and troubleshooting, see the :doc:`installation` guide.
 
-1. **Install Rust** (if not already installed):
+For most development scenarios, follow these quick steps:
 
-   .. code-block:: bash
-
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-      source ~/.cargo/env
-
-2. **Install just** (build tool):
-
-   .. code-block:: bash
-
-      cargo install just
-
-3. **Clone the repository**:
+1. **Clone the repository**:
 
    .. code-block:: bash
 
       git clone https://github.com/pulseengine/wrt.git
       cd wrt
 
-4. **Build and test**:
+2. **Build and test** (requires Rust 1.86.0+):
 
    .. code-block:: bash
 
-      just build
-      just ci-test
+      cargo install --path cargo-wrt
+      cargo-wrt build
+      cargo-wrt test
 
 Supported Platforms
 ===================
 
-WRT supports a wide range of platforms, from development machines to embedded systems:
+PulseEngine supports a wide range of platforms, from development machines to embedded systems:
 
 .. grid:: 2
 
@@ -97,7 +77,7 @@ WRT supports a wide range of platforms, from development machines to embedded sy
 Basic Usage
 ===========
 
-Once installed, you can use WRT in several ways:
+Once installed, you can use PulseEngine in several ways:
 
 Command Line Interface
 ----------------------
@@ -107,15 +87,15 @@ Run WebAssembly modules directly:
 .. code-block:: bash
 
    # Run a simple module
-   just test-wrtd-example
+   cargo-wrt wrtd
 
-   # Run with custom parameters
-   just test-wrtd-example "--fuel 1000 --stats"
+   # Build and run example
+   cargo run --bin wrtd -- module.wasm
 
 Library Integration
 -------------------
 
-Add WRT to your Rust project:
+Add PulseEngine to your Rust project:
 
 .. code-block:: toml
 

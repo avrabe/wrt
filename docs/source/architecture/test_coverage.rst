@@ -471,10 +471,10 @@ Coverage testing across feature combinations::
             name: coverage-${{ strategy.job-index }}
             path: coverage-*.lcov
 
-Parallel Testing with xtask
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Parallel Testing with cargo-wrt
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The xtask coverage command supports parallel testing of feature combinations for faster feedback.
+The cargo-wrt coverage command supports parallel testing of feature combinations for faster feedback.
 
 Priority Implementation Plan
 ----------------------------
@@ -513,7 +513,7 @@ Viewing Coverage Reports
 
 1. **Local Viewer**: Open ``view_coverage_report.html`` in a browser
 2. **Direct HTML**: Open ``target/coverage/html/html/index.html``
-3. **Documentation**: Build docs with ``cargo xtask publish-docs-dagger``
+3. **Documentation**: Build docs with ``cargo-wrt docs``
 
 Test Locations
 --------------

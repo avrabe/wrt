@@ -59,8 +59,13 @@
 //! assert_eq!(result, Value::I32(42));
 //! ```
 
-use crate::prelude::{BoundedCapacity, Debug, Error, PartialEq, PureInstruction, Result, Value, ValueType};
+use crate::prelude::{Debug, Error, PartialEq, PureInstruction, Result, Value, ValueType, BoundedCapacity};
 use crate::validation::{Validate, ValidationContext, validate_memory_op};
+use wrt_foundation::{
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 
 /// Memory trait defining the requirements for memory operations
@@ -1214,15 +1219,36 @@ mod tests {
     use super::*;
 
     /// Mock memory implementation for testing
+    #[cfg(feature = "std")]
     struct MockMemory {
         data: Vec<u8>,
     }
 
+    #[cfg(not(feature = "std"))]
+    struct MockMemory {
+        data: wrt_foundation::BoundedVec<u8, 65536, wrt_foundation::NoStdProvider<65536>>,
+    }
+
     impl MockMemory {
+        #[cfg(feature = "std")]
         fn new(size: usize) -> Self {
             let mut data = Vec::with_capacity(size);
             for _ in 0..size { data.push(0); }
             Self { data }
+        }
+
+        #[cfg(not(feature = "std"))]
+        fn new(size: usize) -> Result<Self> {
+            let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+            let mut data = wrt_foundation::BoundedVec::new(provider).map_err(|_| {
+                Error::memory_error("Failed to create BoundedVec")
+            })?;
+            for _ in 0..core::cmp::min(size, 65536) { 
+                data.push(0).map_err(|_| {
+                    Error::memory_error("Failed to push to BoundedVec")
+                })?; 
+            }
+            Ok(Self { data })
         }
     }
 
@@ -1248,13 +1274,16 @@ mod tests {
                 return Err(Error::memory_error("Memory access out of bounds"));
             }
 
-            let mut result = wrt_foundation::BoundedVec::new();
-            for &byte in &self.data[start..end] {
+            let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+            let mut result = wrt_foundation::BoundedVec::new(provider)?;
+            for i in start..end {
+                let byte = self.data.get(i).map_err(|_| Error::memory_error("Index out of bounds"))?;
                 result.push(byte).map_err(|_| Error::memory_error("BoundedVec capacity exceeded"))?;
             }
             Ok(result)
         }
 
+        #[cfg(feature = "std")]
         fn write_bytes(&mut self, offset: u32, bytes: &[u8]) -> Result<()> {
             let start = offset as usize;
             let end = start + bytes.len();
@@ -1267,16 +1296,56 @@ mod tests {
             Ok(())
         }
 
-        fn size_in_bytes(&self) -> Result<usize> {
-            Ok(self.data.len())
+        #[cfg(not(feature = "std"))]
+        fn write_bytes(&mut self, offset: u32, bytes: &[u8]) -> Result<()> {
+            let start = offset as usize;
+            let end = start + bytes.len();
+
+            if end > self.data.len() {
+                return Err(Error::memory_error("Memory access out of bounds"));
+            }
+
+            for (i, &byte) in bytes.iter().enumerate() {
+                self.data.set(start + i, byte).map_err(|_| Error::memory_error("Index out of bounds"))?;
+            }
+            Ok(())
         }
 
+        fn size_in_bytes(&self) -> Result<usize> {
+            #[cfg(feature = "std")]
+            {
+                Ok(self.data.len())
+            }
+            #[cfg(not(feature = "std"))]
+            {
+                Ok(self.data.len())
+            }
+        }
+
+        #[cfg(feature = "std")]
         fn grow(&mut self, bytes: usize) -> Result<()> {
             let new_size = self.data.len() + bytes;
             self.data.resize(new_size, 0);
             Ok(())
         }
 
+        #[cfg(not(feature = "std"))]
+        fn grow(&mut self, bytes: usize) -> Result<()> {
+            let current_len = self.data.len();
+            let new_size = current_len + bytes;
+            
+            // Check if we can fit the new size in our bounded capacity
+            if new_size > 65536 {
+                return Err(Error::memory_error("Cannot grow beyond bounded capacity"));
+            }
+            
+            for _ in current_len..new_size {
+                self.data.push(0).map_err(|_| Error::memory_error("BoundedVec capacity exceeded"))?;
+            }
+            Ok(())
+        }
+
+        #[cfg(feature = "std")]
         fn fill(&mut self, offset: u32, value: u8, size: u32) -> Result<()> {
             let start = offset as usize;
             let end = start + size as usize;
@@ -1291,6 +1360,22 @@ mod tests {
             Ok(())
         }
 
+        #[cfg(not(feature = "std"))]
+        fn fill(&mut self, offset: u32, value: u8, size: u32) -> Result<()> {
+            let start = offset as usize;
+            let end = start + size as usize;
+
+            if end > self.data.len() {
+                return Err(Error::memory_error("Memory fill out of bounds"));
+            }
+
+            for i in start..end {
+                self.data.set(i, value).map_err(|_| Error::memory_error("Index out of bounds"))?;
+            }
+            Ok(())
+        }
+
+        #[cfg(feature = "std")]
         fn copy(&mut self, dest: u32, src: u32, size: u32) -> Result<()> {
             let dest_start = dest as usize;
             let dest_end = dest_start + size as usize;
@@ -1308,11 +1393,48 @@ mod tests {
             }
             Ok(())
         }
+
+        #[cfg(not(feature = "std"))]
+        fn copy(&mut self, dest: u32, src: u32, size: u32) -> Result<()> {
+            let dest_start = dest as usize;
+            let dest_end = dest_start + size as usize;
+            let src_start = src as usize;
+            let src_end = src_start + size as usize;
+
+            if dest_end > self.data.len() || src_end > self.data.len() {
+                return Err(Error::memory_error("Memory copy out of bounds"));
+            }
+
+            // Handle overlapping regions correctly by copying byte by byte
+            if size > 0 {
+                // Create a temporary buffer on the stack
+                let mut temp_buffer = [0u8; 256]; // Limited buffer for no_std
+                let copy_size = core::cmp::min(size as usize, 256);
+                
+                for chunk_start in (0..size as usize).step_by(256) {
+                    let chunk_end = core::cmp::min(chunk_start + 256, size as usize);
+                    let chunk_size = chunk_end - chunk_start;
+                    
+                    // Copy source to temp buffer
+                    for i in 0..chunk_size {
+                        temp_buffer[i] = self.data.get(src_start + chunk_start + i)
+                            .map_err(|_| Error::memory_error("Source index out of bounds"))?;
+                    }
+                    
+                    // Copy temp buffer to destination
+                    for i in 0..chunk_size {
+                        self.data.set(dest_start + chunk_start + i, temp_buffer[i])
+                            .map_err(|_| Error::memory_error("Destination index out of bounds"))?;
+                    }
+                }
+            }
+            Ok(())
+        }
     }
 
     #[test]
     fn test_memory_load() {
-        let mut memory = MockMemory::new(65_536);
+        let mut memory = MockMemory::new(65_536).unwrap();
 
         // Store some test values
         memory.write_bytes(0, &[42, 0, 0, 0]).unwrap(); // i32 = 42
@@ -1370,7 +1492,7 @@ mod tests {
 
     #[test]
     fn test_memory_store() {
-        let mut memory = MockMemory::new(65_536);
+        let mut memory = MockMemory::new(65_536).unwrap();
 
         // Test i32.store
         let store = MemoryStore::i32(0, 4);
@@ -1431,7 +1553,7 @@ mod tests {
 
     #[test]
     fn test_memory_access_errors() {
-        let mut memory = MockMemory::new(100);
+        let mut memory = MockMemory::new(100).unwrap();
 
         // Out of bounds access
         let load = MemoryLoad::i32(100, 4);
@@ -1507,14 +1629,19 @@ mod tests {
         #[cfg(not(any(feature = "std", )))]
         fn get_data_segment(&self, data_index: u32) -> Result<Option<wrt_foundation::BoundedVec<u8, 65_536, wrt_foundation::NoStdProvider<65_536>>>> {
             if (data_index as usize) < self.segments.len() {
-                Ok(self.segments.get(data_index as usize).unwrap().clone())
+                Ok(self.segments.get(data_index as usize).ok_or_else(|| Error::validation_error("Invalid data segment index"))?.clone())
             } else {
                 Err(Error::validation_error("Invalid data segment index"))
             }
         }
 
         fn drop_data_segment(&mut self, data_index: u32) -> Result<()> {
-            if (data_index as usize) < self.segments.len() {
+            #[cfg(feature = "std")]
+            let segments_len = self.segments.len();
+            #[cfg(not(feature = "std"))]
+            let segments_len = self.segments.len();
+
+            if (data_index as usize) < segments_len {
                 #[cfg(feature = "std")]
                 {
                     self.segments[data_index as usize] = None;
@@ -1532,7 +1659,7 @@ mod tests {
 
     #[test]
     fn test_memory_fill() {
-        let mut memory = MockMemory::new(1024);
+        let mut memory = MockMemory::new(1024).unwrap();
         let fill_op = MemoryFill::new(0);
 
         // Fill 10 bytes with value 0x42 starting at offset 100
@@ -1553,7 +1680,7 @@ mod tests {
 
     #[test]
     fn test_memory_copy() {
-        let mut memory = MockMemory::new(1024);
+        let mut memory = MockMemory::new(1024).unwrap();
         
         // Set up source data
         memory.write_bytes(0, &[1, 2, 3, 4, 5]).unwrap();
@@ -1583,7 +1710,7 @@ mod tests {
 
     #[test]
     fn test_memory_copy_overlapping() {
-        let mut memory = MockMemory::new(1024);
+        let mut memory = MockMemory::new(1024).unwrap();
         
         // Set up source data
         memory.write_bytes(0, &[1, 2, 3, 4, 5, 6, 7, 8]).unwrap();
@@ -1613,7 +1740,7 @@ mod tests {
 
     #[test]
     fn test_memory_init() {
-        let mut memory = MockMemory::new(1024);
+        let mut memory = MockMemory::new(1024).unwrap();
         let data_segments = MockDataSegments::new();
         let init_op = MemoryInit::new(0, 0);
 
@@ -1661,7 +1788,7 @@ mod tests {
 
     #[test]
     fn test_memory_init_dropped_segment() {
-        let mut memory = MockMemory::new(1024);
+        let mut memory = MockMemory::new(1024).unwrap();
         let mut data_segments = MockDataSegments::new();
         
         // Drop segment 0 first
@@ -1682,7 +1809,7 @@ mod tests {
 
     #[test]
     fn test_bulk_memory_bounds_checking() {
-        let mut memory = MockMemory::new(100);
+        let mut memory = MockMemory::new(100).unwrap();
         
         // Test memory.fill out of bounds
         let fill_op = MemoryFill::new(0);
@@ -1698,14 +1825,14 @@ mod tests {
     #[test]
     fn test_memory_size() {
         // Create memory with 2 pages (128 KiB)
-        let memory = MockMemory::new(2 * 65_536);
+        let memory = MockMemory::new(2 * 65_536).unwrap();
         let size_op = MemorySize::new(0);
         
         let result = size_op.execute(&memory).unwrap();
         assert_eq!(result, Value::I32(2));
         
         // Test with partial page
-        let memory = MockMemory::new(65_536 + 100); // 1 page + 100 bytes
+        let memory = MockMemory::new(65_536 + 100).unwrap(); // 1 page + 100 bytes
         let result = size_op.execute(&memory).unwrap();
         assert_eq!(result, Value::I32(1)); // Should return 1 (partial pages are truncated)
     }
@@ -1713,7 +1840,7 @@ mod tests {
     #[test]
     fn test_memory_grow() {
         // Create memory with 1 page (64 KiB)
-        let mut memory = MockMemory::new(65_536);
+        let mut memory = MockMemory::new(65_536).unwrap();
         let grow_op = MemoryGrow::new(0);
         
         // Grow by 2 pages
@@ -1743,7 +1870,7 @@ mod tests {
         fn new(memory_size: usize) -> Self {
             Self {
                 stack: Vec::new(),
-                memory: MockMemory::new(memory_size),
+                memory: MockMemory::new(memory_size).unwrap(),
                 data_segments: MockDataSegments::new(),
             }
         }
@@ -1752,7 +1879,7 @@ mod tests {
     impl MemoryContext for MockMemoryContext {
         fn pop_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::runtime_stack_underflow("Stack underflow")
             })
         }
 

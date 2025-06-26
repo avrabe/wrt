@@ -3,6 +3,7 @@
 //! This strategy logs function calls between components and hosts.
 //! It can be configured to log arguments, results, timing, etc.
 
+
 #[cfg(feature = "std")]
 use std::{time::Instant, sync::{Arc, Mutex}};
 
@@ -260,6 +261,7 @@ impl Default for LoggingStrategy {
     }
 }
 
+#[cfg(not(feature = "std"))]
 impl LoggingStrategy {
     /// Create a new logging strategy for `no_std` environments
     #[must_use] pub fn new() -> Self {

@@ -34,7 +34,10 @@ impl Default for InterceptMode {
 
 impl TestInterceptor {
     fn new(mode: InterceptMode) -> Self {
-        Self { calls: Arc::new(Mutex::new(Vec::new())), intercept_mode: mode }
+        Self {
+            calls: Arc::new(Mutex::new(Vec::new())),
+            intercept_mode: mode,
+        }
     }
 
     fn get_calls(&self) -> Vec<String> {
@@ -49,7 +52,10 @@ impl LinkInterceptorStrategy for TestInterceptor {
         function_name: &str,
         mut arguments: Vec<u8>,
     ) -> Result<(bool, Vec<u8>), Error> {
-        self.calls.lock().unwrap().push(format!("call: {}.{}", component_name, function_name));
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("call: {}.{}", component_name, function_name));
 
         match self.intercept_mode {
             InterceptMode::PassThrough => Ok((false, arguments)),
@@ -57,12 +63,12 @@ impl LinkInterceptorStrategy for TestInterceptor {
                 // For test purposes, append some indicator bytes
                 arguments.extend_from_slice(&[0xFF, 0xFF]);
                 Ok((false, arguments))
-            }
+            },
             InterceptMode::HandleCall => {
                 // Interceptor handles the call completely
                 Ok((true, vec![1, 2, 3, 4]))
-            }
-            InterceptMode::ThrowError => Err(Error::new("Interceptor blocked function call")),
+            },
+            InterceptMode::ThrowError => Err(Error::runtime_execution_error("Interceptor blocked function call")),
             _ => Ok((false, arguments)),
         }
     }
@@ -73,7 +79,10 @@ impl LinkInterceptorStrategy for TestInterceptor {
         function_name: &str,
         mut result: Result<Vec<u8>, Error>,
     ) -> Result<Vec<u8>, Error> {
-        self.calls.lock().unwrap().push(format!("result: {}.{}", component_name, function_name));
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("result: {}.{}", component_name, function_name));
 
         match self.intercept_mode {
             InterceptMode::ModifyResults => {
@@ -84,8 +93,8 @@ impl LinkInterceptorStrategy for TestInterceptor {
                 } else {
                     result
                 }
-            }
-            InterceptMode::ThrowError => Err(Error::new("Interceptor blocked function result")),
+            },
+            InterceptMode::ThrowError => Err(Error::runtime_execution_error("Interceptor blocked function result")),
             _ => result,
         }
     }
@@ -104,7 +113,11 @@ struct MockComponentBuilder {
 
 impl MockComponentBuilder {
     fn new() -> Self {
-        Self { has_start: true, start_should_fail: false, timeout_ms: None }
+        Self {
+            has_start: true,
+            start_should_fail: false,
+            timeout_ms: None,
+        }
     }
 
     fn with_start(mut self, has_start: bool) -> Self {
@@ -155,11 +168,13 @@ impl Component {
     fn execute_start_function_with_integrity(&self) -> Result<(), Error> {
         // For testing, simulate execution or failure based on configuration
         if self.start_should_fail {
-            Err(Error::new("Start function failed"))
+            Err(Error::runtime_execution_error("Start function failed"))
         } else if let Some(timeout) = self.options.execution_timeout {
             if timeout.as_millis() < 100 {
                 // Simulate timeout for very short timeouts
-                Err(Error::from(ExecutionTimeoutError::new("Start function timed out", timeout)))
+                Err(Error::from(ExecutionTimeoutError::runtime_execution_error(",
+                    timeout,
+                )))
             } else {
                 // Simulate successful execution
                 Ok(())
@@ -175,21 +190,27 @@ impl Component {
 fn test_execute_start_basic() {
     let component = MockComponentBuilder::new().build();
     let result = component.execute_start();
-    assert!(result.is_ok(), "Basic start execution should succeed");
+    assert!(result.is_ok(), ");
 }
 
 #[test]
 fn test_execute_start_no_start_function() {
     let component = MockComponentBuilder::new().with_start(false).build();
     let result = component.execute_start();
-    assert!(result.is_ok(), "Component without start function should return Ok");
+    assert!(
+        result.is_ok(),
+        "Component without start function should return Ok"
+    );
 }
 
 #[test]
 fn test_execute_start_failure() {
     let component = MockComponentBuilder::new().with_failing_start().build();
     let result = component.execute_start();
-    assert!(result.is_err(), "Failing start function should return error");
+    assert!(
+        result.is_err(),
+        "Failing start function should return error"
+    );
     assert_eq!(
         result.unwrap_err().to_string(),
         "Start function failed",
@@ -203,7 +224,11 @@ fn test_execute_start_timeout() {
     let result = component.execute_start();
     assert!(result.is_err(), "Start function should timeout");
     let err = result.unwrap_err();
-    assert!(err.to_string().contains("timed out"), "Error should indicate timeout: {}", err);
+    assert!(
+        err.to_string().contains("timed out"),
+        "Error should indicate timeout: {}",
+        err
+    );
 }
 
 #[test]
@@ -218,12 +243,25 @@ fn test_execute_start_with_interceptor_pass_through() {
     component.options = options;
 
     let result = component.execute_start();
-    assert!(result.is_ok(), "Start execution with pass-through interceptor should succeed");
+    assert!(
+        result.is_ok(),
+        "Start execution with pass-through interceptor should succeed"
+    );
 
     let calls = interceptor.get_calls();
-    assert_eq!(calls.len(), 2, "Interceptor should record two calls (call + result)");
-    assert!(calls[0].contains("call"), "First call should be function call");
-    assert!(calls[1].contains("result"), "Second call should be function result");
+    assert_eq!(
+        calls.len(),
+        2,
+        "Interceptor should record two calls (call + result)"
+    );
+    assert!(
+        calls[0].contains("call"),
+        "First call should be function call"
+    );
+    assert!(
+        calls[1].contains("result"),
+        "Second call should be function result"
+    );
 }
 
 #[test]
@@ -238,7 +276,10 @@ fn test_execute_start_with_interceptor_error() {
     component.options = options;
 
     let result = component.execute_start();
-    assert!(result.is_err(), "Start execution with error interceptor should fail");
+    assert!(
+        result.is_err(),
+        "Start execution with error interceptor should fail"
+    );
     assert_eq!(
         result.unwrap_err().to_string(),
         "Interceptor blocked function call",
@@ -246,7 +287,11 @@ fn test_execute_start_with_interceptor_error() {
     );
 
     let calls = interceptor.get_calls();
-    assert_eq!(calls.len(), 1, "Interceptor should record only the call attempt");
+    assert_eq!(
+        calls.len(),
+        1,
+        "Interceptor should record only the call attempt"
+    );
 }
 
 #[test]
@@ -261,10 +306,17 @@ fn test_execute_start_with_interceptor_handle_call() {
     component.options = options;
 
     let result = component.execute_start();
-    assert!(result.is_ok(), "Start execution with handling interceptor should succeed");
+    assert!(
+        result.is_ok(),
+        "Start execution with handling interceptor should succeed"
+    );
 
     let calls = interceptor.get_calls();
-    assert_eq!(calls.len(), 1, "Interceptor should record only one call (no result)");
+    assert_eq!(
+        calls.len(),
+        1,
+        "Interceptor should record only one call (no result)"
+    );
     assert!(calls[0].contains("call"), "Call should be recorded");
 }
 
@@ -308,5 +360,9 @@ fn test_integration_workflow() {
 
     // Verify interceptor was called
     let calls = interceptor.get_calls();
-    assert_eq!(calls.len(), 2, "Interceptor should be called for function and result");
+    assert_eq!(
+        calls.len(),
+        2,
+        "Interceptor should be called for function and result"
+    );
 }

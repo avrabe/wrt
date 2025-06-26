@@ -3,6 +3,7 @@
 //! This module provides a minimal implementation of logging functionality
 //! that works in pure no_std environments without allocation.
 
+
 use crate::level::LogLevel;
 
 /// Minimal log message for pure `no_std` environments.

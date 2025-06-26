@@ -50,6 +50,14 @@ extern crate alloc;
 // Binary std/no_std choice
 // from wrt-foundation
 
+// Bounded infrastructure for static memory allocation
+#[cfg(not(feature = "std"))]
+pub mod bounded_host_infra;
+
+// Safety-critical memory limits
+#[cfg(feature = "safety-critical")]
+pub mod memory_limits;
+
 // Export modules
 pub mod builder;
 pub mod callback;

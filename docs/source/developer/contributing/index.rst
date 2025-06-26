@@ -53,14 +53,14 @@ Development Process
 
    .. code-block:: bash
 
-      # Format code
-      just fmt
+      # Format code and run checks
+      cargo-wrt check
 
       # Run tests
-      just ci-test
+      cargo-wrt test
 
-      # Check lints
-      just ci-static-analysis
+      # Run full CI checks
+      cargo-wrt ci
 
 5. **Submit Pull Request**
 

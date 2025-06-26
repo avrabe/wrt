@@ -1,0 +1,144 @@
+name: Security Audit and Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security audit every Tuesday at 3 AM UTC
+    - cron: '0 3 * * 2'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit --force
+      
+      - name: Run Security Audit
+        run: cargo audit --json > audit-report.json
+        continue-on-error: true
+      
+      - name: Process Audit Results
+        run: |
+          if [ -f audit-report.json ]; then
+            # Count vulnerabilities by severity
+            HIGH=$(jq '[.vulnerabilities.list[] | select(.advisory.severity == "high")] | length' audit-report.json)
+            MEDIUM=$(jq '[.vulnerabilities.list[] | select(.advisory.severity == "medium")] | length' audit-report.json)
+            LOW=$(jq '[.vulnerabilities.list[] | select(.advisory.severity == "low")] | length' audit-report.json)
+            
+            echo "## Security Audit Results" >> $GITHUB_STEP_SUMMARY
+            echo "- High severity: $HIGH" >> $GITHUB_STEP_SUMMARY
+            echo "- Medium severity: $MEDIUM" >> $GITHUB_STEP_SUMMARY
+            echo "- Low severity: $LOW" >> $GITHUB_STEP_SUMMARY
+            
+            if [ $HIGH -gt 0 ]; then
+              echo "::error::High severity vulnerabilities found"
+              exit 1
+            fi
+          fi
+      
+      - name: Upload Audit Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-audit-report
+          path: audit-report.json
+
+  safety-analysis:
+    name: Safety Analysis with Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Run Safety-Critical Clippy
+        run: |
+          cargo clippy --workspace --all-targets --all-features -- \
+            -D clippy::unwrap_used \
+            -D clippy::expect_used \
+            -D clippy::panic \
+            -D clippy::unreachable \
+            -D clippy::std_instead_of_core \
+            -D clippy::std_instead_of_alloc \
+            -W clippy::unnecessary_box_returns \
+            -W clippy::vec_init_then_push \
+            > clippy-safety-report.txt 2>&1
+        continue-on-error: true
+      
+      - name: Process Safety Results
+        run: |
+          if [ -f clippy-safety-report.txt ]; then
+            DENIES=$(grep -c "denied" clippy-safety-report.txt || echo 0)
+            WARNS=$(grep -c "warning" clippy-safety-report.txt || echo 0)
+            
+            echo "## Safety Analysis Results" >> $GITHUB_STEP_SUMMARY
+            echo "- Safety violations (denied): $DENIES" >> $GITHUB_STEP_SUMMARY
+            echo "- Safety warnings: $WARNS" >> $GITHUB_STEP_SUMMARY
+            
+            if [ $DENIES -gt 0 ]; then
+              echo "::error::Safety-critical violations found"
+              cat clippy-safety-report.txt
+              exit 1
+            fi
+          fi
+      
+      - name: Upload Safety Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: safety-analysis-report
+          path: clippy-safety-report.txt
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          # Allow common open source licenses
+          allow-licenses: MIT, Apache-2.0, BSD-3-Clause, ISC, MPL-2.0, Unlicense
+          # Exclude packages with undetected licenses that we've manually verified
+          # Using PURL format: pkg:cargo/package@version
+          allow-dependencies-licenses: |
+            pkg:cargo/chrono@0.4.*, 
+            pkg:cargo/dagger-sdk@0.11.10

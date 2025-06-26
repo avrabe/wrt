@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 
 use super::{MemoryStrategy, VerificationLevel};
-use crate::prelude::*;
 
 /// Builder for creating Resource instances
 #[derive(Clone, Debug)]

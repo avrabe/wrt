@@ -3,11 +3,15 @@
 //! This module provides facilities for intercepting built-in function calls
 //! in the WebAssembly Component Model implementation.
 
-use crate::prelude::{BuiltinType, Debug, str, Value};
-use wrt_error::{Error, Result};
+
+use crate::prelude::{BuiltinType, Debug, str};
+use wrt_error::Error;
 
 #[cfg(feature = "std")]
-use std::{sync::{Arc, RwLock}, collections::HashSet};
+use wrt_foundation::values::Value;
+
+#[cfg(feature = "std")]
+use std::sync::Arc;
 
 #[cfg(feature = "std")]
 use wrt_foundation::component_value::{ComponentValue, ValType};
@@ -99,7 +103,7 @@ impl BuiltinSerialization {
     /// A `Result` containing the serialized bytes or an error
     pub fn serialize(
         values: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<Vec<u8>> {
+    ) -> wrt_error::Result<Vec<u8>> {
         // Simple implementation for now - convert to bytes
         let mut result = Vec::new();
         for value in values {
@@ -109,10 +113,7 @@ impl BuiltinSerialization {
                 ComponentValue::F32(v) => v.0.to_le_bytes().to_vec(),
                 ComponentValue::F64(v) => v.0.to_le_bytes().to_vec(),
                 _ => {
-                    return Err(Error::new(
-                        wrt_error::ErrorCategory::Type,
-                        wrt_error::codes::INVALID_TYPE,
-                        "Unsupported value type for serialization",
+                    return Err(Error::runtime_execution_error("unsupported component value type for serialization"
                     ))
                 }
             };
@@ -134,7 +135,7 @@ impl BuiltinSerialization {
     pub fn deserialize(
         bytes: &[u8],
         types: &[ValType<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>> {
+    ) -> wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>> {
         let mut result = Vec::new();
         let mut offset = 0;
 
@@ -145,8 +146,7 @@ impl BuiltinSerialization {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Parse,
                             wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for i32",
-                        ));
+                            "insufficient bytes for S32 deserialization"));
                     }
                     let mut buf = [0u8; 4];
                     buf.copy_from_slice(&bytes[offset..offset + 4]);
@@ -155,10 +155,7 @@ impl BuiltinSerialization {
                 }
                 ValType::S64 => {
                     if offset + 8 > bytes.len() {
-                        return Err(Error::new(
-                            wrt_error::ErrorCategory::Parse,
-                            wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for i64",
+                        return Err(Error::runtime_execution_error("insufficient bytes for S64 deserialization"
                         ));
                     }
                     let mut buf = [0u8; 8];
@@ -171,8 +168,7 @@ impl BuiltinSerialization {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Parse,
                             wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for f32",
-                        ));
+                            "insufficient bytes for F32 deserialization"));
                     }
                     let mut buf = [0u8; 4];
                     buf.copy_from_slice(&bytes[offset..offset + 4]);
@@ -183,10 +179,7 @@ impl BuiltinSerialization {
                 }
                 ValType::F64 => {
                     if offset + 8 > bytes.len() {
-                        return Err(Error::new(
-                            wrt_error::ErrorCategory::Parse,
-                            wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for f64",
+                        return Err(Error::runtime_execution_error("insufficient bytes for F64 deserialization"
                         ));
                     }
                     let mut buf = [0u8; 8];
@@ -200,8 +193,7 @@ impl BuiltinSerialization {
                     return Err(Error::new(
                         wrt_error::ErrorCategory::Type,
                         wrt_error::codes::INVALID_TYPE,
-                        "Unsupported value type for deserialization",
-                    ))
+                        "unsupported value type for deserialization"))
                 }
             }
         }
@@ -245,10 +237,7 @@ impl BuiltinSerialization {
     // }
     // }
     // _ => {
-    // return Err(Error::new(
-    // wrt_error::ErrorCategory::Type,
-    // wrt_error::codes::INVALID_TYPE,
-    // "Unsupported value type for serialization",
+    // return Err(Error::runtime_execution_error("unsupported value type for argument serialization"
     // ))
     // }
     // },
@@ -256,8 +245,7 @@ impl BuiltinSerialization {
     // return Err(Error::new(
     // wrt_error::ErrorCategory::Type,
     // wrt_error::codes::INVALID_TYPE,
-    // "Index out of bounds for serialization",
-    // ))
+    // "missing type information for argument"))
     // }
     // }
     // }
@@ -295,7 +283,7 @@ pub trait BuiltinInterceptor: Send + Sync {
         &self,
         context: &InterceptContext,
         args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<BeforeBuiltinResult>;
+    ) -> wrt_error::Result<BeforeBuiltinResult>;
 
     /// Called after a built-in function has been invoked
     ///
@@ -312,8 +300,8 @@ pub trait BuiltinInterceptor: Send + Sync {
         &self,
         context: &InterceptContext,
         args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-        result: Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>,
-    ) -> Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>;
+        result: wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>,
+    ) -> wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>;
 
     /// Clone this interceptor
     ///

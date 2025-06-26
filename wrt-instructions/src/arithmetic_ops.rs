@@ -8,12 +8,12 @@
 //! instructions, including add, subtract, multiply, divide, and remainder
 //! operations for various numeric types.
 
-use crate::prelude::{Debug, Error, ErrorCategory, FloatBits32, FloatBits64, PureInstruction, Result, Value, ValueType, codes};
+use crate::prelude::{Debug, Error, FloatBits32, FloatBits64, PureInstruction, Result, Value, ValueType};
 use crate::validation::{Validate, ValidationContext, validate_arithmetic_op};
 use wrt_math as math;
 
 /// Represents a pure arithmetic operation for WebAssembly.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArithmeticOp {
     // Integer operations (i32)
     /// Add two 32-bit integers
@@ -152,6 +152,12 @@ pub enum ArithmeticOp {
     F64Copysign,
 }
 
+impl Default for ArithmeticOp {
+    fn default() -> Self {
+        ArithmeticOp::I32Add
+    }
+}
+
 /// Execution context for arithmetic operations
 pub trait ArithmeticContext {
     /// Pop a value from the context
@@ -169,7 +175,7 @@ where
     let val = context.pop_arithmetic_value()?;
     let float_bits = match val {
         Value::F32(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 operand")),
+        _ => return Err(Error::invalid_type_error("Expected F32 operand")),
     };
     let math_bits = math::FloatBits32(float_bits.0);
     let result = f(math_bits)?;
@@ -183,12 +189,12 @@ where
     let val_b = context.pop_arithmetic_value()?;
     let float_bits_b = match val_b {
         Value::F32(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 operand")),
+        _ => return Err(Error::invalid_type_error("Expected F32 operand")),
     };
     let val_a = context.pop_arithmetic_value()?;
     let float_bits_a = match val_a {
         Value::F32(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 operand")),
+        _ => return Err(Error::invalid_type_error("Expected F32 operand")),
     };
     let math_bits_a = math::FloatBits32(float_bits_a.0);
     let math_bits_b = math::FloatBits32(float_bits_b.0);
@@ -203,7 +209,7 @@ where
     let val = context.pop_arithmetic_value()?;
     let float_bits = match val {
         Value::F64(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 operand")),
+        _ => return Err(Error::invalid_type_error("Expected F64 operand")),
     };
     let math_bits = math::FloatBits64(float_bits.0);
     let result = f(math_bits)?;
@@ -217,12 +223,12 @@ where
     let val_b = context.pop_arithmetic_value()?;
     let float_bits_b = match val_b {
         Value::F64(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 operand")),
+        _ => return Err(Error::invalid_type_error("Expected F64 operand")),
     };
     let val_a = context.pop_arithmetic_value()?;
     let float_bits_a = match val_a {
         Value::F64(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 operand")),
+        _ => return Err(Error::invalid_type_error("Expected F64 operand")),
     };
     let math_bits_a = math::FloatBits64(float_bits_a.0);
     let math_bits_b = math::FloatBits64(float_bits_b.0);
@@ -236,171 +242,171 @@ impl<T: ArithmeticContext> PureInstruction<T, Error> for ArithmeticOp {
             // Integer operations (i32)
             Self::I32Add => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.add operand")
+                    Error::invalid_type_error("Expected I32 for i32.add operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.add operand")
+                    Error::invalid_type_error("Expected I32 for i32.add operand")
                 })?;
                 let result = math::i32_add(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32Sub => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.sub operand")
+                    Error::invalid_type_error("Expected I32 for i32.sub operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.sub operand")
+                    Error::invalid_type_error("Expected I32 for i32.sub operand")
                 })?;
                 let result = math::i32_sub(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32Mul => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.mul operand")
+                    Error::invalid_type_error("Expected I32 for i32.mul operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.mul operand")
+                    Error::invalid_type_error("Expected I32 for i32.mul operand")
                 })?;
                 let result = math::i32_mul(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32DivS => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.div_s operand")
+                    Error::invalid_type_error("Expected I32 for i32.div_s operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.div_s operand")
+                    Error::invalid_type_error("Expected I32 for i32.div_s operand")
                 })?;
                 let result = math::i32_div_s(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32DivU => {
                 let b = context.pop_arithmetic_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.div_u operand")
+                    Error::invalid_type_error("Expected I32 for i32.div_u operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.div_u operand")
+                    Error::invalid_type_error("Expected I32 for i32.div_u operand")
                 })?;
                 let result = math::i32_div_u(a, b)?;
                 context.push_arithmetic_value(Value::I32(result as i32))
             }
             Self::I32RemS => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.rem_s operand")
+                    Error::invalid_type_error("Expected I32 for i32.rem_s operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.rem_s operand")
+                    Error::invalid_type_error("Expected I32 for i32.rem_s operand")
                 })?;
                 let result = math::i32_rem_s(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32RemU => {
                 let b = context.pop_arithmetic_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.rem_u operand")
+                    Error::invalid_type_error("Expected I32 for i32.rem_u operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.rem_u operand")
+                    Error::invalid_type_error("Expected I32 for i32.rem_u operand")
                 })?;
                 let result = math::i32_rem_u(a, b)?;
                 context.push_arithmetic_value(Value::I32(result as i32))
             }
             Self::I32And => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.and operand")
+                    Error::invalid_type_error("Expected I32 for i32.and operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.and operand")
+                    Error::invalid_type_error("Expected I32 for i32.and operand")
                 })?;
                 let result = math::i32_and(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32Or => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.or operand")
+                    Error::invalid_type_error("Expected I32 for i32.or operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.or operand")
+                    Error::invalid_type_error("Expected I32 for i32.or operand")
                 })?;
                 let result = math::i32_or(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32Xor => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.xor operand")
+                    Error::invalid_type_error("Expected I32 for i32.xor operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.xor operand")
+                    Error::invalid_type_error("Expected I32 for i32.xor operand")
                 })?;
                 let result = math::i32_xor(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32Shl => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.shl operand")
+                    Error::invalid_type_error("Expected I32 for i32.shl operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.shl operand")
+                    Error::invalid_type_error("Expected I32 for i32.shl operand")
                 })?;
                 let result = math::i32_shl(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32ShrS => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.shr_s operand")
+                    Error::invalid_type_error("Expected I32 for i32.shr_s operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.shr_s operand")
+                    Error::invalid_type_error("Expected I32 for i32.shr_s operand")
                 })?;
                 let result = math::i32_shr_s(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32ShrU => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.shr_u operand")
+                    Error::invalid_type_error("Expected I32 for i32.shr_u operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.shr_u operand")
+                    Error::invalid_type_error("Expected I32 for i32.shr_u operand")
                 })?;
                 let result = math::i32_shr_u(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32Rotl => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.rotl operand")
+                    Error::invalid_type_error("Expected I32 for i32.rotl operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.rotl operand")
+                    Error::invalid_type_error("Expected I32 for i32.rotl operand")
                 })?;
                 let result = math::i32_rotl(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32Rotr => {
                 let b = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.rotr operand")
+                    Error::invalid_type_error("Expected I32 for i32.rotr operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.rotr operand")
+                    Error::invalid_type_error("Expected I32 for i32.rotr operand")
                 })?;
                 let result = math::i32_rotr(a, b)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32Clz => {
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.clz operand")
+                    Error::invalid_type_error("Expected I32 for i32.clz operand")
                 })?;
                 let result = math::i32_clz(a)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32Ctz => {
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ctz operand")
+                    Error::invalid_type_error("Expected I32 for i32.ctz operand")
                 })?;
                 let result = math::i32_ctz(a)?;
                 context.push_arithmetic_value(Value::I32(result))
             }
             Self::I32Popcnt => {
                 let a = context.pop_arithmetic_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.popcnt operand")
+                    Error::invalid_type_error("Expected I32 for i32.popcnt operand")
                 })?;
                 let result = math::i32_popcnt(a)?;
                 context.push_arithmetic_value(Value::I32(result))
@@ -409,171 +415,171 @@ impl<T: ArithmeticContext> PureInstruction<T, Error> for ArithmeticOp {
             // Integer operations (i64)
             Self::I64Add => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.add operand")
+                    Error::invalid_type_error("Expected I64 for i64.add operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.add operand")
+                    Error::invalid_type_error("Expected I64 for i64.add operand")
                 })?;
                 let result = math::i64_add(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64Sub => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.sub operand")
+                    Error::invalid_type_error("Expected I64 for i64.sub operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.sub operand")
+                    Error::invalid_type_error("Expected I64 for i64.sub operand")
                 })?;
                 let result = math::i64_sub(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64Mul => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.mul operand")
+                    Error::invalid_type_error("Expected I64 for i64.mul operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.mul operand")
+                    Error::invalid_type_error("Expected I64 for i64.mul operand")
                 })?;
                 let result = math::i64_mul(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64DivS => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.div_s operand")
+                    Error::invalid_type_error("Expected I64 for i64.div_s operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.div_s operand")
+                    Error::invalid_type_error("Expected I64 for i64.div_s operand")
                 })?;
                 let result = math::i64_div_s(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64DivU => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.div_u operand")
+                    Error::invalid_type_error("Expected I64 for i64.div_u operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.div_u operand")
+                    Error::invalid_type_error("Expected I64 for i64.div_u operand")
                 })?;
                 let result = math::i64_div_u(a as u64, b as u64)?;
                 context.push_arithmetic_value(Value::I64(result as i64))
             }
             Self::I64RemS => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.rem_s operand")
+                    Error::invalid_type_error("Expected I64 for i64.rem_s operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.rem_s operand")
+                    Error::invalid_type_error("Expected I64 for i64.rem_s operand")
                 })?;
                 let result = math::i64_rem_s(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64RemU => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.rem_u operand")
+                    Error::invalid_type_error("Expected I64 for i64.rem_u operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.rem_u operand")
+                    Error::invalid_type_error("Expected I64 for i64.rem_u operand")
                 })?;
                 let result = math::i64_rem_u(a as u64, b as u64)?;
                 context.push_arithmetic_value(Value::I64(result as i64))
             }
             Self::I64And => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.and operand")
+                    Error::invalid_type_error("Expected I64 for i64.and operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.and operand")
+                    Error::invalid_type_error("Expected I64 for i64.and operand")
                 })?;
                 let result = math::i64_and(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64Or => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.or operand")
+                    Error::invalid_type_error("Expected I64 for i64.or operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.or operand")
+                    Error::invalid_type_error("Expected I64 for i64.or operand")
                 })?;
                 let result = math::i64_or(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64Xor => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.xor operand")
+                    Error::invalid_type_error("Expected I64 for i64.xor operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.xor operand")
+                    Error::invalid_type_error("Expected I64 for i64.xor operand")
                 })?;
                 let result = math::i64_xor(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64Shl => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.shl operand")
+                    Error::invalid_type_error("Expected I64 for i64.shl operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.shl operand")
+                    Error::invalid_type_error("Expected I64 for i64.shl operand")
                 })?;
                 let result = math::i64_shl(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64ShrS => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.shr_s operand")
+                    Error::invalid_type_error("Expected I64 for i64.shr_s operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.shr_s operand")
+                    Error::invalid_type_error("Expected I64 for i64.shr_s operand")
                 })?;
                 let result = math::i64_shr_s(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64ShrU => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.shr_u operand")
+                    Error::invalid_type_error("Expected I64 for i64.shr_u operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.shr_u operand")
+                    Error::invalid_type_error("Expected I64 for i64.shr_u operand")
                 })?;
                 let result = math::i64_shr_u(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64Rotl => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.rotl operand")
+                    Error::invalid_type_error("Expected I64 for i64.rotl operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.rotl operand")
+                    Error::invalid_type_error("Expected I64 for i64.rotl operand")
                 })?;
                 let result = math::i64_rotl(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64Rotr => {
                 let b = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.rotr operand")
+                    Error::invalid_type_error("Expected I64 for i64.rotr operand")
                 })?;
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.rotr operand")
+                    Error::invalid_type_error("Expected I64 for i64.rotr operand")
                 })?;
                 let result = math::i64_rotr(a, b)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64Clz => {
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.clz operand")
+                    Error::invalid_type_error("Expected I64 for i64.clz operand")
                 })?;
                 let result = math::i64_clz(a)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64Ctz => {
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ctz operand")
+                    Error::invalid_type_error("Expected I64 for i64.ctz operand")
                 })?;
                 let result = math::i64_ctz(a)?;
                 context.push_arithmetic_value(Value::I64(result))
             }
             Self::I64Popcnt => {
                 let a = context.pop_arithmetic_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.popcnt operand")
+                    Error::invalid_type_error("Expected I64 for i64.popcnt operand")
                 })?;
                 let result = math::i64_popcnt(a)?;
                 context.push_arithmetic_value(Value::I64(result))
@@ -731,7 +737,7 @@ mod tests {
 
         fn pop_arithmetic_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::runtime_stack_underflow("Stack underflow")
             })
         }
 

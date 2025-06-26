@@ -87,11 +87,7 @@ fn encode_latin1(s: &str) -> Result<Vec<u8>> {
     for c in s.chars() {
         let code_point = c as u32;
         if code_point > 0xFF {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                "Component not found",
-            ));
+            return Err(Error::component_not_found("Component not found"));
         }
         bytes.push(code_point as u8);
     }
@@ -102,17 +98,14 @@ fn encode_latin1(s: &str) -> Result<Vec<u8>> {
 /// Decode from UTF-8
 fn decode_utf8(bytes: &[u8]) -> Result<String> {
     core::str::from_utf8(bytes).map(|s| s.to_string()).map_err(|e| {
-        Error::new(ErrorCategory::Runtime, codes::INVALID_TYPE, "Component not found")
+        Error::component_not_found("Component not found")
     })
 }
 
 /// Decode from UTF-16 Little Endian
 fn decode_utf16_le(bytes: &[u8]) -> Result<String> {
     if bytes.len() % 2 != 0 {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::INVALID_TYPE,
-            "UTF-16 byte sequence must have even length",
+        return Err(Error::runtime_execution_error(",
         ));
     }
 
@@ -123,17 +116,14 @@ fn decode_utf16_le(bytes: &[u8]) -> Result<String> {
     }
 
     String::from_utf16(&code_units).map_err(|e| {
-        Error::new(ErrorCategory::Runtime, codes::INVALID_TYPE, "Component not found")
+        Error::component_not_found(")
     })
 }
 
 /// Decode from UTF-16 Big Endian
 fn decode_utf16_be(bytes: &[u8]) -> Result<String> {
     if bytes.len() % 2 != 0 {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::INVALID_TYPE,
-            "UTF-16 byte sequence must have even length",
+        return Err(Error::runtime_execution_error(",
         ));
     }
 
@@ -144,7 +134,7 @@ fn decode_utf16_be(bytes: &[u8]) -> Result<String> {
     }
 
     String::from_utf16(&code_units).map_err(|e| {
-        Error::new(ErrorCategory::Runtime, codes::INVALID_TYPE, "Component not found")
+        Error::component_not_found(")
     })
 }
 
@@ -240,11 +230,7 @@ pub fn lift_string_with_options(
 ) -> Result<String> {
     // Check bounds for length prefix
     if addr as usize + 4 > memory.len() {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::OUT_OF_BOUNDS_ERROR,
-            "String length prefix out of bounds",
-        ));
+        return Err(Error::runtime_out_of_bounds("String length prefix out of bounds"));
     }
 
     // Read length prefix
@@ -255,22 +241,14 @@ pub fn lift_string_with_options(
     // Check length limit
     if let Some(max_len) = options.max_length {
         if length > max_len {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                "Component not found",
-            ));
+            return Err(Error::component_not_found("Component not found"));
         }
     }
 
     // Check bounds for string data
     let data_start = addr as usize + 4;
     if data_start + length > memory.len() {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::OUT_OF_BOUNDS_ERROR,
-            "String data out of bounds",
-        ));
+        return Err(Error::runtime_out_of_bounds("String data out of bounds"));
     }
 
     // Extract string bytes
@@ -305,10 +283,7 @@ pub fn lower_string_with_options(
     // Check length limit
     if let Some(max_len) = options.max_length {
         if encoded.len() > max_len {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                &format!("String too long: {} > {}", encoded.len(), max_len)
+            return Err(Error::runtime_execution_error(", encoded.len(), max_len)
             ));
         }
     }
@@ -316,11 +291,7 @@ pub fn lower_string_with_options(
     // Check bounds
     let total_size = 4 + encoded.len();
     if addr as usize + total_size > memory.len() {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::OUT_OF_BOUNDS_ERROR,
-            "Not enough memory for string",
-        ));
+        return Err(Error::runtime_out_of_bounds("));
     }
 
     // Write length prefix
@@ -338,10 +309,7 @@ fn validate_string(s: &str) -> Result<()> {
     // Check for isolated surrogates (not allowed in Component Model)
     for ch in s.chars() {
         if (0xD800..=0xDFFF).contains(&(ch as u32)) {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                "String contains isolated surrogate",
+            return Err(Error::runtime_execution_error(",
             ));
         }
     }
@@ -355,8 +323,7 @@ mod tests {
 
     #[test]
     fn test_utf8_encoding() {
-        let text = "Hello, 世界!";
-        let encoded = encode_string(text, StringEncoding::Utf8).unwrap();
+        let text = ").unwrap();
         let decoded = decode_string(&encoded, StringEncoding::Utf8).unwrap();
         assert_eq!(text, decoded);
     }

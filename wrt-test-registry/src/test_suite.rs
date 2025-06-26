@@ -52,10 +52,7 @@ impl TestSuite {
         #[cfg(not(any(feature = "std", )))]
         {
             self.tests.try_push(test_case).map_err(|e| {
-                Error::new(
-                    ErrorCategory::Capacity,
-                    codes::CAPACITY_LIMIT_EXCEEDED,
-                    format!("Test suite capacity exceeded: {}", e),
+                Error::runtime_execution_error(", e),
                 )
             })
         }
@@ -91,7 +88,7 @@ impl TestSuite {
             match test.run() {
                 Ok(()) => {
                     passed += 1;
-                    #[cfg(feature = "std")]
+                    #[cfg(feature = ")]
                     println!("✓ {}", test.name());
                 }
                 Err(e) => {

@@ -5,15 +5,21 @@ fn create_test_module() -> Module {
     let mut module = Module::new();
 
     // Add a simple function type (i32, i32) -> i32
-    let func_type =
-        FuncType { params: vec![ValueType::I32, ValueType::I32], results: vec![ValueType::I32] };
+    let func_type = FuncType {
+        params: vec![ValueType::I32, ValueType::I32],
+        results: vec![ValueType::I32],
+    };
     module.types.push(func_type);
 
     // Add a simple add function
     let function = Function {
         type_idx: 0,
         locals: vec![],
-        code: vec![Instruction::LocalGet(0), Instruction::LocalGet(1), Instruction::I32Add],
+        code: vec![
+            Instruction::LocalGet(0),
+            Instruction::LocalGet(1),
+            Instruction::I32Add,
+        ],
     };
     module.functions.push(function);
 
@@ -46,8 +52,10 @@ fn create_memory_module() -> Module {
     let mut module = Module::new();
 
     // Function type (i32, i32) -> i32
-    let func_type =
-        FuncType { params: vec![ValueType::I32, ValueType::I32], results: vec![ValueType::I32] };
+    let func_type = FuncType {
+        params: vec![ValueType::I32, ValueType::I32],
+        results: vec![ValueType::I32],
+    };
     module.types.push(func_type);
 
     // Create a function that performs memory operations

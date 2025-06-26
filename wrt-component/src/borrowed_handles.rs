@@ -14,6 +14,8 @@ use std::{boxed::Box, vec::Vec, sync::Arc};
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
     prelude::*,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 use crate::{
@@ -75,19 +77,19 @@ pub struct HandleLifetimeTracker {
     #[cfg(feature = "std")]
     owned_handles: Vec<OwnedHandleEntry>,
     #[cfg(not(any(feature = "std", )))]
-    owned_handles: BoundedVec<OwnedHandleEntry, MAX_BORROWED_HANDLES, NoStdProvider<65536>>,
+    owned_handles: BoundedVec<OwnedHandleEntry, MAX_BORROWED_HANDLES>,
     
     /// Active borrowed handles
     #[cfg(feature = "std")]
     borrowed_handles: Vec<BorrowedHandleEntry>,
     #[cfg(not(any(feature = "std", )))]
-    borrowed_handles: BoundedVec<BorrowedHandleEntry, MAX_BORROWED_HANDLES, NoStdProvider<65536>>,
+    borrowed_handles: BoundedVec<BorrowedHandleEntry, MAX_BORROWED_HANDLES>,
     
     /// Lifetime scope stack
     #[cfg(feature = "std")]
     scope_stack: Vec<LifetimeScopeEntry>,
     #[cfg(not(any(feature = "std", )))]
-    scope_stack: BoundedVec<LifetimeScopeEntry, MAX_LIFETIME_DEPTH, NoStdProvider<65536>>,
+    scope_stack: BoundedVec<LifetimeScopeEntry, MAX_LIFETIME_DEPTH>,
     
     /// Next handle ID
     next_handle_id: AtomicU32,
@@ -118,7 +120,7 @@ pub struct OwnedHandleEntry {
     pub owner: ComponentId,
     
     /// Type name for debugging
-    pub type_name: BoundedString<64, NoStdProvider<65536>>,
+    pub type_name: BoundedString<64>,
     
     /// Creation timestamp
     pub created_at: u64,
@@ -180,7 +182,7 @@ pub struct LifetimeScopeEntry {
     #[cfg(feature = "std")]
     pub borrows: Vec<BorrowId>,
     #[cfg(not(any(feature = "std", )))]
-    pub borrows: BoundedVec<BorrowId, MAX_BORROWED_HANDLES, NoStdProvider<65536>>,
+    pub borrows: BoundedVec<BorrowId, MAX_BORROWED_HANDLES>,
     
     /// Creation timestamp
     pub created_at: u64,
@@ -281,7 +283,7 @@ impl<T> OwnHandle<T> {
     }
     
     /// Create from a Value
-    pub fn from_value(value: &Value) -> Result<Self, HandleConversionError> {
+    pub fn from_value(value: &Value) -> core::result::Result<Self, HandleConversionError> {
         match value {
             Value::Own(handle) => Ok(Self::new(*handle, 0)), // Generation would be validated separately
             _ => Err(HandleConversionError::TypeMismatch),
@@ -321,7 +323,7 @@ impl<T> BorrowHandle<T> {
     }
     
     /// Create from a Value
-    pub fn from_value(value: &Value, borrow_id: BorrowId) -> Result<Self, HandleConversionError> {
+    pub fn from_value(value: &Value, borrow_id: BorrowId) -> core::result::Result<Self, HandleConversionError> {
         match value {
             Value::Borrow(handle) => Ok(Self::new(*handle, 0, borrow_id)), // Generation would be validated separately
             _ => Err(HandleConversionError::TypeMismatch),
@@ -331,28 +333,37 @@ impl<T> BorrowHandle<T> {
 
 impl HandleLifetimeTracker {
     /// Create new handle lifetime tracker
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self> {
         Self {
             #[cfg(feature = "std")]
             owned_handles: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            owned_handles: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            owned_handles: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             
             #[cfg(feature = "std")]
             borrowed_handles: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            borrowed_handles: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            borrowed_handles: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             
             #[cfg(feature = "std")]
             scope_stack: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            scope_stack: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            scope_stack: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             
             next_handle_id: AtomicU32::new(1),
             next_borrow_id: AtomicU64::new(1),
             next_scope_id: AtomicU32::new(1),
             stats: LifetimeStats::new(),
-        }
+        })
     }
     
     /// Create a new owned handle
@@ -370,17 +381,19 @@ impl HandleLifetimeTracker {
             generation,
             resource_id,
             owner,
-            type_name: BoundedString::from_str(type_name).unwrap_or_default(),
+            type_name: {
+                let provider = safe_managed_alloc!(64, CrateId::Component)?;
+                BoundedString::from_str_truncate(type_name, provider).unwrap_or_else(|_| {
+                    BoundedString::from_str_truncate("", provider).unwrap_or_default()
+                })
+            },
             created_at: self.get_current_time(),
             active_borrows: 0,
             dropped: false,
         };
         
         self.owned_handles.push(entry).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many owned handles"
+            Error::resource_exhausted("Too many owned handles")
             )
         })?;
         
@@ -400,27 +413,18 @@ impl HandleLifetimeTracker {
         // Validate source handle
         let source_entry = self.find_owned_handle(source.raw)?;
         if source_entry.generation != source.generation {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::EXECUTION_ERROR,
-                "Stale handle generation"
+            return Err(Error::runtime_execution_error("Stale handle generation")
             ));
         }
         
         if source_entry.dropped {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::EXECUTION_ERROR,
-                "Cannot borrow dropped handle"
+            return Err(Error::runtime_execution_error("Cannot borrow dropped handle")
             ));
         }
         
         // Validate scope
         if !self.is_scope_active(scope) {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::EXECUTION_ERROR,
-                "Lifetime scope is not active"
+            return Err(Error::runtime_execution_error("Lifetime scope is not active")
             ));
         }
         
@@ -441,10 +445,7 @@ impl HandleLifetimeTracker {
         };
         
         self.borrowed_handles.push(entry).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many borrowed handles"
+            Error::resource_exhausted("Too many borrowed handles")
             )
         })?;
         
@@ -466,10 +467,7 @@ impl HandleLifetimeTracker {
         let entry = self.find_owned_handle_mut(handle.raw)?;
         
         if entry.generation != handle.generation {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::EXECUTION_ERROR,
-                "Stale handle generation"
+            return Err(Error::runtime_execution_error("Stale handle generation")
             ));
         }
         
@@ -547,16 +545,16 @@ impl HandleLifetimeTracker {
             #[cfg(feature = "std")]
             borrows: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            borrows: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            borrows: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             created_at: self.get_current_time(),
             active: true,
         };
         
         self.scope_stack.push(entry).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Scope stack overflow"
+            Error::resource_exhausted("Scope stack overflow")
             )
         })?;
         
@@ -572,10 +570,7 @@ impl HandleLifetimeTracker {
             .iter()
             .position(|entry| entry.scope == scope)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::EXECUTION_ERROR,
-                    "Scope not found"
+                Error::runtime_execution_error("Scope not found")
                 )
             })?;
         
@@ -662,10 +657,7 @@ impl HandleLifetimeTracker {
             .iter()
             .find(|entry| entry.handle == handle)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::EXECUTION_ERROR,
-                    "Owned handle not found"
+                Error::runtime_execution_error("Owned handle not found")
                 )
             })
     }
@@ -675,10 +667,7 @@ impl HandleLifetimeTracker {
             .iter_mut()
             .find(|entry| entry.handle == handle)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::EXECUTION_ERROR,
-                    "Owned handle not found"
+                Error::runtime_execution_error("Owned handle not found")
                 )
             })
     }
@@ -688,10 +677,7 @@ impl HandleLifetimeTracker {
             .iter()
             .find(|entry| entry.borrow_id == borrow_id)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::EXECUTION_ERROR,
-                    "Borrowed handle not found"
+                Error::runtime_execution_error("Borrowed handle not found")
                 )
             })
     }
@@ -701,10 +687,7 @@ impl HandleLifetimeTracker {
             .iter_mut()
             .find(|entry| entry.borrow_id == borrow_id)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::EXECUTION_ERROR,
-                    "Borrowed handle not found"
+                Error::runtime_execution_error("Borrowed handle not found")
                 )
             })
     }
@@ -720,18 +703,12 @@ impl HandleLifetimeTracker {
             .iter_mut()
             .find(|entry| entry.scope == scope && entry.active)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::EXECUTION_ERROR,
-                    "Scope not found or inactive"
+                Error::runtime_execution_error("Scope not found or inactive")
                 )
             })?;
         
         scope_entry.borrows.push(borrow_id).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many borrows in scope"
+            Error::resource_exhausted("Too many borrows in scope")
             )
         })?;
         
@@ -762,7 +739,10 @@ impl LifetimeStats {
 
 impl Default for HandleLifetimeTracker {
     fn default() -> Self {
-        Self::new()
+        Self::new().unwrap_or_else(|_| {
+            // Fallback for Default trait - this should only be used in non-critical paths
+            panic!("Failed to create HandleLifetimeTracker with default memory allocation")
+        })
     }
 }
 
@@ -826,7 +806,7 @@ mod tests {
     
     #[test]
     fn test_owned_handle() {
-        let mut tracker = HandleLifetimeTracker::new();
+        let mut tracker = HandleLifetimeTracker::new().unwrap();
         
         let handle: OwnHandle<u32> = tracker.create_owned_handle(
             ResourceId(1),
@@ -844,7 +824,7 @@ mod tests {
     
     #[test]
     fn test_borrowed_handle() {
-        let mut tracker = HandleLifetimeTracker::new();
+        let mut tracker = HandleLifetimeTracker::new().unwrap();
         
         let scope = tracker.create_scope(ComponentId(1), TaskId(1)).unwrap();
         
@@ -870,7 +850,7 @@ mod tests {
     
     #[test]
     fn test_handle_drop_invalidates_borrows() {
-        let mut tracker = HandleLifetimeTracker::new();
+        let mut tracker = HandleLifetimeTracker::new().unwrap();
         
         let scope = tracker.create_scope(ComponentId(1), TaskId(1)).unwrap();
         
@@ -893,7 +873,7 @@ mod tests {
     
     #[test]
     fn test_lifetime_scope() {
-        let mut tracker = HandleLifetimeTracker::new();
+        let mut tracker = HandleLifetimeTracker::new().unwrap();
         
         let result = with_lifetime_scope(
             &mut tracker,

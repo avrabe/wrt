@@ -12,6 +12,9 @@ use wrt_format::component::ValType as FormatValType;
 use wrt_foundation::{
     bounded::{BoundedVec, MAX_COMPONENT_TYPES},
     // component_value::{ComponentValue, ValType as TypesValType, ValTypeRef}, // Commented out - std only
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
     traits::{ReadStream, WriteStream},
     values::Value,
 };
@@ -32,122 +35,81 @@ type CanonicalValType = TypesValType;
 /// Serialize a ComponentValue to a bounded buffer in a no_std environment
 pub fn serialize_component_value_no_std(
     value: &ComponentValue,
-) -> Result<BoundedVec<u8, MAX_SERIALIZED_VALUE_SIZE>, NoStdProvider<65536>> {
-    let mut buffer = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+) -> Result<BoundedVec<u8, MAX_SERIALIZED_VALUE_SIZE, NoStdProvider<65536>>> {
+    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+    let mut buffer = BoundedVec::new(provider).map_err(|_| {
+        Error::capacity_exceeded("Failed to create serialization buffer")
+    })?;
 
     match value {
         ComponentValue::Bool(b) => {
             buffer.push(if *b { 1 } else { 0 }).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Capacity,
-                    codes::CAPACITY_EXCEEDED,
-                    "Buffer capacity exceeded when serializing Bool",
-                )
+                Error::capacity_exceeded("Buffer capacity exceeded when serializing Bool")
             })?;
         }
         ComponentValue::S8(v) => {
             buffer.push(*v as u8).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Capacity,
-                    codes::CAPACITY_EXCEEDED,
-                    "Buffer capacity exceeded when serializing S8",
-                )
+                Error::capacity_exceeded("Buffer capacity exceeded when serializing S8")
             })?;
         }
         ComponentValue::U8(v) => {
             buffer.push(*v).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Capacity,
-                    codes::CAPACITY_EXCEEDED,
-                    "Buffer capacity exceeded when serializing U8",
-                )
+                Error::capacity_exceeded("Buffer capacity exceeded when serializing U8")
             })?;
         }
         ComponentValue::S16(v) => {
             for byte in v.to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing S16",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing S16")
                 })?;
             }
         }
         ComponentValue::U16(v) => {
             for byte in v.to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing U16",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing U16")
                 })?;
             }
         }
         ComponentValue::S32(v) => {
             for byte in v.to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing S32",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing S32")
                 })?;
             }
         }
         ComponentValue::U32(v) => {
             for byte in v.to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing U32",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing U32")
                 })?;
             }
         }
         ComponentValue::S64(v) => {
             for byte in v.to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing S64",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing S64")
                 })?;
             }
         }
         ComponentValue::U64(v) => {
             for byte in v.to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing U64",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing U64")
                 })?;
             }
         }
         ComponentValue::F32(v) => {
             for byte in v.to_bits().to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing F32",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing F32")
                 })?;
             }
         }
         ComponentValue::F64(v) => {
             for byte in v.to_bits().to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing F64",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing F64")
                 })?;
             }
         }
@@ -155,11 +117,7 @@ pub fn serialize_component_value_no_std(
             let bytes = [*c as u8];
             for byte in bytes {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing Char",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing Char")
                 })?;
             }
         }
@@ -168,22 +126,14 @@ pub fn serialize_component_value_no_std(
             let len = s.len() as u32;
             for byte in len.to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing String length",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing String length")
                 })?;
             }
 
             // Push string bytes
             for byte in s.as_bytes() {
                 buffer.push(*byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing String content",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing String content")
                 })?;
             }
         }
@@ -192,11 +142,7 @@ pub fn serialize_component_value_no_std(
             let len = items.len() as u32;
             for byte in len.to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing List length",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing List length")
                 })?;
             }
 
@@ -207,22 +153,14 @@ pub fn serialize_component_value_no_std(
                 let item_size = item_data.len() as u32;
                 for byte in item_size.to_le_bytes() {
                     buffer.push(byte).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Capacity,
-                            codes::CAPACITY_EXCEEDED,
-                            "Buffer capacity exceeded when serializing List item size",
-                        )
+                        Error::capacity_exceeded("Buffer capacity exceeded when serializing List item size")
                     })?;
                 }
 
                 // Push item data
                 for byte in item_data.iter() {
                     buffer.push(*byte).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Capacity,
-                            codes::CAPACITY_EXCEEDED,
-                            "Buffer capacity exceeded when serializing List item data",
-                        )
+                        Error::capacity_exceeded("Buffer capacity exceeded when serializing List item data")
                     })?;
                 }
             }
@@ -232,11 +170,7 @@ pub fn serialize_component_value_no_std(
             let field_count = fields.len() as u32;
             for byte in field_count.to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing Record field count",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing Record field count")
                 })?;
             }
 
@@ -246,22 +180,14 @@ pub fn serialize_component_value_no_std(
                 let name_len = name.len() as u16;
                 for byte in name_len.to_le_bytes() {
                     buffer.push(byte).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Capacity,
-                            codes::CAPACITY_EXCEEDED,
-                            "Buffer capacity exceeded when serializing Record field name length",
-                        )
+                        Error::capacity_exceeded("Buffer capacity exceeded when serializing Record field name length")
                     })?;
                 }
 
                 // Push field name bytes
                 for byte in name.as_bytes() {
                     buffer.push(*byte).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Capacity,
-                            codes::CAPACITY_EXCEEDED,
-                            "Buffer capacity exceeded when serializing Record field name content",
-                        )
+                        Error::capacity_exceeded("Buffer capacity exceeded when serializing Record field name content")
                     })?;
                 }
 
@@ -269,11 +195,7 @@ pub fn serialize_component_value_no_std(
                 let value_data = serialize_component_value_no_std(value)?;
                 for byte in value_data.iter() {
                     buffer.push(*byte).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Capacity,
-                            codes::CAPACITY_EXCEEDED,
-                            "Buffer capacity exceeded when serializing Record field value",
-                        )
+                        Error::capacity_exceeded("Buffer capacity exceeded when serializing Record field value")
                     })?;
                 }
             }
@@ -283,11 +205,7 @@ pub fn serialize_component_value_no_std(
             let len = items.len() as u32;
             for byte in len.to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing Tuple length",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing Tuple length")
                 })?;
             }
 
@@ -297,11 +215,7 @@ pub fn serialize_component_value_no_std(
                 // Push item data directly (size is known from type)
                 for byte in item_data.iter() {
                     buffer.push(*byte).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Capacity,
-                            codes::CAPACITY_EXCEEDED,
-                            "Buffer capacity exceeded when serializing Tuple item data",
-                        )
+                        Error::capacity_exceeded("Buffer capacity exceeded when serializing Tuple item data")
                     })?;
                 }
             }
@@ -310,11 +224,7 @@ pub fn serialize_component_value_no_std(
             // Push discriminant as u32
             for byte in (*case as u32).to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing Variant discriminant",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing Variant discriminant")
                 })?;
             }
 
@@ -323,11 +233,7 @@ pub fn serialize_component_value_no_std(
                 let value_data = serialize_component_value_no_std(val)?;
                 for byte in value_data.iter() {
                     buffer.push(*byte).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Capacity,
-                            codes::CAPACITY_EXCEEDED,
-                            "Buffer capacity exceeded when serializing Variant value",
-                        )
+                        Error::capacity_exceeded("Buffer capacity exceeded when serializing Variant value")
                     })?;
                 }
             }
@@ -336,11 +242,7 @@ pub fn serialize_component_value_no_std(
             // Push discriminant as u32
             for byte in (*case as u32).to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing Enum discriminant",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing Enum discriminant")
                 })?;
             }
         }
@@ -348,31 +250,19 @@ pub fn serialize_component_value_no_std(
             // Push presence flag as u8
             if let Some(val) = value {
                 buffer.push(1).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing Option presence flag",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing Option presence flag")
                 })?;
 
                 // Serialize the contained value
                 let value_data = serialize_component_value_no_std(val)?;
                 for byte in value_data.iter() {
                     buffer.push(*byte).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Capacity,
-                            codes::CAPACITY_EXCEEDED,
-                            "Buffer capacity exceeded when serializing Option value",
-                        )
+                        Error::capacity_exceeded("Buffer capacity exceeded when serializing Option value")
                     })?;
                 }
             } else {
                 buffer.push(0).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing Option presence flag",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing Option presence flag")
                 })?;
             }
         }
@@ -381,88 +271,56 @@ pub fn serialize_component_value_no_std(
                 Ok(val) => {
                     // Push success flag as u8
                     buffer.push(1).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Capacity,
-                            codes::CAPACITY_EXCEEDED,
-                            "Buffer capacity exceeded when serializing Result success flag",
-                        )
+                        Error::capacity_exceeded("Buffer capacity exceeded when serializing Result success flag")
                     })?;
 
                     // If there's a value, serialize it
                     if let Some(v) = val {
                         // Push presence flag as u8
                         buffer.push(1).map_err(|_| {
-                            Error::new(
-                                ErrorCategory::Capacity,
-                                codes::CAPACITY_EXCEEDED,
-                                "Buffer capacity exceeded when serializing Result ok presence flag",
-                            )
+                            Error::capacity_exceeded("Buffer capacity exceeded when serializing Result ok presence flag")
                         })?;
 
                         // Serialize the contained value
                         let value_data = serialize_component_value_no_std(v)?;
                         for byte in value_data.iter() {
                             buffer.push(*byte).map_err(|_| {
-                                Error::new(
-                                    ErrorCategory::Capacity,
-                                    codes::CAPACITY_EXCEEDED,
-                                    "Buffer capacity exceeded when serializing Result ok value",
-                                )
+                                Error::capacity_exceeded("Buffer capacity exceeded when serializing Result ok value")
                             })?;
                         }
                     } else {
                         // Push absence flag as u8
                         buffer.push(0).map_err(|_| {
-                            Error::new(
-                                ErrorCategory::Capacity,
-                                codes::CAPACITY_EXCEEDED,
-                                "Buffer capacity exceeded when serializing Result ok presence flag",
-                            )
+                            Error::capacity_exceeded("Buffer capacity exceeded when serializing Result ok presence flag")
                         })?;
                     }
                 }
                 Err(val) => {
                     // Push error flag as u8
                     buffer.push(0).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Capacity,
-                            codes::CAPACITY_EXCEEDED,
-                            "Buffer capacity exceeded when serializing Result error flag",
-                        )
+                        Error::capacity_exceeded("Buffer capacity exceeded when serializing Result error flag")
                     })?;
 
                     // If there's a value, serialize it
                     if let Some(v) = val {
                         // Push presence flag as u8
                         buffer.push(1).map_err(|_| {
-                            Error::new(
-                                ErrorCategory::Capacity,
-                                codes::CAPACITY_EXCEEDED,
-                                "Buffer capacity exceeded when serializing Result err presence \
-                                 flag",
-                            )
+                            Error::capacity_exceeded("Buffer capacity exceeded when serializing Result err presence \
+                                 flag")
                         })?;
 
                         // Serialize the contained value
                         let value_data = serialize_component_value_no_std(v)?;
                         for byte in value_data.iter() {
                             buffer.push(*byte).map_err(|_| {
-                                Error::new(
-                                    ErrorCategory::Capacity,
-                                    codes::CAPACITY_EXCEEDED,
-                                    "Buffer capacity exceeded when serializing Result err value",
-                                )
+                                Error::capacity_exceeded("Buffer capacity exceeded when serializing Result err value")
                             })?;
                         }
                     } else {
                         // Push absence flag as u8
                         buffer.push(0).map_err(|_| {
-                            Error::new(
-                                ErrorCategory::Capacity,
-                                codes::CAPACITY_EXCEEDED,
-                                "Buffer capacity exceeded when serializing Result err presence \
-                                 flag",
-                            )
+                            Error::capacity_exceeded("Buffer capacity exceeded when serializing Result err presence \
+                                 flag")
                         })?;
                     }
                 }
@@ -475,11 +333,7 @@ pub fn serialize_component_value_no_std(
             // Push the number of bytes as u32
             for byte in (num_bytes as u32).to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing Flags byte count",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing Flags byte count")
                 })?;
             }
 
@@ -493,22 +347,14 @@ pub fn serialize_component_value_no_std(
                     }
                 }
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing Flags bits",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing Flags bits")
                 })?;
             }
         }
         ComponentValue::U32(v) => {
             for byte in v.to_le_bytes() {
                 buffer.push(byte).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Buffer capacity exceeded when serializing U32",
-                    )
+                    Error::capacity_exceeded("Buffer capacity exceeded when serializing U32")
                 })?;
             }
         }
@@ -516,11 +362,7 @@ pub fn serialize_component_value_no_std(
             // Void needs no serialization, it has no data
         }
         _ => {
-            return Err(Error::new(
-                ErrorCategory::Serialization,
-                codes::SERIALIZATION_ERROR,
-                "Component not found",
-            ));
+            return Err(Error::component_not_found("Component not found"));
         }
     }
 
@@ -531,7 +373,7 @@ pub fn serialize_component_value_no_std(
 /// This function is adapted for no_std environments
 pub fn convert_valtype_to_format<P: MemoryProvider + Default + Clone + PartialEq + Eq>(
     val_type: &TypesValType<P>,
-) -> Result<FormatValType> {
+) -> Result<FormatValType {
     match val_type {
         TypesValType::Bool => Ok(FormatValType::Bool),
         TypesValType::S8 => Ok(FormatValType::S8),
@@ -550,11 +392,7 @@ pub fn convert_valtype_to_format<P: MemoryProvider + Default + Clone + PartialEq
         // Complex types like Record, Variant, List, etc. are not fully implemented
         // for no_std but would follow the same pattern, converting each nested type
         TypesValType::Void => Ok(FormatValType::Tuple(Vec::new())),
-        _ => Err(Error::new(
-            ErrorCategory::Type,
-            codes::TYPE_CONVERSION_ERROR,
-            "Component not found",
-        )),
+        _ => Err(Error::type_conversion_error("Component not found")),
     }
 }
 
@@ -580,11 +418,7 @@ pub fn convert_format_to_valtype<P: MemoryProvider + Default + Clone + PartialEq
         FormatValType::Ref(idx) => Ok(TypesValType::Ref(*idx)),
         // Complex types like Record, Variant, List, etc. are not fully implemented
         // for no_std but would follow the same pattern, converting each nested type
-        _ => Err(Error::new(
-            ErrorCategory::Type,
-            codes::TYPE_CONVERSION_ERROR,
-            "Component not found",
-        )),
+        _ => Err(Error::type_conversion_error("Component not found")),
     }
 }
 
@@ -612,15 +446,15 @@ mod tests {
 
     #[test]
     fn test_valtype_conversion() {
-        use wrt_foundation::DefaultMemoryProvider;
+        use wrt_foundation::safe_memory::NoStdProvider<65536>;
 
         // Test bool conversion
-        let bool_type = TypesValType::<DefaultMemoryProvider>::Bool;
+        let bool_type = TypesValType::<NoStdProvider::<65536>>::Bool;
         let format_type = convert_valtype_to_format(&bool_type).unwrap();
         assert!(matches!(format_type, FormatValType::Bool));
 
         let converted_back =
-            convert_format_to_valtype::<DefaultMemoryProvider>(&format_type).unwrap();
+            convert_format_to_valtype::<NoStdProvider::<65536>>(&format_type).unwrap();
         assert!(matches!(converted_back, TypesValType::Bool));
     }
 }

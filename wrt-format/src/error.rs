@@ -6,10 +6,9 @@
 #[cfg(feature = "std")]
 use std::{boxed::Box, string::String};
 
+use wrt_error::Error;
 #[cfg(not(feature = "std"))]
 use wrt_foundation::bounded::BoundedString;
-
-use wrt_error::Error;
 
 /// Module for error codes
 pub mod codes {
@@ -87,12 +86,6 @@ pub fn wrt_validation_error(message: &'static str) -> Error {
 /// Create a new type error with the given message
 pub fn wrt_type_error(message: &'static str) -> Error {
     Error::type_error(message)
-}
-
-/// Create a parse error with the given message
-#[deprecated(since = "0.2.0", note = "use Error::parse_error instead")]
-pub fn wrt_parse_error(message: &'static str) -> Error {
-    parse_error(message)
 }
 
 #[cfg(test)]

@@ -1,0 +1,84 @@
+# WRT Allowed Unsafe Code Configuration
+# This file documents approved unsafe code blocks that are necessary for ASIL compliance
+# Each entry must include justification and be re-evaluated when code changes
+
+# Format:
+# [[allowed]]
+# file = "relative/path/to/file.rs"
+# line = 123  # Optional: specific line number
+# function = "function_name"  # Optional: function name for context
+# reason = "Brief explanation of why unsafe is required"
+# asil_justification = "ASIL-specific safety justification"
+
+# Waker API - Required by Rust standard library
+[[allowed]]
+file = "wrt-component/src/async_/fuel_aware_waker.rs"
+line = 320
+function = "create_fuel_aware_waker"
+reason = "Rust's Waker API requires unsafe for Waker::from_raw"
+asil_justification = "ASIL-D compliant: Valid heap-allocated WakerData pointer with proper cleanup via waker_drop"
+
+[[allowed]]
+file = "wrt-component/src/async_/fuel_aware_waker.rs"
+line = 338
+function = "create_fuel_aware_waker"
+reason = "Rust's Waker API requires unsafe for Waker::from_raw"
+asil_justification = "ASIL-D compliant: Noop waker with null pointer data, all vtable functions are no-ops"
+
+[[allowed]]
+file = "wrt-component/src/async_/fuel_async_executor.rs"
+line = 2911
+function = "create_noop_waker"
+reason = "Rust's Waker API requires unsafe for Waker::from_raw"
+asil_justification = "ASIL-D compliant: Noop waker with null pointer data, no memory access or dereferencing"
+
+# Waker vtable functions - Required for non-ASIL-D builds
+[[allowed]]
+file = "wrt-component/src/async_/fuel_aware_waker.rs"
+line = 217
+function = "waker_clone"
+reason = "Waker vtable function signature requires unsafe"
+asil_justification = "Only used in non-ASIL-D builds with proper feature gates"
+
+[[allowed]]
+file = "wrt-component/src/async_/fuel_aware_waker.rs"
+line = 227
+function = "waker_wake"
+reason = "Waker vtable function signature requires unsafe"
+asil_justification = "Only used in non-ASIL-D builds with proper feature gates"
+
+[[allowed]]
+file = "wrt-component/src/async_/fuel_aware_waker.rs"
+line = 233
+function = "waker_wake_by_ref"
+reason = "Waker vtable function signature requires unsafe"
+asil_justification = "Only used in non-ASIL-D builds with proper feature gates"
+
+[[allowed]]
+file = "wrt-component/src/async_/fuel_aware_waker.rs"
+line = 239
+function = "waker_drop"
+reason = "Waker vtable function signature requires unsafe"
+asil_justification = "Only used in non-ASIL-D builds with proper feature gates"
+
+# Memory profiler - No-std environments
+[[allowed]]
+file = "wrt-debug/src/memory_profiling.rs"
+line = 881
+function = "with_profiler"
+reason = "No-std environment requires raw pointer access for static memory profiler"
+asil_justification = "ASIL-D compliant: Pointer from Box::leak with 'static lifetime, single initialization guarantee"
+
+# cargo-wrt CLI validation - Not safety critical
+[[allowed]]
+file = "cargo-wrt/src/main.rs"
+function = "validate_cli"
+reason = "CLI validation macros for compile-time checks"
+asil_justification = "CLI tool validation only - not part of runtime safety-critical code"
+
+# Test code - Not production
+[[allowed]]
+file = "wrt/tests/wasm_testsuite.rs"
+function = "test_v128_values"
+reason = "Test code for SIMD value verification"
+asil_justification = "Test code only - not included in production builds"

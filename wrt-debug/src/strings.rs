@@ -48,8 +48,8 @@ impl<'a> wrt_foundation::traits::FromBytes for DebugString<'a> {
         _provider: &P,
     ) -> wrt_foundation::Result<Self> {
         // This is tricky because we need to return a reference with lifetime 'a
-        // In practice, this should not be called for DebugString as it's a zero-copy type
-        // We'll return a default value for now
+        // In practice, this should not be called for DebugString as it's a zero-copy
+        // type We'll return a default value for now
         let _ = reader.read_u32_le()?; // Read and ignore length
         Ok(Self::default())
     }
@@ -90,7 +90,10 @@ impl<'a> StringTable<'a> {
 
     /// Iterator over all strings in the table
     pub fn strings(&self) -> StringTableIterator<'a> {
-        StringTableIterator { data: self.data, offset: 0 }
+        StringTableIterator {
+            data: self.data,
+            offset: 0,
+        }
     }
 
     /// Check if the string table is empty
@@ -170,12 +173,14 @@ impl<'a> Iterator for StringTableIterator<'a> {
 
 /// Helper function to read a string reference from DWARF data
 /// Used for DW_FORM_strp attributes
+#[allow(dead_code)]
 pub fn read_string_ref(cursor: &mut DwarfCursor) -> DebugResult<u32> {
     Ok(cursor.read_u32()?)
 }
 
 /// Helper function to read an inline string from DWARF data
 /// Used for DW_FORM_string attributes
+#[allow(dead_code)]
 pub fn read_inline_string<'a>(cursor: &mut DwarfCursor<'a>) -> DebugResult<DebugString<'a>> {
     let remaining = cursor.remaining_slice();
 

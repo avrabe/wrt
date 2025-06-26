@@ -106,10 +106,7 @@ impl TestRunner {
         #[cfg(not(any(feature = "std", )))]
         {
             self.suites.try_push(suite_entry).map_err(|e| {
-                Error::new(
-                    ErrorCategory::Capacity,
-                    codes::CAPACITY_LIMIT_EXCEEDED,
-                    format!("Test runner capacity exceeded: {}", e),
+                Error::runtime_execution_error(", e),
                 )
             })
         }
@@ -121,7 +118,7 @@ impl TestRunner {
         let mut total_failed = 0;
         let mut failed_suites = Vec::new();
         
-        #[cfg(feature = "std")]
+        #[cfg(feature = ")]
         let start_time = std::time::Instant::now();
 
         #[cfg(feature = "std")]

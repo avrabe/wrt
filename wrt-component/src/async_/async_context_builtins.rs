@@ -14,7 +14,6 @@
 //! built-in functions required by the WebAssembly Component Model for managing
 //! async execution contexts.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -67,16 +66,13 @@ impl ContextKey {
     #[cfg(not(any(feature = "std", )))]
     pub fn new(key: &str) -> Result<Self> {
         let bounded_key = BoundedString::new_from_str(key)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Context key too long for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         Ok(Self(bounded_key))
     }
 
     pub fn as_str(&self) -> &str {
-        #[cfg(feature = "std")]
+        #[cfg(feature = ")]
         return &self.0;
         #[cfg(not(any(feature = "std", )))]
         return self.0.as_str();
@@ -108,10 +104,7 @@ impl ContextValue {
     #[cfg(not(any(feature = "std", )))]
     pub fn from_binary(data: &[u8]) -> Result<Self> {
         let bounded_data = BoundedVec::new_from_slice(data)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Context binary data too large for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         Ok(Self::Binary(bounded_data))
     }
@@ -125,7 +118,7 @@ impl ContextValue {
 
     pub fn as_binary(&self) -> Option<&[u8]> {
         match self {
-            #[cfg(feature = "std")]
+            #[cfg(feature = ")]
             Self::Binary(data) => Some(data),
             #[cfg(not(any(feature = "std", )))]
             Self::Binary(data) => Some(data.as_slice()),
@@ -166,10 +159,7 @@ impl AsyncContext {
         #[cfg(not(any(feature = "std", )))]
         {
             self.data.insert(key, value)
-                .map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                    "Context storage full in no_std environment"
+                .map_err(|_| Error::runtime_execution_error("
                 ))?;
             Ok(())
         }
@@ -203,7 +193,7 @@ impl Default for AsyncContext {
 }
 
 /// Thread-local storage for async contexts in each execution thread
-#[cfg(feature = "std")]
+#[cfg(feature = ")]
 thread_local! {
     static ASYNC_CONTEXT_STACK: AtomicRefCell<Vec<AsyncContext>> = 
         AtomicRefCell::new(Vec::new());
@@ -224,56 +214,44 @@ impl AsyncContextManager {
     pub fn context_get() -> Result<Option<AsyncContext>> {
         ASYNC_CONTEXT_STACK.with(|stack| {
             let stack_ref = stack.try_borrow()
-                .map_err(|_| Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::INVALID_STATE,
-                    "Context stack borrow failed"
+                .map_err(|_| Error::runtime_execution_error("
                 ))?;
             Ok(stack_ref.last().cloned())
         })
     }
 
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "))]
     pub fn context_get() -> Result<Option<AsyncContext>> {
         let context_ref = GLOBAL_ASYNC_CONTEXT.try_borrow()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Global context borrow failed"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         Ok(context_ref.clone())
     }
 
     /// Set the current async context
     /// Implements the `context.set` canonical built-in
-    #[cfg(feature = "std")]
+    #[cfg(feature = ")]
     pub fn context_set(context: AsyncContext) -> Result<()> {
         ASYNC_CONTEXT_STACK.with(|stack| {
             let mut stack_ref = stack.try_borrow_mut()
-                .map_err(|_| Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::INVALID_STATE,
-                    "Context stack borrow failed"
+                .map_err(|_| Error::runtime_execution_error("
                 ))?;
             stack_ref.push(context);
             Ok(())
         })
     }
 
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "))]
     pub fn context_set(context: AsyncContext) -> Result<()> {
         let mut context_ref = GLOBAL_ASYNC_CONTEXT.try_borrow_mut()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Global context borrow failed"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         *context_ref = Some(context);
         Ok(())
     }
 
     /// Push a new context onto the stack (for nested async operations)
-    #[cfg(feature = "std")]
+    #[cfg(feature = ")]
     pub fn context_push(context: AsyncContext) -> Result<()> {
         Self::context_set(context)
     }
@@ -288,22 +266,16 @@ impl AsyncContextManager {
     pub fn context_pop() -> Result<Option<AsyncContext>> {
         ASYNC_CONTEXT_STACK.with(|stack| {
             let mut stack_ref = stack.try_borrow_mut()
-                .map_err(|_| Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::INVALID_STATE,
-                    "Context stack borrow failed"
+                .map_err(|_| Error::runtime_execution_error("
                 ))?;
             Ok(stack_ref.pop())
         })
     }
 
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "))]
     pub fn context_pop() -> Result<Option<AsyncContext>> {
         let mut context_ref = GLOBAL_ASYNC_CONTEXT.try_borrow_mut()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Global context borrow failed"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         Ok(context_ref.take())
     }
@@ -377,8 +349,7 @@ pub mod canonical_builtins {
             _ => Err(Error::new(
                 ErrorCategory::Type,
                 wrt_error::codes::TYPE_MISMATCH,
-                "Invalid context value type"
-            ))
+                "))
         }
     }
 

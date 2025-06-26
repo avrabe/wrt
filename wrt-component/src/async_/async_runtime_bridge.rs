@@ -44,7 +44,7 @@ pub mod rust_async_bridge {
     }
 
     impl<T: Clone + Send + 'static> RustFuture for ComponentFutureAdapter<T> {
-        type Output = Result<T, String>;
+        type Output = core::result::Result<T, String>;
 
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             let future = self.wasm_future.lock().unwrap();
@@ -75,7 +75,7 @@ pub mod rust_async_bridge {
         future: F,
         task_manager: &mut TaskManager,
         component_id: ComponentInstanceId,
-    ) -> Result<FutureHandle, String>
+    ) -> core::result::Result<FutureHandle, String>
     where
         F: RustFuture<Output = T> + Send + 'static,
         T: Into<ComponentValue>,
@@ -95,7 +95,7 @@ pub mod component_async {
     pub fn execute_async_operation(
         task_manager: &mut TaskManager,
         operation: AsyncOperation,
-    ) -> Result<TaskId, String> {
+    ) -> core::result::Result<TaskId, String> {
         // Create a task for the async operation
         let task_id = task_manager
             .create_task(operation.component_id, &operation.name)

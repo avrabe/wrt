@@ -35,8 +35,11 @@ pub use std::{
     vec::Vec,
 };
 
-// Binary std/no_std choice
-pub use std::{
+// Re-export from alloc when available (no_std + alloc)
+#[cfg(all(not(feature = "std"), any(feature = "alloc", feature = "dynamic-allocation")))]
+extern crate alloc;
+#[cfg(all(not(feature = "std"), any(feature = "alloc", feature = "dynamic-allocation")))]
+pub use alloc::{
     boxed::Box,
     collections::{BTreeMap as HashMap, BTreeSet as HashSet},
     format,
@@ -46,11 +49,10 @@ pub use std::{
     vec::Vec,
 };
 
-// Binary std/no_std choice
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
+// Stub types for pure no_std environments
+#[cfg(all(not(feature = "std"), not(feature = "alloc"), not(feature = "dynamic-allocation")))]
 pub type Arc<T> = core::marker::PhantomData<T>;
-
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
+#[cfg(all(not(feature = "std"), not(feature = "alloc"), not(feature = "dynamic-allocation")))]
 pub type Box<T> = core::marker::PhantomData<T>;
 
 // Re-export from wrt-error if enabled

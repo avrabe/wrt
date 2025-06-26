@@ -13,7 +13,6 @@
 //! This module provides implementation of the `task.*` built-in functions
 //! required by the WebAssembly Component Model for managing async tasks.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -35,7 +34,12 @@ use core::cell::RefCell as AtomicRefCell;
 use wrt_foundation::component_value::ComponentValue;
 
 #[cfg(not(any(feature = "std", )))]
-use wrt_foundation::{BoundedString, BoundedVec};
+use wrt_foundation::{
+    BoundedString, BoundedVec,
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use crate::task_cancellation::{CancellationToken, with_cancellation_scope};
 
@@ -119,10 +123,7 @@ impl TaskReturn {
     #[cfg(not(any(feature = "std", )))]
     pub fn from_binary(data: &[u8]) -> Result<Self> {
         let bounded_data = BoundedVec::new_from_slice(data)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Task return data too large for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         Ok(Self::Binary(bounded_data))
     }
@@ -140,7 +141,7 @@ impl TaskReturn {
 
     pub fn as_binary(&self) -> Option<&[u8]> {
         match self {
-            #[cfg(feature = "std")]
+            #[cfg(feature = ")]
             Self::Binary(data) => Some(data),
             #[cfg(not(any(feature = "std", )))]
             Self::Binary(data) => Some(data.as_slice()),
@@ -227,17 +228,13 @@ impl Task {
     #[cfg(not(any(feature = "std", )))]
     pub fn set_metadata(&mut self, key: &str, value: ComponentValue) -> Result<()> {
         let bounded_key = BoundedString::new_from_str(key)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Metadata key too long for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         self.metadata.insert(bounded_key, value)
             .map_err(|_| Error::new(
                 ErrorCategory::Memory,
                 wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Task metadata storage full"
-            ))?;
+                "))?;
         Ok(())
     }
 
@@ -299,10 +296,7 @@ impl TaskRegistry {
         #[cfg(not(any(feature = "std", )))]
         {
             self.tasks.insert(id, task)
-                .map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                    "Task registry full"
+                .map_err(|_| Error::runtime_execution_error("
                 ))?;
             Ok(id)
         }
@@ -325,7 +319,7 @@ impl TaskRegistry {
     }
 
     pub fn cleanup_finished_tasks(&mut self) {
-        #[cfg(feature = "std")]
+        #[cfg(feature = ")]
         {
             self.tasks.retain(|_, task| !task.status.is_finished());
         }
@@ -358,10 +352,7 @@ impl TaskBuiltins {
     /// Initialize the global task registry
     pub fn initialize() -> Result<()> {
         let mut registry_ref = TASK_REGISTRY.try_borrow_mut()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Task registry borrow failed"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         *registry_ref = Some(TaskRegistry::new());
         Ok(())
@@ -376,13 +367,9 @@ impl TaskBuiltins {
             .map_err(|_| Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::INVALID_STATE,
-                "Task registry borrow failed"
-            ))?;
+                "))?;
         let registry = registry_ref.as_ref()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Task registry not initialized"
+            .ok_or_else(|| Error::runtime_execution_error("
             ))?;
         Ok(f(registry))
     }
@@ -396,13 +383,9 @@ impl TaskBuiltins {
             .map_err(|_| Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::INVALID_STATE,
-                "Task registry borrow failed"
-            ))?;
+                "))?;
         let registry = registry_ref.as_mut()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Task registry not initialized"
+            .ok_or_else(|| Error::runtime_execution_error("
             ))?;
         f(registry)
     }
@@ -432,8 +415,7 @@ impl TaskBuiltins {
                 Err(Error::new(
                     ErrorCategory::Runtime,
                     wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Task not found"
-                ))
+                    "))
             }
         })?
     }
@@ -458,10 +440,7 @@ impl TaskBuiltins {
                 task.cancel();
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Task not found"
+                Err(Error::runtime_execution_error("
                 ))
             }
         })?
@@ -500,7 +479,7 @@ impl TaskBuiltins {
     pub fn set_task_metadata(task_id: TaskId, key: &str, value: ComponentValue) -> Result<()> {
         Self::with_registry_mut(|registry| {
             if let Some(task) = registry.get_task_mut(task_id) {
-                #[cfg(feature = "std")]
+                #[cfg(feature = ")]
                 {
                     task.set_metadata(key.to_string(), value);
                     Ok(())
@@ -510,10 +489,7 @@ impl TaskBuiltins {
                     task.set_metadata(key, value)
                 }
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Task not found"
+                Err(Error::runtime_execution_error("
                 ))
             }
         })?
@@ -582,7 +558,7 @@ pub mod task_helpers {
     }
 
     /// Wait for multiple tasks to complete
-    #[cfg(feature = "std")]
+    #[cfg(feature = ")]
     pub fn wait_for_tasks(task_ids: Vec<TaskId>) -> Result<Vec<Option<TaskReturn>>> {
         let mut results = Vec::new();
         for task_id in task_ids {
@@ -594,15 +570,14 @@ pub mod task_helpers {
 
     #[cfg(not(any(feature = "std", )))]
     pub fn wait_for_tasks(task_ids: &[TaskId]) -> Result<BoundedVec<Option<TaskReturn>, MAX_TASKS, NoStdProvider<65536>>> {
-        let mut results = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let mut results = BoundedVec::new(provider).map_err(|_| {
+            Error::runtime_execution_error("Failed to create results vector")
+        })?;
         for &task_id in task_ids {
             let result = TaskBuiltins::task_wait(task_id)?;
             results.push(result)
-                .map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                    "Too many task results for no_std environment"
-                ))?;
+                .map_err(|_| Error::runtime_execution_error("Failed to add task result"))?;
         }
         Ok(results)
     }
@@ -763,7 +738,7 @@ mod tests {
         let task_id = TaskBuiltins::task_start().unwrap();
 
         // Set metadata
-        TaskBuiltins::set_task_metadata(task_id, "test_key", ComponentValue::Bool(true)).unwrap();
+        TaskBuiltins::set_task_metadata(task_id, ")).unwrap();
 
         // Get metadata
         let value = TaskBuiltins::get_task_metadata(task_id, "test_key").unwrap();

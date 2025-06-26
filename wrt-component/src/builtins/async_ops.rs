@@ -6,8 +6,6 @@
 // - async.poll: Poll an async value for completion
 // - async.wait: Wait for an async value to complete
 
-#[cfg(all(feature = "component-model-async", not(feature = "std"), ))]
-use std::{boxed::Box, collections::HashMap, sync::Arc, vec::Vec};
 #[cfg(all(feature = "component-model-async", feature = "std"))]
 use std::{
     boxed::Box,
@@ -16,13 +14,29 @@ use std::{
     vec::Vec,
 };
 
+#[cfg(all(feature = "component-model-async", not(feature = "std")))]
+use alloc::{boxed::Box, vec::Vec};
+
+#[cfg(all(feature = "component-model-async", not(feature = "std")))]
+use wrt_foundation::{bounded::BoundedVec, safe_memory::NoStdProvider};
+
 #[cfg(feature = "component-model-async")]
-use wrt_error::{kinds::AsyncError, Error, Result};
-#[cfg(feature = "component-model-async")]
-use wrt_foundation::builtin::BuiltinType;
-#[cfg(feature = "component-model-async")]
-#[cfg(feature = "std")]
-use wrt_foundation::component_value::ComponentValue;
+use wrt_error::{Error, Result};
+
+#[cfg(all(feature = "component-model-async", feature = "std"))]
+use wrt_foundation::{builtin::BuiltinType, component_value::ComponentValue};
+
+#[cfg(all(feature = "component-model-async", not(feature = "std")))]
+use crate::types::Value as ComponentValue;
+
+#[cfg(all(feature = "component-model-async", not(feature = "std")))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuiltinType {
+    AsyncNew,
+    AsyncGet,
+    AsyncPoll,
+    AsyncWait,
+}
 
 #[cfg(feature = "component-model-async")]
 use crate::builtins::BuiltinHandler;
@@ -92,7 +106,7 @@ impl AsyncValueStore {
 
                 Ok(())
             }
-            None => Err(Error::new(AsyncError("Component not found"))),
+            None => Err(Error::component_not_found("Component not found"))),
         }
     }
 
@@ -105,7 +119,7 @@ impl AsyncValueStore {
 
                 Ok(())
             }
-            None => Err(Error::new(AsyncError("Component not found"))),
+            None => Err(Error::component_not_found("Component not found"))),
         }
     }
 
@@ -113,7 +127,7 @@ impl AsyncValueStore {
     pub fn get_status(&self, id: u32) -> Result<AsyncStatus> {
         match self.values.get(&id) {
             Some(async_value) => Ok(async_value.status.clone()),
-            None => Err(Error::new(AsyncError("Component not found"))),
+            None => Err(Error::component_not_found("Component not found"))),
         }
     }
 
@@ -123,7 +137,7 @@ impl AsyncValueStore {
             Some(async_value) => {
                 if async_value.status == AsyncStatus::Ready {
                     async_value.result.clone().ok_or_else(|| {
-                        Error::new(AsyncError("Async result not available".to_string()))
+                        Error::async_error("Async result not available"))
                     })
                 } else if async_value.status == AsyncStatus::Failed {
                     Err(Error::new(AsyncError(
@@ -133,10 +147,10 @@ impl AsyncValueStore {
                             .unwrap_or_else(|| "Async operation failed".to_string()),
                     )))
                 } else {
-                    Err(Error::new(AsyncError("Async operation still pending".to_string())))
+                    Err(Error::async_error("Async operation still pending")))
                 }
             }
-            None => Err(Error::new(AsyncError("Component not found"))),
+            None => Err(Error::component_not_found("Component not found"))),
         }
     }
 
@@ -150,7 +164,7 @@ impl AsyncValueStore {
         if self.values.remove(&id).is_some() {
             Ok(())
         } else {
-            Err(Error::new(AsyncError("Component not found")))
+            Err(Error::component_not_found("Component not found")))
         }
     }
 }
@@ -179,7 +193,7 @@ impl BuiltinHandler for AsyncNewHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate args - async.new takes no arguments
         if !args.is_empty() {
-            return Err(Error::new("Component not found")));
+            return Err(Error::component_not_found("Component not found")));
         }
 
         // Create a new async value
@@ -221,15 +235,14 @@ impl BuiltinHandler for AsyncGetHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate args
         if args.len() != 1 {
-            return Err(Error::new("Component not found")));
+            return Err(Error::component_not_found("Component not found")));
         }
 
         // Extract the async ID from args
         let async_id = match &args[0] {
             ComponentValue::U32(id) => *id,
             _ => {
-                return Err(Error::new(format!(
-                    "async.get: Expected u32 async ID, got {:?}",
+                return Err(Error::runtime_execution_error(",
                     args[0]
                 )));
             }
@@ -245,7 +258,7 @@ impl BuiltinHandler for AsyncGetHandler {
     }
 }
 
-#[cfg(feature = "component-model-async")]
+#[cfg(feature = ")]
 /// Handler for the async.poll built-in function
 pub struct AsyncPollHandler {
     /// Store containing async values
@@ -269,15 +282,14 @@ impl BuiltinHandler for AsyncPollHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate args
         if args.len() != 1 {
-            return Err(Error::new("Component not found")));
+            return Err(Error::component_not_found("Component not found")));
         }
 
         // Extract the async ID from args
         let async_id = match &args[0] {
             ComponentValue::U32(id) => *id,
             _ => {
-                return Err(Error::new(format!(
-                    "async.poll: Expected u32 async ID, got {:?}",
+                return Err(Error::runtime_execution_error(",
                     args[0]
                 )));
             }
@@ -300,7 +312,7 @@ impl BuiltinHandler for AsyncPollHandler {
     }
 }
 
-#[cfg(feature = "component-model-async")]
+#[cfg(feature = ")]
 #[cfg(feature = "std")]
 /// Handler for the async.wait built-in function
 pub struct AsyncWaitHandler {
@@ -327,15 +339,14 @@ impl BuiltinHandler for AsyncWaitHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate args
         if args.len() != 1 {
-            return Err(Error::new("Component not found")));
+            return Err(Error::component_not_found("Component not found")));
         }
 
         // Extract the async ID from args
         let async_id = match &args[0] {
             ComponentValue::U32(id) => *id,
             _ => {
-                return Err(Error::new(format!(
-                    "async.wait: Expected u32 async ID, got {:?}",
+                return Err(Error::runtime_execution_error(",
                     args[0]
                 )));
             }
@@ -356,7 +367,7 @@ impl BuiltinHandler for AsyncWaitHandler {
                     // Drop the lock and yield/sleep briefly
                     drop(store);
 
-                    #[cfg(feature = "std")]
+                    #[cfg(feature = ")]
                     std::thread::sleep(std::time::Duration::from_millis(1));
 
                     // Continue polling

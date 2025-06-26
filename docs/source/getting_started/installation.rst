@@ -2,7 +2,15 @@
 Installation
 ============
 
-This page provides detailed installation instructions for WRT across all supported platforms.
+This page provides installation instructions for PulseEngine (WRT Edition) development environment.
+
+.. warning::
+   **Development Status**: PulseEngine provides WebAssembly infrastructure and tooling, but the core execution engine is under development. 
+   Installation allows building modules and exploring the intended API design.
+
+.. warning::
+   **Source-Only Installation**: PulseEngine is currently available only as source code. 
+   Pre-built binaries and package manager distributions are not yet available.
 
 .. contents:: On this page
    :local:
@@ -35,8 +43,9 @@ Core Dependencies
 All platforms require:
 
 1. **Rust Toolchain**: Version 1.86.0 or newer (stable)
-2. **just**: Build automation tool
-3. **Git**: Source code management
+2. **Git**: Source code management
+
+The unified build tool (cargo-wrt) is included in the repository and installed automatically.
 
 Install Rust
 ~~~~~~~~~~~~~
@@ -58,19 +67,54 @@ Install Rust
 
       Download from the `official Rust website <https://forge.rust-lang.org/infra/channel-layout.html#archives>`_
 
-Install just
-~~~~~~~~~~~~
+Install cargo-wrt
+~~~~~~~~~~~~~~~~~~
+
+The cargo-wrt unified build tool is installed from the repository:
 
 .. code-block:: bash
 
-   cargo install just
+   # After cloning the repository
+   cargo install --path cargo-wrt
 
 Verify installation:
 
 .. code-block:: bash
 
-   just --version
+   cargo-wrt --help
    rustc --version
+
+Development Tool Setup
+~~~~~~~~~~~~~~~~~~~~~~
+
+After installing cargo-wrt, set up your development environment:
+
+.. code-block:: bash
+
+   # Check all tool dependencies
+   cargo-wrt setup --check
+
+   # Install optional development tools (kani, cargo-fuzz, etc.)
+   cargo-wrt setup --install
+
+   # Complete setup (tools + git hooks)
+   cargo-wrt setup --all
+
+   # Verify tool versions against requirements
+   cargo-wrt tool-versions check --verbose
+
+The build system includes sophisticated tool version management:
+
+- **tool-versions.toml**: Configuration file specifying exact tool version requirements
+- **Automated tool detection**: Missing tools trigger helpful installation messages  
+- **Reproducible environments**: Consistent tool versions across all contributors
+
+Optional development tools include:
+
+- **kani**: Formal verification tool for safety-critical code
+- **cargo-fuzz**: Fuzzing framework for security testing
+- **llvm-tools**: Coverage analysis and profiling
+- **mdbook**: Documentation generation
 
 WebAssembly Targets
 ~~~~~~~~~~~~~~~~~~~
@@ -94,7 +138,10 @@ For full development workflow:
    cargo install cargo-component
 
    # WebAssembly tools
-   cargo install wasmtime-cli wasm-tools
+   cargo install wasm-tools
+   
+   # PulseEngine command-line interface (from source)
+   cargo install --path wrtd
 
    # Code coverage (optional)
    cargo install cargo-llvm-cov
@@ -111,20 +158,21 @@ Source Installation
 
    .. code-block:: bash
 
-      git clone https://github.com/pulseengine/wrt.git
+      git clone https://github.com/pulseengine/wrt
       cd wrt
 
-2. Build from source:
+2. Install and build:
 
    .. code-block:: bash
 
-      just build
+      cargo install --path cargo-wrt
+      cargo-wrt build
 
 3. Run tests to verify:
 
    .. code-block:: bash
 
-      just ci-test
+      cargo-wrt test
 
 4. (Optional) Install system-wide:
 
@@ -135,67 +183,49 @@ Source Installation
 Binary Installation
 -------------------
 
-**For production deployment**
+.. warning::
+   **Not Available**: Pre-built binaries are not currently available. 
+   Please use source installation method above.
 
-Pre-built binaries are available for major platforms:
+Package Manager Installation
+----------------------------
 
-.. code-block:: bash
-
-   # Download and install (example)
-   wget https://releases.example.com/wrt/latest/wrt-linux-x86_64.tar.gz
-   tar -xzf wrt-linux-x86_64.tar.gz
-   sudo cp wrtd /usr/local/bin/
-
-Package Managers
-----------------
-
-**Platform-specific packages**
-
-.. tabs::
-
-   .. tab:: Cargo
-
-      .. code-block:: bash
-
-         cargo install wrt-runtime
-
-   .. tab:: Homebrew (macOS)
-
-      .. code-block:: bash
-
-         brew install wrt
-
-   .. tab:: Debian/Ubuntu
-
-      .. code-block:: bash
-
-         sudo apt install wrt
+.. warning::
+   **Not Available**: PulseEngine is not currently published to package managers including:
+   
+   - crates.io (Cargo)
+   - Homebrew
+   - APT repositories
+   - Other package managers
+   
+   Please use source installation method above.
 
 Configuration
 =============
 
-Environment Variables
----------------------
+Environment Variables (Planned)
+--------------------------------
 
-Set these for optimal performance:
+The following environment variables are designed for the target runtime configuration:
 
 .. code-block:: bash
 
-   # Runtime configuration
-   export WRT_STACK_SIZE=1048576
-   export WRT_FUEL_LIMIT=1000000
+   # Target runtime configuration (execution engine under development)
+   export WRT_STACK_SIZE=1048576    # Stack size for PulseEngine runtime
+   export WRT_FUEL_LIMIT=1000000    # Fuel limit for PulseEngine execution
 
    # Development options
    export WRT_LOG_LEVEL=info
    export WRT_DEBUG_MODE=1
 
-Build Configuration
--------------------
+Build Configuration (Planned)
+------------------------------
 
-Create a ``.wrt/config.toml`` file in your project:
+The planned configuration system will use a ``.wrt/config.toml`` file:
 
 .. code-block:: toml
 
+   # Target configuration format (under development)
    [runtime]
    stack_size = 1048576
    fuel_limit = 1000000
@@ -211,20 +241,22 @@ Create a ``.wrt/config.toml`` file in your project:
 Verification
 ============
 
-Verify your installation works correctly:
+Verify your development environment works correctly:
 
 .. code-block:: bash
 
-   # Check WRT installation
-   wrtd --version
+   # Check that wrtd builds (infrastructure verification)
+   cargo run --bin wrtd -- --help
 
-   # Build and run example
-   just test-wrtd-example
+   # Build all crates to verify dependencies
+   cargo-wrt build
 
-   # Run comprehensive tests
-   just ci-main
+   # Run infrastructure tests
+   cargo-wrt test
 
-Expected output should show successful compilation and test execution.
+.. note::
+   **Development Status**: The wrtd tool currently provides infrastructure and module validation. 
+   Full WebAssembly execution is under development. Expected output shows successful build and infrastructure validation.
 
 Troubleshooting
 ===============
@@ -243,14 +275,14 @@ Common Issues
 
 .. code-block:: bash
 
-   just setup-rust-targets
+   rustup target add wasm32-unknown-unknown wasm32-wasip1 wasm32-wasip2
 
 **Build failures:**
 
 .. code-block:: bash
 
-   cargo clean
-   just build
+   cargo-wrt clean
+   cargo-wrt build
 
 **Permission errors:**
 

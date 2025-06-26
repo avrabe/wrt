@@ -114,23 +114,23 @@ cargo run -p wrt-test-registry --features runner --bin wrt-test-runner -- --name
 cargo run -p wrt-test-registry --features runner --bin wrt-test-runner -- --no-std
 ```
 
-### Using with justfile
+### Using with cargo-wrt
 
-The project's justfile includes several commands for running tests:
+The unified build system provides commands for running tests:
 
-```
+```bash
 # Build the test registry
-just build-test-registry
+cargo-wrt build --package wrt-test-registry
 
 # Run all tests
-just run-unified-tests
+cargo-wrt test
 
-# List all tests
-just list-tests
+# Run tests with specific features
+cargo-wrt test --package wrt-test-registry --features runner
 
-# Run specific categories
-just test-decoder
-just test-instruction-decoder
+# Run specific test categories
+cargo-wrt test --filter decoder
+cargo-wrt test --filter instruction-decoder
 ```
 
 ## Converting Existing Tests

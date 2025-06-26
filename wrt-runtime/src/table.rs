@@ -10,14 +10,20 @@ use wrt_foundation::{
     values::{Value as WrtValue, FuncRef as WrtFuncRef, ExternRef as WrtExternRef},
     safe_memory::NoStdMemoryProvider,
     bounded::BoundedVec,
-    budget_types::RuntimeVec,
+    // Use clean collections instead of runtime allocator types
     verification::VerificationLevel,
 };
 
 // Platform-aware memory provider for table operations  
 type TableProvider = wrt_foundation::safe_memory::NoStdProvider<8192>;  // 8KB for table operations
 
-use crate::prelude::{BoundedCapacity, Debug, Eq, Error, ErrorCategory, Ord, PartialEq, Result, String, TryFrom, codes, format};
+use crate::prelude::{BoundedCapacity, Debug, Eq, Error, ErrorCategory, Ord, PartialEq, Result, RuntimeString, TryFrom, codes, Arc};
+
+// Import format macro based on feature flags
+#[cfg(feature = "std")]
+use std::format;
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
+use alloc::format;
 
 // Import the TableOperations trait from wrt-instructions
 use wrt_instructions::table_ops::TableOperations;
@@ -37,10 +43,7 @@ const INDEX_TOO_LARGE: u16 = 4005;
 /// 
 /// Ok(usize) if conversion is safe, error otherwise
 fn wasm_index_to_usize(index: u32) -> Result<usize> {
-    usize::try_from(index).map_err(|_| Error::new(
-        ErrorCategory::Runtime, 
-        INVALID_INDEX, 
-        "Index exceeds usize limit"
+    usize::try_from(index).map_err(|_| Error::runtime_execution_error("
     ))
 }
 
@@ -57,8 +60,7 @@ fn usize_to_wasm_u32(size: usize) -> Result<u32> {
     u32::try_from(size).map_err(|_| Error::new(
         ErrorCategory::Runtime, 
         INDEX_TOO_LARGE, 
-        "Size exceeds u32 limit"
-    ))
+        "))
 }
 
 /// A WebAssembly table is a vector of opaque values of a single type.
@@ -69,7 +71,7 @@ pub struct Table {
     /// The table elements
     elements: wrt_foundation::bounded::BoundedVec<Option<WrtValue>, 1024, TableProvider>,
     /// A debug name for the table (optional)
-    pub debug_name: Option<String>,
+    pub debug_name: Option<RuntimeString>,
     /// Verification level for table operations
     pub verification_level: VerificationLevel,
 }
@@ -262,11 +264,7 @@ impl Table {
     pub fn get(&self, idx: u32) -> Result<Option<WrtValue>> {
         let idx = wasm_index_to_usize(idx)?;
         if idx >= self.elements.len() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_FUNCTION_INDEX,
-                "Table access out of bounds",
-            ));
+            return Err(Error::runtime_invalid_function_index("Table access out of bounds"));
         }
 
         // Implement verification if needed based on verification level
@@ -274,21 +272,13 @@ impl Table {
             // Verify table integrity - this is a simplified version
             // In a real implementation, we would do more thorough checks
             if idx >= self.elements.len() {
-                return Err(Error::new(
-                    ErrorCategory::Validation,
-                    codes::VALIDATION_ERROR,
-                    "Table integrity check failed: index out of bounds",
-                ));
+                return Err(Error::validation_error("Table integrity check failed: index out of bounds"));
             }
         }
 
         // Use BoundedVec's get method for direct access
         self.elements.get(idx as usize)
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_FUNCTION_INDEX,
-                "Table index out of bounds",
-            ))
+            .map_err(|_| Error::runtime_invalid_function_index("Table index out of bounds"))
     }
 
     /// Sets an element at the specified index
@@ -309,11 +299,7 @@ impl Table {
     pub fn set(&mut self, idx: u32, value: Option<WrtValue>) -> Result<()> {
         let idx = wasm_index_to_usize(idx)?;
         if idx >= self.elements.len() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_FUNCTION_INDEX,
-                "Table access out of bounds",
-            ));
+            return Err(Error::runtime_invalid_function_index("Table access out of bounds"));
         }
 
         if let Some(ref val) = value {
@@ -323,11 +309,7 @@ impl Table {
                 _ => false,
             };
             if !val_matches {
-                return Err(Error::new(
-                    ErrorCategory::Validation,
-                    codes::VALIDATION_ERROR,
-                    "Element value type doesn't match table element type",
-                ));
+                return Err(Error::validation_error("Element value type doesn't match table element type"));
             }
         }
         self.elements.set(idx, value)?;
@@ -355,16 +337,12 @@ impl Table {
             _ => false,
         };
         if !init_val_matches {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Grow operation init value type doesn't match table element type",
-            ));
+            return Err(Error::validation_error("Grow operation init value type doesn't match table element type"));
         }
 
         let old_size = self.size();
         let new_size = old_size.checked_add(delta).ok_or_else(|| {
-            Error::new(ErrorCategory::Runtime, codes::CAPACITY_EXCEEDED, "Table size overflow")
+            Error::runtime_execution_error(")
         })?;
 
         if let Some(max) = self.ty.limits.max {
@@ -374,8 +352,7 @@ impl Table {
                 return Err(Error::new(
                     ErrorCategory::Runtime,
                     codes::CAPACITY_EXCEEDED,
-                    "Table grow exceeds maximum limit",
-                ));
+                    "));
             }
         }
 
@@ -407,10 +384,7 @@ impl Table {
     /// isn't a funcref
     pub fn set_func(&mut self, idx: u32, func_idx: u32) -> Result<()> {
         if !matches!(self.ty.element_type, WrtRefType::Funcref) {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                codes::INVALID_TYPE,
-                "Table element type is not FuncRef",
+            return Err(Error::runtime_execution_error(",
             ));
         }
         self.set(idx, Some(WrtValue::FuncRef(Some(WrtFuncRef { index: func_idx }))))
@@ -432,11 +406,7 @@ impl Table {
     /// Returns an error if the operation fails
     pub fn init(&mut self, offset: u32, init_data: &[Option<WrtValue>]) -> Result<()> {
         if offset as usize + init_data.len() > self.elements.len() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::OUT_OF_BOUNDS_ERROR,
-                "Table init out of bounds",
-            ));
+            return Err(Error::runtime_out_of_bounds("));
         }
         for (i, val_opt) in init_data.iter().enumerate() {
             if let Some(val) = val_opt {
@@ -446,11 +416,7 @@ impl Table {
                     _ => false,
                 };
                 if !val_matches {
-                    return Err(Error::new(
-                        ErrorCategory::Validation,
-                        codes::VALIDATION_ERROR,
-                        "Table init value type mismatch",
-                    ));
+                    return Err(Error::validation_error("Table init value type mismatch"));
                 }
             }
             self.elements.set((offset as usize) + i, val_opt.clone())?;
@@ -462,11 +428,7 @@ impl Table {
     pub fn copy_elements(&mut self, dst: usize, src: usize, len: usize) -> Result<()> {
         // Verify bounds
         if src + len > self.elements.len() || dst + len > self.elements.len() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::RUNTIME_ERROR,
-                "Runtime operation error",
-            ));
+            return Err(Error::runtime_error("Runtime operation error"));
         }
 
         // Handle the case where regions don't overlap or no elements to copy
@@ -513,11 +475,7 @@ impl Table {
     ) -> Result<()> {
         // Verify bounds
         if offset + len > self.elements.len() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::RUNTIME_ERROR,
-                "Runtime operation error",
-            ));
+            return Err(Error::runtime_error("Runtime operation error"));
         }
 
         // Handle empty fill
@@ -570,11 +528,7 @@ impl Table {
     pub fn init_element(&mut self, idx: usize, value: Option<WrtValue>) -> Result<()> {
         // Check bounds
         if idx >= self.elements.len() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_FUNCTION_INDEX,
-                "Runtime operation error",
-            ));
+            return Err(Error::runtime_invalid_function_index("Runtime operation error"));
         }
 
         // Set the element directly without converting to/from Vec
@@ -607,13 +561,7 @@ impl Table {
     ///
     /// A string containing the statistics
     pub fn safety_stats(&self) -> wrt_foundation::bounded::BoundedString<256, TableProvider> {
-        let stats_text = format!(
-            "Table Safety Stats:\n- Size: {} elements\n- Element type: {:?}\n- Verification \
-             level: {:?}",
-            self.elements.len(),
-            self.ty.element_type,
-            self.verification_level
-        );
+        let stats_text = "Table Safety Stats: [Runtime table]";
         wrt_foundation::bounded::BoundedString::from_str(stats_text, TableProvider::default()).unwrap_or_default()
     }
 }
@@ -729,30 +677,18 @@ impl TableManager {
     /// Get a table by index
     pub fn get_table(&self, index: u32) -> Result<Table> {
         let table = self.tables.get(index as usize)
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_FUNCTION_INDEX,
-                "Table index out of bounds",
-            ))?;
+            .map_err(|_| Error::runtime_invalid_function_index("Table index out of bounds"))?;
         Ok(table)
     }
     
     /// Get a mutable table by index
     pub fn get_table_mut(&mut self, index: u32) -> Result<&mut Table> {
         if index as usize >= self.tables.len() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_FUNCTION_INDEX,
-                "Table index out of bounds",
-            ));
+            return Err(Error::runtime_invalid_function_index("Table index out of bounds"));
         }
         // Since BoundedVec doesn't have get_mut, we need to work around this
         // For now, return an error indicating this operation is not supported
-        Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::RUNTIME_ERROR,
-            "Mutable table access not supported with current BoundedVec implementation",
-        ))
+        Err(Error::runtime_error("Mutable table access not supported with current BoundedVec implementation"))
     }
     
     /// Get the number of tables

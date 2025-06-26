@@ -16,6 +16,14 @@ use wrt_foundation::{
     bounded::BoundedVec, component::ComponentType, component_value::ComponentValue, prelude::*,
 };
 
+#[cfg(not(feature = "std"))]
+use wrt_foundation::{
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+    BoundedString,
+};
+
 use crate::{
     canonical::CanonicalAbi,
     execution_engine::{ComponentExecutionEngine, HostFunction},
@@ -259,20 +267,30 @@ pub struct SecurityPolicy {
 
 impl HostIntegrationManager {
     /// Create a new host integration manager
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> WrtResult<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             host_functions: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            host_functions: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            host_functions: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    wrt_error::Error::resource_exhausted("Failed to create host functions vector")
+                })?
+            },
             #[cfg(feature = "std")]
             event_handlers: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            event_handlers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-            host_resources: HostResourceManager::new(),
+            event_handlers: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    wrt_error::Error::resource_exhausted("Failed to create event handlers vector")
+                })?
+            },
+            host_resources: HostResourceManager::new()?,
             canonical_abi: CanonicalAbi::new(),
-            security_policy: SecurityPolicy::default(),
-        }
+            security_policy: SecurityPolicy::default()?,
+        })
     }
 
     /// Register a host function
@@ -306,7 +324,8 @@ impl HostIntegrationManager {
         let registry_entry = HostFunctionRegistry { name, signature, implementation, permissions };
 
         self.host_functions.push(registry_entry).map_err(|_| {
-            wrt_foundation::WrtError::ResourceExhausted("Too many host functions".into())
+            wrt_error::Error::resource_exhausted("Too many host functions")
+            )
         })?;
 
         Ok(function_id)
@@ -321,20 +340,19 @@ impl HostIntegrationManager {
         engine: &mut ComponentExecutionEngine,
     ) -> WrtResult<Value> {
         let function = self.host_functions.get(function_id as usize).ok_or_else(|| {
-            wrt_foundation::WrtError::invalid_input("Invalid input")
+            wrt_error::Error::validation_invalid_input("Invalid input")
+            )
         })?;
 
         // Check security policy
         if !self.security_policy.allow_arbitrary_host_calls {
-            return Err(wrt_foundation::WrtError::PermissionDenied(
-                "Arbitrary host calls not allowed".into(),
+            return Err(wrt_error::Error::runtime_error("Arbitrary host calls not allowed")
             ));
         }
 
         // Check function permissions
         if !self.check_function_permissions(&function.permissions, caller_instance) {
-            return Err(wrt_foundation::WrtError::PermissionDenied(
-                "Host function call not permitted".into(),
+            return Err(wrt_error::Error::runtime_error("Host function call not permitted")
             ));
         }
 
@@ -398,7 +416,8 @@ impl HostIntegrationManager {
         let event_handler = EventHandler { event_type, handler, priority };
 
         self.event_handlers.push(event_handler).map_err(|_| {
-            wrt_foundation::WrtError::ResourceExhausted("Too many event handlers".into())
+            wrt_error::Error::resource_exhausted("Too many event handlers")
+            )
         })?;
 
         Ok(())
@@ -432,8 +451,7 @@ impl HostIntegrationManager {
     ) -> WrtResult<u32> {
         // Check security policy
         if !self.security_policy.allowed_resource_types.contains(&resource_type) {
-            return Err(wrt_foundation::WrtError::PermissionDenied(
-                "Host resource type not allowed".into(),
+            return Err(wrt_error::Error::runtime_error("Host resource type not allowed")
             ));
         }
 
@@ -448,7 +466,8 @@ impl HostIntegrationManager {
         #[cfg(not(any(feature = "std", )))]
         {
             self.host_resources.resources.push(resource).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many host resources".into())
+                wrt_error::Error::resource_exhausted("Too many host resources")
+                )
             })?;
         }
 
@@ -464,19 +483,24 @@ impl HostIntegrationManager {
     ) -> WrtResult<()> {
         let resource =
             self.host_resources.resources.get(resource_id as usize).ok_or_else(|| {
-                wrt_foundation::WrtError::invalid_input("Invalid input")
+                wrt_error::Error::validation_invalid_input("Invalid input")
+            )
             })?;
 
         if !resource.permissions.shareable {
-            return Err(wrt_foundation::WrtError::PermissionDenied(
-                "Host resource is not shareable".into(),
+            return Err(wrt_error::Error::runtime_error("Host resource is not shareable")
             ));
         }
 
         #[cfg(feature = "std")]
         let mut allowed_instances = Vec::new();
         #[cfg(not(any(feature = "std", )))]
-        let mut allowed_instances = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let mut allowed_instances = {
+            let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+            BoundedVec::new(provider).map_err(|_| {
+                wrt_error::Error::resource_exhausted("Failed to create allowed instances vector")
+            })?
+        };
 
         #[cfg(feature = "std")]
         {
@@ -485,7 +509,8 @@ impl HostIntegrationManager {
         #[cfg(not(any(feature = "std", )))]
         {
             allowed_instances.push(instance_id).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many allowed instances".into())
+                wrt_error::Error::resource_exhausted("Too many allowed instances")
+                )
             })?;
         }
 
@@ -498,7 +523,8 @@ impl HostIntegrationManager {
         #[cfg(not(any(feature = "std", )))]
         {
             self.host_resources.sharing_policies.push(policy).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many sharing policies".into())
+                wrt_error::Error::resource_exhausted("Too many sharing policies")
+                )
             })?;
         }
 
@@ -544,17 +570,27 @@ impl HostIntegrationManager {
 
 impl HostResourceManager {
     /// Create a new host resource manager
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> WrtResult<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             resources: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            resources: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            resources: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    wrt_error::Error::resource_exhausted("Failed to create resources vector")
+                })?
+            },
             #[cfg(feature = "std")]
             sharing_policies: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            sharing_policies: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            sharing_policies: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    wrt_error::Error::resource_exhausted("Failed to create sharing policies vector")
+                })?
+            },
+        })
     }
 
     /// Get resource by ID
@@ -575,13 +611,17 @@ impl HostResourceManager {
 
 impl Default for HostIntegrationManager {
     fn default() -> Self {
-        Self::new()
+        // The Default trait must not fail, so we panic if allocation fails.
+        // This is acceptable for Default as it's typically used during initialization.
+        Self::new().expect("Failed to create default HostIntegrationManager")
     }
 }
 
 impl Default for HostResourceManager {
     fn default() -> Self {
-        Self::new()
+        // The Default trait must not fail, so we panic if allocation fails.
+        // This is acceptable for Default as it's typically used during initialization.
+        Self::new().expect("Failed to create default HostResourceManager")
     }
 }
 
@@ -602,9 +642,10 @@ impl Default for HostResourcePermissions {
     }
 }
 
-impl Default for SecurityPolicy {
-    fn default() -> Self {
-        Self {
+impl SecurityPolicy {
+    /// Create a new security policy with default settings
+    pub fn new() -> WrtResult<Self> {
+        Ok(Self {
             allow_arbitrary_host_calls: false,
             max_memory_per_component: 64 * 1024 * 1024, // 64MB
             max_execution_time_ms: 5000,                // 5 seconds
@@ -613,11 +654,24 @@ impl Default for SecurityPolicy {
             allowed_resource_types: vec![HostResourceType::Buffer],
             #[cfg(not(any(feature = "std", )))]
             allowed_resource_types: {
-                let mut types = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-                let _ = types.push(HostResourceType::Buffer);
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                let mut types = BoundedVec::new(provider).map_err(|_| {
+                    wrt_error::Error::resource_exhausted("Failed to create allowed resource types vector")
+                })?;
+                types.push(HostResourceType::Buffer).map_err(|_| {
+                    wrt_error::Error::resource_exhausted("Failed to add default resource type")
+                })?;
                 types
             },
-        }
+        })
+    }
+}
+
+impl Default for SecurityPolicy {
+    fn default() -> Self {
+        // The Default trait must not fail, so we panic if allocation fails.
+        // This is acceptable for Default as it's typically used during initialization.
+        Self::new().expect("Failed to create default SecurityPolicy")
     }
 }
 
