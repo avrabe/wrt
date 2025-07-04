@@ -5,6 +5,7 @@
 //! consistency across all crates in the WRT project and simplify imports in
 //! individual modules.
 
+
 // Binary std/no_std choice
 pub use core::{
     any::Any,
@@ -32,7 +33,7 @@ pub use std::{
 
 // no_std alternatives using bounded collections
 #[cfg(not(feature = "std"))]
-pub use wrt_foundation::{BoundedVec, BoundedString};
+pub use wrt_foundation::{BoundedVec, BoundedString, BoundedCapacity};
 
 // Re-export from wrt-error
 pub use wrt_error::{codes, kinds, Error, ErrorCategory, Result};

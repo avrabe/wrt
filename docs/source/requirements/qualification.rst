@@ -7,7 +7,7 @@ Qualification Requirements
    :align: right
    :alt: Qualification Requirements Icon
 
-This document defines the qualification requirements for the SentryPulse Engine (WRT Edition). These requirements specify how the system must be qualified for use in safety-critical applications.
+This document defines the qualification requirements for PulseEngine (WRT Edition). These requirements specify how the system must be qualified for use in safety-critical applications.
 
 .. contents:: On this page
    :local:

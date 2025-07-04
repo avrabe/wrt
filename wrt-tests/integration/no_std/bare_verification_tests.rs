@@ -7,7 +7,6 @@
 //! that core WRT features work correctly on embedded and bare-metal systems.
 
 // Binary std/no_std choice
-#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(test)]
 mod tests {

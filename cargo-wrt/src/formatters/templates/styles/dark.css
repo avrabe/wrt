@@ -1,0 +1,232 @@
+/* Dark theme CSS for cargo-wrt HTML reports */
+
+:root {
+    --primary-color: #60a5fa;
+    --secondary-color: #9ca3af;
+    --success-color: #34d399;
+    --warning-color: #fbbf24;
+    --error-color: #f87171;
+    --background-color: #111827;
+    --surface-color: #1f2937;
+    --text-color: #f9fafb;
+    --text-muted: #9ca3af;
+    --border-color: #374151;
+    --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+    --border-radius: 0.5rem;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--background-color);
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+header h1 {
+    color: var(--primary-color);
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+/* Summary statistics */
+.summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat {
+    background: var(--surface-color);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    text-align: center;
+    border: 1px solid var(--border-color);
+}
+
+.stat .number {
+    display: block;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.stat .label {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Requirements table */
+.requirements-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    margin-bottom: 2rem;
+}
+
+.requirements-table thead th {
+    background: var(--primary-color);
+    color: var(--background-color);
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.requirements-table tbody tr {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.requirements-table tbody tr:hover {
+    background: var(--background-color);
+}
+
+.requirements-table tbody td {
+    padding: 1rem;
+    vertical-align: top;
+}
+
+.req-id {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.req-title {
+    font-weight: 500;
+    max-width: 300px;
+}
+
+.asil-level {
+    font-weight: 700;
+    text-align: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.asil-qm { background: #4b5563; color: #f9fafb; }
+.asil-a { background: #1e40af; color: #dbeafe; }
+.asil-b { background: #b45309; color: #fef3c7; }
+.asil-c { background: #c2410c; color: #fed7aa; }
+.asil-d { background: #dc2626; color: #fecaca; }
+
+.req-status span {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-verified span { background: #059669; color: #dcfce7; }
+.status-implemented span { background: #1e40af; color: #dbeafe; }
+.status-partial span { background: #b45309; color: #fef3c7; }
+.status-pending span { background: #4b5563; color: #f9fafb; }
+
+/* Safety report styles */
+.compliance-overview {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.compliance-score {
+    display: inline-block;
+    padding: 2rem;
+    border-radius: var(--border-radius);
+    background: var(--surface-color);
+    box-shadow: var(--shadow);
+}
+
+.compliance-score .score {
+    display: block;
+    font-size: 4rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.compliance-excellent .score { color: var(--success-color); }
+.compliance-good .score { color: var(--primary-color); }
+.compliance-warning .score { color: var(--warning-color); }
+.compliance-critical .score { color: var(--error-color); }
+
+.compliance-score .label {
+    color: var(--text-muted);
+    font-size: 1.125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding-top: 2rem;
+    margin-top: 3rem;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-muted);
+}
+
+footer a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+footer a:hover {
+    text-decoration: underline;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    header h1 {
+        font-size: 2rem;
+    }
+    
+    .requirements-table {
+        font-size: 0.875rem;
+    }
+    
+    .requirements-table thead th,
+    .requirements-table tbody td {
+        padding: 0.75rem;
+    }
+}

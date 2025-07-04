@@ -14,7 +14,6 @@
 //! required by the WebAssembly Component Model for managing error contexts and
 //! debugging information.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -27,6 +26,9 @@ use wrt_foundation::{
     atomic_memory::AtomicRefCell,
     bounded::{BoundedMap, BoundedString, BoundedVec},
     component_value::ComponentValue,
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 
@@ -136,10 +138,7 @@ impl StackFrame {
     #[cfg(not(any(feature = "std", )))]
     pub fn new(function_name: &str) -> Result<Self> {
         let bounded_name = BoundedString::new_from_str(function_name)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Function name too long for no_std environment"
+            .map_err(|_| Error::memory_allocation_failed("Function name too long for no_std environment")
             ))?;
         Ok(Self {
             function_name: bounded_name,
@@ -160,10 +159,7 @@ impl StackFrame {
     #[cfg(not(any(feature = "std", )))]
     pub fn with_location(mut self, file_name: &str, line: u32, column: u32) -> Result<Self> {
         let bounded_file = BoundedString::new_from_str(file_name)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "File name too long for no_std environment"
+            .map_err(|_| Error::memory_allocation_failed("File name too long for no_std environment")
             ))?;
         self.file_name = Some(bounded_file);
         self.line_number = Some(line);
@@ -233,17 +229,19 @@ impl ErrorContextImpl {
     #[cfg(not(any(feature = "std", )))]
     pub fn new(message: &str, severity: ErrorSeverity) -> Result<Self> {
         let bounded_message = BoundedString::new_from_str(message)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Debug message too long for no_std environment"
+            .map_err(|_| Error::memory_allocation_failed("Debug message too long for no_std environment")
             ))?;
         Ok(Self {
             id: ErrorContextId::new(),
             handle: ErrorContextHandle::new(),
             severity,
             debug_message: bounded_message,
-            stack_trace: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            stack_trace: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    Error::memory_allocation_failed("Failed to create stack trace vector")
+                })?
+            },
             metadata: BoundedMap::new(),
             error_code: None,
             source_error: None,
@@ -268,10 +266,7 @@ impl ErrorContextImpl {
     #[cfg(not(any(feature = "std", )))]
     pub fn add_stack_frame(&mut self, frame: StackFrame) -> Result<()> {
         self.stack_trace.push(frame)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Stack trace full"
+            .map_err(|_| Error::memory_allocation_failed("Stack trace full")
             ))?;
         Ok(())
     }
@@ -284,16 +279,10 @@ impl ErrorContextImpl {
     #[cfg(not(any(feature = "std", )))]
     pub fn set_metadata(&mut self, key: &str, value: ComponentValue) -> Result<()> {
         let bounded_key = BoundedString::new_from_str(key)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Metadata key too long for no_std environment"
+            .map_err(|_| Error::memory_allocation_failed("Metadata key too long for no_std environment")
             ))?;
         self.metadata.insert(bounded_key, value)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Metadata storage full"
+            .map_err(|_| Error::memory_allocation_failed("Metadata storage full")
             ))?;
         Ok(())
     }
@@ -341,29 +330,17 @@ impl ErrorContextImpl {
     }
 
     #[cfg(not(any(feature = "std", )))]
-    pub fn format_stack_trace(&self) -> Result<BoundedString<1024, NoStdProvider<65536>>> {
+    pub fn format_stack_trace(&self) -> core::result::Result<BoundedString<1024, NoStdProvider<65536>>> {
         let mut output = BoundedString::new();
         for (i, frame) in self.stack_trace.iter().enumerate() {
             // Binary std/no_std choice
-            output.push_str("  #").map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Stack trace format buffer full"
+            output.push_str("  #").map_err(|_| Error::memory_allocation_failed("Stack trace format buffer full")
             ))?;
-            output.push_str(": ").map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Stack trace format buffer full"
+            output.push_str(": ").map_err(|_| Error::memory_allocation_failed("Stack trace format buffer full")
             ))?;
-            output.push_str(frame.function_name()).map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Stack trace format buffer full"
+            output.push_str(frame.function_name()).map_err(|_| Error::memory_allocation_failed("Stack trace format buffer full")
             ))?;
-            output.push('\n').map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Stack trace format buffer full"
+            output.push('\n').map_err(|_| Error::memory_allocation_failed("Stack trace format buffer full")
             ))?;
         }
         Ok(output)
@@ -403,10 +380,7 @@ impl ErrorContextRegistry {
         #[cfg(not(any(feature = "std", )))]
         {
             self.contexts.insert(id, context)
-                .map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                    "Error context registry full"
+                .map_err(|_| Error::memory_allocation_failed("Error context registry full")
                 ))?;
             Ok(id)
         }
@@ -442,10 +416,7 @@ impl ErrorContextBuiltins {
     /// Initialize the global error context registry
     pub fn initialize() -> Result<()> {
         let mut registry_ref = ERROR_CONTEXT_REGISTRY.try_borrow_mut()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Error context registry borrow failed"
+            .map_err(|_| Error::runtime_invalid_state("Error context registry borrow failed")
             ))?;
         *registry_ref = Some(ErrorContextRegistry::new());
         Ok(())
@@ -457,16 +428,10 @@ impl ErrorContextBuiltins {
         F: FnOnce(&ErrorContextRegistry) -> R,
     {
         let registry_ref = ERROR_CONTEXT_REGISTRY.try_borrow()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Error context registry borrow failed"
+            .map_err(|_| Error::runtime_invalid_state("Error context registry borrow failed")
             ))?;
         let registry = registry_ref.as_ref()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Error context registry not initialized"
+            .ok_or_else(|| Error::runtime_invalid_state("Error context registry not initialized")
             ))?;
         Ok(f(registry))
     }
@@ -477,16 +442,10 @@ impl ErrorContextBuiltins {
         F: FnOnce(&mut ErrorContextRegistry) -> Result<R>,
     {
         let mut registry_ref = ERROR_CONTEXT_REGISTRY.try_borrow_mut()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Error context registry borrow failed"
+            .map_err(|_| Error::runtime_invalid_state("Error context registry borrow failed")
             ))?;
         let registry = registry_ref.as_mut()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Error context registry not initialized"
+            .ok_or_else(|| Error::runtime_invalid_state("Error context registry not initialized")
             ))?;
         f(registry)
     }
@@ -577,7 +536,7 @@ impl ErrorContextBuiltins {
     }
 
     #[cfg(not(any(feature = "std", )))]
-    pub fn error_context_stack_trace(context_id: ErrorContextId) -> Result<BoundedString<1024, NoStdProvider<65536>>> {
+    pub fn error_context_stack_trace(context_id: ErrorContextId) -> core::result::Result<BoundedString<1024, NoStdProvider<65536>>> {
         Self::with_registry(|registry| {
             if let Some(context) = registry.get_context(context_id) {
                 context.format_stack_trace()
@@ -605,16 +564,13 @@ impl ErrorContextBuiltins {
                 context.add_stack_frame(frame);
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Error context not found"
+                Err(Error::runtime_execution_error("
                 ))
             }
         })?
     }
 
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(any(feature = ")))]
     pub fn error_context_add_stack_frame(
         context_id: ErrorContextId, 
         function_name: &str,
@@ -631,17 +587,14 @@ impl ErrorContextBuiltins {
                 context.add_stack_frame(frame)?;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Error context not found"
+                Err(Error::runtime_execution_error("
                 ))
             }
         })?
     }
 
     /// Set metadata on an error context
-    #[cfg(feature = "std")]
+    #[cfg(feature = ")]
     pub fn error_context_set_metadata(
         context_id: ErrorContextId,
         key: String,
@@ -652,16 +605,13 @@ impl ErrorContextBuiltins {
                 context.set_metadata(key, value);
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Error context not found"
+                Err(Error::runtime_execution_error("
                 ))
             }
         })?
     }
 
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(any(feature = ")))]
     pub fn error_context_set_metadata(
         context_id: ErrorContextId,
         key: &str,
@@ -672,10 +622,7 @@ impl ErrorContextBuiltins {
                 context.set_metadata(key, value)?;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Error context not found"
+                Err(Error::runtime_execution_error("
                 ))
             }
         })?
@@ -701,7 +648,7 @@ pub mod error_context_helpers {
     use super::*;
 
     /// Create an error context from a standard error
-    #[cfg(feature = "std")]
+    #[cfg(feature = ")]
     pub fn from_error(error: &Error) -> Result<ErrorContextId> {
         let message = error.message().to_string();
         let severity = match error.category() {

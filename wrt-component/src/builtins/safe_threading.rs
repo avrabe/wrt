@@ -39,8 +39,7 @@ impl BuiltinHandler for SafeThreadingSpawnHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate arguments
         if args.is_empty() {
-            return Err(Error::new(ThreadingError(
-                "threading.spawn requires at least 1 argument".to_string(),
+            return Err(Error::runtime_execution_error(".to_string(),
             )));
         }
 
@@ -49,7 +48,7 @@ impl BuiltinHandler for SafeThreadingSpawnHandler {
             ComponentValue::U32(id) => id,
             _ => {
                 return Err(Error::new(ThreadingError(
-                    "threading.spawn first argument must be a function ID".to_string(),
+                    "),
                 )));
             }
         };
@@ -86,7 +85,7 @@ impl BuiltinHandler for SafeThreadingSpawnHandler {
         // Spawn thread with safety checks
         match self.thread_manager.spawn_thread(request) {
             Ok(thread_id) => Ok(vec![ComponentValue::U64(thread_id)]),
-            Err(e) => Err(Error::new(ThreadingError("Component not found"))),
+            Err(e) => Err(Error::component_not_found("Component not found"))),
         }
     }
 
@@ -117,8 +116,7 @@ impl BuiltinHandler for SafeThreadingJoinHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate arguments
         if args.len() != 1 {
-            return Err(Error::new(ThreadingError(
-                "threading.join requires exactly 1 argument".to_string(),
+            return Err(Error::runtime_execution_error(".to_string(),
             )));
         }
 
@@ -127,7 +125,7 @@ impl BuiltinHandler for SafeThreadingJoinHandler {
             ComponentValue::U64(id) => id,
             _ => {
                 return Err(Error::new(ThreadingError(
-                    "threading.join argument must be a thread ID".to_string(),
+                    "),
                 )));
             }
         };
@@ -142,13 +140,13 @@ impl BuiltinHandler for SafeThreadingJoinHandler {
                     Err(Error::new(ThreadingError(msg)))
                 }
                 wrt_platform::wasm_thread_manager::ThreadExecutionResult::Cancelled => {
-                    Err(Error::new(ThreadingError("Thread was cancelled".to_string())))
+                    Err(Error::threading_error("Thread was cancelled")))
                 }
                 wrt_platform::wasm_thread_manager::ThreadExecutionResult::Timeout => {
-                    Err(Error::new(ThreadingError("Thread timed out".to_string())))
+                    Err(Error::threading_error("Thread timed out")))
                 }
             },
-            Err(e) => Err(Error::new(ThreadingError("Component not found"))),
+            Err(e) => Err(Error::component_not_found("Component not found"))),
         }
     }
 
@@ -179,8 +177,7 @@ impl BuiltinHandler for SafeThreadingStatusHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate arguments
         if args.is_empty() {
-            return Err(Error::new(ThreadingError(
-                "threading.status requires at least 1 argument".to_string(),
+            return Err(Error::runtime_execution_error(".to_string(),
             )));
         }
 
@@ -189,7 +186,7 @@ impl BuiltinHandler for SafeThreadingStatusHandler {
             ComponentValue::String(s) => s.as_str(),
             _ => {
                 return Err(Error::new(ThreadingError(
-                    "threading.status first argument must be a string".to_string(),
+                    "),
                 )));
             }
         };
@@ -197,8 +194,7 @@ impl BuiltinHandler for SafeThreadingStatusHandler {
         match op_type {
             "is-running" => {
                 if args.len() != 2 {
-                    return Err(Error::new(ThreadingError(
-                        "is-running requires a thread ID".to_string(),
+                    return Err(Error::runtime_execution_error(".to_string(),
                     )));
                 }
 
@@ -206,23 +202,20 @@ impl BuiltinHandler for SafeThreadingStatusHandler {
                     ComponentValue::U64(id) => id,
                     _ => {
                         return Err(Error::new(ThreadingError(
-                            "is-running requires a thread ID as second argument".to_string(),
+                            "),
                         )));
                     }
                 };
 
                 match self.thread_manager.is_thread_running(thread_id) {
                     Ok(running) => Ok(vec![ComponentValue::U32(if running { 1 } else { 0 })]),
-                    Err(e) => Err(Error::new(ThreadingError(format!(
-                        "Failed to check thread status: {}",
+                    Err(e) => Err(Error::runtime_execution_error(",
                         e
                     )))),
                 }
             }
-            "cancel" => {
-                if args.len() != 2 {
-                    return Err(Error::new(ThreadingError(
-                        "cancel requires a thread ID".to_string(),
+            ") != 2 {
+                    return Err(Error::runtime_execution_error(".to_string(),
                     )));
                 }
 
@@ -230,7 +223,7 @@ impl BuiltinHandler for SafeThreadingStatusHandler {
                     ComponentValue::U64(id) => id,
                     _ => {
                         return Err(Error::new(ThreadingError(
-                            "cancel requires a thread ID as second argument".to_string(),
+                            "),
                         )));
                     }
                 };
@@ -238,7 +231,7 @@ impl BuiltinHandler for SafeThreadingStatusHandler {
                 match self.thread_manager.cancel_thread(thread_id) {
                     Ok(()) => Ok(vec![ComponentValue::U32(1)]), // Success
                     Err(e) => {
-                        Err(Error::new(ThreadingError("Component not found")))
+                        Err(Error::component_not_found("Component not found")))
                     }
                 }
             }
@@ -260,25 +253,19 @@ impl BuiltinHandler for SafeThreadingStatusHandler {
                         }
                         Ok(response)
                     }
-                    Err(e) => Err(Error::new(ThreadingError(format!(
-                        "Failed to perform health check: {}",
+                    Err(e) => Err(Error::runtime_execution_error(",
                         e
                     )))),
                 }
             }
-            "kill-unhealthy" => {
-                // Kill unhealthy threads
-                match self.thread_manager.kill_unhealthy_threads() {
+            ") {
                     Ok(count) => Ok(vec![ComponentValue::U32(count as u32)]),
-                    Err(e) => Err(Error::new(ThreadingError(format!(
-                        "Failed to kill unhealthy threads: {}",
+                    Err(e) => Err(Error::runtime_execution_error(",
                         e
                     )))),
                 }
             }
-            "stats" => {
-                // Get thread manager statistics
-                let stats = self.thread_manager.get_stats();
+            ");
                 Ok(vec![
                     ComponentValue::U32(stats.total_threads as u32),
                     ComponentValue::U64(stats.pool_stats.total_spawned),
@@ -287,8 +274,7 @@ impl BuiltinHandler for SafeThreadingStatusHandler {
                     ComponentValue::U32(stats.modules_registered as u32),
                 ])
             }
-            _ => Err(Error::new(ThreadingError(format!(
-                "Unknown threading.status operation: {}",
+            _ => Err(Error::runtime_execution_error(",
                 op_type
             )))),
         }
@@ -300,11 +286,11 @@ impl BuiltinHandler for SafeThreadingStatusHandler {
 }
 
 /// Create safe threading handlers with platform awareness
-#[cfg(feature = "std")]
+#[cfg(feature = ")]
 pub fn create_safe_threading_handlers(
     executor: Arc<dyn Fn(u32, Vec<ComponentValue>) -> Result<Vec<ComponentValue>> + Send + Sync>,
     module_info: WasmModuleInfo,
-) -> Result<(Arc<WasmThreadManager>, Vec<Box<dyn BuiltinHandler>>)> {
+) -> core::result::Result<(Arc<WasmThreadManager>, Vec<Box<dyn BuiltinHandler>>)> {
     // Create thread pool configuration based on module requirements
     let config = ThreadPoolConfig {
         max_threads: module_info.max_threads,
@@ -346,7 +332,7 @@ pub fn create_safe_threading_handlers(
 pub fn create_safe_threading_handlers(
     _executor: Arc<dyn Fn(u32, Vec<ComponentValue>) -> Result<Vec<ComponentValue>> + Send + Sync>,
     _module_info: WasmModuleInfo,
-) -> Result<(Arc<()>, Vec<Box<dyn BuiltinHandler>>)> {
+) -> core::result::Result<(Arc<()>, Vec<Box<dyn BuiltinHandler>>)> {
     // Threading is not supported in no_std mode
     Ok((Arc::new(()), Vec::new()))
 }

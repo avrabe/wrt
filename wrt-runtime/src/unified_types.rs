@@ -13,7 +13,7 @@ use wrt_foundation::{
     traits::{Checksummable, ToBytes, FromBytes},
     prelude::{BoundedCapacity, Clone, Copy, Debug, Default, Eq, PartialEq, Value},
 };
-use wrt_error::{Error, ErrorCategory, codes};
+use wrt_error::{Error, ErrorCategory};
 
 // =============================================================================
 // PLATFORM-AWARE CAPACITY CONSTANTS
@@ -250,11 +250,7 @@ where
     
     fn allocate(&mut self, size: usize) -> core::result::Result<&mut [u8], Self::Error> {
         if self.allocated_bytes + size > self.max_memory {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::INSUFFICIENT_MEMORY,
-                "Allocation would exceed platform memory limits",
-            ));
+            return Err(Error::runtime_execution_error("Memory allocation limit exceeded"));
         }
         
         self.allocated_bytes += size;
@@ -262,9 +258,8 @@ where
         // Placeholder - real implementation would use provider
         Err(Error::new(
             ErrorCategory::Memory,
-            codes::NOT_IMPLEMENTED,
-            "Actual memory allocation not implemented in type system",
-        ))
+            wrt_error::codes::NOT_IMPLEMENTED,
+            "Allocation not implemented"))
     }
     
     fn deallocate(&mut self, ptr: &mut [u8]) -> core::result::Result<(), Self::Error> {

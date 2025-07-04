@@ -42,7 +42,7 @@
 //! // Execute with appropriate context
 //! ```
 
-use crate::prelude::{BoundedCapacity, Debug, Error, PartialEq, PureInstruction, Result, Value, ValueType};
+use crate::prelude::{Debug, Error, PartialEq, PureInstruction, Result, Value, ValueType, BoundedCapacity};
 use crate::validation::{Validate, ValidationContext};
 
 /// Table operations trait defining the interface to table implementations

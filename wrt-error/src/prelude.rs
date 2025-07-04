@@ -38,7 +38,7 @@ pub use core::{
 };
 
 // Re-export from std when the std feature is enabled
-// #[cfg(feature = \"std\")]
+// #[cfg(feature = "std")]
 // pub use std::{
 //     boxed::Box,
 //     collections::{HashMap, HashSet},

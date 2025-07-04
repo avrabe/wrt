@@ -372,6 +372,7 @@ fn main() -> Result<()> {
 
 #[cfg(not(feature = "std"))]
 fn main() {
-    // Binary std/no_std choice
-    panic!("This example requires std or alloc features");
+    // Binary std/no_std choice - ASIL-D safe: exit gracefully
+    eprintln!("This example requires std or alloc features");
+    core::process::exit(1);
 }

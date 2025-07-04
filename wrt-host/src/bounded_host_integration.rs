@@ -283,7 +283,7 @@ impl BoundedCallResult {
     /// Create an error result indicating function call failure
     #[must_use] pub fn error() -> Self {
         Self {
-            return_data: Vec::new(),
+            return_data: alloc::vec::Vec::new(),
             memory_used: 0,
             execution_time_us: 0,
             success: false,
@@ -412,8 +412,8 @@ impl BoundedHostIntegrationManager {
         
         Ok(Self {
             limits,
-            functions: Vec::new(),
-            active_calls: Vec::new(),
+            functions: alloc::vec::Vec::new(),
+            active_calls: alloc::vec::Vec::new(),
             total_memory_used: 0,
             next_function_id: 1,
         })
@@ -709,7 +709,7 @@ mod tests {
         
         let large_function = SimpleBoundedHostFunction::new(
             "large_function".to_string(),
-            |_| Ok(BoundedCallResult::success(Vec::new())),
+            |_| Ok(BoundedCallResult::success(alloc::vec::Vec::new())),
             200, // Exceeds budget
             0,
         );
@@ -730,7 +730,7 @@ mod tests {
             "blocking_function".to_string(),
             |_| {
                 // This would normally block
-                Ok(BoundedCallResult::success(Vec::new()))
+                Ok(BoundedCallResult::success(alloc::vec::Vec::new()))
             },
             100,
             0,
@@ -741,14 +741,14 @@ mod tests {
         let context1 = BoundedCallContext::new(
             function_id,
             ComponentInstanceId(1),
-            Vec::new(),
+            alloc::vec::Vec::new(),
             0,
         );
         
         let context2 = BoundedCallContext::new(
             function_id,
             ComponentInstanceId(2),
-            Vec::new(),
+            alloc::vec::Vec::new(),
             0,
         );
         
@@ -795,7 +795,7 @@ mod tests {
         let context = BoundedCallContext::new(
             function_id,
             ComponentInstanceId(1),
-            Vec::new(),
+            alloc::vec::Vec::new(),
             5, // Higher than function's safety level (4)
         );
         
@@ -814,7 +814,7 @@ mod tests {
         let context = BoundedCallContext::new(
             function_id,
             ComponentInstanceId(1),
-            Vec::new(),
+            alloc::vec::Vec::new(),
             0,
         );
         

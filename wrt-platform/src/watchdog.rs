@@ -5,6 +5,7 @@
 //!
 //! This module requires the `std` feature since it uses std::thread and std::time.
 
+
 use core::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Duration,
@@ -208,11 +209,7 @@ impl SoftwareWatchdog {
         {
             let tasks = self.tasks.read();
             if tasks.len() >= self.config.max_watched_tasks {
-                return Err(Error::new(
-                    ErrorCategory::Resource,
-                    1,
-                    "Too many watched tasks",
-                ));
+                return Err(Error::runtime_execution_error("Maximum watched tasks limit reached"));
             }
         }
 
@@ -231,8 +228,7 @@ impl SoftwareWatchdog {
             Error::new(
                 ErrorCategory::Validation,
                 1,
-                "Task not found",
-            )
+                "Task not found")
         })?;
 
         if task.active.load(Ordering::Acquire) {
@@ -244,11 +240,7 @@ impl SoftwareWatchdog {
             *task.last_heartbeat.lock() = now;
             Ok(())
         } else {
-            Err(Error::new(
-                ErrorCategory::Runtime,
-                1,
-                "Task is no longer active",
-            ))
+            Err(Error::runtime_execution_error("Task is not active"))
         }
     }
 
@@ -261,8 +253,7 @@ impl SoftwareWatchdog {
             Err(Error::new(
                 ErrorCategory::Validation,
                 1,
-                "Task not found",
-            ))
+                "Task not found"))
         }
     }
 }
@@ -279,11 +270,7 @@ impl<'a> WatchdogHandle<'a> {
         if let Some(task) = &self.task {
             self.watchdog.heartbeat(task.id)
         } else {
-            Err(Error::new(
-                ErrorCategory::Runtime,
-                1,
-                "Handle already consumed",
-            ))
+            Err(Error::runtime_execution_error("Task is not active"))
         }
     }
 
@@ -332,7 +319,7 @@ impl WatchdogIntegration for SoftwareWatchdog {
         timeout: Duration,
     ) -> Result<WatchdogHandle> {
         self.watch_task(
-            format!("wasm:{module_name}"),
+            format!("WASM module: {}", module_name),
             Some(timeout),
             WatchdogAction::Log,
         )

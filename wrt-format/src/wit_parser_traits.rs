@@ -1,17 +1,14 @@
 //! Trait implementations for WIT parser types
 
-use super::*;
+use super::wit_parser_types::*;
 use wrt_foundation::{
     traits::{Checksummable, FromBytes, ToBytes, ReadStream, WriteStream},
     verification::Checksum,
     Result as WrtResult,
-    MemoryProvider, NoStdProvider, BoundedVec,
+    MemoryProvider, BoundedVec,
 };
 use wrt_error::{Error, ErrorCategory};
 use core::default::Default;
-
-// Type alias for our memory provider
-type WitProvider = NoStdProvider<1024>;
 
 // ===== Default implementations =====
 
@@ -43,8 +40,8 @@ impl Default for WitFunction {
     fn default() -> Self {
         Self {
             name: WitBoundedString::default(),
-            params: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
-            results: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
+            params: BoundedVec::new(),
+            results: BoundedVec::new(),
             is_async: false,
         }
     }
@@ -111,7 +108,7 @@ impl Default for WitType {
 impl Default for WitRecord {
     fn default() -> Self {
         Self {
-            fields: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
+            fields: BoundedVec::new(),
         }
     }
 }
@@ -128,7 +125,7 @@ impl Default for WitRecordField {
 impl Default for WitVariant {
     fn default() -> Self {
         Self {
-            cases: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
+            cases: BoundedVec::new(),
         }
     }
 }
@@ -145,7 +142,7 @@ impl Default for WitVariantCase {
 impl Default for WitEnum {
     fn default() -> Self {
         Self {
-            cases: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
+            cases: BoundedVec::new(),
         }
     }
 }
@@ -153,7 +150,7 @@ impl Default for WitEnum {
 impl Default for WitFlags {
     fn default() -> Self {
         Self {
-            flags: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
+            flags: BoundedVec::new(),
         }
     }
 }
@@ -312,14 +309,14 @@ impl Checksummable for WitType {
                 match ok {
                     Some(t) => {
                         checksum.update(1);
-                        t.update_checksum(checksum);
+                        t.as_ref().update_checksum(checksum);
                     }
                     None => checksum.update(0),
                 }
                 match err {
                     Some(t) => {
                         checksum.update(1);
-                        t.update_checksum(checksum);
+                        t.as_ref().update_checksum(checksum);
                     }
                     None => checksum.update(0),
                 }
@@ -672,17 +669,18 @@ impl ToBytes for WitType {
                 match ok {
                     Some(t) => {
                         writer.write_u8(1)?;
-                        t.to_bytes_with_provider(writer, provider)?;
+                        t.as_ref().to_bytes_with_provider(writer, provider)?;
                     }
                     None => writer.write_u8(0)?,
                 }
                 match err {
                     Some(t) => {
                         writer.write_u8(1)?;
-                        t.to_bytes_with_provider(writer, provider)
+                        t.as_ref().to_bytes_with_provider(writer, provider)?;
                     }
-                    None => writer.write_u8(0),
+                    None => writer.write_u8(0)?,
                 }
+                Ok(())
             }
             WitType::Tuple(types) => {
                 writer.write_u8(16)?;
@@ -876,7 +874,7 @@ impl FromBytes for WitItem {
             1 => Ok(WitItem::Interface(WitInterface::from_bytes_with_provider(reader, provider)?)),
             2 => Ok(WitItem::Type(WitType::from_bytes_with_provider(reader, provider)?)),
             3 => Ok(WitItem::Instance(WitInstance::from_bytes_with_provider(reader, provider)?)),
-            _ => Err(Error::new(ErrorCategory::Parse, wrt_error::codes::PARSE_ERROR, "Invalid WitItem tag")),
+            _ => Err(Error::runtime_execution_error("Invalid WitItem tag")),
         }
     }
 }
@@ -952,7 +950,7 @@ impl FromBytes for WitValue {
         match tag {
             0 => Ok(WitValue::Type(WitType::from_bytes_with_provider(reader, provider)?)),
             1 => Ok(WitValue::Instance(WitBoundedString::from_bytes_with_provider(reader, provider)?)),
-            _ => Err(Error::new(ErrorCategory::Parse, wrt_error::codes::PARSE_ERROR, "Invalid WitValue tag")),
+            _ => Err(Error::new(ErrorCategory::Parse, wrt_error::codes::PARSE_ERROR, ")),
         }
     }
 }
@@ -1016,7 +1014,7 @@ impl FromBytes for WitType {
             23 => Ok(WitType::Named(WitBoundedString::from_bytes_with_provider(reader, provider)?)),
             24 => Ok(WitType::Stream(Box::new(WitType::from_bytes_with_provider(reader, provider)?))),
             25 => Ok(WitType::Future(Box::new(WitType::from_bytes_with_provider(reader, provider)?))),
-            _ => Err(Error::new(ErrorCategory::Parse, wrt_error::codes::PARSE_ERROR, "Invalid WitType tag")),
+            _ => Err(Error::runtime_execution_error("Invalid WitType tag")),
         }
     }
 }

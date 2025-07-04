@@ -8,6 +8,9 @@ use wrt_error::kinds::{ExecutionLimitExceeded, ExecutionTimeoutError};
 
 use crate::prelude::*;
 
+#[cfg(feature = "std")]
+use std::time::Instant;
+
 /// Represents the outcome of a time-bounded execution
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TimeBoundedOutcome {
@@ -69,10 +72,7 @@ impl TimeBoundedContext {
     /// Check if execution is still within time bounds
     pub fn check_time_bounds(&self) -> Result<()> {
         if self.terminated {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::EXECUTION_LIMIT_EXCEEDED,
-                ExecutionLimitExceeded("Execution was terminated".to_string()),
+            return Err(Error::execution_limit_exceeded("Execution was terminated"),
             ));
         }
 
@@ -82,13 +82,7 @@ impl TimeBoundedContext {
             let elapsed_ms = elapsed.as_millis() as u64;
 
             if elapsed_ms > time_limit_ms {
-                return Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::EXECUTION_TIMEOUT,
-                    ExecutionTimeoutError(format!(
-                        "Execution time limit exceeded: {} ms (limit: {} ms)",
-                        elapsed_ms, time_limit_ms
-                    )),
+                return Err(Error::runtime_execution_error("Execution time limit exceeded: {} ms (limit: {} ms)")),
                 ));
             }
         }
@@ -96,13 +90,7 @@ impl TimeBoundedContext {
         #[cfg(not(feature = "std"))]
         if let Some(fuel_limit) = self.config.fuel_limit {
             if self.elapsed_fuel > fuel_limit {
-                return Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::EXECUTION_LIMIT_EXCEEDED,
-                    ExecutionLimitExceeded(format!(
-                        "Execution fuel limit exceeded: {} (limit: {})",
-                        self.elapsed_fuel, fuel_limit
-                    )),
+                return Err(Error::runtime_execution_error("Execution fuel limit exceeded: {} (limit: {})")),
                 ));
             }
         }
@@ -113,10 +101,7 @@ impl TimeBoundedContext {
     /// Extend the time limit (if allowed)
     pub fn extend_time_limit(&mut self, additional_ms: u64) -> Result<()> {
         if !self.config.allow_extension {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::EXECUTION_TIMEOUT,
-                "Time limit extension not allowed".to_string(),
+            return Err(Error::runtime_execution_error(".to_string(),
             ));
         }
 
@@ -128,7 +113,7 @@ impl TimeBoundedContext {
             Err(Error::new(
                 ErrorCategory::Runtime,
                 codes::EXECUTION_TIMEOUT,
-                "Cannot extend unlimited time".to_string(),
+                "),
             ))
         }
     }

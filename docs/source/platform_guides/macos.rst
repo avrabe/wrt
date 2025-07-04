@@ -84,7 +84,7 @@ Source Installation
 
    git clone https://github.com/pulseengine/wrt.git
    cd wrt
-   just build
+   cargo-wrt build
 
 Apple Silicon Considerations
 ============================
@@ -108,7 +108,7 @@ WRT has full native support for Apple Silicon (M1, M2, M3, M4):
 
    # Build with Apple Silicon optimizations
    export RUSTFLAGS="-C target-cpu=native"
-   just build
+   cargo-wrt build
 
 Rosetta 2 Compatibility
 -----------------------
@@ -203,7 +203,7 @@ CPU Features
    # Intel optimized build
    export RUSTFLAGS="-C target-cpu=native"
 
-   just build
+   cargo-wrt build
 
 Memory Management
 -----------------
@@ -367,7 +367,7 @@ Testing and Validation
    cargo test --target x86_64-apple-darwin
 
    # Run comprehensive test suite
-   just ci-full
+   cargo-wrt ci
 
 **Performance benchmarking:**
 

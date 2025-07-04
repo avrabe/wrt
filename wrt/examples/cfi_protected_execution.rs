@@ -28,12 +28,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(result) => {
             println!("✓ CFI execution successful!");
             println!("  Function executed: {}", result.function_index);
-            println!("  Instructions protected: {}", result.instruction_results.len());
+            println!(
+                "  Instructions protected: {}",
+                result.instruction_results.len()
+            );
             println!("  CFI violations detected: {}", result.violations_detected);
-        }
+        },
         Err(e) => {
             println!("✗ CFI execution failed: {}", e);
-        }
+        },
     }
 
     // Example 2: Custom CFI configuration with hardware features
@@ -58,12 +61,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(result) => {
             println!("✓ Custom CFI execution successful!");
             println!("  Function executed: {}", result.function_index);
-            println!("  Instructions protected: {}", result.instruction_results.len());
+            println!(
+                "  Instructions protected: {}",
+                result.instruction_results.len()
+            );
             println!("  CFI violations detected: {}", result.violations_detected);
-        }
+        },
         Err(e) => {
             println!("✗ Custom CFI execution failed: {}", e);
-        }
+        },
     }
 
     // Example 3: CFI engine with persistent state
@@ -87,36 +93,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(result) => {
                             println!("✓ Module executed with CFI protection!");
                             println!("  CFI violations: {}", result.violations_detected);
-                        }
+                        },
                         Err(e) => {
                             println!("✗ Module execution failed: {}", e);
-                        }
+                        },
                     }
 
                     // Print CFI statistics
                     let stats = engine.statistics();
                     println!("\nCFI Execution Statistics:");
-                    println!("  Modules executed: {}", stats.execution_metrics.modules_executed);
-                    println!("  Functions analyzed: {}", stats.metadata_stats.functions_analyzed);
+                    println!(
+                        "  Modules executed: {}",
+                        stats.execution_metrics.modules_executed
+                    );
+                    println!(
+                        "  Functions analyzed: {}",
+                        stats.metadata_stats.functions_analyzed
+                    );
                     println!(
                         "  Instructions protected: {}",
                         stats.runtime_stats.instructions_protected
                     );
-                    println!("  Total violations: {}", stats.execution_metrics.total_violations);
-                    println!("  Total validations: {}", stats.execution_metrics.total_validations);
+                    println!(
+                        "  Total violations: {}",
+                        stats.execution_metrics.total_violations
+                    );
+                    println!(
+                        "  Total validations: {}",
+                        stats.execution_metrics.total_validations
+                    );
                     println!(
                         "  Average CFI overhead: {:.2}%",
                         stats.execution_metrics.avg_cfi_overhead_percent
                     );
-                }
+                },
                 Err(e) => {
                     println!("✗ Module loading failed: {}", e);
-                }
+                },
             }
-        }
+        },
         Err(e) => {
             println!("✗ CFI engine creation failed: {}", e);
-        }
+        },
     }
 
     // Example 4: Demonstrate CFI violation detection
@@ -131,14 +149,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match wrt::execute_with_cfi_config(&malicious_wasm, "exploit_attempt", malicious_config) {
         Ok(result) => {
             if result.violations_detected > 0 {
-                println!("✓ CFI successfully detected {} violations!", result.violations_detected);
+                println!(
+                    "✓ CFI successfully detected {} violations!",
+                    result.violations_detected
+                );
             } else {
                 println!("⚠ No violations detected (module may be benign)");
             }
-        }
+        },
         Err(e) => {
             println!("✓ CFI successfully blocked execution: {}", e);
-        }
+        },
     }
 
     println!("\nCFI-Protected WebAssembly execution examples completed!");

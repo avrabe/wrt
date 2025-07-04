@@ -1,8 +1,8 @@
-#![cfg(feature = "runtime-debug")]
+#![cfg(feature = "runtime-inspection")]
 
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
 #[cfg(feature = "std")]
-use std::boxed::Box;
-#[cfg(all(not(feature = "std")))]
 use std::boxed::Box;
 
 use wrt_foundation::{
@@ -10,6 +10,7 @@ use wrt_foundation::{
     NoStdProvider,
 };
 
+use crate::bounded_debug_infra;
 /// Runtime debugging API definitions
 /// This module defines the interface between the debug information
 /// and the runtime execution engine for advanced debugging features
@@ -77,7 +78,12 @@ impl VariableValue {
     /// Interpret as i32
     pub fn as_i32(&self) -> Option<i32> {
         if self.size >= 4 {
-            Some(i32::from_le_bytes([self.bytes[0], self.bytes[1], self.bytes[2], self.bytes[3]]))
+            Some(i32::from_le_bytes([
+                self.bytes[0],
+                self.bytes[1],
+                self.bytes[2],
+                self.bytes[3],
+            ]))
         } else {
             None
         }
@@ -86,7 +92,12 @@ impl VariableValue {
     /// Interpret as u32
     pub fn as_u32(&self) -> Option<u32> {
         if self.size >= 4 {
-            Some(u32::from_le_bytes([self.bytes[0], self.bytes[1], self.bytes[2], self.bytes[3]]))
+            Some(u32::from_le_bytes([
+                self.bytes[0],
+                self.bytes[1],
+                self.bytes[2],
+                self.bytes[3],
+            ]))
         } else {
             None
         }
@@ -117,7 +128,7 @@ pub enum DwarfLocation {
     /// On stack at offset from frame pointer
     FrameOffset(i32),
     /// Complex expression (not yet supported)
-    Expression(BoundedVec<u8, 64, NoStdProvider<1024>>),
+    Expression(BoundedVec<u8, 64, crate::bounded_debug_infra::DebugProvider>),
 }
 
 /// Variable information with runtime value
@@ -190,19 +201,23 @@ pub enum DebugAction {
 /// Runtime debugger interface
 pub trait RuntimeDebugger {
     /// Called when breakpoint is hit
-    fn on_breakpoint(&mut self, bp: &Breakpoint, state: &dyn RuntimeState) -> DebugAction;
+    fn on_breakpoint(
+        &mut self,
+        bp: &Breakpoint,
+        state: &(dyn RuntimeState + 'static),
+    ) -> DebugAction;
 
     /// Called on each instruction (if enabled)
-    fn on_instruction(&mut self, pc: u32, state: &dyn RuntimeState) -> DebugAction;
+    fn on_instruction(&mut self, pc: u32, state: &(dyn RuntimeState + 'static)) -> DebugAction;
 
     /// Called on function entry
-    fn on_function_entry(&mut self, func_idx: u32, state: &dyn RuntimeState);
+    fn on_function_entry(&mut self, func_idx: u32, state: &(dyn RuntimeState + 'static));
 
     /// Called on function exit
-    fn on_function_exit(&mut self, func_idx: u32, state: &dyn RuntimeState);
+    fn on_function_exit(&mut self, func_idx: u32, state: &(dyn RuntimeState + 'static));
 
     /// Called on trap/panic
-    fn on_trap(&mut self, trap_code: u32, state: &dyn RuntimeState);
+    fn on_trap(&mut self, trap_code: u32, state: &(dyn RuntimeState + 'static));
 }
 
 /// Debugger attachment point for runtime
@@ -265,12 +280,16 @@ mod integration_example {
         fn pc(&self) -> u32 {
             self.pc
         }
+
         fn sp(&self) -> u32 {
             self.sp
         }
+
         fn fp(&self) -> Option<u32> {
             None
-        } // WASM has no frame pointer
+        }
+
+        // WASM has no frame pointer
 
         fn read_local(&self, index: u32) -> Option<u64> {
             self.locals.get(index as usize).copied()

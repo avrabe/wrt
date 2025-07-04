@@ -1,0 +1,412 @@
+name: KANI Formal Verification
+
+on:
+  push:
+    branches: [ main, develop, resource-implementation ]
+    paths:
+      - 'wrt-foundation/src/**'
+      - 'wrt-component/src/**'
+      - 'wrt-runtime/src/**'
+      - 'wrt-decoder/src/**'
+      - 'wrt-format/src/**'
+      - 'cargo-wrt/**'
+      - '.github/workflows/kani-regression.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'wrt-foundation/src/**'
+      - 'wrt-component/src/**'
+      - 'wrt-runtime/src/**'
+      - 'wrt-decoder/src/**'
+      - 'wrt-format/src/**'
+      - 'cargo-wrt/**'
+      - '.github/workflows/kani-regression.yml'
+  schedule:
+    # Run nightly KANI verification at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      asil_level:
+        description: 'ASIL level for verification'
+        required: false
+        default: 'a'
+        type: choice
+        options:
+          - 'qm'
+          - 'a'
+          - 'b'
+          - 'c'
+          - 'd'
+      package:
+        description: 'Specific package to verify (optional)'
+        required: false
+        type: string
+      harness:
+        description: 'Specific harness to run (optional)'
+        required: false
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  kani-verification:
+    name: KANI Verification (ASIL-${{ matrix.asil_level }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        asil_level: [qm, a, b, c, d]
+        include:
+          - asil_level: qm
+            timeout: 30
+            priority: low
+          - asil_level: a
+            timeout: 45
+            priority: high
+          - asil_level: b
+            timeout: 60
+            priority: high
+          - asil_level: c
+            timeout: 90
+            priority: critical
+          - asil_level: d
+            timeout: 120
+            priority: critical
+
+    timeout-minutes: ${{ matrix.timeout }}
+    outputs:
+      asil-${{ matrix.asil_level }}-status: ${{ steps.verify.outputs.status }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-kani-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-kani-
+          ${{ runner.os }}-cargo-
+
+    - name: Install KANI Verifier
+      run: |
+        # Install KANI from source for latest features
+        cargo install --locked kani-verifier
+        cargo install --locked kani-driver
+        # Verify installation
+        kani --version
+
+    - name: Install cargo-wrt
+      run: |
+        cargo install --path cargo-wrt --locked
+
+    - name: Verify KANI installation
+      run: |
+        which kani
+        kani --version
+        cargo-wrt setup --check || true
+
+    - name: Run KANI verification
+      id: verify
+      run: |
+        set +e  # Don't exit on non-zero status
+        
+        # Determine arguments based on trigger type
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          ASIL_LEVEL="${{ github.event.inputs.asil_level || 'a' }}"
+          ARGS="--asil-profile $ASIL_LEVEL --verbose --output json --cache"
+          
+          if [ -n "${{ github.event.inputs.package }}" ]; then
+            ARGS="$ARGS --package ${{ github.event.inputs.package }}"
+          fi
+          if [ -n "${{ github.event.inputs.harness }}" ]; then
+            ARGS="$ARGS --harness ${{ github.event.inputs.harness }}"
+          fi
+          
+          OUTPUT_FILE="kani-results-manual.json"
+        else
+          ASIL_LEVEL="${{ matrix.asil_level }}"
+          ARGS="--asil-profile $ASIL_LEVEL --verbose --output json --cache"
+          OUTPUT_FILE="kani-results-${{ matrix.asil_level }}.json"
+        fi
+        
+        echo "Running: cargo-wrt kani-verify $ARGS"
+        cargo-wrt kani-verify $ARGS 2>&1 | tee "$OUTPUT_FILE"
+        KANI_EXIT_CODE=$?
+        
+        # Parse results and set status
+        if [ $KANI_EXIT_CODE -eq 0 ] && grep -q "VERIFICATION.*SUCCESSFUL" "$OUTPUT_FILE" 2>/dev/null; then
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "KANI_STATUS=success" >> $GITHUB_ENV
+        elif grep -q "VERIFICATION.*FAILED" "$OUTPUT_FILE" 2>/dev/null; then
+          echo "status=failed" >> $GITHUB_OUTPUT
+          echo "KANI_STATUS=failed" >> $GITHUB_ENV
+        else
+          echo "status=incomplete" >> $GITHUB_OUTPUT
+          echo "KANI_STATUS=incomplete" >> $GITHUB_ENV
+        fi
+        
+        # Always continue to upload results
+        exit 0
+
+    - name: Parse KANI results
+      run: |
+        # Find the results file
+        if [ -f "kani-results-${{ matrix.asil_level }}.json" ]; then
+          RESULTS_FILE="kani-results-${{ matrix.asil_level }}.json"
+        else
+          RESULTS_FILE="kani-results-manual.json"
+        fi
+        
+        echo "## KANI Verification Results (ASIL-${{ matrix.asil_level }})" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Show verification status
+        case "$KANI_STATUS" in
+          "success")
+            echo "✅ **VERIFICATION SUCCESSFUL**" >> $GITHUB_STEP_SUMMARY
+            ;;
+          "failed")
+            echo "❌ **VERIFICATION FAILED**" >> $GITHUB_STEP_SUMMARY
+            ;;
+          *)
+            echo "⚠️ **VERIFICATION INCOMPLETE**" >> $GITHUB_STEP_SUMMARY
+            ;;
+        esac
+        
+        # Extract and show coverage information
+        if [ -f "$RESULTS_FILE" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E "(Coverage|Harness|Property|Proof)" "$RESULTS_FILE" | head -15 >> $GITHUB_STEP_SUMMARY || echo "No coverage data found" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Upload KANI results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: kani-results-${{ matrix.asil_level }}-${{ github.run_number }}
+        path: |
+          kani-results-*.json
+          kani-*.log
+        retention-days: 30
+
+    - name: Check verification status
+      if: matrix.priority == 'critical' || matrix.priority == 'high'
+      run: |
+        if [ "$KANI_STATUS" = "failed" ]; then
+          echo "❌ Critical KANI verification failed for ASIL-${{ matrix.asil_level }}"
+          exit 1
+        elif [ "$KANI_STATUS" = "incomplete" ]; then
+          echo "⚠️ KANI verification incomplete for ASIL-${{ matrix.asil_level }}"
+          exit 1
+        fi
+
+  coverage-report:
+    name: Generate Coverage Report
+    runs-on: ubuntu-latest
+    needs: kani-verification
+    if: always()
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download all KANI results
+      uses: actions/download-artifact@v4
+      with:
+        pattern: kani-results-*
+        merge-multiple: true
+
+    - name: Generate comprehensive coverage report
+      run: |
+        echo "# KANI Verification Coverage Report" > coverage-report.md
+        echo "" >> coverage-report.md
+        echo "Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> coverage-report.md
+        echo "Commit: ${{ github.sha }}" >> coverage-report.md
+        echo "Workflow: ${{ github.workflow }}" >> coverage-report.md
+        echo "" >> coverage-report.md
+        
+        echo "## Summary by ASIL Level" >> coverage-report.md
+        echo "" >> coverage-report.md
+        echo "| ASIL Level | Status | Harnesses | Coverage | Notes |" >> coverage-report.md
+        echo "|------------|--------|-----------|----------|-------|" >> coverage-report.md
+        
+        for level in qm a b c d; do
+          if [ -f "kani-results-${level}.json" ]; then
+            # Determine status
+            if grep -q "VERIFICATION.*SUCCESSFUL" "kani-results-${level}.json" 2>/dev/null; then
+              status="✅ Pass"
+            elif grep -q "VERIFICATION.*FAILED" "kani-results-${level}.json" 2>/dev/null; then
+              status="❌ Fail"
+            else
+              status="⚠️ Incomplete"
+            fi
+            
+            # Extract metrics
+            harness_count=$(grep -c "harness" "kani-results-${level}.json" 2>/dev/null || echo "N/A")
+            coverage=$(grep -o "Coverage: [0-9]*%" "kani-results-${level}.json" | head -1 | sed 's/Coverage: //' 2>/dev/null || echo "N/A")
+            
+            # Extract any important notes
+            notes="Standard"
+            if grep -q "timeout" "kani-results-${level}.json" 2>/dev/null; then
+              notes="Timeout"
+            elif grep -q "memory" "kani-results-${level}.json" 2>/dev/null; then
+              notes="Memory constrained"
+            fi
+            
+            echo "| ASIL-${level^^} | $status | $harness_count | $coverage | $notes |" >> coverage-report.md
+          else
+            echo "| ASIL-${level^^} | ⚠️ Not Run | N/A | N/A | Missing results |" >> coverage-report.md
+          fi
+        done
+        
+        echo "" >> coverage-report.md
+        echo "## Detailed Results" >> coverage-report.md
+        echo "" >> coverage-report.md
+        
+        for level in qm a b c d; do
+          if [ -f "kani-results-${level}.json" ]; then
+            echo "### ASIL-${level^^} Results" >> coverage-report.md
+            echo "" >> coverage-report.md
+            echo '```json' >> coverage-report.md
+            head -30 "kani-results-${level}.json" >> coverage-report.md 2>/dev/null || echo "No detailed results available" >> coverage-report.md
+            echo '```' >> coverage-report.md
+            echo "" >> coverage-report.md
+          fi
+        done
+        
+        # Add summary statistics
+        echo "## Statistics" >> coverage-report.md
+        echo "" >> coverage-report.md
+        echo "- Total ASIL levels tested: $(ls kani-results-*.json 2>/dev/null | wc -l)" >> coverage-report.md
+        echo "- Successful verifications: $(grep -l 'VERIFICATION.*SUCCESSFUL' kani-results-*.json 2>/dev/null | wc -l)" >> coverage-report.md
+        echo "- Failed verifications: $(grep -l 'VERIFICATION.*FAILED' kani-results-*.json 2>/dev/null | wc -l)" >> coverage-report.md
+        
+        echo "Coverage report generated successfully"
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: kani-coverage-report-${{ github.run_number }}
+        path: coverage-report.md
+        retention-days: 90
+
+    - name: Comment PR with results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let comment = '## 🔍 KANI Verification Results\n\n';
+          
+          try {
+            const report = fs.readFileSync('coverage-report.md', 'utf8');
+            const summaryMatch = report.match(/## Summary by ASIL Level.*?(?=## Detailed Results)/s);
+            if (summaryMatch) {
+              comment += summaryMatch[0];
+            } else {
+              comment += 'Coverage report generated but summary not found.\n';
+            }
+          } catch (error) {
+            comment += '❌ Could not read coverage report.\n';
+            comment += `Error: ${error.message}\n`;
+          }
+          
+          comment += '\n📊 Full coverage report available in workflow artifacts.\n';
+          comment += `🔗 [View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  safety-gate:
+    name: Safety Gate Check
+    runs-on: ubuntu-latest
+    needs: kani-verification
+    if: always()
+
+    steps:
+    - name: Evaluate safety requirements
+      run: |
+        echo "## Safety Gate Evaluation" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Extract status from job outputs
+        ASIL_A_STATUS="${{ needs.kani-verification.outputs.asil-a-status || 'unknown' }}"
+        ASIL_B_STATUS="${{ needs.kani-verification.outputs.asil-b-status || 'unknown' }}"
+        ASIL_C_STATUS="${{ needs.kani-verification.outputs.asil-c-status || 'unknown' }}"
+        ASIL_D_STATUS="${{ needs.kani-verification.outputs.asil-d-status || 'unknown' }}"
+        
+        echo "### ASIL Level Verification Status" >> $GITHUB_STEP_SUMMARY
+        echo "- ASIL-A Status: $ASIL_A_STATUS" >> $GITHUB_STEP_SUMMARY
+        echo "- ASIL-B Status: $ASIL_B_STATUS" >> $GITHUB_STEP_SUMMARY
+        echo "- ASIL-C Status: $ASIL_C_STATUS" >> $GITHUB_STEP_SUMMARY
+        echo "- ASIL-D Status: $ASIL_D_STATUS" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Safety gate logic based on criticality
+        CRITICAL_PASSED=true
+        HIGH_PASSED=true
+        
+        # Check critical levels (C/D must pass)
+        if [[ "$ASIL_C_STATUS" != "success" || "$ASIL_D_STATUS" != "success" ]]; then
+          CRITICAL_PASSED=false
+        fi
+        
+        # Check high priority levels (A/B should pass)
+        if [[ "$ASIL_A_STATUS" != "success" || "$ASIL_B_STATUS" != "success" ]]; then
+          HIGH_PASSED=false
+        fi
+        
+        # Determine overall safety gate status
+        if $CRITICAL_PASSED && $HIGH_PASSED; then
+          echo "✅ **SAFETY GATE PASSED** - All ASIL levels verified successfully" >> $GITHUB_STEP_SUMMARY
+          echo "SAFETY_GATE=pass" >> $GITHUB_ENV
+        elif $CRITICAL_PASSED; then
+          echo "⚠️ **SAFETY GATE CONDITIONAL** - Critical levels passed, high priority levels need attention" >> $GITHUB_STEP_SUMMARY
+          echo "SAFETY_GATE=conditional" >> $GITHUB_ENV
+        else
+          echo "❌ **SAFETY GATE FAILED** - Critical ASIL verification incomplete" >> $GITHUB_STEP_SUMMARY
+          echo "SAFETY_GATE=fail" >> $GITHUB_ENV
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Safety Requirements" >> $GITHUB_STEP_SUMMARY
+        echo "- **Critical (C/D)**: Must pass for safety compliance" >> $GITHUB_STEP_SUMMARY
+        echo "- **High (A/B)**: Should pass for production readiness" >> $GITHUB_STEP_SUMMARY
+        echo "- **Standard (QM)**: Baseline verification" >> $GITHUB_STEP_SUMMARY
+
+    - name: Block merge on safety gate failure
+      if: github.event_name == 'pull_request' && env.SAFETY_GATE == 'fail'
+      run: |
+        echo "❌ Safety gate failed - blocking merge"
+        echo "Critical ASIL levels (C/D) must pass KANI verification before merge"
+        echo "Please fix verification failures and re-run the workflow"
+        exit 1
+
+    - name: Warn on conditional safety gate
+      if: github.event_name == 'pull_request' && env.SAFETY_GATE == 'conditional'
+      run: |
+        echo "⚠️ Safety gate conditional - merge allowed but high priority verification incomplete"
+        echo "Consider fixing ASIL-A/B verification issues before production deployment"

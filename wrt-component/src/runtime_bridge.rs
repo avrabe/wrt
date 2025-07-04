@@ -19,7 +19,6 @@
 //! - **InstanceResolver**: Maps component instances to runtime instances
 //! - **HostRegistry**: Manages host function registration and invocation
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]
@@ -313,11 +312,7 @@ impl ValueConverter {
             ComponentValue::Char(c) => Ok(CoreValue::I32(*c as i32)),
             ComponentValue::String(s) => {
                 if s.len() > self.config.max_string_length {
-                    return Err(Error::new(
-                        ErrorCategory::Validation,
-                        codes::VALIDATION_ERROR,
-                        "String too long for conversion",
-                    ));
+                    return Err(Error::validation_error("String too long for conversion"));
                 }
                 // For now, return string length as i32
                 // Binary std/no_std choice
@@ -325,11 +320,7 @@ impl ValueConverter {
             }
             ComponentValue::List(items) => {
                 if items.len() > self.config.max_array_length {
-                    return Err(Error::new(
-                        ErrorCategory::Validation,
-                        codes::VALIDATION_ERROR,
-                        "List too long for conversion",
-                    ));
+                    return Err(Error::validation_error("List too long for conversion"));
                 }
                 // Return list length for now
                 Ok(CoreValue::I32(items.len() as i32))
@@ -337,11 +328,7 @@ impl ValueConverter {
             _ => {
                 // Complex types need special handling
                 if self.config.strict_type_checking {
-                    Err(Error::new(
-                        ErrorCategory::Runtime,
-                        codes::TYPE_MISMATCH,
-                        "Complex component value cannot be directly converted to core value",
-                    ))
+                    Err(Error::runtime_type_mismatch("Complex component value cannot be directly converted to core value"))
                 } else {
                     // Fallback to zero value
                     Ok(CoreValue::I32(0))
@@ -369,11 +356,7 @@ impl ValueConverter {
             }
             _ => {
                 if self.config.strict_type_checking {
-                    Err(Error::new(
-                        ErrorCategory::Runtime,
-                        codes::TYPE_MISMATCH,
-                        "Component not found",
-                    ))
+                    Err(Error::runtime_type_mismatch("Component not found"))
                 } else {
                     // Fallback conversion
                     Ok(ComponentValue::S32(0))
@@ -398,11 +381,7 @@ impl ValueConverter {
         types: &[crate::canonical_abi::ComponentType]
     ) -> Result<Vec<ComponentValue>> {
         if values.len() != types.len() {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Value count does not match type count",
-            ));
+            return Err(Error::validation_error("Value count does not match type count"));
         }
 
         let mut component_values = Vec::new();
@@ -463,11 +442,7 @@ impl InstanceResolver {
         #[cfg(not(any(feature = "std", )))]
         {
             if self.instances.len() >= MAX_INSTANCES_NO_STD {
-                return Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_EXHAUSTED,
-                    "Maximum instances exceeded",
-                ));
+                return Err(Error::resource_exhausted("Maximum instances exceeded"));
             }
             self.instances.push((self.next_instance_id, runtime_info));
         }
@@ -498,11 +473,7 @@ impl InstanceResolver {
                 info.state = state;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::INSTANCE_NOT_FOUND,
-                    "Instance not found",
-                ))
+                Err(Error::instance_not_found("Instance not found"))
             }
         }
 
@@ -512,11 +483,7 @@ impl InstanceResolver {
                 info.state = state;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::INSTANCE_NOT_FOUND,
-                    "Instance not found",
-                ))
+                Err(Error::instance_not_found("Instance not found"))
             }
         }
     }
@@ -528,11 +495,7 @@ impl InstanceResolver {
             if self.instances.remove(&instance_id).is_some() {
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::INSTANCE_NOT_FOUND,
-                    "Instance not found",
-                ))
+                Err(Error::instance_not_found("Instance not found"))
             }
         }
 
@@ -542,11 +505,7 @@ impl InstanceResolver {
                 self.instances.remove(pos);
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::INSTANCE_NOT_FOUND,
-                    "Instance not found",
-                ))
+                Err(Error::instance_not_found("Instance not found"))
             }
         }
     }
@@ -609,11 +568,7 @@ impl HostFunctionRegistry {
         func: fn(&[ComponentValue]) -> Result<ComponentValue>,
     ) -> Result<usize> {
         if self.functions.len() >= MAX_HOST_FUNCTIONS_NO_STD {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_EXHAUSTED,
-                "Maximum host functions exceeded",
-            ));
+            return Err(Error::resource_exhausted("Maximum host functions exceeded"));
         }
 
         let index = self.functions.len();
@@ -647,11 +602,7 @@ impl HostFunctionRegistry {
                 (entry.implementation)(args)
             }
         } else {
-            Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::FUNCTION_NOT_FOUND,
-                "Host function not found",
-            ))
+            Err(Error::runtime_function_not_found("Host function not found"))
         }
     }
 
@@ -699,18 +650,11 @@ impl ComponentRuntimeBridge {
     ) -> Result<ComponentValue> {
         // Get instance information
         let instance_info = self.instance_resolver.get_instance(instance_id)
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                codes::INSTANCE_NOT_FOUND,
-                "Component instance not found",
-            ))?;
+            .ok_or_else(|| Error::instance_not_found("Component instance not found"))?;
 
         // Check instance state
         if instance_info.state != RuntimeInstanceState::Ready {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_STATE,
-                "Component not found",
+            return Err(Error::runtime_invalid_state("Component not found"),
             ));
         }
 

@@ -68,9 +68,37 @@ extern crate std;
 
 use core::sync::atomic::{AtomicU8, AtomicU32, Ordering};
 
-// Re-export foundation types for user convenience
-pub use wrt_foundation::safety_system::{AsilLevel, SafetyStandard, UniversalSafetyContext};
-pub use wrt_foundation::safe_memory::{MemoryProvider, NoStdProvider};
+/// ASIL (Automotive Safety Integrity Level) as defined by ISO 26262
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+pub enum AsilLevel {
+    /// Quality Management (no safety requirements)
+    QM = 0,
+    /// ASIL-A (lowest safety integrity level)
+    AsilA = 1,
+    /// ASIL-B (medium-low safety integrity level)
+    AsilB = 2,
+    /// ASIL-C (medium-high safety integrity level)
+    AsilC = 3,
+    /// ASIL-D (highest safety integrity level)
+    AsilD = 4,
+}
+
+/// Simple memory provider trait for panic handler usage
+pub trait MemoryProvider {
+    /// Get the capacity of this memory provider
+    fn capacity(&self) -> usize;
+}
+
+/// No-std memory provider for panic handler
+#[derive(Debug, Clone, Default)]
+pub struct NoStdProvider<const N: usize>;
+
+impl<const N: usize> MemoryProvider for NoStdProvider<N> {
+    fn capacity(&self) -> usize {
+        N
+    }
+}
 
 /// Panic information magic number for debugger recognition
 pub const PANIC_MAGIC: u32 = 0xDEADBEEF;
@@ -125,6 +153,12 @@ pub struct PanicContextBuilder<P: MemoryProvider> {
     safety_level: AsilLevel,
     memory_provider: Option<P>,
     memory_budget: usize,
+}
+
+impl<P: MemoryProvider> Default for PanicContextBuilder<P> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<P: MemoryProvider> PanicContextBuilder<P> {
@@ -186,6 +220,7 @@ pub fn initialize_panic_handler<P: MemoryProvider>(context: PanicContext<P>) -> 
 }
 
 /// Hash a string at compile time for error codes
+#[allow(dead_code)]
 const fn hash_str(s: &str) -> u32 {
     let bytes = s.as_bytes();
     let mut hash = 5381u32;
@@ -198,6 +233,7 @@ const fn hash_str(s: &str) -> u32 {
 }
 
 /// Store panic information in memory with debugger-visible pattern
+#[allow(dead_code)]
 fn store_panic_info(info: &core::panic::PanicInfo) {
     let asil_level = PANIC_ASIL_LEVEL.load(Ordering::SeqCst);
     let _memory_budget = PANIC_MEMORY_BUDGET.load(Ordering::SeqCst) as usize;

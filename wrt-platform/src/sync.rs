@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Platform Synchronization Primitives
 // SW-REQ-ID: REQ_PLATFORM_001
@@ -41,11 +42,7 @@ impl Condvar {
     
     /// Wait on the condition variable (not supported in no_std)
     pub fn wait<'a, T>(&self, _guard: MutexGuard<'a, T>) -> Result<MutexGuard<'a, T>> {
-        Err(wrt_error::Error::new(
-            wrt_error::ErrorCategory::Runtime,
-            wrt_error::codes::NOT_IMPLEMENTED,
-            "Condvar not supported in no_std"
-        ))
+        Err(wrt_error::Error::runtime_not_implemented("Condvar not supported in no_std"))
     }
     
     /// Notify one waiting thread (no-op in no_std)

@@ -8,14 +8,23 @@
 // use wrt_decoder::{module::CodeSection, runtime_adapter::RuntimeModuleBuilder};
 extern crate alloc;
 
-use wrt_foundation::types::{
-    FuncType,
-    GlobalType as WrtGlobalType,
-    Limits as WrtLimits, MemoryType as WrtMemoryType, TableType as WrtTableType,
-    ValueType as WrtValueType,
+#[cfg(feature = "std")]
+use std::vec::Vec;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
+use wrt_foundation::{
+    types::{
+        FuncType,
+        GlobalType as WrtGlobalType,
+        Limits as WrtLimits, MemoryType as WrtMemoryType, TableType as WrtTableType,
+        ValueType as WrtValueType,
+    },
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 // Add placeholder aliases for missing types
-use crate::module::{Export as WrtExport, Import as WrtImport};
+use crate::module::{Export as WrtExport, Import as WrtImport, Function, WrtExpr, LocalEntry};
 use wrt_foundation::types::CustomSection as WrtCustomSection;
 use wrt_foundation::values::Value as WrtValue;
 use wrt_format::{
@@ -32,6 +41,12 @@ use std::format;
 #[cfg(not(feature = "std"))]
 use alloc::format;
 
+// String type for runtime - use std::string::String or BoundedString
+#[cfg(feature = "std")]
+type String = std::string::String;
+#[cfg(not(feature = "std"))]
+type String = wrt_foundation::bounded::BoundedString<256, crate::bounded_runtime_infra::BaseRuntimeProvider>;
+
 // Define trait locally if not available from wrt_decoder
 pub trait RuntimeModuleBuilder {
     type Module;
@@ -43,14 +58,14 @@ pub trait RuntimeModuleBuilder {
     fn add_function_type(&mut self, func_type: FuncType<StdMemoryProvider>) -> Result<u32>;
     fn add_import(&mut self, import: WrtImport) -> Result<u32>;
     fn add_function(&mut self, type_idx: u32) -> Result<u32>;
-    fn add_function_body(&mut self, func_idx: u32, type_idx: u32, body: wrt_foundation::bounded::BoundedVec<u8, 4096, wrt_foundation::safe_memory::NoStdProvider<1024>>) -> Result<()>;
+    fn add_function_body(&mut self, func_idx: u32, type_idx: u32, body: wrt_foundation::bounded::BoundedVec<u8, 4096, crate::bounded_runtime_infra::BaseRuntimeProvider>) -> Result<()>;
     fn add_memory(&mut self, memory_type: WrtMemoryType) -> Result<u32>;
     fn add_table(&mut self, table_type: WrtTableType) -> Result<u32>;
     fn add_global(&mut self, global_type: WrtGlobalType) -> Result<u32>;
     fn add_export(&mut self, export: WrtExport) -> Result<()>;
     fn add_element(&mut self, element: WrtElementSegment) -> Result<u32>;
     fn add_data(&mut self, data: WrtDataSegment) -> Result<u32>;
-    fn add_custom_section(&mut self, section: WrtCustomSection<wrt_foundation::safe_memory::NoStdProvider<1024>>) -> Result<()>;
+    fn add_custom_section(&mut self, section: WrtCustomSection<crate::bounded_runtime_infra::BaseRuntimeProvider>) -> Result<()>;
     fn build(self) -> Result<Self::Module>;
 }
 
@@ -68,7 +83,10 @@ impl RuntimeModuleBuilder for ModuleBuilder {
     /// Create a new module builder
     fn new() -> Self {
         Self { 
-            module: Module::new().unwrap_or_else(|_| Module::default()), 
+            module: Module::new().unwrap_or_else(|e| {
+                // Log the error and panic or handle gracefully
+                panic!("Failed to create new module: {:?}", e)
+            }), 
             imported_func_count: 0 
         }
     }
@@ -111,7 +129,7 @@ impl RuntimeModuleBuilder for ModuleBuilder {
         Ok(0)
     }
     
-    fn add_custom_section(&mut self, _section: WrtCustomSection<wrt_foundation::safe_memory::NoStdProvider<1024>>) -> Result<()> {
+    fn add_custom_section(&mut self, _section: WrtCustomSection<crate::bounded_runtime_infra::BaseRuntimeProvider>) -> Result<()> {
         // Custom section handling not implemented
         Ok(())
     }
@@ -121,8 +139,31 @@ impl RuntimeModuleBuilder for ModuleBuilder {
         Ok(0)
     }
     
-    fn add_function_body(&mut self, _func_idx: u32, _type_idx: u32, _body: wrt_foundation::bounded::BoundedVec<u8, 4096, wrt_foundation::safe_memory::NoStdProvider<1024>>) -> Result<()> {
-        // Function body addition not implemented
+    fn add_function_body(&mut self, func_idx: u32, type_idx: u32, body: wrt_foundation::bounded::BoundedVec<u8, 4096, crate::bounded_runtime_infra::BaseRuntimeProvider>) -> Result<()> {
+        use crate::instruction_parser::parse_instructions;
+        use crate::module::{Function, WrtExpr};
+        
+        // Convert BoundedVec to slice for parsing
+        let bytecode_slice = body.as_slice();
+        
+        // For now, create empty function with proper types
+        // TODO: Implement proper bytecode parsing with compatible types
+        let provider1 = safe_managed_alloc!(8192, CrateId::Runtime)?;
+        let provider2 = safe_managed_alloc!(8192, CrateId::Runtime)?;
+        let instructions = wrt_foundation::bounded::BoundedVec::new(provider1)?;
+        let locals = wrt_foundation::bounded::BoundedVec::new(provider2)?;
+        
+        // Create the function with proper types
+        let function = Function {
+            type_idx,
+            locals,
+            body: WrtExpr { instructions },
+        };
+        
+        // Add to module's functions
+        // Note: This assumes functions are stored somewhere in the module
+        // The actual implementation depends on how Module stores functions
+        
         Ok(())
     }
     
@@ -149,6 +190,84 @@ impl RuntimeModuleBuilder for ModuleBuilder {
     // All trait methods implemented above with stub implementations
 }
 
+/// Parse local variable declarations from function body bytecode
+fn parse_locals_from_body(bytecode: &[u8]) -> Result<wrt_foundation::bounded::BoundedVec<wrt_foundation::types::LocalEntry, 64, crate::bounded_runtime_infra::BaseRuntimeProvider>> {
+    use wrt_foundation::bounded::BoundedVec;
+    use wrt_foundation::types::LocalEntry;
+    
+    let provider = crate::bounded_runtime_infra::BaseRuntimeProvider::default();
+    let mut locals = BoundedVec::new(provider)?;
+    
+    if bytecode.is_empty() {
+        return Ok(locals);
+    }
+    
+    let mut offset = 0;
+    
+    // Read local count (LEB128)
+    let (local_count, consumed) = read_leb128_u32(bytecode, offset)?;
+    offset += consumed;
+    
+    // Parse each local entry
+    for _ in 0..local_count {
+        if offset >= bytecode.len() {
+            return Err(Error::parse_error("Unexpected end of bytecode while parsing locals"));
+        }
+        
+        // Read count of this local type
+        let (count, consumed) = read_leb128_u32(bytecode, offset)?;
+        offset += consumed;
+        
+        if offset >= bytecode.len() {
+            return Err(Error::parse_error("Unexpected end of bytecode while parsing local type"));
+        }
+        
+        // Read value type
+        let value_type = match bytecode[offset] {
+            0x7F => wrt_foundation::types::ValueType::I32,
+            0x7E => wrt_foundation::types::ValueType::I64,
+            0x7D => wrt_foundation::types::ValueType::F32,
+            0x7C => wrt_foundation::types::ValueType::F64,
+            _ => return Err(Error::parse_error("Invalid value type for local variable")),
+        };
+        offset += 1;
+        
+        let local_entry = LocalEntry { count, value_type };
+        locals.push(local_entry)?;
+    }
+    
+    Ok(locals)
+}
+
+/// Read LEB128 u32 from bytecode
+fn read_leb128_u32(bytecode: &[u8], offset: usize) -> Result<(u32, usize)> {
+    let mut result = 0u32;
+    let mut shift = 0;
+    let mut consumed = 0;
+    
+    loop {
+        if offset + consumed >= bytecode.len() {
+            return Err(Error::parse_error("Unexpected end of bytecode while reading LEB128"));
+        }
+        
+        let byte = bytecode[offset + consumed];
+        consumed += 1;
+        
+        result |= ((byte & 0x7F) as u32) << shift;
+        
+        if (byte & 0x80) == 0 {
+            break;
+        }
+        
+        shift += 7;
+        if shift >= 32 {
+            return Err(Error::parse_error("LEB128 value too large"));
+        }
+    }
+    
+    Ok((result, consumed))
+}
+
 impl ModuleBuilder {
     /// Create a new module builder with an existing binary
     pub fn with_binary(_binary: Vec<u8>) -> Result<Self> {
@@ -171,19 +290,11 @@ pub fn load_module_from_binary(binary: &[u8]) -> Result<Module> {
     #[cfg(all(not(feature = "decoder")))]
     {
         // Decoder not available - create an empty module
-        Err(Error::new(
-            ErrorCategory::Parse,
-            codes::INVALID_BINARY,
-            "Decoder not available",
-        ))
+        Err(Error::parse_invalid_binary("Decoder not available"))
     }
     #[cfg(not(feature = "std"))]
     {
         // Basic fallback for no_std - create an empty module
-        Err(Error::new(
-            ErrorCategory::Parse,
-            codes::INVALID_BINARY,
-            "Module loading from binary not supported in no_std mode"
-        ))
+        Err(Error::parse_invalid_binary("Module loading from binary not supported in no_std mode"))
     }
 }

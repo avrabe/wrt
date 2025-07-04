@@ -57,10 +57,7 @@ impl Host {
         target: &mut dyn core::any::Any,
     ) -> Result<Vec<Value>> {
         let function = self.functions.get(name).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::EXECUTION_ERROR,
-                kinds::ExecutionError("Component not found"),
+            Error::runtime_execution_error("Component not found"),
             )
         })?;
 
@@ -71,10 +68,7 @@ impl Host {
                 // Note: Registry access needs to be correctly implemented with the proper type
                 registry.call_host_function(target, "wrt_component", callback_name, args)
             }
-            HostFunctionImpl::Trap(message) => Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::EXECUTION_ERROR,
-                kinds::ExecutionError("Component not found"),
+            HostFunctionImpl::Trap(message) => Err(Error::runtime_execution_error("Component not found"),
             )),
         }
     }

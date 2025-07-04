@@ -18,16 +18,16 @@ This workspace provides a unified testing infrastructure for the WebAssembly Run
 
 ## Running Tests
 
-### Using xtask (Recommended)
+### Using cargo-wrt (Recommended)
 ```bash
-# Run all tests via xtask
-cargo xtask run-tests
+# Run all tests via cargo-wrt
+cargo-wrt test
 
 # Verify no_std compatibility across all crates
-cargo xtask verify-no-std
+cargo-wrt no-std
 
-# Quick partial verification
-cargo xtask verify-no-std --partial --verbose
+# Quick partial verification with verbose output
+cargo-wrt no-std --detailed
 ```
 
 ### Direct Cargo Commands

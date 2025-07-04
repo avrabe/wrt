@@ -10,9 +10,9 @@
 #[cfg(any(doc, kani))]
 /// Kani verification proofs for error handling.
 pub mod kani_verification {
+    use core::fmt::{self, Debug, Display};
     #[cfg(feature = "std")]
     use std::format;
-    use core::fmt::{self, Debug, Display};
 
     // Use crate::Error directly, remove ResultExt if it was here.
     use crate::{codes, Error, ErrorCategory, ErrorSource, Result}; // Added Error, codes

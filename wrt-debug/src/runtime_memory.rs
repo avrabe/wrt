@@ -2,9 +2,11 @@
 
 use wrt_foundation::{
     bounded::{BoundedVec, MAX_DWARF_FILE_TABLE},
-    NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
+use crate::bounded_debug_infra;
 /// Runtime memory inspection implementation
 /// Provides safe memory access and heap analysis capabilities
 use crate::runtime_api::{DebugMemory, RuntimeState};
@@ -57,21 +59,29 @@ pub struct HeapAllocation {
 /// Memory inspector for runtime debugging
 pub struct MemoryInspector<'a> {
     /// Memory regions
-    regions: BoundedVec<MemoryRegion, 16, NoStdProvider<1024>>,
+    regions: BoundedVec<MemoryRegion, 16, crate::bounded_debug_infra::DebugProvider>,
     /// Binary std/no_std choice
-    allocations: BoundedVec<HeapAllocation, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>>,
+    allocations:
+        BoundedVec<HeapAllocation, MAX_DWARF_FILE_TABLE, crate::bounded_debug_infra::DebugProvider>,
     /// Reference to debug memory interface
     memory: Option<&'a dyn DebugMemory>,
 }
 
 impl<'a> MemoryInspector<'a> {
     /// Create a new memory inspector
-    pub fn new() -> Self {
-        Self {
-            regions: BoundedVec::new(NoStdProvider),
-            allocations: BoundedVec::new(NoStdProvider),
+    pub fn new() -> Result<Self, wrt_foundation::Error> {
+        let regions_provider = safe_managed_alloc!(65536, CrateId::Runtime)?;
+        let allocations_provider = safe_managed_alloc!(65536, CrateId::Runtime)?;
+
+        Ok(Self {
+            regions: BoundedVec::new(regions_provider).map_err(|_| {
+                wrt_foundation::Error::allocation_failed("Failed to create regions vector")
+            })?,
+            allocations: BoundedVec::new(allocations_provider).map_err(|_| {
+                wrt_foundation::Error::allocation_failed("Failed to create allocations vector")
+            })?,
             memory: None,
-        }
+        })
     }
 
     /// Attach to runtime memory
@@ -91,7 +101,9 @@ impl<'a> MemoryInspector<'a> {
 
     /// Find which region contains an address
     pub fn find_region(&self, addr: u32) -> Option<&MemoryRegion> {
-        self.regions.iter().find(|r| addr >= r.start && addr < r.start.saturating_add(r.size))
+        self.regions
+            .iter()
+            .find(|r| addr >= r.start && addr < r.start.saturating_add(r.size))
     }
 
     /// Check if an address is valid
@@ -108,7 +120,11 @@ impl<'a> MemoryInspector<'a> {
         let memory = self.memory?;
         let data = memory.read_bytes(addr, len)?;
 
-        Some(MemoryView { address: addr, data, region: self.find_region(addr) })
+        Some(MemoryView {
+            address: addr,
+            data,
+            region: self.find_region(addr),
+        })
     }
 
     /// Read a null-terminated string
@@ -129,7 +145,10 @@ impl<'a> MemoryInspector<'a> {
         }
 
         let data = memory.read_bytes(addr, len)?;
-        Some(CStringView { address: addr, data })
+        Some(CStringView {
+            address: addr,
+            data,
+        })
     }
 
     /// Get heap statistics
@@ -174,7 +193,11 @@ impl<'a> MemoryInspector<'a> {
 
     /// Dump memory in hex format
     pub fn dump_hex(&self, addr: u32, len: usize) -> MemoryDump {
-        MemoryDump { inspector: self, address: addr, length: len }
+        MemoryDump {
+            inspector: self,
+            address: addr,
+            length: len,
+        }
     }
 
     /// Analyze stack usage
@@ -360,8 +383,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_memory_regions() {
-        let mut inspector = MemoryInspector::new();
+    fn test_memory_regions() -> Result<(), wrt_foundation::Error> {
+        let mut inspector = MemoryInspector::new()?;
 
         // Add memory regions
         inspector
@@ -388,11 +411,13 @@ mod tests {
         assert!(inspector.find_region(0x5000).is_some());
         assert!(inspector.find_region(0x15000).is_some());
         assert!(inspector.find_region(0x30000).is_none());
+
+        Ok(())
     }
 
     #[test]
-    fn test_heap_stats() {
-        let mut inspector = MemoryInspector::new();
+    fn test_heap_stats() -> Result<(), wrt_foundation::Error> {
+        let mut inspector = MemoryInspector::new()?;
 
         // Binary std/no_std choice
         inspector
@@ -427,5 +452,7 @@ mod tests {
         assert_eq!(stats.active_allocations, 2);
         assert_eq!(stats.allocated_bytes, 768);
         assert_eq!(stats.largest_allocation, 512);
+
+        Ok(())
     }
 }

@@ -1,5 +1,5 @@
 // Platform-aware Component Runtime Implementation
-// This is Agent C's implementation of the platform component runtime
+// This is the implementation of the platform component runtime
 
 use crate::foundation_stubs::{SmallVec, MediumVec, SafetyContext, AsilLevel};
 use crate::platform_stubs::{ComprehensivePlatformLimits, PlatformId};
@@ -384,7 +384,7 @@ pub trait ComponentResultExt<T> {
 impl<T> ComponentResultExt<T> for Result<T> {
     fn with_component_context(self, component_id: ComponentId) -> Result<T> {
         self.map_err(|e| {
-            Error::new(wrt_error::ErrorCategory::Component, wrt_error::codes::COMPONENT_INSTANTIATION_ERROR, "Component context error")
+            wrt_error::Error::component_instantiation_error("Component context error")
         })
     }
 }

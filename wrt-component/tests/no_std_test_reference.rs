@@ -1,7 +1,8 @@
 //! No-std compatibility test reference for wrt-component
 //!
-//! This file references the consolidated no_std tests in wrt-tests/integration/no_std/
-//! The actual no_std tests for wrt-component are now part of the centralized test suite.
+//! This file references the consolidated no_std tests in
+//! wrt-tests/integration/no_std/ The actual no_std tests for wrt-component are
+//! now part of the centralized test suite.
 
 #[cfg(test)]
 mod tests {

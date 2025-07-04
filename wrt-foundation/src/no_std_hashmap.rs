@@ -321,61 +321,63 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::safe_memory::NoStdProvider;
+    use crate::{safe_managed_alloc, budget_aware_provider::CrateId, safe_memory::NoStdProvider};
 
     #[test]
-    fn test_simple_hashmap() {
-        let provider = NoStdProvider::<512>::default();
-        let mut map = SimpleHashMap::<u32, i32, 8, NoStdProvider<512>>::new(provider).unwrap();
+    fn test_simple_hashmap() -> crate::WrtResult<()> {
+        let provider = safe_managed_alloc!(512, CrateId::Foundation)?;
+        let mut map = SimpleHashMap::<u32, i32, 8, NoStdProvider<512>>::new(provider)?;
 
         // Test insertion
-        assert!(map.insert(1, 100).unwrap().is_none());
-        assert!(map.insert(2, 200).unwrap().is_none());
-        assert!(map.insert(3, 300).unwrap().is_none());
+        assert!(map.insert(1, 100)?.is_none());
+        assert!(map.insert(2, 200)?.is_none());
+        assert!(map.insert(3, 300)?.is_none());
 
         // Test get
-        assert_eq!(map.get(&1).unwrap(), Some(100));
-        assert_eq!(map.get(&2).unwrap(), Some(200));
-        assert_eq!(map.get(&3).unwrap(), Some(300));
-        assert_eq!(map.get(&4).unwrap(), None);
+        assert_eq!(map.get(&1)?, Some(100));
+        assert_eq!(map.get(&2)?, Some(200));
+        assert_eq!(map.get(&3)?, Some(300));
+        assert_eq!(map.get(&4)?, None);
 
         // Test replacing a value
-        assert_eq!(map.insert(1, 1000).unwrap(), Some(100));
-        assert_eq!(map.get(&1).unwrap(), Some(1000));
+        assert_eq!(map.insert(1, 1000)?, Some(100));
+        assert_eq!(map.get(&1)?, Some(1000));
 
         // Test removing a value
-        assert_eq!(map.remove("two").unwrap(), Some(2));
-        assert_eq!(map.get("two").unwrap(), None);
+        assert_eq!(map.remove(&2)?, Some(200));
+        assert_eq!(map.get(&2)?, None);
 
         // Test len and is_empty
         assert_eq!(map.len(), 2);
         assert!(!map.is_empty());
 
         // Test clear
-        map.clear().unwrap();
+        map.clear()?;
         assert_eq!(map.len(), 0);
         assert!(map.is_empty());
-        assert_eq!(map.get(&1).unwrap(), None);
+        assert_eq!(map.get(&1)?, None);
+        Ok(())
     }
 
     #[test]
-    fn test_full_map() {
-        let provider = NoStdProvider::<256>::default();
-        let mut map = SimpleHashMap::<i32, i32, 4, NoStdProvider<256>>::new(provider).unwrap();
+    fn test_full_map() -> crate::WrtResult<()> {
+        let provider = safe_managed_alloc!(256, CrateId::Foundation)?;
+        let mut map = SimpleHashMap::<i32, i32, 4, NoStdProvider<256>>::new(provider)?;
 
         // Fill the map
-        assert!(map.insert(1, 10).unwrap().is_none());
-        assert!(map.insert(2, 20).unwrap().is_none());
-        assert!(map.insert(3, 30).unwrap().is_none());
-        assert!(map.insert(4, 40).unwrap().is_none());
+        assert!(map.insert(1, 10)?.is_none());
+        assert!(map.insert(2, 20)?.is_none());
+        assert!(map.insert(3, 30)?.is_none());
+        assert!(map.insert(4, 40)?.is_none());
 
         // Map is full
         assert!(map.is_full());
 
         // Can replace existing keys
-        assert_eq!(map.insert(1, 100).unwrap(), Some(10));
+        assert_eq!(map.insert(1, 100)?, Some(10));
 
         // But can't add new keys
         assert!(map.insert(5, 50).is_err());
+        Ok(())
     }
 }

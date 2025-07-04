@@ -64,7 +64,7 @@ impl SectionId {
             11 => Ok(Self::Data),
             12 => Ok(Self::DataCount),
             _ => {
-                Err(Error::new(ErrorCategory::Validation, codes::PARSE_ERROR, "Invalid section id"))
+                Err(Error::validation_parse_error("Invalid section id"))
             }
         }
     }
@@ -168,11 +168,7 @@ impl<'a> Section<'a> {
 
         // Verify size matches data length
         if self.size as usize != self.data.len() {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Section size mismatch",
-            ));
+            return Err(Error::validation_error("Section size mismatch"));
         }
         Ok(())
     }

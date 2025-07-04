@@ -2,14 +2,12 @@
 Arm Hardening Features
 ======================
 
-WRT supports optional Arm hardening features for enhanced control-flow integrity and memory safety, primarily targeting the `wrt-helper` runtime used with AOT-compiled code.
 
 For comprehensive Control Flow Integrity (CFI) implementation details including BTI, RISC-V CFI, and software CFI fallback, see :doc:`cfi_hardening`.
 
 Enabling Hardening
 ------------------
 
-These features are enabled via the `arm-hardening` cargo feature flag when building `wrt-helper`:
 
 .. code-block:: bash
 

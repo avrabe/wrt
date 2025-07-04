@@ -35,49 +35,49 @@
 //! ```
 
 use wrt_error::{codes, Error, ErrorCategory, Result};
-use crate::prelude::BoundedVecExt;
 use wrt_format::binary;
-use wrt_foundation::NoStdProvider;
+use wrt_foundation::{
+    capabilities::CapabilityAwareProvider, capability_context, safe_capability_alloc,
+    traits::BoundedCapacity, CrateId, NoStdProvider,
+};
+
+// Helper functions to create properly sized providers
+fn create_provider_1024() -> Result<CapabilityAwareProvider<NoStdProvider<1024>>> {
+    let context: wrt_foundation::WrtResult<_> =
+        capability_context!(dynamic(CrateId::Decoder, 1024));
+    let context = context?;
+    safe_capability_alloc!(context, CrateId::Decoder, 1024)
+}
 
 /// Read a name from binary data (no_std version)
 /// Returns (name_bytes, total_bytes_read)
 fn read_name(data: &[u8], offset: usize) -> Result<(&[u8], usize)> {
     if offset >= data.len() {
-        return Err(Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Offset beyond data"));
+        return Err(Error::parse_error("Offset beyond data"));
     }
-    
+
     // Read length as LEB128
     let (name_len, leb_bytes) = binary::read_leb128_u32(data, offset)?;
     let name_start = offset + leb_bytes;
     let name_end = name_start + name_len as usize;
-    
+
     if name_end > data.len() {
-        return Err(Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Name extends beyond data"));
+        return Err(Error::parse_error("Name extends beyond data"));
     }
-    
+
     Ok((&data[name_start..name_end], leb_bytes + name_len as usize))
 }
-// BoundedCapacity trait is private, using alternative approaches for length operations
+// BoundedCapacity trait is private, using alternative approaches for length
+// operations
 use wrt_foundation::{
-    bounded::{
-        BoundedString, BoundedVec, MAX_BUFFER_SIZE, MAX_COMPONENT_LIST_ITEMS,
-        MAX_COMPONENT_RECORD_FIELDS, MAX_COMPONENT_TYPES, MAX_WASM_NAME_LENGTH,
-    },
+    bounded::{BoundedString, BoundedVec, MAX_COMPONENT_TYPES},
     component::{MAX_COMPONENT_EXPORTS, MAX_COMPONENT_IMPORTS},
-    safe_memory::SafeSlice,
     verification::VerificationLevel,
 };
 
 use crate::{
-    component::{
-        section::{
-            ComponentExport, ComponentImport, ComponentInstance, ComponentSection, ComponentType,
-        },
-        validation,
-    },
-    decoder_no_alloc::{
-        create_error, create_memory_provider, verify_wasm_header, NoAllocErrorCode, MAX_MODULE_SIZE,
-    },
+    component::section::{ComponentExport, ComponentImport, ComponentType},
+    decoder_no_alloc::{create_error, create_memory_provider, NoAllocErrorCode, MAX_MODULE_SIZE},
     prelude::*,
 };
 
@@ -209,11 +209,23 @@ pub struct ComponentHeader {
     /// Number of sections detected in the component
     pub section_count: u8,
     /// Component types
-    pub types: BoundedVec<ComponentType, MAX_COMPONENT_TYPES, NoStdProvider<1024>>,
+    pub types: BoundedVec<
+        ComponentType,
+        MAX_COMPONENT_TYPES,
+        CapabilityAwareProvider<NoStdProvider<1024>>,
+    >,
     /// Component exports
-    pub exports: BoundedVec<ComponentExport, MAX_COMPONENT_EXPORTS, NoStdProvider<1024>>,
+    pub exports: BoundedVec<
+        ComponentExport<CapabilityAwareProvider<NoStdProvider<1024>>>,
+        MAX_COMPONENT_EXPORTS,
+        CapabilityAwareProvider<NoStdProvider<1024>>,
+    >,
     /// Component imports
-    pub imports: BoundedVec<ComponentImport, MAX_COMPONENT_IMPORTS, NoStdProvider<1024>>,
+    pub imports: BoundedVec<
+        ComponentImport<CapabilityAwareProvider<NoStdProvider<1024>>>,
+        MAX_COMPONENT_IMPORTS,
+        CapabilityAwareProvider<NoStdProvider<1024>>,
+    >,
     /// Whether the component contains a start function
     pub has_start: bool,
     /// Whether the component contains core modules
@@ -231,12 +243,17 @@ pub struct ComponentHeader {
 impl ComponentHeader {
     /// Creates a new ComponentHeader with default values
     pub fn new(verification_level: VerificationLevel) -> Self {
+        let provider = create_provider_1024().unwrap_or_else(|_| {
+            // Create capability-aware provider as fallback using default
+            use wrt_foundation::capabilities::CapabilityAwareProvider;
+            CapabilityAwareProvider::default()
+        });
         Self {
             size: 0,
             section_count: 0,
-            types: BoundedVec::empty(),
-            exports: BoundedVec::empty(),
-            imports: BoundedVec::empty(),
+            types: BoundedVec::new(provider.clone()).unwrap_or_default(),
+            exports: BoundedVec::new(provider.clone()).unwrap_or_default(),
+            imports: BoundedVec::new(provider.clone()).unwrap_or_default(),
             has_start: false,
             has_core_modules: false,
             has_sub_components: false,
@@ -319,14 +336,14 @@ pub fn decode_component_header(
     verify_component_header(bytes)?;
 
     // Create a memory provider for the component data
-    let provider = create_memory_provider(bytes, verification_level)?;
+    let _provider = create_memory_provider(bytes, verification_level)?;
 
     // Initialize the component header
     let mut header = ComponentHeader::new(verification_level);
     header.size = bytes.len();
 
     // Create empty collections for the component header
-    let header_provider = NoStdProvider::<1024>::default();
+    let header_provider = create_provider_1024()?;
     let types = BoundedVec::new(header_provider.clone())?;
     let exports = BoundedVec::new(header_provider.clone())?;
     let imports = BoundedVec::new(header_provider)?;
@@ -377,20 +394,20 @@ pub fn decode_component_header(
         match section_id_enum {
             ComponentSectionId::Start => {
                 header.has_start = true;
-            }
+            },
             ComponentSectionId::CoreModule => {
                 header.has_core_modules = true;
-            }
+            },
             ComponentSectionId::Module => {
                 header.has_sub_components = true;
-            }
+            },
             ComponentSectionId::ComponentType => {
                 // Check for resource type usage
                 if check_for_resource_types(bytes, section_data_offset, section_size) {
                     header.uses_resources = true;
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         // Move to next section
@@ -460,7 +477,11 @@ fn check_for_resource_types(bytes: &[u8], offset: usize, size: u32) -> bool {
 /// * `Result<()>` - Ok if successful
 fn scan_component_imports(
     section_data: &[u8],
-    imports: &mut BoundedVec<ComponentImport, MAX_COMPONENT_IMPORTS, NoStdProvider<1024>>,
+    imports: &mut BoundedVec<
+        ComponentImport<CapabilityAwareProvider<NoStdProvider<1024>>>,
+        MAX_COMPONENT_IMPORTS,
+        CapabilityAwareProvider<NoStdProvider<1024>>,
+    >,
 ) -> Result<()> {
     if section_data.is_empty() {
         return Ok(());
@@ -489,14 +510,14 @@ fn scan_component_imports(
             let import = ComponentImport {
                 name: {
                     let name_str = core::str::from_utf8(name)
-                        .map_err(|_| Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Invalid UTF-8 in name"))?;
-                    BoundedString::from_str_truncate(name_str, NoStdProvider::<1024>::default())?
+                        .map_err(|_| Error::parse_error("Invalid UTF-8 in name"))?;
+                    BoundedString::from_str_truncate(name_str, create_provider_1024()?)?
                 },
                 type_index: 0, // Placeholder
             };
 
             // Try to add the import to our bounded collection
-            let _ = imports.try_push(import);
+            let _ = imports.push(import);
 
             // Skip the import type (simplified)
             if offset < section_data.len() {
@@ -522,7 +543,11 @@ fn scan_component_imports(
 /// * `Result<()>` - Ok if successful
 fn scan_component_exports(
     section_data: &[u8],
-    exports: &mut BoundedVec<ComponentExport, MAX_COMPONENT_EXPORTS, NoStdProvider<1024>>,
+    exports: &mut BoundedVec<
+        ComponentExport<CapabilityAwareProvider<NoStdProvider<1024>>>,
+        MAX_COMPONENT_EXPORTS,
+        CapabilityAwareProvider<NoStdProvider<1024>>,
+    >,
 ) -> Result<()> {
     if section_data.is_empty() {
         return Ok(());
@@ -551,15 +576,15 @@ fn scan_component_exports(
             let export = ComponentExport {
                 name: {
                     let name_str = core::str::from_utf8(name)
-                        .map_err(|_| Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Invalid UTF-8 in name"))?;
-                    BoundedString::from_str_truncate(name_str, NoStdProvider::<1024>::default())?
+                        .map_err(|_| Error::parse_error("Invalid UTF-8 in name"))?;
+                    BoundedString::from_str_truncate(name_str, create_provider_1024()?)?
                 },
                 type_index: 0, // Placeholder
                 kind: 0,       // Placeholder
             };
 
             // Try to add the export to our bounded collection
-            let _ = exports.try_push(export);
+            let _ = exports.push(export);
 
             // Skip the export type and index (simplified)
             if offset < section_data.len() {
@@ -585,7 +610,11 @@ fn scan_component_exports(
 /// * `Result<()>` - Ok if successful
 fn scan_component_types(
     section_data: &[u8],
-    types: &mut BoundedVec<ComponentType, MAX_COMPONENT_TYPES, NoStdProvider<1024>>,
+    types: &mut BoundedVec<
+        ComponentType,
+        MAX_COMPONENT_TYPES,
+        CapabilityAwareProvider<NoStdProvider<1024>>,
+    >,
 ) -> Result<()> {
     if section_data.is_empty() {
         return Ok(());
@@ -617,7 +646,7 @@ fn scan_component_types(
             };
 
             // Try to add the type to our bounded collection
-            let _ = types.try_push(component_type);
+            let _ = types.push(component_type);
 
             // Skip remaining type data (simplified)
             // In a real implementation, we would parse the type structure
@@ -938,7 +967,10 @@ mod tests {
     #[test]
     fn test_component_section_id_from_u8() {
         assert_eq!(ComponentSectionId::from(0), ComponentSectionId::Custom);
-        assert_eq!(ComponentSectionId::from(1), ComponentSectionId::ComponentType);
+        assert_eq!(
+            ComponentSectionId::from(1),
+            ComponentSectionId::ComponentType
+        );
         assert_eq!(ComponentSectionId::from(255), ComponentSectionId::Unknown);
     }
 

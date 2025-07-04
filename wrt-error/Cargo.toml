@@ -18,16 +18,49 @@ path = "src/lib.rs"
 
 [features]
 default = []
-# Binary choice: std OR no_std (no alloc middle ground)
-# Performance optimization
-optimize = []
-# Safety features
-safety = []
-# Binary choice: std OR no_std (no alloc middle ground)
-std = []
+
+# Core allocation strategies (aligned with wrt-foundation)
+dynamic-allocation = []
+static-allocation = []
+verified-static-allocation = ["static-allocation"]
+
+# Capability features
+compile-time-capacity-limits = []
+runtime-bounds-checking = []
+
+# Convenience bundles
+bounded-collections = [
+    "compile-time-capacity-limits",
+    "runtime-bounds-checking"
+]
+
+static-memory-safety = [
+    "static-allocation"
+]
+
+maximum-safety = [
+    "verified-static-allocation"
+]
+
+# ASIL Safety Levels
+qm = ["dynamic-allocation"]
+asil-a = ["runtime-bounds-checking"]
+asil-b = ["asil-a", "compile-time-capacity-limits"]
+asil-c = ["asil-b", "static-allocation"]
+asil-d = ["asil-c", "verified-static-allocation"]
+
+# Legacy compatibility
+std = ["dynamic-allocation"]
 no_std = []
-# Disable panic handler for library builds to avoid conflicts
-disable-panic-handler = []
+alloc = ["no_std"]
+safety-asil-b = ["asil-b"]
+safety-asil-c = ["asil-c"]
+safety-asil-d = ["asil-d"]
+optimize = []
+
+# KANI formal verification support
+kani = []
+
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)', 'cfg(kani)', 'cfg(coverage)', 'cfg(doc)'] }

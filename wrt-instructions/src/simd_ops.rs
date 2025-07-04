@@ -503,11 +503,7 @@ impl<T: SimdExecutionContext> PureInstruction<T, wrt_error::Error> for SimdInstr
 impl<T: SimdExecutionContext> PureInstruction<T, wrt_error::Error> for SimdInstruction {
     fn execute(&self, _context: &mut T) -> Result<()> {
         // Binary std/no_std choice
-        Err(wrt_error::Error::new(
-            wrt_error::ErrorCategory::Validation,
-            1,
-            "SIMD operations require alloc feature"
-        ))
+        Err(wrt_error::Error::runtime_execution_error("SIMD operations require alloc feature"))
     }
 }
 

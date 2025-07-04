@@ -2,16 +2,18 @@
 //!
 //! This module provides types for representing log levels in component logging.
 
+
 use core::str::FromStr;
 
 /// Log levels for WebAssembly component logging
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum LogLevel {
     /// Trace-level messages (detailed debugging information)
     Trace,
     /// Debug-level messages (useful for developers)
     Debug,
     /// Informational messages (general runtime information)
+    #[default]
     Info,
     /// Warning messages (potential issues)
     Warn,
@@ -133,7 +135,7 @@ mod tests {
 
         // Test error message
         let err = "invalid".parse::<LogLevel>().unwrap_err();
-        assert_eq!(err.invalid_level, "invalid");
+        assert_eq!(err.message, "Invalid log level");
     }
 
     #[test]

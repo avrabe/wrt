@@ -117,7 +117,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
             // i32 conversions
             Self::I32WrapI64 => {
                 let a = context.pop_conversion_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i32.wrap_i64 operand")
+                    Error::type_error("Expected I64 for i32.wrap_i64 operand")
                 })?;
                 let result = math::i32_wrap_i64(a)?;
                 context.push_conversion_value(Value::I32(result))
@@ -126,7 +126,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F32(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 for i32.trunc_f32_s operand")),
+                    _ => return Err(Error::type_error("Expected F32 for i32.trunc_f32_s operand")),
                 };
                 // Convert wrt_foundation::FloatBits32 to wrt_math::FloatBits32
                 let math_bits = math::FloatBits32(float_bits.0);
@@ -137,7 +137,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F32(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 for i32.trunc_f32_u operand")),
+                    _ => return Err(Error::type_error("Expected F32 for i32.trunc_f32_u operand")),
                 };
                 let math_bits = math::FloatBits32(float_bits.0);
                 let result = math::i32_trunc_f32_u(math_bits)?;
@@ -147,7 +147,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F64(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 for i32.trunc_f64_s operand")),
+                    _ => return Err(Error::type_error("Expected F64 for i32.trunc_f64_s operand")),
                 };
                 let math_bits = math::FloatBits64(float_bits.0);
                 let result = math::i32_trunc_f64_s(math_bits)?;
@@ -157,7 +157,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F64(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 for i32.trunc_f64_u operand")),
+                    _ => return Err(Error::type_error("Expected F64 for i32.trunc_f64_u operand")),
                 };
                 let math_bits = math::FloatBits64(float_bits.0);
                 let result = math::i32_trunc_f64_u(math_bits)?;
@@ -167,7 +167,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F32(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 for i32.reinterpret_f32 operand")),
+                    _ => return Err(Error::type_error("Expected F32 for i32.reinterpret_f32 operand")),
                 };
                 let math_bits = math::FloatBits32(float_bits.0);
                 let result = math::i32_reinterpret_f32(math_bits)?;
@@ -177,14 +177,14 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
             // i32 sign extensions
             Self::I32Extend8S => {
                 let a = context.pop_conversion_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.extend8_s operand")
+                    Error::type_error("Expected I32 for i32.extend8_s operand")
                 })?;
                 let result = math::i32_extend8_s(a)?;
                 context.push_conversion_value(Value::I32(result))
             }
             Self::I32Extend16S => {
                 let a = context.pop_conversion_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.extend16_s operand")
+                    Error::type_error("Expected I32 for i32.extend16_s operand")
                 })?;
                 let result = math::i32_extend16_s(a)?;
                 context.push_conversion_value(Value::I32(result))
@@ -193,14 +193,14 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
             // i64 conversions
             Self::I64ExtendI32S => {
                 let a = context.pop_conversion_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i64.extend_i32_s operand")
+                    Error::type_error("Expected I32 for i64.extend_i32_s operand")
                 })?;
                 let result = math::i64_extend_i32_s(a)?;
                 context.push_conversion_value(Value::I64(result))
             }
             Self::I64ExtendI32U => {
                 let a = context.pop_conversion_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i64.extend_i32_u operand")
+                    Error::type_error("Expected I32 for i64.extend_i32_u operand")
                 })?;
                 let result = math::i64_extend_i32_u(a)?;
                 context.push_conversion_value(Value::I64(result))
@@ -209,7 +209,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F32(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 for i64.trunc_f32_s operand")),
+                    _ => return Err(Error::type_error("Expected F32 for i64.trunc_f32_s operand")),
                 };
                 let math_bits = math::FloatBits32(float_bits.0);
                 let result = math::i64_trunc_f32_s(math_bits)?;
@@ -219,7 +219,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F32(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 for i64.trunc_f32_u operand")),
+                    _ => return Err(Error::type_error("Expected F32 for i64.trunc_f32_u operand")),
                 };
                 let math_bits = math::FloatBits32(float_bits.0);
                 let result = math::i64_trunc_f32_u(math_bits)?;
@@ -229,7 +229,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F64(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 for i64.trunc_f64_s operand")),
+                    _ => return Err(Error::type_error("Expected F64 for i64.trunc_f64_s operand")),
                 };
                 let math_bits = math::FloatBits64(float_bits.0);
                 let result = math::i64_trunc_f64_s(math_bits)?;
@@ -239,7 +239,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F64(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 for i64.trunc_f64_u operand")),
+                    _ => return Err(Error::type_error("Expected F64 for i64.trunc_f64_u operand")),
                 };
                 let math_bits = math::FloatBits64(float_bits.0);
                 let result = math::i64_trunc_f64_u(math_bits)?;
@@ -249,7 +249,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F64(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 for i64.reinterpret_f64 operand")),
+                    _ => return Err(Error::type_error("Expected F64 for i64.reinterpret_f64 operand")),
                 };
                 let math_bits = math::FloatBits64(float_bits.0);
                 let result = math::i64_reinterpret_f64(math_bits)?;
@@ -259,21 +259,21 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
             // i64 sign extensions
             Self::I64Extend8S => {
                 let a = context.pop_conversion_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.extend8_s operand")
+                    Error::type_error("Expected I64 for i64.extend8_s operand")
                 })?;
                 let result = math::i64_extend8_s(a)?;
                 context.push_conversion_value(Value::I64(result))
             }
             Self::I64Extend16S => {
                 let a = context.pop_conversion_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.extend16_s operand")
+                    Error::type_error("Expected I64 for i64.extend16_s operand")
                 })?;
                 let result = math::i64_extend16_s(a)?;
                 context.push_conversion_value(Value::I64(result))
             }
             Self::I64Extend32S => {
                 let a = context.pop_conversion_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.extend32_s operand")
+                    Error::type_error("Expected I64 for i64.extend32_s operand")
                 })?;
                 let result = math::i64_extend32_s(a)?;
                 context.push_conversion_value(Value::I64(result))
@@ -282,7 +282,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
             // f32 conversions
             Self::F32ConvertI32S => {
                 let a = context.pop_conversion_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for f32.convert_i32_s operand")
+                    Error::type_error("Expected I32 for f32.convert_i32_s operand")
                 })?;
                 let result = math::f32_convert_i32_s(a)?;
                 // Convert wrt_math::FloatBits32 to wrt_foundation::FloatBits32
@@ -290,21 +290,21 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
             }
             Self::F32ConvertI32U => {
                 let a = context.pop_conversion_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for f32.convert_i32_u operand")
+                    Error::type_error("Expected I32 for f32.convert_i32_u operand")
                 })?;
                 let result = math::f32_convert_i32_u(a)?;
                 context.push_conversion_value(Value::F32(FloatBits32(result.0)))
             }
             Self::F32ConvertI64S => {
                 let a = context.pop_conversion_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for f32.convert_i64_s operand")
+                    Error::type_error("Expected I64 for f32.convert_i64_s operand")
                 })?;
                 let result = math::f32_convert_i64_s(a)?;
                 context.push_conversion_value(Value::F32(FloatBits32(result.0)))
             }
             Self::F32ConvertI64U => {
                 let a = context.pop_conversion_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for f32.convert_i64_u operand")
+                    Error::type_error("Expected I64 for f32.convert_i64_u operand")
                 })?;
                 let result = math::f32_convert_i64_u(a as u64)?;
                 context.push_conversion_value(Value::F32(FloatBits32(result.0)))
@@ -313,7 +313,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F64(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 for f32.demote_f64 operand")),
+                    _ => return Err(Error::type_error("Expected F64 for f32.demote_f64 operand")),
                 };
                 let math_bits = math::FloatBits64(float_bits.0);
                 let result = math::f32_demote_f64(math_bits)?;
@@ -321,7 +321,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
             }
             Self::F32ReinterpretI32 => {
                 let a = context.pop_conversion_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for f32.reinterpret_i32 operand")
+                    Error::type_error("Expected I32 for f32.reinterpret_i32 operand")
                 })?;
                 let result = math::f32_reinterpret_i32(a)?;
                 context.push_conversion_value(Value::F32(FloatBits32(result.0)))
@@ -330,28 +330,28 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
             // f64 conversions
             Self::F64ConvertI32S => {
                 let a = context.pop_conversion_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for f64.convert_i32_s operand")
+                    Error::type_error("Expected I32 for f64.convert_i32_s operand")
                 })?;
                 let result = math::f64_convert_i32_s(a)?;
                 context.push_conversion_value(Value::F64(FloatBits64(result.0)))
             }
             Self::F64ConvertI32U => {
                 let a = context.pop_conversion_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for f64.convert_i32_u operand")
+                    Error::type_error("Expected I32 for f64.convert_i32_u operand")
                 })?;
                 let result = math::f64_convert_i32_u(a)?;
                 context.push_conversion_value(Value::F64(FloatBits64(result.0)))
             }
             Self::F64ConvertI64S => {
                 let a = context.pop_conversion_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for f64.convert_i64_s operand")
+                    Error::type_error("Expected I64 for f64.convert_i64_s operand")
                 })?;
                 let result = math::f64_convert_i64_s(a)?;
                 context.push_conversion_value(Value::F64(FloatBits64(result.0)))
             }
             Self::F64ConvertI64U => {
                 let a = context.pop_conversion_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for f64.convert_i64_u operand")
+                    Error::type_error("Expected I64 for f64.convert_i64_u operand")
                 })?;
                 let result = math::f64_convert_i64_u(a as u64)?;
                 context.push_conversion_value(Value::F64(FloatBits64(result.0)))
@@ -360,7 +360,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F32(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 for f64.promote_f32 operand")),
+                    _ => return Err(Error::type_error("Expected F32 for f64.promote_f32 operand")),
                 };
                 let math_bits = math::FloatBits32(float_bits.0);
                 let result = math::f64_promote_f32(math_bits)?;
@@ -368,7 +368,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
             }
             Self::F64ReinterpretI64 => {
                 let a = context.pop_conversion_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for f64.reinterpret_i64 operand")
+                    Error::type_error("Expected I64 for f64.reinterpret_i64 operand")
                 })?;
                 let result = math::f64_reinterpret_i64(a)?;
                 context.push_conversion_value(Value::F64(FloatBits64(result.0)))
@@ -379,7 +379,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F32(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 for i32.trunc_sat_f32_s operand")),
+                    _ => return Err(Error::type_error("Expected F32 for i32.trunc_sat_f32_s operand")),
                 };
                 let math_bits = math::FloatBits32(float_bits.0);
                 let result = math::i32_trunc_sat_f32_s(math_bits);
@@ -389,7 +389,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F32(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 for i32.trunc_sat_f32_u operand")),
+                    _ => return Err(Error::type_error("Expected F32 for i32.trunc_sat_f32_u operand")),
                 };
                 let math_bits = math::FloatBits32(float_bits.0);
                 let result = math::i32_trunc_sat_f32_u(math_bits);
@@ -399,7 +399,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F64(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 for i32.trunc_sat_f64_s operand")),
+                    _ => return Err(Error::type_error("Expected F64 for i32.trunc_sat_f64_s operand")),
                 };
                 let math_bits = math::FloatBits64(float_bits.0);
                 let result = math::i32_trunc_sat_f64_s(math_bits);
@@ -409,7 +409,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F64(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 for i32.trunc_sat_f64_u operand")),
+                    _ => return Err(Error::type_error("Expected F64 for i32.trunc_sat_f64_u operand")),
                 };
                 let math_bits = math::FloatBits64(float_bits.0);
                 let result = math::i32_trunc_sat_f64_u(math_bits);
@@ -419,7 +419,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F32(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 for i64.trunc_sat_f32_s operand")),
+                    _ => return Err(Error::type_error("Expected F32 for i64.trunc_sat_f32_s operand")),
                 };
                 let math_bits = math::FloatBits32(float_bits.0);
                 let result = math::i64_trunc_sat_f32_s(math_bits);
@@ -429,7 +429,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F32(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 for i64.trunc_sat_f32_u operand")),
+                    _ => return Err(Error::type_error("Expected F32 for i64.trunc_sat_f32_u operand")),
                 };
                 let math_bits = math::FloatBits32(float_bits.0);
                 let result = math::i64_trunc_sat_f32_u(math_bits);
@@ -439,7 +439,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F64(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 for i64.trunc_sat_f64_s operand")),
+                    _ => return Err(Error::type_error("Expected F64 for i64.trunc_sat_f64_s operand")),
                 };
                 let math_bits = math::FloatBits64(float_bits.0);
                 let result = math::i64_trunc_sat_f64_s(math_bits);
@@ -449,7 +449,7 @@ impl<T: ConversionContext> PureInstruction<T, Error> for ConversionOp {
                 let val = context.pop_conversion_value()?;
                 let float_bits = match val {
                     Value::F64(bits) => bits,
-                    _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 for i64.trunc_sat_f64_u operand")),
+                    _ => return Err(Error::type_error("Expected F64 for i64.trunc_sat_f64_u operand")),
                 };
                 let math_bits = math::FloatBits64(float_bits.0);
                 let result = math::i64_trunc_sat_f64_u(math_bits);

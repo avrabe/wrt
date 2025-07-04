@@ -2,10 +2,11 @@
 //!
 //! This module provides types for handling logs from WebAssembly components.
 
+
 #[cfg(feature = "std")]
 use std::boxed::Box;
 
-use wrt_host::CallbackRegistry;
+use wrt_host::{CallbackRegistry, CallbackType};
 
 use crate::operation::LogOperation;
 

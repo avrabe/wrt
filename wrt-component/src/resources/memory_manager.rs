@@ -28,11 +28,7 @@ impl MemoryManager {
     ) -> Result<()> {
         // Verify the resource exists
         if !resource_manager.has_resource(id) {
-            return Err(Error::new(
-                wrt_error::ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found"
-            ));
+            return Err(Error::component_not_found("Component not found"));
         }
 
         // Register with the default strategy
@@ -50,11 +46,7 @@ impl MemoryManager {
     ) -> Result<()> {
         // Verify the resource exists
         if !resource_manager.has_resource(id) {
-            return Err(Error::new(
-                wrt_error::ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found"
-            ));
+            return Err(Error::component_not_found("Component not found"));
         }
 
         // Register with the specified strategy

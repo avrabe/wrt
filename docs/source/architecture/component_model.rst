@@ -9,6 +9,10 @@ Component Model Architecture
 
 The Component Model subsystem implements the WebAssembly Component Model Preview 2 specification with enhanced support for value types and resources.
 
+.. warning::
+   **Implementation Status**: Component Model support is under development. Type system and 
+   parsing infrastructure are partially implemented. See :doc:`../overview/implementation_status`.
+
 .. spec:: Component Model Architecture
    :id: SPEC_003
    :links: REQ_014, REQ_019, REQ_020, REQ_021, REQ_RESOURCE_001
@@ -38,42 +42,42 @@ The Component Model subsystem implements the WebAssembly Component Model Preview
 
 .. impl:: Component Implementation
    :id: IMPL_005
-   :status: implemented
+   :status: partial
    :links: SPEC_003, REQ_014, REQ_019, REQ_WASM_001
    
    The ``Component`` struct represents a WebAssembly component:
    
-   1. Parses component binary format
-   2. Manages component instances
-   3. Handles interface binding
-   4. Orchestrates resource lifetime
-   5. Tracks value consumption for proper validation
+   1. **Partial**: Component binary format parsing (basic structure)
+   2. **In Development**: Component instance management
+   3. **Planned**: Interface binding
+   4. **Partial**: Resource type definitions
+   5. **Planned**: Value consumption tracking
    
    Key methods include:
-   - ``load_from_binary(bytes)`` - Loads a component binary
-   - ``instantiate(engine, imports)`` - Creates a new component instance
-   - ``link(other_component)`` - Links two components together
+   - ``load_from_binary(bytes)`` - **Partial**: Basic parsing only
+   - ``instantiate(engine, imports)`` - **Not Implemented**: Requires execution engine
+   - ``link(other_component)`` - **Not Implemented**: Requires instantiation
 
 .. impl:: Value Types and Encoding
    :id: IMPL_012
-   :status: implemented
+   :status: partial
    :links: SPEC_003, REQ_014, REQ_019, REQ_021
    
    The value types implementation provides:
    
-   1. Complete encoding and decoding of all value types
-   2. Support for complex types (records, variants, lists, tuples, flags, enums)
-   3. Support for option and result types with proper tag handling
-   4. Type validation for encoded values
-   5. Efficient serialization and deserialization
-   6. Conversion strategies for different type representations
-   7. Built-in support for common value types
+   1. **Implemented**: Basic value type definitions
+   2. **Partial**: Complex type support (records, variants basic structure)
+   3. **Implemented**: Option and result type definitions
+   4. **Partial**: Type validation framework
+   5. **In Development**: Serialization and deserialization
+   6. **Planned**: Type conversion strategies
+   7. **Implemented**: Common value type structures
    
-   This implementation allows for proper representation and manipulation of all value types defined in the Component Model specification.
+   This infrastructure provides the foundation for Component Model value handling.
 
 .. impl:: Interface Type Handling
    :id: IMPL_006
-   :status: implemented
+   :status: partial
    :links: SPEC_003, REQ_014, REQ_019
    
    Interface types are managed through:

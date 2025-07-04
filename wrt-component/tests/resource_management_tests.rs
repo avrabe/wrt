@@ -89,7 +89,10 @@ fn test_resource_lifecycle() {
         resource_manager.get_resource_type(id1),
         Some(std::any::TypeId::of::<Box<String>>())
     );
-    assert_eq!(resource_manager.get_resource_type(id2), Some(std::any::TypeId::of::<Box<i32>>()));
+    assert_eq!(
+        resource_manager.get_resource_type(id2),
+        Some(std::any::TypeId::of::<Box<i32>>())
+    );
 
     // Delete resources
     resource_manager.delete_resource(id1);
@@ -268,7 +271,7 @@ fn test_component_value_resource_representation() {
     match resource_value {
         ComponentValue::Resource { id } => {
             assert_eq!(id, 42);
-        }
+        },
         _ => panic!("Expected Resource variant"),
     }
 
@@ -365,8 +368,9 @@ fn test_resource_system_integration() {
     let vector_res = resource_manager.get_host_resource::<Vec<i32>>(vector_id).unwrap();
     assert_eq!(*vector_res, vec![1, 2, 3, 4, 5]);
 
-    let complex_res =
-        resource_manager.get_host_resource::<Box<(String, i32, bool)>>(complex_id).unwrap();
+    let complex_res = resource_manager
+        .get_host_resource::<Box<(String, i32, bool)>>(complex_id)
+        .unwrap();
     assert_eq!(complex_res.0, "name");
     assert_eq!(complex_res.1, 42);
     assert_eq!(complex_res.2, true);

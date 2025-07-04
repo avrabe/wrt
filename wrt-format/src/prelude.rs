@@ -34,7 +34,7 @@ pub use wrt_foundation::MemoryProvider;
 // No-std memory provider
 #[cfg(all(feature = "safety", not(feature = "std")))]
 pub use wrt_foundation::NoStdProvider as NoStdMemoryProvider;
-// Re-export from wrt-foundation
+// Re-export clean types from wrt-foundation
 pub use wrt_foundation::{
     // Verification types
     verification::VerificationLevel,
@@ -42,6 +42,32 @@ pub use wrt_foundation::{
     // SafeMemory types
     SafeMemoryHandler,
     SafeSlice,
+    // Legacy types for compatibility
+    types::{BlockType, RefType, ValueType},
+    values::Value,
+};
+
+// Clean types without provider parameters - only when allocation is available
+#[cfg(any(feature = "std", feature = "alloc"))]
+pub use wrt_foundation::{
+    CleanValType,
+    CleanFuncType,
+    CleanGlobalType,
+    CleanMemoryType,
+    CleanTableType,
+    CleanValue,
+};
+
+// Re-export additional clean types when allocation is available  
+#[cfg(any(feature = "std", feature = "alloc"))]
+pub use wrt_foundation::{
+    CleanExternType,
+};
+
+// Re-export type factory types - only when allocation is available
+#[cfg(any(feature = "std", feature = "alloc"))]
+pub use wrt_foundation::{
+    TypeFactory, RuntimeTypeFactory, ComponentTypeFactory,
 };
 // Binary std/no_std choice
 #[cfg(feature = "std")]
@@ -108,6 +134,18 @@ pub fn memory_provider(data: &[u8]) -> wrt_foundation::safe_memory::StdProvider 
 #[cfg(all(feature = "safety", feature = "std"))] // StdMemoryProvider likely needs std
 pub fn memory_provider_with_capacity(capacity: usize) -> wrt_foundation::safe_memory::StdProvider {
     wrt_foundation::safe_memory::StdProvider::with_capacity(capacity)
+}
+
+// Factory function for creating providers using capability system
+#[cfg(not(feature = "std"))]
+pub fn create_format_provider<const N: usize>() -> wrt_foundation::WrtResult<wrt_foundation::capabilities::CapabilityAwareProvider<wrt_foundation::NoStdProvider<N>>> {
+    use wrt_foundation::{
+        capability_context, safe_capability_alloc,
+        CrateId
+    };
+    let context: wrt_foundation::WrtResult<_> = capability_context!(dynamic(CrateId::Format, N));
+    let context = context?;
+    safe_capability_alloc!(context, CrateId::Format, N)
 }
 
 /// The prelude trait

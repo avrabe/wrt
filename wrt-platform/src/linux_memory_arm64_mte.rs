@@ -112,11 +112,7 @@ impl LinuxArm64MteAllocator {
 
     fn pages_to_bytes(pages: u32) -> Result<usize> {
         pages.checked_mul(WASM_PAGE_SIZE as u32).map(|b| b as usize).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Page count results in byte overflow",
-            )
+            Error::memory_error("Page count results in byte overflow")
         })
     }
 
@@ -132,10 +128,7 @@ impl LinuxArm64MteAllocator {
         let result = unsafe { Self::prctl(PR_SET_TAGGED_ADDR_CTRL, mte_flags, 0, 0, 0) };
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "Failed to configure MTE",
+            return Err(Error::runtime_execution_error(",
             ));
         }
 
@@ -147,8 +140,7 @@ impl LinuxArm64MteAllocator {
         let result: isize;
 
         core::arch::asm!(
-            "svc #0",
-            inout("x8") syscalls::PRCTL => _,
+            ") syscalls::PRCTL => _,
             inout("x0") option => result,
             in("x1") arg2,
             in("x2") arg3,
@@ -271,10 +263,7 @@ impl LinuxArm64MteAllocator {
         let result = Self::mprotect(guard_page_addr, WASM_PAGE_SIZE, PROT_NONE);
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "Failed to set up guard page protection",
+            return Err(Error::runtime_execution_error(",
             ));
         }
 
@@ -337,16 +326,11 @@ impl PageAllocator for LinuxArm64MteAllocator {
             return Err(Error::new(
                 ErrorCategory::System, 1,
                 
-                "Allocator has already allocated memory",
-            ));
+                "));
         }
 
         if initial_pages == 0 {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Initial pages cannot be zero",
-            ));
+            return Err(Error::memory_error("Initial pages cannot be zero"));
         }
 
         let initial_bytes = Self::pages_to_bytes(initial_pages)?;
@@ -361,11 +345,7 @@ impl PageAllocator for LinuxArm64MteAllocator {
         }
 
         if reserve_bytes > self.max_capacity_bytes {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Requested reservation size exceeds allocator's maximum capacity",
-            ));
+            return Err(Error::memory_error("Requested reservation size exceeds allocator's maximum capacity"));
         }
 
         // Determine protection flags
@@ -391,10 +371,7 @@ impl PageAllocator for LinuxArm64MteAllocator {
 
         // Check for mapping failure
         if ptr == MAP_FAILED {
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "Memory mapping failed due to OS error",
+            return Err(Error::runtime_execution_error(",
             ));
         }
 
@@ -406,8 +383,7 @@ impl PageAllocator for LinuxArm64MteAllocator {
             Error::new(
                 ErrorCategory::System, 1,
                 
-                "Memory mapping returned null pointer",
-            )
+                ")
         })?;
 
         // Set memory tags if MTE is available
@@ -434,11 +410,7 @@ impl PageAllocator for LinuxArm64MteAllocator {
 
     fn grow(&mut self, current_pages: u32, additional_pages: u32) -> Result<()> {
         let Some(base_ptr) = self.base_ptr else {
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "No memory allocated to grow",
-            ));
+            return Err(Error::runtime_execution_error("Grow called before allocate"));
         };
 
         if additional_pages == 0 {
@@ -447,11 +419,7 @@ impl PageAllocator for LinuxArm64MteAllocator {
 
         let current_bytes_from_arg = Self::pages_to_bytes(current_pages)?;
         if current_bytes_from_arg != self.current_committed_bytes {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Inconsistent current_pages argument for grow operation",
-            ));
+            return Err(Error::memory_error("Current page count mismatch"));
         }
 
         let new_total_pages = current_pages
@@ -468,11 +436,7 @@ impl PageAllocator for LinuxArm64MteAllocator {
         };
 
         if new_committed_bytes > available_space {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Grow request exceeds total reserved memory space",
-            ));
+            return Err(Error::memory_error("Grow request exceeds total reserved memory space"));
         }
 
         // Set memory tags for the newly accessible region if MTE is available
@@ -497,20 +461,12 @@ impl PageAllocator for LinuxArm64MteAllocator {
 
         // Validate that untagged ptr matches our base_ptr
         let Some(base_ptr) = self.base_ptr.take() else {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "No memory allocated to deallocate",
-            ));
+            return Err(Error::memory_error("No memory allocated to deallocate"));
         };
 
         if untagged_ptr.as_ptr() != base_ptr.as_ptr() {
             self.base_ptr = Some(base_ptr); // Restore base_ptr
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Attempted to deallocate with mismatched pointer",
-            ));
+            return Err(Error::memory_error("Attempted to deallocate with mismatched pointer"));
         }
 
         // SAFETY: ptr was obtained from our mmap call and is valid.
@@ -519,11 +475,7 @@ impl PageAllocator for LinuxArm64MteAllocator {
         if result != 0 {
             // munmap failed, need to restore base_ptr
             self.base_ptr = Some(base_ptr);
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "Memory unmapping failed due to OS error",
-            ));
+            return Err(Error::runtime_execution_error("Memory unmapping failed due to OS error"));
         }
 
         // Reset internal state

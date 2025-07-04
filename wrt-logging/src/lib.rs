@@ -37,6 +37,9 @@ pub use wrt_host::CallbackRegistry;
 /// which process log messages from WebAssembly components.
 pub mod handler;
 
+/// Bounded infrastructure for logging collections
+pub mod bounded_log_infra;
+
 /// Log level definitions for categorizing message severity.
 ///
 /// This module defines the different log levels supported by the logging

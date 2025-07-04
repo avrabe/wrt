@@ -71,23 +71,26 @@ pub use crate::component_builder::{
 // #[cfg(feature = "wrt-sync")] // Or a more specific feature if wrt-sync is always a dep
 
 // Re-export platform-specific memory builders if the feature is enabled
-#[cfg(feature = "platform-memory")]
-pub use crate::memory_builder::{LinearMemoryBuilder, PalMemoryProviderBuilder};
+// Memory builders removed in clean architecture
+// #[cfg(feature = "platform-memory")]
+// pub use crate::memory_builder::{LinearMemoryBuilder, PalMemoryProviderBuilder};
 // Binary std/no_std choice
 #[cfg(not(feature = "std"))]
 pub use crate::no_std_hashmap::SimpleHashMap;
 // Re-export from this crate
 pub use crate::{
+    // ASIL testing framework
+    asil_testing::{
+        get_asil_tests, get_test_statistics, get_tests_by_asil, get_tests_by_category,
+        register_asil_test, AsilTestMetadata, TestCategory, TestStatistics,
+    },
     // Atomic memory operations
     atomic_memory::{AtomicMemoryExt, AtomicMemoryOps},
     // Bounded collections
     bounded::{BoundedStack, BoundedString, BoundedVec, CapacityError, WasmName},
     bounded_collections::{BoundedDeque, BoundedMap, BoundedQueue, BoundedSet},
     // Builder patterns
-    builder::{
-        BoundedBuilder, MemoryBuilder, NoStdProviderBuilder, ResourceBuilder, ResourceItemBuilder,
-        StringBuilder,
-    },
+    builder::{BoundedBuilder, MemoryBuilder, ResourceBuilder, ResourceItemBuilder, StringBuilder},
     // Builtin types
     builtin::BuiltinType,
     // Component model types
@@ -98,12 +101,15 @@ pub use crate::{
         Namespace,
         ResourceType,
     },
+    memory_coordinator::{AllocationId, CrateIdentifier, GenericMemoryCoordinator},
     // Resource types
     resource::ResourceOperation,
     // Safe memory types (SafeMemoryHandler, SafeSlice, SafeStack are already here from direct
     // re-exports) Sections (SectionId, SectionType, Section are usually handled by decoder)
     // Binary std/no_std choice
     safe_memory::NoStdProvider,
+    // Safety system types
+    safety_system::{AsilLevel, SafeMemoryAllocation, SafetyContext, SafetyGuard},
     // Validation traits (moved to traits module to break circular dependency)
     traits::{
         BoundedCapacity, Checksummed,
@@ -125,6 +131,11 @@ pub use crate::{
         TableType,
         ValueType,
     },
+    // New unified types from Agent A deliverables (simplified)
+    unified_types_simple::{
+        DefaultTypes, DesktopTypes, EmbeddedTypes, PlatformCapacities, SafetyCriticalTypes,
+        UnifiedTypes,
+    },
     // Value representations
     values::{FloatBits32, FloatBits64, Value},
     // Verification types
@@ -133,38 +144,9 @@ pub use crate::{
     // ResourceType, // Already covered by component::* above
     SafeMemoryHandler,
     SafeSlice,
-    // New unified types from Agent A deliverables (simplified)
-    unified_types_simple::{
-        DefaultTypes, EmbeddedTypes, DesktopTypes, SafetyCriticalTypes,
-        PlatformCapacities, UnifiedTypes,
-    },
-    // Memory system types
-    memory_system::{
-        UnifiedMemoryProvider, ConfigurableProvider, SmallProvider, MediumProvider, LargeProvider,
-        NoStdProviderWrapper, MemoryProviderFactory,
-    },
-    // Global memory configuration
-    global_memory_config::{
-        GlobalMemoryConfig, GlobalMemoryStats, ProviderType, PlatformAwareMemoryFactory,
-        GlobalMemoryAwareProvider, global_memory_config, initialize_global_memory_system,
-    },
-    // Safety system types
-    safety_system::{
-        AsilLevel, SafetyContext, SafetyGuard, SafeMemoryAllocation,
-    },
-    // ASIL testing framework
-    asil_testing::{
-        AsilTestMetadata, TestCategory, TestStatistics,
-        register_asil_test, get_asil_tests, get_tests_by_asil, get_tests_by_category, get_test_statistics,
-    },
 };
 
-// Conditional re-exports for memory provider functions
-#[cfg(any(feature = "std", feature = "alloc"))]
-pub use crate::global_memory_config::create_memory_provider;
-
-#[cfg(not(any(feature = "std", feature = "alloc")))]
-pub use crate::global_memory_config::{create_small_provider, create_medium_provider, create_large_provider};
+// Modern memory system convenience functions already imported above
 
 // Binary std/no_std choice
 #[cfg(feature = "std")]
@@ -172,7 +154,7 @@ pub use crate::conversion::{ref_type_to_val_type, val_type_to_ref_type};
 
 // std-only memory provider
 #[cfg(feature = "std")]
-pub use crate::memory_system::UnifiedStdProvider;
+// UnifiedStdProvider is now part of the modern memory system
 
 // Alloc-dependent re-exports
 #[cfg(feature = "std")]

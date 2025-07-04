@@ -218,7 +218,9 @@ impl FromBytes for ComponentType {
         reader: &mut ReadStream<'a>,
         provider: &PStream,
     ) -> WrtResult<Self> {
-        Ok(Self { form: u8::from_bytes_with_provider(reader, provider)? })
+        Ok(Self {
+            form: u8::from_bytes_with_provider(reader, provider)?,
+        })
     }
 }
 
@@ -244,7 +246,9 @@ impl FromBytes for ComponentInstance {
         reader: &mut ReadStream<'a>,
         provider: &PStream,
     ) -> WrtResult<Self> {
-        Ok(Self { type_index: u32::from_bytes_with_provider(reader, provider)? })
+        Ok(Self {
+            type_index: u32::from_bytes_with_provider(reader, provider)?,
+        })
     }
 }
 

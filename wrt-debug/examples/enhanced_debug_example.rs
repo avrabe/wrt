@@ -44,8 +44,11 @@ pub extern "C" fn demonstrate_debug_features() -> DebugResult {
     // Initialize the debug info parser
     let info_init_result = debug_info.init_info_parser();
 
-    let mut result =
-        DebugResult { has_line_info: false, has_function_info: false, function_count: 0 };
+    let mut result = DebugResult {
+        has_line_info: false,
+        has_function_info: false,
+        function_count: 0,
+    };
 
     // Check for line information
     if let Ok(Some(line_info)) = debug_info.find_line_info(0x42) {

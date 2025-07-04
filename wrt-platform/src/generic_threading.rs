@@ -5,6 +5,7 @@
 //!
 //! This module is only available when the `std` feature is enabled.
 
+
 use core::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Duration,
@@ -38,17 +39,13 @@ impl PlatformThreadHandle for GenericThreadHandle {
         if let Some(handle) = self.handle.take() {
             match handle.join() {
                 Ok(result) => result,
-                Err(_) => Err(Error::new(
-                    ErrorCategory::Platform,
-                    1,
-                    "Thread panicked during execution",
-                )),
+                Err(_) => Err(Error::runtime_execution_error("Thread panicked during execution")),
             }
         } else {
             Err(Error::new(
                 ErrorCategory::Runtime,
                 1,
-                "Thread handle already consumed",
+                "No thread handle available to join",
             ))
         }
     }
@@ -59,6 +56,17 @@ impl PlatformThreadHandle for GenericThreadHandle {
 
     fn get_stats(&self) -> Result<ThreadStats> {
         Ok(self.stats.lock().clone())
+    }
+
+    fn terminate(&self) -> Result<()> {
+        self.running.store(false, Ordering::Release);
+        Ok(())
+    }
+
+    fn join_timeout(&self, timeout: Duration) -> Result<Option<Vec<u8>>> {
+        // For generic implementation, we can't easily implement timeout join
+        // Return None to indicate timeout not supported
+        Ok(None)
     }
 }
 
@@ -115,20 +123,16 @@ impl PlatformThreadPool for GenericThreadPool {
     fn spawn_wasm_thread(&self, task: WasmTask) -> Result<ThreadHandle> {
         // Check if shutting down
         if self.shutdown.load(Ordering::Acquire) {
-            return Err(Error::new(
-                ErrorCategory::Platform, 1,
-                
-                "Thread pool is shutting down",
-            ));
+            return Err(Error::runtime_execution_error("Thread pool is shutting down"));
         }
 
         // Check thread limit
         let active_count = self.active_threads.read().len();
         if active_count >= self.config.max_threads {
             return Err(Error::new(
-                ErrorCategory::Resource, 1,
-                
-                "Thread pool limit reached",
+                ErrorCategory::Resource,
+                1,
+                "Thread pool has reached maximum thread limit",
             ));
         }
 
@@ -168,11 +172,7 @@ impl PlatformThreadPool for GenericThreadPool {
                 result
             })
             .map_err(|_| {
-                Error::new(
-                    ErrorCategory::Platform, 1,
-                    
-                    "Failed to spawn thread",
-                )
+                Error::runtime_execution_error("Failed to spawn thread")
             })?;
 
         // Create platform handle
@@ -189,10 +189,7 @@ impl PlatformThreadPool for GenericThreadPool {
             stats.total_spawned += 1;
         }
 
-        Ok(ThreadHandle {
-            id: thread_id,
-            platform_handle,
-        })
+        Ok(ThreadHandle::new(thread_id, platform_handle))
     }
 
     fn get_stats(&self) -> ThreadPoolStats {

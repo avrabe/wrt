@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Advanced Synchronization Primitives
 // SW-REQ-ID: REQ_PLATFORM_SYNC_ADV_001
@@ -193,18 +194,15 @@ impl LockFreeAllocator {
     /// `block_size` must be >= size_of::<FreeBlock>().
     pub unsafe fn new(pool: *mut u8, pool_size: usize, block_size: usize) -> Result<Self, Error> {
         if block_size < core::mem::size_of::<FreeBlock>() {
-            return Err(Error::new(
-                wrt_error::ErrorCategory::Validation, 1,
-                "Invalid operation",
-            ));
+            return Err(Error::runtime_execution_error("Block size too small"));
         }
 
         let total_blocks = pool_size / block_size;
         if total_blocks == 0 {
             return Err(Error::new(
-                wrt_error::ErrorCategory::Validation, 1,
-                "Invalid operation",
-            ));
+                wrt_error::ErrorCategory::Validation, 
+                wrt_error::codes::VALIDATION_ERROR,
+                "Pool size too small"));
         }
 
         // Initialize free list

@@ -21,9 +21,13 @@ readme = "README.md"
 keywords = ["webassembly", "wasm", "runtime", "platform", "memory", "sync"]
 categories = ["wasm", "os"]
 
+[lints]
+workspace = true
+
 [dependencies]
 wrt-error = { workspace = true } # Assuming wrt-error is in workspace.dependencies
 wrt-sync = { workspace = true } # Add wrt-sync for synchronization primitives
+wrt-panic = { workspace = true, optional = true } # Dedicated panic handler
 # wrt-format = { workspace = true, optional = true } # For AST allocator - temporarily disabled to fix cyclic dependency
 # wrt-foundation = { workspace = true, optional = true } # For bounded collections - temporarily disabled to fix cyclic dependency
 # libc dependency removed - using direct syscalls instead
@@ -32,7 +36,7 @@ wrt-sync = { workspace = true } # Add wrt-sync for synchronization primitives
 criterion = { version = "0.6", features = ["html_reports"] }
 
 [features]
-default = [] # No std/alloc by default
+default = [] # No panic handler by default - libraries should provide their own
 # Binary choice: std OR no_std (no alloc middle ground)
 
 # Binary choice: std OR no_std (no alloc middle ground)
@@ -44,6 +48,9 @@ no_std = []
 # Feature for threading support (requires std)
 threading = ["std"] # , "wrt-foundation"]
 
+# Test utilities (for testing random number generation, etc.)
+test-utils = []
+
 # libc dependency removed - using direct syscalls instead
 
 # Platform-specific features
@@ -51,23 +58,66 @@ platform-macos = [] # platform-macos no longer activates alloc by default
 platform-linux = [] # Linux support with direct syscalls
 linux-mte = [] # Enhanced ARM64 MTE support for Linux
 platform-qnx = [] # QNX Neutrino RTOS support
-platform-zephyr = [] # Zephyr RTOS support
 platform-tock = [] # Tock OS support
+platform-zephyr = [] # Zephyr RTOS support
 platform-vxworks = [] # VxWorks RTOS support (LKM and RTP)
 # platform-baremetal = []
 # arm-hardening = [] # If any platform code depends on this
 helper-mode = [] # Added for C-ABI runtime
-disable-panic-handler = ["wrt-error/disable-panic-handler", "wrt-sync/disable-panic-handler"] # Disable panic handler for library builds
-enable-panic-handler = [] # Enable panic handler for standalone no_std builds
+enable-panic-handler = ["dep:wrt-panic", "wrt-panic/default-panic-handler"] # Enable basic panic handler for standalone no_std builds
+dev-panic-handler = ["dep:wrt-panic", "wrt-panic/dev", "wrt-panic/default-panic-handler"] # Development panic handler with debugging
+asil-b-panic-handler = ["dep:wrt-panic", "wrt-panic/asil-b", "wrt-panic/default-panic-handler"] # ASIL-B compliant panic handler
+asil-d-panic-handler = ["dep:wrt-panic", "wrt-panic/asil-d", "wrt-panic/default-panic-handler"] # ASIL-D compliant panic handler
+# Core allocation strategies (aligned with wrt-foundation)
+dynamic-allocation = []
+static-allocation = []
+verified-static-allocation = ["static-allocation"]
+
+# Capability features
+compile-time-capacity-limits = []
+runtime-bounds-checking = []
+formal-verification-required = ["kani"]
+
+# Platform-specific safety features
+platform-sync = []  # Master feature for platform synchronization
+deterministic-timing = []
+memory-protection = []
+isolation-enforcement = []
+
+# ASIL Safety Levels
+qm = ["dynamic-allocation"]
+asil-a = ["runtime-bounds-checking"]
+asil-b = ["asil-a", "compile-time-capacity-limits", "platform-sync"]
+asil-c = ["asil-b", "static-allocation", "deterministic-timing"]
+asil-d = ["asil-c", "verified-static-allocation", "formal-verification-required", "memory-protection", "isolation-enforcement"]
+
+# Convenience bundles
+bounded-collections = [
+    "compile-time-capacity-limits",
+    "runtime-bounds-checking"
+]
+
+static-memory-safety = [
+    "static-allocation",
+    "memory-protection"
+]
+
+maximum-safety = [
+    "verified-static-allocation",
+    "formal-verification-required",
+    "isolation-enforcement"
+]
+
+# Legacy compatibility
+safety-asil-b = ["asil-b"]
+safety-asil-c = ["asil-c"]
+safety-asil-d = ["asil-d"]
+kani = ["formal-verification-required"]
+
 
 [lib]
 crate-type = ["rlib", "staticlib"] # staticlib for C ABI helper if needed later
 
 [[bench]]
 name = "cfi_performance_benchmarks"
-harness = false
-
-[lints.rust]
-unsafe_code = "allow"
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)', 'cfg(target_feature, values("shstk", "pku"))'] }
-# Add other lints as needed, consistent with workspace 
+harness = false 

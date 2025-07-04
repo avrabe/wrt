@@ -6,8 +6,8 @@
 use wrt_error::kinds::{OutOfBoundsAccess, ResourceLimitExceeded};
 
 use crate::{
+    resources::{BoundedBufferPool, MemoryStrategy},
     prelude::*,
-    resources::{BufferPool, MemoryStrategy},
 };
 
 /// Trait defining a memory optimization strategy
@@ -81,11 +81,7 @@ impl MemoryOptimizationStrategy for ZeroCopyStrategy {
     ) -> Result<()> {
         // Check bounds
         if offset + size > source.len() || size > destination.len() {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ACCESS_OUT_OF_BOUNDS,
-                OutOfBoundsAccess(format!(
-                    "Memory bounds exceeded: offset={}, size={}, source_len={}, dest_len={}",
+            return Err(Error::runtime_execution_error(",
                     offset,
                     size,
                     source.len(),
@@ -127,7 +123,7 @@ impl MemoryOptimizationStrategy for ZeroCopyStrategy {
 #[derive(Debug)]
 pub struct BoundedCopyStrategy {
     /// Binary std/no_std choice
-    buffer_pool: Arc<RwLock<BufferPool>>,
+    buffer_pool: Arc<RwLock<BoundedBufferPool>>,
     /// Maximum copy size in bytes
     max_copy_size: usize,
     /// Minimum trust level required for this strategy
@@ -137,7 +133,7 @@ pub struct BoundedCopyStrategy {
 impl BoundedCopyStrategy {
     /// Create a new bounded-copy strategy with the given parameters
     pub fn new(
-        buffer_pool: Arc<RwLock<BufferPool>>,
+        buffer_pool: Arc<RwLock<BoundedBufferPool>>,
         max_copy_size: usize,
         min_trust_level: u8,
     ) -> Self {
@@ -147,7 +143,7 @@ impl BoundedCopyStrategy {
     /// Create a new bounded-copy strategy with default settings
     pub fn default() -> Self {
         Self {
-            buffer_pool: Arc::new(RwLock::new(BufferPool::new(1024 * 1024))), // 1MB pool
+            buffer_pool: Arc::new(RwLock::new(BoundedBufferPool::new())), // Bounded pool
             max_copy_size: 64 * 1024,                                         // 64KB max copy
             min_trust_level: 1, // Works for standard trust components
         }
@@ -166,10 +162,7 @@ impl Clone for BoundedCopyStrategy {
 
 impl MemoryOptimizationStrategy for BoundedCopyStrategy {
     fn name(&self) -> &str {
-        "BoundedCopy"
-    }
-
-    fn memory_strategy_type(&self) -> MemoryStrategy {
+        ") -> MemoryStrategy {
         MemoryStrategy::BoundedCopy
     }
 
@@ -182,11 +175,7 @@ impl MemoryOptimizationStrategy for BoundedCopyStrategy {
     ) -> Result<()> {
         // Check bounds
         if offset + size > source.len() || size > destination.len() {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ACCESS_OUT_OF_BOUNDS,
-                OutOfBoundsAccess(format!(
-                    "Memory bounds exceeded: offset={}, size={}, source_len={}, dest_len={}",
+            return Err(Error::runtime_execution_error(",
                     offset,
                     size,
                     source.len(),
@@ -201,9 +190,7 @@ impl MemoryOptimizationStrategy for BoundedCopyStrategy {
                 ErrorCategory::Resource,
                 codes::RESOURCE_LIMIT_EXCEEDED,
                 ResourceLimitExceeded(format!(
-                    "Copy size {} exceeds maximum allowed size {}",
-                    size, self.max_copy_size
-                )),
+                    ")),
             ));
         }
 
@@ -272,11 +259,7 @@ impl MemoryOptimizationStrategy for FullIsolationStrategy {
     ) -> Result<()> {
         // Check bounds
         if offset + size > source.len() || size > destination.len() {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ACCESS_OUT_OF_BOUNDS,
-                OutOfBoundsAccess(format!(
-                    "Memory bounds exceeded: offset={}, size={}, source_len={}, dest_len={}",
+            return Err(Error::runtime_execution_error(",
                     offset,
                     size,
                     source.len(),
@@ -291,9 +274,7 @@ impl MemoryOptimizationStrategy for FullIsolationStrategy {
                 ErrorCategory::Resource,
                 codes::RESOURCE_LIMIT_EXCEEDED,
                 ResourceLimitExceeded(format!(
-                    "Copy size {} exceeds maximum allowed size {}",
-                    size, self.max_copy_size
-                )),
+                    ")),
             ));
         }
 

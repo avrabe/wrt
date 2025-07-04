@@ -6,6 +6,7 @@
 //! - Libraries that want to provide best-effort platform support
 //! - Testing and benchmarking across multiple platforms
 
+
 use wrt_error::Error;
 
 /// Platform capabilities detected at runtime
@@ -188,10 +189,7 @@ impl PlatformDetector {
 
         // Unreachable but needed for exhaustiveness
         #[allow(unreachable_code)]
-        Err(Error::new(
-            wrt_error::ErrorCategory::System, 1,
-            "Platform not configured",
-        ))
+        Err(Error::runtime_execution_error("Platform detection failed"))
     }
 
     /// Detect synchronization capabilities
@@ -257,10 +255,7 @@ impl PlatformDetector {
 
         // Unreachable but needed for exhaustiveness
         #[allow(unreachable_code)]
-        Err(Error::new(
-            wrt_error::ErrorCategory::System, 1,
-            "Platform not configured",
-        ))
+        Err(Error::runtime_execution_error("Platform detection failed"))
     }
 
     /// Detect security capabilities

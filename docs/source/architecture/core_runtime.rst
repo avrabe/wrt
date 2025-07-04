@@ -9,6 +9,10 @@ Core Runtime Architecture
 
 The core runtime is responsible for executing WebAssembly instructions and managing the WebAssembly execution environment.
 
+.. warning::
+   **Implementation Status**: This document describes the target architecture. The core execution 
+   engine is currently under development. See :doc:`../overview/implementation_status` for actual status.
+
 .. spec:: Core Runtime Execution Flow
    :id: SPEC_006
    :links: REQ_PLATFORM_001, REQ_HELPER_ABI_001, REQ_007, REQ_RESOURCE_004
@@ -65,48 +69,48 @@ The core runtime is responsible for executing WebAssembly instructions and manag
 
 .. impl:: Engine Implementation
    :id: IMPL_001
-   :status: implemented
+   :status: partial
    :links: SPEC_002, REQ_PLATFORM_001, REQ_HELPER_ABI_001, REQ_007, REQ_RESOURCE_004, IMPL_FUEL_001
    
    The ``Engine`` struct is the central execution component that:
    
-   1. Manages the WebAssembly state
-   2. Tracks fuel consumption
-   3. Provides execution control
-   4. Contains statistics gathering capabilities
+   1. **Implemented**: Basic engine structure and state management
+   2. **Implemented**: Fuel tracking infrastructure
+   3. **In Development**: Instruction execution dispatch
+   4. **Implemented**: Statistics gathering capabilities
    
    Key methods include:
-   - ``set_fuel(amount)`` - Sets the fuel limit for bounded execution
-   - ``execute(instance_idx, func_idx, args)`` - Executes a WebAssembly function
+   - ``set_fuel(amount)`` - Sets the fuel limit for bounded execution (infrastructure ready)
+   - ``execute(instance_idx, func_idx, args)`` - **In Development**: WebAssembly function execution
    - ``remaining_fuel()`` - Returns the remaining fuel after execution
    - ``stats()`` - Returns execution statistics
 
 .. impl:: Module Implementation
    :id: IMPL_002
-   :status: implemented
+   :status: partial
    :links: SPEC_002, REQ_018, REQ_WASM_001
    
    The ``Module`` struct encapsulates a WebAssembly module and provides:
    
-   1. Binary parsing and validation
-   2. Type checking
-   3. Function table management
-   4. Memory management
+   1. **Partial**: Binary parsing (type sections work, element/data segments missing)
+   2. **Implemented**: Type system and validation framework
+   3. **Partial**: Function table management infrastructure
+   4. **Implemented**: Memory management infrastructure
    
    Key methods include:
-   - ``load_from_binary(bytes)`` - Loads a WebAssembly binary
-   - ``validate()`` - Validates the module structure and types
-   - ``instantiate(engine)`` - Creates a new module instance
+   - ``load_from_binary(bytes)`` - **Partial**: Type sections only
+   - ``validate()`` - **Partial**: Basic structure validation
+   - ``instantiate(engine)`` - **In Development**: Module instantiation
 
 .. impl:: Stack Implementation
    :id: IMPL_004
-   :status: implemented
+   :status: partial
    :links: SPEC_002, REQ_005, REQ_RESOURCE_002
    
    The ``Stack`` struct implements a value stack for the stackless interpreter model:
    
-   1. Stores the WebAssembly value stack
-   2. Tracks control flow with labels
-   3. Enables pausing and resuming execution at any point
+   1. **Implemented**: Basic stack data structure
+   2. **In Development**: Control flow label tracking
+   3. **Planned**: Execution pause/resume capability
    
-   This implementation enables bounded execution and state migration. 
+   This infrastructure will enable bounded execution and state migration once complete. 

@@ -1,16 +1,16 @@
-//! Minimal stubs for unified execution agent compilation
-//! These stubs allow the unified agent to compile without all dependencies
+//! Minimal stubs for unified execution engine compilation
+//! These stubs allow the unified engine to compile without all dependencies
 
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
     prelude::*,
-    traits::DefaultMemoryProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
     WrtResult,
 };
 
 #[cfg(feature = "std")]
-#[cfg(feature = "std")]
-use wrt_foundation::component_value::ComponentValue;
+use crate::prelude::WrtComponentValue;
 
 use crate::types::Value;
 
@@ -43,7 +43,7 @@ impl ResourceLifecycleManager {
         Self { next_handle: 1 }
     }
     
-    pub fn create_resource(&mut self, _type_id: u32, _data: ComponentValue) -> WrtResult<ResourceHandle> {
+    pub fn create_resource(&mut self, _type_id: u32, _data: WrtComponentValue) -> WrtResult<ResourceHandle> {
         let handle = ResourceHandle(self.next_handle);
         self.next_handle += 1;
         Ok(handle)
@@ -53,9 +53,9 @@ impl ResourceLifecycleManager {
         Ok(())
     }
     
-    pub fn borrow_resource(&mut self, _handle: ResourceHandle) -> WrtResult<&ComponentValue> {
+    pub fn borrow_resource(&mut self, _handle: ResourceHandle) -> WrtResult<&WrtComponentValue> {
         // Return a dummy value - in real implementation this would be tracked
-        static DUMMY: ComponentValue = ComponentValue::Bool(false);
+        static DUMMY: WrtComponentValue = WrtComponentValue::Bool(false);
         Ok(&DUMMY)
     }
     
@@ -85,10 +85,10 @@ impl ComponentRuntimeBridge {
         &mut self,
         _instance_id: u32,
         _function_name: &str,
-        _args: &[wrt_foundation::component_value::ComponentValue],
-    ) -> Result<wrt_foundation::component_value::ComponentValue, wrt_error::Error> {
+        _args: &[WrtComponentValue],
+    ) -> core::result::Result<WrtComponentValue, wrt_error::Error> {
         // Return a dummy successful result
-        Ok(wrt_foundation::component_value::ComponentValue::U32(42))
+        Ok(WrtComponentValue::U32(42))
     }
     
     pub fn register_component_instance(
@@ -97,7 +97,7 @@ impl ComponentRuntimeBridge {
         _module_name: alloc::string::String,
         _function_count: u32,
         _memory_size: u32,
-    ) -> Result<u32, wrt_error::Error> {
+    ) -> core::result::Result<u32, wrt_error::Error> {
         Ok(1)
     }
     
@@ -107,9 +107,9 @@ impl ComponentRuntimeBridge {
         _name: alloc::string::String,
         _signature: crate::component_instantiation::FunctionSignature,
         _func: F,
-    ) -> Result<usize, wrt_error::Error>
+    ) -> core::result::Result<usize, wrt_error::Error>
     where
-        F: Fn(&[ComponentValue]) -> Result<ComponentValue, wrt_error::Error> + Send + Sync + 'static,
+        F: Fn(&[WrtComponentValue]) -> core::result::Result<WrtComponentValue, wrt_error::Error> + Send + Sync + 'static,
     {
         Ok(0)
     }
@@ -117,53 +117,53 @@ impl ComponentRuntimeBridge {
     #[cfg(not(feature = "std"))]
     pub fn register_host_function(
         &mut self,
-        _name: BoundedString<64, DefaultMemoryProvider>,
+        _name: BoundedString<64>,
         _signature: crate::component_instantiation::FunctionSignature,
-        _func: fn(&[ComponentValue]) -> Result<ComponentValue, wrt_error::Error>,
-    ) -> Result<usize, wrt_error::Error> {
+        _func: fn(&[WrtComponentValue]) -> core::result::Result<WrtComponentValue, wrt_error::Error>,
+    ) -> core::result::Result<usize, wrt_error::Error> {
         Ok(0)
     }
 }
 
 /// Component value conversion stubs
-impl From<wrt_foundation::component_value::ComponentValue> for Value {
-    fn from(cv: wrt_foundation::component_value::ComponentValue) -> Self {
+impl From<WrtComponentValue> for Value {
+    fn from(cv: WrtComponentValue) -> Self {
         match cv {
-            wrt_foundation::component_value::ComponentValue::Bool(b) => Value::Bool(b),
-            wrt_foundation::component_value::ComponentValue::U8(v) => Value::U8(v),
-            wrt_foundation::component_value::ComponentValue::U16(v) => Value::U16(v),
-            wrt_foundation::component_value::ComponentValue::U32(v) => Value::U32(v),
-            wrt_foundation::component_value::ComponentValue::U64(v) => Value::U64(v),
-            wrt_foundation::component_value::ComponentValue::S8(v) => Value::S8(v),
-            wrt_foundation::component_value::ComponentValue::S16(v) => Value::S16(v),
-            wrt_foundation::component_value::ComponentValue::S32(v) => Value::S32(v),
-            wrt_foundation::component_value::ComponentValue::S64(v) => Value::S64(v),
-            wrt_foundation::component_value::ComponentValue::F32(v) => Value::F32(v),
-            wrt_foundation::component_value::ComponentValue::F64(v) => Value::F64(v),
-            wrt_foundation::component_value::ComponentValue::Char(c) => Value::Char(c),
-            wrt_foundation::component_value::ComponentValue::String(s) => Value::String(s),
+            WrtComponentValue::Bool(b) => Value::Bool(b),
+            WrtComponentValue::U8(v) => Value::U8(v),
+            WrtComponentValue::U16(v) => Value::U16(v),
+            WrtComponentValue::U32(v) => Value::U32(v),
+            WrtComponentValue::U64(v) => Value::U64(v),
+            WrtComponentValue::S8(v) => Value::S8(v),
+            WrtComponentValue::S16(v) => Value::S16(v),
+            WrtComponentValue::S32(v) => Value::S32(v),
+            WrtComponentValue::S64(v) => Value::S64(v),
+            WrtComponentValue::F32(v) => Value::F32(v),
+            WrtComponentValue::F64(v) => Value::F64(v),
+            WrtComponentValue::Char(c) => Value::Char(c),
+            WrtComponentValue::String(s) => Value::String(s),
             _ => Value::Bool(false), // Fallback
         }
     }
 }
 
-impl From<Value> for wrt_foundation::component_value::ComponentValue {
+impl From<Value> for WrtComponentValue {
     fn from(v: Value) -> Self {
         match v {
-            Value::Bool(b) => wrt_foundation::component_value::ComponentValue::Bool(b),
-            Value::U8(v) => wrt_foundation::component_value::ComponentValue::U8(v),
-            Value::U16(v) => wrt_foundation::component_value::ComponentValue::U16(v),
-            Value::U32(v) => wrt_foundation::component_value::ComponentValue::U32(v),
-            Value::U64(v) => wrt_foundation::component_value::ComponentValue::U64(v),
-            Value::S8(v) => wrt_foundation::component_value::ComponentValue::S8(v),
-            Value::S16(v) => wrt_foundation::component_value::ComponentValue::S16(v),
-            Value::S32(v) => wrt_foundation::component_value::ComponentValue::S32(v),
-            Value::S64(v) => wrt_foundation::component_value::ComponentValue::S64(v),
-            Value::F32(v) => wrt_foundation::component_value::ComponentValue::F32(v),
-            Value::F64(v) => wrt_foundation::component_value::ComponentValue::F64(v),
-            Value::Char(c) => wrt_foundation::component_value::ComponentValue::Char(c),
-            Value::String(s) => wrt_foundation::component_value::ComponentValue::String(s),
-            _ => wrt_foundation::component_value::ComponentValue::Bool(false), // Fallback
+            Value::Bool(b) => WrtComponentValue::Bool(b),
+            Value::U8(v) => WrtComponentValue::U8(v),
+            Value::U16(v) => WrtComponentValue::U16(v),
+            Value::U32(v) => WrtComponentValue::U32(v),
+            Value::U64(v) => WrtComponentValue::U64(v),
+            Value::S8(v) => WrtComponentValue::S8(v),
+            Value::S16(v) => WrtComponentValue::S16(v),
+            Value::S32(v) => WrtComponentValue::S32(v),
+            Value::S64(v) => WrtComponentValue::S64(v),
+            Value::F32(v) => WrtComponentValue::F32(v),
+            Value::F64(v) => WrtComponentValue::F64(v),
+            Value::Char(c) => WrtComponentValue::Char(c),
+            Value::String(s) => WrtComponentValue::String(s),
+            _ => WrtComponentValue::Bool(false), // Fallback
         }
     }
 }
@@ -245,13 +245,13 @@ pub mod cfi_stubs {
     }
     
     /// CFI execution context stub
-    #[derive(Debug, Default, Clone)]
+    #[derive(Debug, Clone)]
     pub struct CfiExecutionContext {
         pub current_function: u32,
         pub current_instruction: u32,
-        pub shadow_stack: BoundedVec<u32, 1024, DefaultMemoryProvider>,
+        pub shadow_stack: BoundedVec<u32, 1024>,
         pub violation_count: u32,
-        pub landing_pad_expectations: BoundedVec<LandingPadExpectation, 16, DefaultMemoryProvider>,
+        pub landing_pad_expectations: BoundedVec<LandingPadExpectation, 16>,
         pub metrics: CfiMetrics,
     }
     
@@ -296,7 +296,7 @@ pub mod cfi_stubs {
             _table_idx: u32,
             _protection: &CfiControlFlowProtection,
             _context: &mut CfiExecutionContext,
-        ) -> Result<CfiProtectedBranchTarget, wrt_error::Error> {
+        ) -> core::result::Result<CfiProtectedBranchTarget, wrt_error::Error> {
             Ok(CfiProtectedBranchTarget {
                 target: 0,
                 protection: CfiProtection::default(),
@@ -307,7 +307,7 @@ pub mod cfi_stubs {
             &mut self,
             _protection: &CfiControlFlowProtection,
             _context: &mut CfiExecutionContext,
-        ) -> Result<(), wrt_error::Error> {
+        ) -> core::result::Result<(), wrt_error::Error> {
             Ok(())
         }
         
@@ -317,7 +317,7 @@ pub mod cfi_stubs {
             _conditional: bool,
             _protection: &CfiControlFlowProtection,
             _context: &mut CfiExecutionContext,
-        ) -> Result<CfiProtectedBranchTarget, wrt_error::Error> {
+        ) -> core::result::Result<CfiProtectedBranchTarget, wrt_error::Error> {
             Ok(CfiProtectedBranchTarget {
                 target: _label_idx,
                 protection: CfiProtection::default(),
@@ -325,16 +325,22 @@ pub mod cfi_stubs {
         }
     }
     
-    impl Default for CfiExecutionContext {
-        fn default() -> Self {
-            Self {
+    impl CfiExecutionContext {
+        pub fn new() -> WrtResult<Self> {
+            Ok(Self {
                 current_function: 0,
                 current_instruction: 0,
-                shadow_stack: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                shadow_stack: {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider)?
+                },
                 violation_count: 0,
-                landing_pad_expectations: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                landing_pad_expectations: {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider)?
+                },
                 metrics: CfiMetrics::default(),
-            }
+            })
         }
     }
 }

@@ -7,7 +7,7 @@
 //! This module provides pure implementations for WebAssembly variable access
 //! instructions, including local and global variable operations.
 
-use crate::prelude::{ConstExprContext, Debug, Error, PureInstruction, Result, Value};
+use crate::prelude::{Debug, Error, PureInstruction, Result, Value};
 
 // ToString is brought in through the prelude for both std and no_std
 // configurations so we don't need explicit imports
@@ -113,11 +113,7 @@ mod tests {
     impl VariableContext for MockVariableContext {
         fn get_local(&self, index: u32) -> Result<Value> {
             self.locals.get(index as usize).cloned().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid local index",
-                )
+                Error::invalid_function_index("Invalid local index")
             })
         }
 
@@ -126,21 +122,13 @@ mod tests {
                 *local = value;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid local index",
-                ))
+                Err(Error::invalid_function_index("Invalid local index"))
             }
         }
 
         fn get_global(&self, index: u32) -> Result<Value> {
             self.globals.get(index as usize).cloned().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid global index",
-                )
+                Error::invalid_function_index("Invalid global index")
             })
         }
 
@@ -149,11 +137,7 @@ mod tests {
                 *global = value;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid global index",
-                ))
+                Err(Error::invalid_function_index("Invalid global index"))
             }
         }
 
@@ -164,7 +148,7 @@ mod tests {
 
         fn pop_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::runtime_stack_underflow("Stack underflow")
             })
         }
     }

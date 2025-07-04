@@ -162,20 +162,12 @@ pub fn validate_component_with_level(bytes: &[u8], level: ValidationLevel) -> Re
 fn validate_component_structure(bytes: &[u8]) -> Result<()> {
     // Verify header
     if bytes.len() < 8 {
-        return Err(Error::new(
-            ErrorCategory::Parse,
-            codes::PARSE_ERROR,
-            "Component binary too small",
-        ));
+        return Err(Error::parse_error("Component binary too small"));
     }
 
     // Verify magic number and version
     if &bytes[0..8] != &COMPONENT_MAGIC {
-        return Err(Error::new(
-            ErrorCategory::Parse,
-            codes::PARSE_ERROR,
-            "Invalid component magic number or version",
-        ));
+        return Err(Error::parse_error("Invalid component magic number or version"));
     }
 
     // For now, we just do basic validation

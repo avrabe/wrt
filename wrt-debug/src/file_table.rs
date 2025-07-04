@@ -1,6 +1,9 @@
 use wrt_foundation::{
     bounded::{BoundedVec, MAX_DWARF_FILE_TABLE},
-    BoundedCapacity, NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+    safe_memory::NoStdProvider,
+    BoundedCapacity, Result,
 };
 
 /// File table support for resolving file indices to paths
@@ -23,7 +26,12 @@ pub struct FileEntry<'a> {
 // Implement required traits for BoundedVec compatibility
 impl<'a> Default for FileEntry<'a> {
     fn default() -> Self {
-        Self { path: DebugString::default(), dir_index: 0, mod_time: 0, size: 0 }
+        Self {
+            path: DebugString::default(),
+            dir_index: 0,
+            mod_time: 0,
+            size: 0,
+        }
     }
 }
 
@@ -95,26 +103,38 @@ pub struct FileTable<'a> {
 impl<'a> FileTable<'a> {
     /// Create a new empty file table
     pub fn new() -> Self {
-        // BoundedVec::new returns a Result, so we need to handle it
-        let directories =
-            BoundedVec::new(NoStdProvider::<{ MAX_DWARF_FILE_TABLE * 32 }>::default())
-                .expect("Failed to create directories BoundedVec");
-        let files = BoundedVec::new(NoStdProvider::<{ MAX_DWARF_FILE_TABLE * 64 }>::default())
-            .expect("Failed to create files BoundedVec");
-        Self { directories, files }
+        // Create with proper error propagation
+        Self::try_new().expect("Failed to create FileTable")
+    }
+
+    /// Try to create a new FileTable with proper error handling
+    pub fn try_new() -> Result<Self> {
+        let directories = {
+            let provider = safe_managed_alloc!({ MAX_DWARF_FILE_TABLE * 32 }, CrateId::Debug)?;
+            BoundedVec::new(provider)?
+        };
+        let files = {
+            let provider = safe_managed_alloc!({ MAX_DWARF_FILE_TABLE * 64 }, CrateId::Debug)?;
+            BoundedVec::new(provider)?
+        };
+        Ok(Self { directories, files })
     }
 
     /// Add a directory entry
-    pub fn add_directory(&mut self, dir: DebugString<'a>) -> Result<u32, ()> {
+    pub fn add_directory(&mut self, dir: DebugString<'a>) -> Result<u32> {
         let index = self.directories.len() as u32;
-        self.directories.push(dir).map_err(|_| ())?;
+        self.directories
+            .push(dir)
+            .map_err(|_| wrt_error::Error::memory_error("Failed to add directory"))?;
         Ok(index)
     }
 
     /// Add a file entry
-    pub fn add_file(&mut self, file: FileEntry<'a>) -> Result<u32, ()> {
+    pub fn add_file(&mut self, file: FileEntry<'a>) -> Result<u32> {
         let index = self.files.len() as u32;
-        self.files.push(file).map_err(|_| ())?;
+        self.files
+            .push(file)
+            .map_err(|_| wrt_error::Error::memory_error("Failed to add file"))?;
         Ok(index)
     }
 
@@ -141,11 +161,17 @@ impl<'a> FileTable<'a> {
 
         if file.dir_index == 0 {
             // File is relative to compilation directory
-            Some(FilePath { directory: None, filename: file.path })
+            Some(FilePath {
+                directory: None,
+                filename: file.path,
+            })
         } else {
             // File has explicit directory
             let directory = self.get_directory(file.dir_index)?;
-            Some(FilePath { directory: Some(directory), filename: file.path })
+            Some(FilePath {
+                directory: Some(directory),
+                filename: file.path,
+            })
         }
     }
 

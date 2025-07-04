@@ -14,18 +14,14 @@ use wrt_error::Result;
 /// Convert WAT text to WASM binary for testing
 pub fn wat_to_wasm(wat: &str) -> Result<Vec<u8>> {
     wat::parse_str(wat).map_err(|e| {
-        wrt_error::Error::new(
-            wrt_error::ErrorCategory::Validation,
-            1,
-            format!("WAT parsing failed: {}", e),
+        wrt_error::Error::runtime_execution_error(", e),
         )
     })
 }
 
 /// Create a simple WAT module for testing
 pub fn create_simple_wat_module() -> &'static str {
-    r#"(module
-        (func (export "add") (param i32 i32) (result i32)
+    r#") (param i32 i32) (result i32)
             local.get 0
             local.get 1
             i32.add

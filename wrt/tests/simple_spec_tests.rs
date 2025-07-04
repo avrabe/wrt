@@ -169,7 +169,10 @@ fn run_test_case(wasm_path: &Path) -> Result<()> {
     let _instance_idx = engine.instantiate(module)?;
 
     // TODO: Add actual test logic here to invoke functions and check results
-    println!("Successfully loaded and instantiated {:?}, but no tests run.", wasm_path);
+    println!(
+        "Successfully loaded and instantiated {:?}, but no tests run.",
+        wasm_path
+    );
 
     Ok(())
 }

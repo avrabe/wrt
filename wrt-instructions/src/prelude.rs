@@ -59,19 +59,26 @@ macro_rules! format {
 macro_rules! vec {
     () => {
         {
-            $crate::types::InstructionVec::new(wrt_foundation::NoStdProvider::<1024>::default())
-                .unwrap_or_else(|_| panic!("Failed to create BoundedVec"))
+            (|| -> wrt_error::Result<_> {
+                let provider = wrt_foundation::safe_managed_alloc!(1024, wrt_foundation::budget_aware_provider::CrateId::Instructions)?;
+                $crate::types::InstructionVec::new(provider)
+                    .map_err(|_| wrt_error::Error::memory_error("Failed to create BoundedVec"))
+            })()
+            .unwrap_or_else(|_| panic!("Failed to create vec!"))
         }
     };
     ($($x:expr),+ $(,)?) => {
         {
-            let provider = wrt_foundation::NoStdProvider::<1024>::default();
-            let mut temp_vec = $crate::types::InstructionVec::new(provider)
-                .unwrap_or_else(|_| panic!("Failed to create BoundedVec"));
-            $(
-                temp_vec.push($x).unwrap_or_else(|_| panic!("Failed to push to BoundedVec"));
-            )*
-            temp_vec
+            (|| -> wrt_error::Result<_> {
+                let provider = wrt_foundation::safe_managed_alloc!(1024, wrt_foundation::budget_aware_provider::CrateId::Instructions)?;
+                let mut temp_vec = $crate::types::InstructionVec::new(provider)
+                    .map_err(|_| wrt_error::Error::memory_error("Failed to create BoundedVec"))?;
+                $(
+                    temp_vec.push($x).map_err(|_| wrt_error::Error::memory_error("Failed to push to BoundedVec"))?;
+                )*
+                Ok(temp_vec)
+            })()
+            .unwrap_or_else(|_| panic!("Failed to create vec!"))
         }
     };
 }

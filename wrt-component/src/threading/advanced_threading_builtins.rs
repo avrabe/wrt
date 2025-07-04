@@ -14,7 +14,6 @@
 //! WebAssembly Component Model, including `thread.spawn_ref`, `thread.spawn_indirect`,
 //! and `thread.join` operations.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -22,7 +21,11 @@ extern crate alloc;
 use std::{boxed::Box, collections::HashMap, vec::Vec};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedVec as Vec, BoundedMap as HashMap, safe_memory::NoStdProvider};
+use wrt_foundation::{
+    BoundedVec as Vec, BoundedMap as HashMap, 
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use wrt_error::{Error, ErrorCategory, Result};
 use wrt_foundation::{
@@ -39,7 +42,7 @@ use wrt_foundation::BoundedString;
 
 // Type aliases for no_std compatibility
 #[cfg(not(feature = "std"))]
-type String = BoundedString<256, NoStdProvider<65536>>;
+type ThreadingString = BoundedString<256>;
 
 #[cfg(not(feature = "std"))]
 // For no_std, use a simpler ComponentValue representation
@@ -105,10 +108,7 @@ impl FunctionReference {
     #[cfg(not(any(feature = "std", )))]
     pub fn new(name: &str, signature: FunctionSignature, module_index: u32, function_index: u32) -> Result<Self> {
         let bounded_name = BoundedString::new_from_str(name)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Function name too long for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         Ok(Self {
             name: bounded_name,
@@ -119,7 +119,7 @@ impl FunctionReference {
     }
 
     pub fn name(&self) -> &str {
-        #[cfg(feature = "std")]
+        #[cfg(feature = ")]
         return &self.name;
         #[cfg(not(any(feature = "std", )))]
         return self.name.as_str();
@@ -135,7 +135,7 @@ pub struct IndirectCall {
     #[cfg(feature = "std")]
     pub arguments: Vec<ComponentValue>,
     #[cfg(not(any(feature = "std", )))]
-    pub arguments: BoundedVec<ComponentValue, 16, NoStdProvider<65536>>,
+    pub arguments: BoundedVec<ComponentValue, 16>,
 }
 
 impl IndirectCall {
@@ -152,10 +152,7 @@ impl IndirectCall {
     #[cfg(not(any(feature = "std", )))]
     pub fn new(table_index: u32, function_index: u32, type_index: u32, arguments: &[ComponentValue]) -> Result<Self> {
         let bounded_args = BoundedVec::new_from_slice(arguments)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Too many arguments for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         Ok(Self {
             table_index,
@@ -221,7 +218,7 @@ pub struct AdvancedThread {
     pub config: ThreadSpawnConfig,
     pub cancellation_token: CancellationToken,
     
-    #[cfg(feature = "std")]
+    #[cfg(feature = ")]
     pub thread_locals: HashMap<u32, ThreadLocalEntry>,
     #[cfg(not(any(feature = "std", )))]
     pub thread_locals: BoundedMap<u32, ThreadLocalEntry, MAX_THREAD_LOCALS>,
@@ -233,12 +230,12 @@ pub struct AdvancedThread {
     #[cfg(feature = "std")]
     pub child_threads: Vec<AdvancedThreadId>,
     #[cfg(not(any(feature = "std", )))]
-    pub child_threads: BoundedVec<AdvancedThreadId, MAX_THREADS, NoStdProvider<65536>>,
+    pub child_threads: BoundedVec<AdvancedThreadId, MAX_THREADS>,
 }
 
 impl AdvancedThread {
-    pub fn new(config: ThreadSpawnConfig) -> Self {
-        Self {
+    pub fn new(config: ThreadSpawnConfig) -> Result<Self> {
+        Ok(Self {
             id: AdvancedThreadId::new(),
             state: AdvancedThreadState::Starting,
             config,
@@ -253,14 +250,17 @@ impl AdvancedThread {
             #[cfg(feature = "std")]
             child_threads: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            child_threads: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            child_threads: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
+        })
     }
 
-    pub fn with_parent(config: ThreadSpawnConfig, parent_id: AdvancedThreadId) -> Self {
-        let mut thread = Self::new(config);
+    pub fn with_parent(config: ThreadSpawnConfig, parent_id: AdvancedThreadId) -> Result<Self> {
+        let mut thread = Self::new(config)?;
         thread.parent_thread = Some(parent_id);
-        thread
+        Ok(thread)
     }
 
     #[cfg(feature = "std")]
@@ -271,10 +271,7 @@ impl AdvancedThread {
     #[cfg(not(any(feature = "std", )))]
     pub fn add_child(&mut self, child_id: AdvancedThreadId) -> Result<()> {
         self.child_threads.push(child_id)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Too many child threads for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         Ok(())
     }
@@ -313,7 +310,7 @@ impl AdvancedThread {
             destructor,
         };
         
-        #[cfg(feature = "std")]
+        #[cfg(feature = ")]
         {
             self.thread_locals.insert(key, entry);
             Ok(())
@@ -321,10 +318,7 @@ impl AdvancedThread {
         #[cfg(not(any(feature = "std", )))]
         {
             self.thread_locals.insert(key, entry)
-                .map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                    "Thread local storage full"
+                .map_err(|_| Error::runtime_execution_error("
                 ))?;
             Ok(())
         }
@@ -354,7 +348,7 @@ static ADVANCED_THREAD_REGISTRY: AtomicRefCell<Option<AdvancedThreadRegistry>> =
 /// Registry for managing advanced threading operations
 #[derive(Debug)]
 pub struct AdvancedThreadRegistry {
-    #[cfg(feature = "std")]
+    #[cfg(feature = ")]
     threads: HashMap<AdvancedThreadId, AdvancedThread>,
     #[cfg(not(any(feature = "std", )))]
     threads: BoundedMap<AdvancedThreadId, AdvancedThread, MAX_THREADS>,
@@ -380,10 +374,7 @@ impl AdvancedThreadRegistry {
         #[cfg(not(any(feature = "std", )))]
         {
             self.threads.insert(id, thread)
-                .map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                    "Thread registry full"
+                .map_err(|_| Error::runtime_execution_error("
                 ))?;
             Ok(id)
         }
@@ -406,13 +397,14 @@ impl AdvancedThreadRegistry {
     }
 
     pub fn cleanup_finished_threads(&mut self) {
-        #[cfg(feature = "std")]
+        #[cfg(feature = ")]
         {
             self.threads.retain(|_, thread| !thread.state.is_finished());
         }
         #[cfg(not(any(feature = "std", )))]
         {
-            let mut finished_ids = BoundedVec::<AdvancedThreadId, MAX_THREADS>::new();
+            let provider = safe_managed_alloc!(MAX_THREADS * core::mem::size_of::<AdvancedThreadId>(), CrateId::Component).unwrap();
+            let mut finished_ids = BoundedVec::<AdvancedThreadId, MAX_THREADS>::new(provider).unwrap();
             for (id, thread) in self.threads.iter() {
                 if thread.state.is_finished() {
                     let _ = finished_ids.push(*id);
@@ -438,10 +430,7 @@ impl AdvancedThreadingBuiltins {
     /// Initialize the global advanced thread registry
     pub fn initialize() -> Result<()> {
         let mut registry_ref = ADVANCED_THREAD_REGISTRY.try_borrow_mut()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Advanced thread registry borrow failed"
+            .map_err(|_| Error::runtime_execution_error("
             ))?;
         *registry_ref = Some(AdvancedThreadRegistry::new());
         Ok(())
@@ -456,13 +445,9 @@ impl AdvancedThreadingBuiltins {
             .map_err(|_| Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::INVALID_STATE,
-                "Advanced thread registry borrow failed"
-            ))?;
+                "))?;
         let registry = registry_ref.as_ref()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Advanced thread registry not initialized"
+            .ok_or_else(|| Error::runtime_execution_error("
             ))?;
         Ok(f(registry))
     }
@@ -476,13 +461,9 @@ impl AdvancedThreadingBuiltins {
             .map_err(|_| Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::INVALID_STATE,
-                "Advanced thread registry borrow failed"
-            ))?;
+                "))?;
         let registry = registry_ref.as_mut()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Advanced thread registry not initialized"
+            .ok_or_else(|| Error::runtime_execution_error("
             ))?;
         f(registry)
     }
@@ -495,9 +476,9 @@ impl AdvancedThreadingBuiltins {
         parent_id: Option<AdvancedThreadId>
     ) -> Result<AdvancedThreadId> {
         let thread = if let Some(parent) = parent_id {
-            AdvancedThread::with_parent(config, parent)
+            AdvancedThread::with_parent(config, parent)?
         } else {
-            AdvancedThread::new(config)
+            AdvancedThread::new(config)?
         };
 
         let thread_id = thread.id;
@@ -513,7 +494,7 @@ impl AdvancedThreadingBuiltins {
             // Add to parent's child list if applicable
             if let Some(parent) = parent_id {
                 if let Some(parent_thread) = registry.get_thread_mut(parent) {
-                    #[cfg(feature = "std")]
+                    #[cfg(feature = ")]
                     parent_thread.add_child(id);
                     #[cfg(not(any(feature = "std", )))]
                     parent_thread.add_child(id)?;
@@ -532,9 +513,9 @@ impl AdvancedThreadingBuiltins {
         parent_id: Option<AdvancedThreadId>
     ) -> Result<AdvancedThreadId> {
         let thread = if let Some(parent) = parent_id {
-            AdvancedThread::with_parent(config, parent)
+            AdvancedThread::with_parent(config, parent)?
         } else {
-            AdvancedThread::new(config)
+            AdvancedThread::new(config)?
         };
 
         let thread_id = thread.id;
@@ -591,10 +572,7 @@ impl AdvancedThreadingBuiltins {
                     _ => Ok(ThreadJoinResult::NotReady)
                 }
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Thread not found"
+                Err(Error::runtime_execution_error("
                 ))
             }
         })?
@@ -621,8 +599,7 @@ impl AdvancedThreadingBuiltins {
                 Err(Error::new(
                     ErrorCategory::Runtime,
                     wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Thread not found"
-                ))
+                    "))
             }
         })?
     }
@@ -638,10 +615,7 @@ impl AdvancedThreadingBuiltins {
             if let Some(thread) = registry.get_thread_mut(thread_id) {
                 thread.set_thread_local(key, value, destructor)
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Thread not found"
+                Err(Error::runtime_execution_error("
                 ))
             }
         })?
@@ -707,7 +681,7 @@ pub mod advanced_threading_helpers {
     }
 
     /// Cancel all child threads of a parent
-    #[cfg(feature = "std")]
+    #[cfg(feature = ")]
     pub fn cancel_child_threads(parent_id: AdvancedThreadId) -> Result<Vec<AdvancedThreadId>> {
         let mut cancelled = Vec::new();
         
@@ -727,8 +701,9 @@ pub mod advanced_threading_helpers {
     }
 
     #[cfg(not(any(feature = "std", )))]
-    pub fn cancel_child_threads(parent_id: AdvancedThreadId) -> Result<BoundedVec<AdvancedThreadId, MAX_THREADS>, NoStdProvider<65536>> {
-        let mut cancelled = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+    pub fn cancel_child_threads(parent_id: AdvancedThreadId) -> Result<BoundedVec<AdvancedThreadId, MAX_THREADS>> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let mut cancelled = BoundedVec::new(provider)?;
         
         AdvancedThreadingBuiltins::with_registry_mut(|registry| {
             if let Some(parent) = registry.get_thread(parent_id) {
@@ -736,10 +711,7 @@ pub mod advanced_threading_helpers {
                     if let Some(child) = registry.get_thread_mut(child_id) {
                         child.cancel();
                         cancelled.push(child_id)
-                            .map_err(|_| Error::new(
-                                ErrorCategory::Memory,
-                                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                                "Too many cancelled threads for no_std environment"
+                            .map_err(|_| Error::runtime_execution_error("
                             ))?;
                     }
                 }
@@ -780,7 +752,7 @@ mod tests {
             results: vec![ThreadValueType::I32],
         };
 
-        #[cfg(feature = "std")]
+        #[cfg(feature = ")]
         {
             let func_ref = FunctionReference::new(
                 "test_function".to_string(),
@@ -859,7 +831,7 @@ mod tests {
             stack_size: Some(65536),
             priority: Some(5),
         };
-        let mut thread = AdvancedThread::new(config);
+        let mut thread = AdvancedThread::new(config).unwrap();
         
         assert_eq!(thread.state, AdvancedThreadState::Starting);
         assert!(thread.result.is_none());
@@ -879,7 +851,7 @@ mod tests {
             stack_size: Some(65536),
             priority: Some(5),
         };
-        let mut thread = AdvancedThread::new(config);
+        let mut thread = AdvancedThread::new(config).unwrap();
 
         // Set thread local value
         thread.set_thread_local(1, ComponentValue::I32(42), None).unwrap();
@@ -908,10 +880,10 @@ mod tests {
         };
         
         let parent_id = AdvancedThreadId::new();
-        let mut parent = AdvancedThread::new(config.clone());
+        let mut parent = AdvancedThread::new(config.clone()).unwrap();
         parent.id = parent_id;
 
-        let mut child = AdvancedThread::with_parent(config, parent_id);
+        let mut child = AdvancedThread::with_parent(config, parent_id).unwrap();
         let child_id = child.id;
         
         assert_eq!(child.parent_thread, Some(parent_id));
@@ -933,7 +905,7 @@ mod tests {
             stack_size: Some(65536),
             priority: Some(5),
         };
-        let thread = AdvancedThread::new(config);
+        let thread = AdvancedThread::new(config).unwrap();
         let thread_id = thread.id;
 
         registry.register_thread(thread).unwrap();

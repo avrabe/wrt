@@ -44,11 +44,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> TypeStore<P> {
         // Add new type
         let index = self.types.len() as u32;
         self.types.push(val_type).map_err(|_| {
-            Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_ERROR,
-                "Type store capacity exceeded"
-            )
+            Error::memory_error("Type store capacity exceeded")
         })?;
         Ok(ValTypeRef(index))
     }

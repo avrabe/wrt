@@ -440,7 +440,8 @@ pub const HAS_BOUNDED_WIT_PARSING_NO_STD: bool = true;
 /// Convenience function to parse WIT text with default provider
 pub fn parse_wit_bounded(input: &str) -> Result<BoundedWitParser<NoStdProvider<8192>>> {
     // Use larger memory provider to avoid capacity issues
-    let mut parser = BoundedWitParser::new(NoStdProvider::<8192>::default())?;
+    let provider = wrt_foundation::safe_managed_alloc!(8192, wrt_foundation::budget_aware_provider::CrateId::Format)?;
+    let mut parser = BoundedWitParser::new(provider)?;
     parser.parse(input)?;
     Ok(parser)
 }
@@ -454,7 +455,7 @@ mod tests {
 
     #[test]
     fn test_bounded_wit_parser_creation() {
-        let provider = TestProvider::default();
+        let provider = wrt_foundation::safe_managed_alloc!(8192, wrt_foundation::budget_aware_provider::CrateId::Format).unwrap();
         let parser = BoundedWitParser::new(provider);
         assert!(parser.is_ok());
 
@@ -522,7 +523,8 @@ mod tests {
     #[test]
     fn test_bounded_capacity_limits() {
         // Test that parser respects bounded collection limits
-        let mut parser = BoundedWitParser::new(TestProvider::default()).unwrap();
+        let provider = wrt_foundation::safe_managed_alloc!(8192, wrt_foundation::budget_aware_provider::CrateId::Format).unwrap();
+        let mut parser = BoundedWitParser::new(provider).unwrap();
         
         // Create input with many worlds (should hit limit)
         let large_input = "world world0 {} world world1 {} world world2 {} world world3 {} world world4 {} world world5 {}";

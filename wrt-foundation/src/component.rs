@@ -263,11 +263,7 @@ impl FromBytes for ComponentAliasOuterKind {
             1 => Ok(Self::Component),
             2 => Ok(Self::CoreType),
             3 => Ok(Self::CoreModule),
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid byte for ComponentAliasOuterKind",
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid component kind discriminant")),
         }
     }
 }
@@ -389,8 +385,7 @@ impl FromBytes for ExternKind {
             _ => Err(Error::new(
                 ErrorCategory::Parse,
                 codes::INVALID_VALUE,
-                "Invalid byte for ExternKind",
-            )),
+                "Invalid enum value")),
         }
     }
 }
@@ -842,11 +837,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for ExternT
             7 => Ok(Self::CoreModule(TypeRef::from_bytes_with_provider(reader, provider)?)),
             8 => Ok(Self::TypeDef(TypeRef::from_bytes_with_provider(reader, provider)?)), /* This is TypeRef */
             9 => Ok(Self::Resource(ResourceType::<P>::from_bytes_with_provider(reader, provider)?)), /* This is ResourceType<P> */
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid variant tag for ExternType",
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid component type kind discriminant")),
         }
     }
 }
@@ -926,8 +917,7 @@ impl FromBytes for ComponentAliasExportKind {
             _ => Err(Error::new(
                 ErrorCategory::Parse,
                 codes::INVALID_VALUE,
-                "Invalid byte for ComponentAliasExportKind",
-            )),
+                "Invalid enum value")),
         }
     }
 }
@@ -1006,11 +996,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for Compone
                 let inner = ComponentAliasOuter::from_bytes_with_provider(reader, provider)?;
                 Ok(ComponentAlias::Outer(inner))
             }
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid variant index for ComponentAlias",
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid variant index for ComponentAlias")),
         }
     }
     // from_bytes is provided by the trait

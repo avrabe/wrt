@@ -14,7 +14,6 @@
 //! WebAssembly Component Model type system, enabling compile-time
 //! guaranteed list sizes for better performance and safety.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -27,15 +26,17 @@ use wrt_foundation::{
     bounded::{BoundedVec},
     component_value::ComponentValue,
     types::ValueType,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
-#[cfg(not(any(feature = "std", )))]
+#[cfg(not(feature = "std"))]
 use wrt_foundation::{BoundedString};
 
 // Constants for no_std environments
-#[cfg(not(any(feature = "std", )))]
+#[cfg(not(feature = "std"))]
 const MAX_FIXED_LIST_SIZE: usize = 1024;
-#[cfg(not(any(feature = "std", )))]
+#[cfg(not(feature = "std"))]
 const MAX_TYPE_DEFINITIONS: usize = 256;
 
 /// Fixed-length list type definition
@@ -91,18 +92,12 @@ impl FixedLengthListType {
 
     pub fn validate_size(&self) -> Result<()> {
         if self.length == 0 {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Fixed-length list cannot have zero length"
+            return Err(Error::type_error("Fixed-length list cannot have zero length")
             ));
         }
         
         if self.length > MAX_FIXED_LIST_SIZE as u32 {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Fixed-length list size exceeds maximum"
+            return Err(Error::type_error("Fixed-length list size exceeds maximum")
             ));
         }
         
@@ -116,8 +111,8 @@ pub struct FixedLengthList {
     pub list_type: FixedLengthListType,
     #[cfg(feature = "std")]
     pub elements: Vec<ComponentValue>,
-    #[cfg(not(any(feature = "std", )))]
-    pub elements: BoundedVec<ComponentValue, MAX_FIXED_LIST_SIZE, NoStdProvider<65536>>,
+    #[cfg(not(feature = "std"))]
+    pub elements: BoundedVec<ComponentValue, MAX_FIXED_LIST_SIZE>,
 }
 
 impl FixedLengthList {
@@ -131,10 +126,11 @@ impl FixedLengthList {
         })
     }
 
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub fn new(list_type: FixedLengthListType) -> Result<Self> {
         list_type.validate_size()?;
-        let elements = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let elements = BoundedVec::new(provider)?;
         Ok(Self {
             list_type,
             elements,
@@ -146,21 +142,14 @@ impl FixedLengthList {
         list_type.validate_size()?;
         
         if elements.len() != list_type.length as usize {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Element count does not match fixed list length"
+            return Err(Error::type_error("Element count does not match fixed list length")
             ));
         }
         
         // Validate element types
         for (i, element) in elements.iter().enumerate() {
             if !Self::validate_element_type(element, &list_type.element_type) {
-                return Err(Error::new(
-                    ErrorCategory::Type,
-                    wrt_error::codes::TYPE_MISMATCH,
-                    &"Component not found"
-                ));
+                return Err(Error::component_not_found("Component not found"));
             }
         }
         
@@ -170,34 +159,25 @@ impl FixedLengthList {
         })
     }
 
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub fn with_elements(list_type: FixedLengthListType, elements: &[ComponentValue]) -> Result<Self> {
         list_type.validate_size()?;
         
         if elements.len() != list_type.length as usize {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Element count does not match fixed list length"
+            return Err(Error::type_error("Element count does not match fixed list length")
             ));
         }
         
         // Validate element types
         for (i, element) in elements.iter().enumerate() {
             if !Self::validate_element_type(element, &list_type.element_type) {
-                return Err(Error::new(
-                    ErrorCategory::Type,
-                    wrt_error::codes::TYPE_MISMATCH,
-                    "Element has incorrect type"
+                return Err(Error::type_error("Element has incorrect type")
                 ));
             }
         }
         
         let bounded_elements = BoundedVec::new_from_slice(elements)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Too many elements for no_std environment"
+            .map_err(|_| Error::memory_allocation_failed("Too many elements for no_std environment")
             ))?;
         
         Ok(Self {
@@ -254,26 +234,17 @@ impl FixedLengthList {
 
     pub fn set(&mut self, index: u32, value: ComponentValue) -> Result<()> {
         if !self.list_type.mutable {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Cannot modify immutable fixed-length list"
+            return Err(Error::type_error("Cannot modify immutable fixed-length list")
             ));
         }
 
         if index >= self.list_type.length {
-            return Err(Error::new(
-                ErrorCategory::InvalidInput,
-                wrt_error::codes::OUT_OF_BOUNDS_ERROR,
-                "Index out of bounds"
+            return Err(Error::runtime_execution_error("
             ));
         }
 
         if !Self::validate_element_type(&value, &self.list_type.element_type) {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Value type does not match list element type"
+            return Err(Error::type_error(")
             ));
         }
 
@@ -284,18 +255,12 @@ impl FixedLengthList {
             if self.elements.len() == index as usize {
                 #[cfg(feature = "std")]
                 self.elements.push(value);
-                #[cfg(not(any(feature = "std", )))]
+                #[cfg(not(feature = "std"))]
                 self.elements.push(value)
-                    .map_err(|_| Error::new(
-                        ErrorCategory::Memory,
-                        wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                        "List storage full"
+                    .map_err(|_| Error::memory_allocation_failed("List storage full")
                     ))?;
             } else {
-                return Err(Error::new(
-                    ErrorCategory::InvalidInput,
-                    wrt_error::codes::OUT_OF_BOUNDS_ERROR,
-                    "Cannot set non-consecutive index"
+                return Err(Error::runtime_execution_error("
                 ));
             }
         }
@@ -305,37 +270,25 @@ impl FixedLengthList {
 
     pub fn push(&mut self, value: ComponentValue) -> Result<()> {
         if !self.list_type.mutable {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Cannot modify immutable fixed-length list"
+            return Err(Error::type_error(")
             ));
         }
 
         if self.is_full() {
-            return Err(Error::new(
-                ErrorCategory::InvalidInput,
-                wrt_error::codes::OUT_OF_BOUNDS_ERROR,
-                "Fixed-length list is already full"
+            return Err(Error::runtime_execution_error("
             ));
         }
 
         if !Self::validate_element_type(&value, &self.list_type.element_type) {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Value type does not match list element type"
+            return Err(Error::type_error(")
             ));
         }
 
         #[cfg(feature = "std")]
         self.elements.push(value);
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         self.elements.push(value)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "List storage full"
+            .map_err(|_| Error::memory_allocation_failed("List storage full")
             ))?;
 
         Ok(())
@@ -358,7 +311,7 @@ impl FixedLengthList {
         self.elements.clone()
     }
 
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub fn to_slice(&self) -> &[ComponentValue] {
         self.elements.as_slice()
     }
@@ -369,8 +322,8 @@ impl FixedLengthList {
 pub struct FixedLengthListTypeRegistry {
     #[cfg(feature = "std")]
     types: Vec<FixedLengthListType>,
-    #[cfg(not(any(feature = "std", )))]
-    types: BoundedVec<FixedLengthListType, MAX_TYPE_DEFINITIONS, NoStdProvider<65536>>,
+    #[cfg(not(feature = "std"))]
+    types: BoundedVec<FixedLengthListType, MAX_TYPE_DEFINITIONS>,
 }
 
 impl FixedLengthListTypeRegistry {
@@ -378,8 +331,12 @@ impl FixedLengthListTypeRegistry {
         Self {
             #[cfg(feature = "std")]
             types: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            types: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            types: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)
+                    .expect("Failed to allocate memory for type registry");
+                BoundedVec::new(provider).expect("Failed to create BoundedVec")
+            },
         }
     }
 
@@ -397,12 +354,9 @@ impl FixedLengthListTypeRegistry {
         
         #[cfg(feature = "std")]
         self.types.push(list_type);
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         self.types.push(list_type)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Type registry full"
+            .map_err(|_| Error::memory_allocation_failed("Type registry full")
             ))?;
         
         Ok(index)
@@ -443,7 +397,7 @@ pub mod component_integration {
             {
                 ComponentValue::List(list.elements)
             }
-            #[cfg(not(any(feature = "std", )))]
+            #[cfg(not(feature = "std"))]
             {
                 // Convert to regular list representation
                 let vec_data: Vec<ComponentValue> = list.elements.iter().cloned().collect();
@@ -464,15 +418,12 @@ pub mod component_integration {
                     {
                         Self::with_elements(expected_type, elements)
                     }
-                    #[cfg(not(any(feature = "std", )))]
+                    #[cfg(not(feature = "std"))]
                     {
                         Self::with_elements(expected_type, &elements)
                     }
                 }
-                _ => Err(Error::new(
-                    ErrorCategory::Type,
-                    wrt_error::codes::TYPE_MISMATCH,
-                    "ComponentValue is not a list"
+                _ => Err(Error::type_error("ComponentValue is not a list")
                 ))
             }
         }
@@ -552,10 +503,7 @@ pub mod fixed_list_utils {
             ValueType::String => ComponentValue::String("".to_string()),
             ValueType::I32 => ComponentValue::I32(0),
             ValueType::I64 => ComponentValue::I64(0),
-            _ => return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Cannot create default value for this type"
+            _ => return Err(Error::type_error("Cannot create default value for this type")
             )),
         };
         
@@ -565,10 +513,7 @@ pub mod fixed_list_utils {
     /// Create a fixed-length list from a range
     pub fn from_range(start: i32, end: i32) -> Result<FixedLengthList> {
         if start >= end {
-            return Err(Error::new(
-                ErrorCategory::InvalidInput,
-                wrt_error::codes::OUT_OF_BOUNDS_ERROR,
-                "Start must be less than end"
+            return Err(Error::runtime_execution_error("
             ));
         }
         
@@ -589,10 +534,7 @@ pub mod fixed_list_utils {
         list2: &FixedLengthList
     ) -> Result<FixedLengthList> {
         if list1.element_type() != list2.element_type() {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Cannot concatenate lists with different element types"
+            return Err(Error::type_error(")
             ));
         }
         
@@ -620,10 +562,7 @@ pub mod fixed_list_utils {
         length: u32
     ) -> Result<FixedLengthList> {
         if start + length > list.length() {
-            return Err(Error::new(
-                ErrorCategory::InvalidInput,
-                wrt_error::codes::OUT_OF_BOUNDS_ERROR,
-                "Slice range exceeds list bounds"
+            return Err(Error::runtime_execution_error("
             ));
         }
         
@@ -691,9 +630,9 @@ mod tests {
             ComponentValue::I32(3),
         ];
 
-        #[cfg(feature = "std")]
+        #[cfg(feature = ")]
         let list = FixedLengthList::with_elements(list_type, elements).unwrap();
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         let list = FixedLengthList::with_elements(list_type, &elements).unwrap();
 
         assert_eq!(list.current_length(), 3);
@@ -712,7 +651,7 @@ mod tests {
         let wrong_count = vec![ComponentValue::I32(1)];
         #[cfg(feature = "std")]
         let result = FixedLengthList::with_elements(list_type.clone(), wrong_count);
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         let result = FixedLengthList::with_elements(list_type.clone(), &wrong_count);
         assert!(result.is_err());
 
@@ -723,7 +662,7 @@ mod tests {
         ];
         #[cfg(feature = "std")]
         let result = FixedLengthList::with_elements(list_type, wrong_type);
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         let result = FixedLengthList::with_elements(list_type, &wrong_type);
         assert!(result.is_err());
     }
@@ -807,7 +746,7 @@ mod tests {
 
         #[cfg(feature = "std")]
         let list = FixedLengthList::with_elements(list_type.clone(), elements.clone()).unwrap();
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         let list = FixedLengthList::with_elements(list_type.clone(), &elements).unwrap();
 
         // Convert to ComponentValue
@@ -853,14 +792,14 @@ mod tests {
         let list1_elements = vec![ComponentValue::I32(1), ComponentValue::I32(2)];
         #[cfg(feature = "std")]
         let list1 = FixedLengthList::with_elements(list1_type, list1_elements).unwrap();
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         let list1 = FixedLengthList::with_elements(list1_type, &list1_elements).unwrap();
 
         let list2_type = FixedLengthListType::new(ValueType::I32, 2);
         let list2_elements = vec![ComponentValue::I32(3), ComponentValue::I32(4)];
         #[cfg(feature = "std")]
         let list2 = FixedLengthList::with_elements(list2_type, list2_elements).unwrap();
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         let list2 = FixedLengthList::with_elements(list2_type, &list2_elements).unwrap();
 
         // Test concatenation

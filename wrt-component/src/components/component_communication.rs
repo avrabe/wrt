@@ -35,23 +35,26 @@
 //! let result = router.dispatch_call(context)?;
 //! ```
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]
 use std::{vec::Vec, string::String, collections::HashMap, boxed::Box, format};
 
 #[cfg(all(not(feature = "std")))]
-use std::{vec::Vec, string::String, collections::BTreeMap as HashMap, boxed::Box, format};
+use alloc::{vec::Vec, string::String, collections::BTreeMap as HashMap, boxed::Box, format};
 
-#[cfg(not(any(feature = "std", )))]
-use wrt_foundation::{BoundedVec, BoundedString, BoundedMap as HashMap, safe_memory::NoStdProvider};
+#[cfg(not(feature = "std"))]
+use wrt_foundation::{bounded::{BoundedString, BoundedVec}, safe_memory::NoStdProvider};
 
-// Type aliases for no_std compatibility
-#[cfg(not(any(feature = "std", )))]
-type Vec<T> = BoundedVec<T, 64, NoStdProvider<65536>>;
-#[cfg(not(any(feature = "std", )))]
-type String = BoundedString<256, NoStdProvider<65536>>;
+// Note: Using alloc for no_std instead of wrt_foundation bounded types for now
+// #[cfg(not(any(feature = "std", )))]
+// use wrt_foundation::{BoundedVec, BoundedString, BoundedMap as HashMap, safe_memory::NoStdProvider};
+
+// Type aliases for no_std compatibility (commented out to avoid conflicts)
+// #[cfg(not(any(feature = "std", )))]
+// type Vec<T> = BoundedVec<T, 64, NoStdProvider<65536>>;
+// #[cfg(not(any(feature = "std", )))]
+// type String = BoundedString<256, NoStdProvider<65536>>;
 
 use wrt_error::{Error, ErrorCategory, Result, codes};
 use crate::canonical_abi::{ComponentType};
@@ -62,7 +65,7 @@ use crate::canonical_abi::ComponentValue;
 #[cfg(not(feature = "std"))]
 // For no_std, use a simpler ComponentValue representation
 use crate::types::Value as ComponentValue;
-use crate::component_instantiation::{InstanceId, ComponentInstance, FunctionSignature};
+use crate::components::component_instantiation::{InstanceId, ComponentInstance, FunctionSignature};
 use crate::resource_management::{ResourceHandle, ResourceManager as ComponentResourceManager};
 
 /// Maximum call stack depth to prevent infinite recursion
@@ -438,20 +441,13 @@ impl CallRouter {
 
         // Check call stack depth
         if self.call_stack.current_depth >= self.config.max_call_stack_depth {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::CALL_STACK_OVERFLOW,
-                "Call stack depth exceeded",
-            ));
+            return Err(Error::runtime_stack_overflow("Call stack depth exceeded"));
         }
 
         // Check concurrent call limits
         let active_calls_for_target = self.count_active_calls_for_instance(context.target_instance);
         if active_calls_for_target >= self.config.max_concurrent_calls_per_instance {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::RESOURCE_EXHAUSTED,
-                "Too many concurrent calls for target instance",
+            return Err(Error::runtime_execution_error(",
             ));
         }
 
@@ -500,7 +496,7 @@ impl CallRouter {
                 self.stats.successful_calls += 1;
             }
             Err(e) => {
-                context.state = CallState::Failed("Component not found");
+                context.state = CallState::Failed(");
                 self.stats.failed_calls += 1;
             }
         }
@@ -528,19 +524,11 @@ impl CallRouter {
         return_types: Vec<ComponentType>,
     ) -> Result<CallContext> {
         if parameters.len() > MAX_CALL_PARAMETERS {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Too many parameters for function call",
-            ));
+            return Err(Error::validation_error("Too many parameters for function call"));
         }
 
         if return_types.len() > MAX_CALL_RETURN_VALUES {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Too many return values for function call",
-            ));
+            return Err(Error::validation_error("Too many return values for function call"));
         }
 
         Ok(CallContext {
@@ -577,19 +565,11 @@ impl CallRouter {
 
     fn validate_call_context(&self, context: &CallContext) -> Result<()> {
         if context.target_function.is_empty() {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Target function name cannot be empty",
-            ));
+            return Err(Error::validation_error("Target function name cannot be empty"));
         }
 
         if context.source_instance == context.target_instance {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Source and target instances cannot be the same",
-            ));
+            return Err(Error::validation_error("Source and target instances cannot be the same"));
         }
 
         Ok(())
@@ -640,11 +620,7 @@ impl CallStack {
     /// Push a call frame onto the stack
     pub fn push_frame(&mut self, frame: CallFrame) -> Result<()> {
         if self.current_depth >= self.max_depth {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::CALL_STACK_OVERFLOW,
-                "Call stack overflow",
-            ));
+            return Err(Error::runtime_stack_overflow("Call stack overflow"));
         }
 
         self.frames.push(frame);
@@ -655,10 +631,7 @@ impl CallStack {
     /// Pop a call frame from the stack
     pub fn pop_frame(&mut self) -> Result<CallFrame> {
         if self.frames.is_empty() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_STATE,
-                "Cannot pop from empty call stack",
+            return Err(Error::runtime_execution_error(",
             ));
         }
 
@@ -720,11 +693,7 @@ impl ParameterBridge {
 
     fn validate_parameters(&self, parameters: &[ComponentValue]) -> Result<()> {
         if parameters.len() > MAX_CALL_PARAMETERS {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Too many parameters",
-            ));
+            return Err(Error::validation_error("));
         }
 
         // Additional parameter validation would go here

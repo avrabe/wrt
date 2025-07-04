@@ -10,16 +10,19 @@ readme = "README.md"
 keywords = ["wasm", "webassembly", "runtime", "component-model"]
 categories = ["wasm", "no-std"]
 
+[lints]
+workspace = true
+
 [dependencies]
 wrt-error = { workspace = true, default-features = false }
 wrt-foundation = { workspace = true, default-features = false }
 wrt-format = { workspace = true, default-features = false }
 wrt-sync = { workspace = true, default-features = false }
-# wrt-decoder = { workspace = true, default-features = false }
+wrt-decoder = { workspace = true, default-features = false }
 wrt-instructions = { workspace = true, default-features = false }
-wrt-host = { workspace = true, default-features = false }
+wrt-host = { workspace = true, default-features = false, optional = true }
 wrt-intercept = { workspace = true, default-features = false }
-wrt-platform = { workspace = true, default-features = false }
+wrt-platform = { workspace = true, default-features = false, optional = true }
 wrt-debug = { workspace = true, default-features = false, optional = true }
 
 # No-std support (removed invalid alloc dependency)
@@ -27,21 +30,28 @@ wrt-debug = { workspace = true, default-features = false, optional = true }
 # No additional dependencies for now
 
 [features]
-default = []
+default = ["std"] # Enable std by default for platform compatibility
 # Binary choice: std OR no_std (no alloc middle ground)
 std = [
     # "wrt-decoder/std",
     "wrt-format/std",
-    "wrt-host/std",
+    "dep:wrt-host",
+    "wrt-host?/std",
     "wrt-instructions/std",
     "wrt-intercept/std",
-    "wrt-platform/std",
+    "dep:wrt-platform",
     "wrt-sync/std",
     "wrt-foundation/std"]
+
+# Allocation support for no_std environments
+alloc = [
+    "wrt-foundation/alloc",
+    "wrt-format/alloc",
+    "wrt-host?/alloc",
+    "wrt-instructions/alloc",
+    "wrt-intercept/alloc"]
 # Debug support features
 debug = ["dep:wrt-debug", "wrt-debug/line-info"]
-debug-full = ["dep:wrt-debug", "wrt-debug/full-debug"]
-wit-debug-integration = ["dep:wrt-debug", "wrt-debug/wit-integration", "std"]
 # For compatibility with verification script
 # This is a no-op since the crate is no_std by default
 no_std = []
@@ -49,74 +59,34 @@ optimize = [
     "wrt-foundation/optimize",
     # "wrt-decoder/optimize",
     "wrt-instructions/optimize",
-    "wrt-host/optimize",
+    "wrt-host?/optimize",
     "wrt-intercept/optimize"]
-disable-panic-handler = [
-    "wrt-error/disable-panic-handler",
-    "wrt-foundation/disable-panic-handler", 
-    "wrt-format/disable-panic-handler",
-    "wrt-sync/disable-panic-handler",
-    "wrt-instructions/disable-panic-handler",
-    "wrt-host/disable-panic-handler",
-    "wrt-intercept/disable-panic-handler",
-    "wrt-platform/disable-panic-handler"
-]
 
-# Safe memory implementations
-safe-memory = [
-    "wrt-foundation/safe-memory"]
-safety = [
-    "wrt-foundation/safety",
-    # "wrt-decoder/safety",
-    "wrt-instructions/safety",
-    "wrt-host/safety",
-    "wrt-intercept/safety"]
+# Safety level presets using capability-based features
+qm = ["wrt-foundation/dynamic-allocation"]
+asil-a = ["wrt-foundation/bounded-collections"]
+asil-b = ["wrt-foundation/bounded-collections"]
+asil-c = ["wrt-foundation/static-memory-safety"]
+asil-d = ["wrt-foundation/asil-d"]
+
+# Legacy compatibility features
+safe-memory = ["asil-b"]
+safety-asil-b = ["asil-b"]
+safety-asil-c = ["asil-c"]
+safety-asil-d = ["asil-d"]
+
+# Platform features - properly abstracted for ASIL compliance
+# Platform sync enables native platform synchronization primitives
+platform-sync = ["dep:wrt-platform", "wrt-platform?/std"]
+# Specific platform support (requires platform-sync)
+platform-macos = ["platform-sync", "wrt-platform?/platform-macos"]
+platform-linux = ["platform-sync", "wrt-platform?/platform-linux"]
+platform-qnx = ["platform-sync", "wrt-platform?/platform-qnx"]
+platform-embedded = ["dep:wrt-platform"] # Minimal platform support
+helper-mode = ["dep:wrt-platform", "wrt-platform?/helper-mode"]
+
+# Verification features
 kani = []
 kani-verifier = []
-platform-macos = ["wrt-platform/platform-macos"]
-helper-mode = ["wrt-platform/helper-mode"]
 
-# Additional features
-# Disable panic handler for library builds to avoid conflicts
 
-[lints.rust]
-unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] }
-unused_imports = "allow"
-unused_variables = "allow"
-unused_mut = "allow"
-unsafe_code = "deny"  # Changed from forbid to deny to allow module-level overrides
-# Rule 1
-# pointer_cast is not a valid Rust lint - removed
-# Rule 9
-missing_docs = "deny"
-
-[lints.clippy]
-# Rule 1: Language subset
-inline_asm_x86_att_syntax = "warn"
-transmute_ptr_to_ref = "deny"
-type_id = "deny"
-dyn_trait = "warn"
-float_arithmetic = "warn"
-# Rule 2: Unsafe usage
-ptr_offset_with_cast = "warn"
-# Rule 3: Error handling & panics
-unwrap_used = "warn"
-panic = "warn" # Also covers Rule 4
-result_unit_err = "warn"
-let_underscore_drop = "warn"
-must_use_candidate = "warn"
-must_use_unit = "warn"
-# Rule 4: Control-flow soundness
-match_wildcard_for_single_variants = "warn"
-never_loop = "warn"
-unreachable = "warn" # Also related to Rule 4
-# Rule 5: Memory & concurrency safety
-static_mut_reference = "deny"
-arc_mutate = "deny"
-# Rule 8: Static analysis gates (CI)
-pedantic = "warn"
-# Rule 9: Documentation
-debug_assert_with_mut_call = "warn"
-
-[dev-dependencies]
-proptest = "1.4.0" 

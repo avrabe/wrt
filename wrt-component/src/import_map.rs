@@ -161,7 +161,7 @@ impl SafeImportMap {
     }
 
     /// Get all imports as a Vec of (name, import) pairs
-    pub fn get_all(&self) -> Result<Vec<(String, Arc<Import>)>> {
+    pub fn get_all(&self) -> core::result::Result<Vec<(String, Arc<Import>)>> {
         self.imports.to_vec()
     }
 
