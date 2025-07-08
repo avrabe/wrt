@@ -9,13 +9,16 @@ documentation = "https://docs.rs/wrt-component"
 keywords = ["wasm", "webassembly", "runtime", "component-model"]
 categories = ["wasm", "no-std"]
 
+[lints]
+workspace = true
+
 [dependencies]
 wrt-error = { workspace = true, default-features = false }
 wrt-format = { workspace = true, default-features = false }
 wrt-host = { workspace = true, default-features = false }
 wrt-foundation = { workspace = true, default-features = false }
 wrt-intercept = { workspace = true, default-features = false }
-wrt-decoder = { workspace = true, default-features = false }
+wrt-decoder = { workspace = true, default-features = false, optional = true }
 wrt-runtime = { workspace = true, default-features = false }
 wrt-sync = { workspace = true, default-features = false }
 
@@ -25,6 +28,7 @@ wrt-sync = { workspace = true, default-features = false }
 log = { version = "0.4", optional = true }
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [features]
 # By default, no features for pure no_std compatibility
@@ -41,17 +45,38 @@ std = [
     "wrt-sync/std",
     "wrt-error/std",
     "wrt-foundation/std",
+    "wrt-foundation/wrt-allocator",
     "dep:log"]
 
-# For compatibility with verification script
-# This is a no-op since the crate is no_std by default
-no_std = []
+# Allocation support for no_std environments
+alloc = [
+    "wrt-foundation/alloc",
+    "wrt-format/alloc",
+    "wrt-decoder/alloc",
+    "wrt-runtime/alloc",
+    "wrt-host/alloc",
+    "wrt-intercept/alloc"]
 
+# Safety level presets using capability-based features
+qm = ["wrt-foundation/dynamic-allocation", "wrt-format/qm", "wrt-host/qm", "wrt-decoder/qm", "wrt-runtime/qm", "wrt-intercept/qm"]
+asil-a = ["wrt-foundation/bounded-collections", "wrt-format/asil-a", "wrt-host/asil-a", "wrt-decoder/asil-a", "wrt-runtime/asil-a", "wrt-intercept/asil-a"]
+asil-b = ["wrt-foundation/bounded-collections", "wrt-format/asil-b", "wrt-host/asil-b", "wrt-decoder/asil-b", "wrt-runtime/asil-b", "wrt-intercept/asil-b"]
+asil-c = ["wrt-foundation/static-memory-safety", "wrt-format/asil-c", "wrt-host/asil-c", "wrt-decoder/asil-c", "wrt-runtime/asil-c", "wrt-intercept/asil-c"]
+asil-d = ["wrt-foundation/asil-d", "wrt-format/asil-d", "wrt-host/asil-d", "wrt-decoder/asil-d", "wrt-runtime/asil-d", "wrt-intercept/asil-d"]
+
+# Legacy compatibility features
+safe-memory = ["asil-b"]
+safety-asil-b = ["asil-b"]
+safety-asil-c = ["asil-c"]
+safety-asil-d = ["asil-d"]
+
+# For compatibility with verification script
+no_std = []
 
 # Verification with Kani
 kani = ["wrt-host/kani", "wrt-intercept/kani", "wrt-foundation/kani"]
 
-# Performance and safety features
+# Performance features
 optimize = [
     "wrt-format/optimize",
     "wrt-host/optimize",
@@ -61,28 +86,8 @@ optimize = [
     "wrt-runtime/optimize"
 ]
 
-# Safety features (always includes alloc)
-safety = [
-    "wrt-format/safety",
-    "wrt-host/safety",
-    "wrt-foundation/safety",
-    "wrt-intercept/safety",
-    "wrt-decoder/safety",
-    "wrt-runtime/safety",
-    "std"
-]
-
 # Debug logging
 debug-log = []
-
-# Disable panic handler for library builds to avoid conflicts
-disable-panic-handler = []
-
-# Safe memory implementations
-safe-memory = [
-    "wrt-foundation/safe-memory",
-    "wrt-format/safe-memory",
-    "wrt-runtime/safe-memory"]
 
 # Component Model features
 component-model-core = ["wrt-format/component-model-core"]
@@ -100,6 +105,10 @@ component-model-all = [
     "component-model-threading"
 ]
 
+# Decoder support
+decoder = ["dep:wrt-decoder"]
+
+
 [[example]]
 name = "component_info_simple"
 path = "examples/component_info_simple.rs"
@@ -110,39 +119,15 @@ name = "interceptor_example"
 path = "examples/interceptor_example.rs"
 required-features = ["std"]
 
+[[bench]]
+name = "wrt_allocator_benchmarks"
+harness = false
+required-features = ["std", "safety-asil-c"]
 
-[lints.rust]
-unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] }
-# Rule 1
-pointer_cast = "deny"
-# Rule 9
-missing_docs = "deny"
-unsafe_code = "forbid"
+[[bench]]
+name = "zero_cost_validation"
+harness = false
+required-features = ["std", "safety-asil-c"]
 
-[lints.clippy]
-# Rule 1: Language subset
-inline_asm_x86_att_syntax = "warn"
-transmute_ptr_to_ref = "deny"
-type_id = "deny"
-dyn_trait = "warn"
-float_arithmetic = "warn"
-# Rule 2: Unsafe usage
-ptr_offset_with_cast = "warn"
-# Rule 3: Error handling & panics
-unwrap_used = "warn"
-panic = "warn" # Also covers Rule 4
-result_unit_err = "warn"
-let_underscore_drop = "warn"
-must_use_candidate = "warn"
-must_use_unit = "warn"
-# Rule 4: Control-flow soundness
-match_wildcard_for_single_variants = "warn"
-never_loop = "warn"
-unreachable = "warn" # Also related to Rule 4
-# Rule 5: Memory & concurrency safety
-static_mut_refs = "deny"
-arc_mutate = "deny"
-# Rule 8: Static analysis gates (CI)
-pedantic = "warn"
-# Rule 9: Documentation
-debug_assert_with_mut_call = "warn" 
+
+ 

@@ -130,15 +130,15 @@ impl ResourceLimits {
     /// Validate resource limits
     pub fn validate(&self) -> Result<()> {
         if self.max_resource_types == 0 {
-            return Err(Error::invalid_input("max_resource_types cannot be zero"));
+            return Err(Error::invalid_input("Error occurred"max_resource_types cannot be zeroMissing messageMissing messageMissing message");
         }
         if self.max_resources_per_instance == 0 {
-            return Err(Error::invalid_input("max_resources_per_instance cannot be zero"));
+            return Err(Error::invalid_input("Error occurred"max_resources_per_instance cannot be zeroMissing messageMissing messageMissing message");
         }
         if self.max_global_resources == 0 {
-            return Err(Error::invalid_input("max_global_resources cannot be zero"));
+            return Err(Error::invalid_input("Error occurred"max_global_resources cannot be zeroMissing messageMissing messageMissing message");
         }
-        Ok(())
+        Ok(()
     }
 }
 
@@ -271,13 +271,13 @@ impl BoundedResourceTable {
             .map_err(|_| Error::OUT_OF_MEMORY)?;
         self.handles.push(handle)
             .map_err(|_| Error::OUT_OF_MEMORY)?;
-        Ok(())
+        Ok(()
     }
     
     pub fn remove_resource(&mut self, resource_id: ResourceId) -> Option<ResourceHandle> {
         if let Some(pos) = self.resources.iter().position(|&id| id == resource_id) {
             self.resources.remove(pos);
-            Some(self.handles.remove(pos))
+            Some(self.handles.remove(pos)
         } else {
             None
         }
@@ -332,7 +332,7 @@ impl BoundedResourceManager {
         
         // Validate safety level compatibility
         if safety_level as u8 > self.safety_context.effective_asil() as u8 {
-            return Err(Error::invalid_input("Resource safety level exceeds runtime safety level"));
+            return Err(Error::invalid_input("Error occurred"Resource safety level exceeds runtime safety levelMissing messageMissing messageMissing message");
         }
         
         let type_id = ResourceTypeId(self.next_type_id);
@@ -367,7 +367,7 @@ impl BoundedResourceManager {
         // Validate resource type exists
         let resource_type = self.resource_types.iter()
             .find(|rt| rt.id == type_id)
-            .ok_or(Error::invalid_input("Resource type not found"))?;
+            .ok_or(Error::invalid_input("Error occurred"Resource type not foundMissing messageMissing messageMissing message"))?;
         
         // Create resource
         let resource_id = ResourceId(self.next_resource_id);
@@ -411,7 +411,7 @@ impl BoundedResourceManager {
             .ok_or(Error::COMPONENT_NOT_FOUND)?;
         
         if resource.ownership != ResourceOwnership::Owned {
-            return Err(Error::invalid_input("Cannot transfer non-owned resource"));
+            return Err(Error::invalid_input("Error occurred"Cannot transfer non-owned resourceMissing messageMissing messageMissing message");
         }
         
         let source_instance = resource.instance_id;
@@ -438,7 +438,7 @@ impl BoundedResourceManager {
             let _ = self.sharing_entries.push(sharing_entry);
         }
         
-        Ok(())
+        Ok(()
     }
     
     /// Create a borrowed reference to a resource
@@ -452,7 +452,7 @@ impl BoundedResourceManager {
             .ok_or(Error::COMPONENT_NOT_FOUND)?;
         
         if resource.state != ResourceState::Active {
-            return Err(Error::invalid_input("Cannot borrow inactive resource"));
+            return Err(Error::invalid_input("Error occurred"Cannot borrow inactive resourceMissing messageMissing messageMissing message");
         }
         
         // Create a new handle for the borrowed reference
@@ -502,7 +502,7 @@ impl BoundedResourceManager {
             self.finalize_resource(resource_id)?;
         }
         
-        Ok(())
+        Ok(()
     }
     
     /// Finalize a resource and call its destructor
@@ -525,7 +525,7 @@ impl BoundedResourceManager {
         // Mark as finalized
         resource.state = ResourceState::Finalized;
         
-        Ok(())
+        Ok(()
     }
     
     /// Add resource to instance table
@@ -549,7 +549,7 @@ impl BoundedResourceManager {
             table.add_resource(resource_id, handle)?;
             self.instance_tables.push(table)
                 .map_err(|_| Error::OUT_OF_MEMORY)?;
-            Ok(())
+            Ok(()
         }
     }
     
@@ -562,7 +562,7 @@ impl BoundedResourceManager {
     /// Get resource statistics
     pub fn get_statistics(&self) -> ResourceManagerStatistics {
         let total_memory_used = self.global_resources.iter()
-            .map(|resource| resource.data.len())
+            .map(|resource| resource.data.len()
             .sum();
         
         let active_resources = self.global_resources.iter()
@@ -593,11 +593,11 @@ impl BoundedResourceManager {
         // Validate resource integrity
         for resource in &self.global_resources {
             if !self.resource_types.iter().any(|rt| rt.id == resource.type_id) {
-                return Err(Error::invalid_input("Resource type not found"));
+                return Err(Error::invalid_input("Error occurred"Resource type not foundMissing messageMissing messageMissing message");
             }
         }
         
-        Ok(())
+        Ok(()
     }
     
     /// Cleanup resources for a specific instance
@@ -636,7 +636,7 @@ impl BoundedResourceManager {
             self.finalize_resource(resource_id)?;
         }
         
-        Ok(())
+        Ok(()
     }
 }
 
@@ -705,7 +705,7 @@ mod tests {
         let data = alloc::vec![0u8; 100].into_boxed_slice();
         let handle = manager.create_resource(type_id, data, instance_id).unwrap();
         
-        assert!(manager.get_resource(handle).is_some());
+        assert!(manager.get_resource(handle).is_some();
         
         let stats = manager.get_statistics();
         assert_eq!(stats.active_resources, 1);
@@ -755,8 +755,8 @@ mod tests {
         
         let borrowed_handle = manager.borrow_resource(handle, target_instance).unwrap();
         
-        assert!(manager.get_resource(handle).is_some());
-        assert!(manager.get_resource(borrowed_handle).is_some());
+        assert!(manager.get_resource(handle).is_some();
+        assert!(manager.get_resource(borrowed_handle).is_some();
         
         let stats = manager.get_statistics();
         assert_eq!(stats.cross_component_shares, 1);
@@ -810,6 +810,6 @@ mod tests {
             None,
             AsilLevel::QM,
         );
-        assert!(result.is_err());
+        assert!(result.is_err();
     }
 }

@@ -57,10 +57,7 @@ impl Host {
         target: &mut dyn core::any::Any,
     ) -> Result<Vec<Value>> {
         let function = self.functions.get(name).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::EXECUTION_ERROR,
-                kinds::ExecutionError("Component not found"),
+            Error::runtime_execution_error("Error occurred"Component not foundMissing message"),
             )
         })?;
 
@@ -71,10 +68,7 @@ impl Host {
                 // Note: Registry access needs to be correctly implemented with the proper type
                 registry.call_host_function(target, "wrt_component", callback_name, args)
             }
-            HostFunctionImpl::Trap(message) => Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::EXECUTION_ERROR,
-                kinds::ExecutionError("Component not found"),
+            HostFunctionImpl::Trap(message) => Err(Error::runtime_execution_error("Error occurred"Component not foundMissing message"),
             )),
         }
     }
@@ -102,10 +96,10 @@ mod tests {
 
         host.add_function("add".to_string(), function);
 
-        let retrieved = host.get_function("add");
-        assert!(retrieved.is_some());
+        let retrieved = host.get_function("addMissing message");
+        assert!(retrieved.is_some();
 
-        let not_found = host.get_function("non_existent");
-        assert!(not_found.is_none());
+        let not_found = host.get_function("non_existentMissing message");
+        assert!(not_found.is_none();
     }
 }

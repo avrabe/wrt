@@ -8,10 +8,13 @@
 extern crate alloc;
 
 use std::{
-    collections::BTreeMap,
     format,
     string::{String, ToString},
-    vec::Vec,
+};
+
+use crate::bounded_wrtd_infra::{
+    BoundedServiceMap, BoundedLogEntryVec, WrtdProvider,
+    new_service_map, new_log_entry_vec
 };
 
 // Binary std/no_std choice
@@ -50,7 +53,7 @@ pub struct AllocStats {
 pub struct AllocRuntime {
     config: AllocConfig,
     stats: AllocStats,
-    module_cache: BTreeMap<String, Vec<u8>>,
+    module_cache: BoundedServiceMap<BoundedLogEntryVec<u8>>,
 }
 
 impl AllocRuntime {
@@ -59,7 +62,7 @@ impl AllocRuntime {
         Self {
             config,
             stats: AllocStats::default(),
-            module_cache: BTreeMap::new(),
+            module_cache: new_service_map(),
         }
     }
     

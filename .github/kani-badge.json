@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "label": "formal verification",
+  "message": "KANI",
+  "color": "brightgreen",
+  "namedLogo": "rust",
+  "logoColor": "white",
+  "style": "for-the-badge",
+  "cacheSeconds": 86400
+}

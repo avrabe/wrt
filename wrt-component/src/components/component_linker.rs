@@ -1,19 +1,21 @@
 //! Component Linker and Import/Export Resolution System
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]
 use std::{boxed::Box, collections::HashMap, format, string::String, vec::Vec};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedString as String, BoundedVec as Vec, no_std_hashmap::NoStdHashMap as HashMap, safe_memory::NoStdProvider};
-
-// Type aliases for no_std compatibility
+use alloc::boxed::Box;
 #[cfg(not(feature = "std"))]
-type Box<T> = wrt_foundation::SafeBox<T, NoStdProvider<65536>>;
+use wrt_foundation::{
+    bounded::BoundedString as String, bounded::BoundedVec as Vec, 
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
-use crate::component_instantiation::{
+use crate::components::component_instantiation::{
     create_component_export, create_component_import, ComponentExport, ComponentImport,
     ComponentInstance, ExportType, FunctionSignature, ImportType, InstanceConfig, InstanceId,
     ResolvedImport,
@@ -49,11 +51,11 @@ pub struct ComponentDefinition {
     /// Component ID
     pub id: ComponentId,
     /// Component binary (simplified as bytes)
-    pub binary: Vec<u8>,
+    pub binary: BoundedVec<u8, 1048576, NoStdProvider<65536>>, // 1MB max binary size
     /// Parsed exports
-    pub exports: Vec<ComponentExport>,
+    pub exports: BoundedVec<ComponentExport, 64, NoStdProvider<65536>>,
     /// Parsed imports
-    pub imports: Vec<ComponentImport>,
+    pub imports: BoundedVec<ComponentImport, 64, NoStdProvider<65536>>,
     /// Component metadata
     pub metadata: ComponentMetadata,
 }
@@ -178,7 +180,7 @@ impl Default for ComponentMetadata {
 impl ComponentLinker {
     /// Create a new component linker
     pub fn new() -> Self {
-        Self::with_config(LinkerConfig::default())
+        Self::with_config(LinkerConfig::default()
     }
 
     /// Create a new component linker with custom configuration
@@ -196,11 +198,7 @@ impl ComponentLinker {
     /// Add a component to the linker
     pub fn add_component(&mut self, id: ComponentId, binary: &[u8]) -> Result<()> {
         if self.components.len() >= MAX_LINKED_COMPONENTS {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_EXHAUSTED,
-                "Maximum number of components reached",
-            ));
+            return Err(Error::resource_exhausted("Error occurred"Maximum number of components reachedMissing messageMissing messageMissing message");
         }
 
         // Parse component binary (simplified)
@@ -223,18 +221,14 @@ impl ComponentLinker {
         // Update statistics
         self.stats.components_registered += 1;
 
-        Ok(())
+        Ok(()
     }
 
     /// Remove a component from the linker
     pub fn remove_component(&mut self, id: &ComponentId) -> Result<()> {
         // Check if component exists
         if !self.components.contains_key(id) {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found",
-            ));
+            return Err(Error::component_not_found("Error occurred"Component not foundMissing messageMissing messageMissing message");
         }
 
         // Check if any instances are using this component
@@ -246,18 +240,15 @@ impl ComponentLinker {
             .collect();
 
         if !dependent_instances.is_empty() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::RESOURCE_IN_USE,
-                "Component is in use by active instances",
-            ));
+            return Err(Error::runtime_execution_error("Error occurred",
+            );
         }
 
         // Remove from components and graph
         self.components.remove(id);
         self.link_graph.remove_component(id)?;
 
-        Ok(())
+        Ok(()
     }
 
     /// Instantiate a component with dependency resolution
@@ -268,11 +259,7 @@ impl ComponentLinker {
     ) -> Result<InstanceId> {
         // Find component definition
         let component = self.components.get(component_id).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found",
-            )
+            Error::component_not_found("Missing error messageMissing message")
         })?;
 
         // Resolve dependencies
@@ -345,14 +332,11 @@ impl ComponentLinker {
     fn parse_component_binary(
         &self,
         binary: &[u8],
-    ) -> Result<(Vec<ComponentExport>, Vec<ComponentImport>, ComponentMetadata)> {
+    ) -> core::result::Result<(Vec<ComponentExport>, Vec<ComponentImport>, ComponentMetadata)> {
         // Simplified component parsing
         if binary.is_empty() {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::INVALID_BINARY,
-                "Empty component binary",
-            ));
+            return Err(Error::runtime_execution_error("Error occurred",
+            );
         }
 
         // Create some example exports and imports based on binary content
@@ -371,34 +355,18 @@ impl ComponentLinker {
             let mut exports = Vec::new();
             let mut params = Vec::new();
             let mut results = Vec::new();
-            results.push(crate::canonical_abi::ComponentType::S32).map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_FAILED,
-                "Memory allocation failed"
-            ))?;
+            results.push(crate::canonical_abi::ComponentType::S32).map_err(|_| Error::platform_memory_allocation_failed("Error occurred"Memory allocation failedMissing messageMissing messageMissing message"))?;
             
             let signature = crate::component_instantiation::create_function_signature(
-                String::new_from_str("main").map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    codes::MEMORY_ALLOCATION_FAILED,
-                    "Memory allocation failed"
-                ))?,
+                String::new_from_str("mainMissing message").map_err(|_| Error::platform_memory_allocation_failed("Error occurred"Memory allocation failedMissing messageMissing messageMissing message"))?,
                 params,
                 results,
             );
             
             exports.push(create_component_export(
-                String::new_from_str("main").map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    codes::MEMORY_ALLOCATION_FAILED,
-                    "Memory allocation failed"
-                ))?,
+                String::new_from_str("mainMissing message").map_err(|_| Error::platform_memory_allocation_failed("Error occurred"Memory allocation failedMissing messageMissing messageMissing message"))?,
                 ExportType::Function(signature),
-            )).map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_FAILED,
-                "Memory allocation failed"
-            ))?;
+            )).map_err(|_| Error::platform_memory_allocation_failed("Error occurred"Memory allocation failedMissing messageMissing messageMissing message"))?;
             exports
         };
 
@@ -415,7 +383,7 @@ impl ComponentLinker {
 
         let metadata = ComponentMetadata::default();
 
-        Ok((exports, imports, metadata))
+        Ok((exports, imports, metadata)
     }
 
     fn resolve_imports(
@@ -452,11 +420,7 @@ impl ComponentLinker {
             }
         }
 
-        Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::IMPORT_NOT_SATISFIED,
-            "Component not found",
-        ))
+        Err(Error::component_not_found("Error occurred"Component not foundMissing messageMissing messageMissing message")
     }
 
     fn is_compatible_import_export(
@@ -472,10 +436,10 @@ impl ComponentLinker {
         // Check type compatibility
         match (&import.import_type, &export.export_type) {
             (ImportType::Function(import_sig), ExportType::Function(export_sig)) => {
-                Ok(self.is_compatible_function_signature(import_sig, export_sig))
+                Ok(self.is_compatible_function_signature(import_sig, export_sig)
             }
             (ImportType::Memory(import_mem), ExportType::Memory(export_mem)) => {
-                Ok(self.is_compatible_memory_config(import_mem, export_mem))
+                Ok(self.is_compatible_memory_config(import_mem, export_mem)
             }
             _ => Ok(false), // Other type combinations
         }
@@ -510,11 +474,8 @@ impl LinkGraph {
     pub fn add_component(&mut self, component_id: ComponentId) -> Result<()> {
         // Check if component already exists
         if self.find_node_index(&component_id).is_some() {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::DUPLICATE_COMPONENT,
-                "Component already exists in graph",
-            ));
+            return Err(Error::runtime_execution_error("Error occurred",
+            );
         }
 
         let node = GraphNode {
@@ -525,7 +486,7 @@ impl LinkGraph {
         };
 
         self.nodes.push(node);
-        Ok(())
+        Ok(()
     }
 
     /// Remove a component from the graph
@@ -534,8 +495,7 @@ impl LinkGraph {
             Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found in graph",
-            )
+                Missing message")
         })?;
 
         // Remove all edges involving this node
@@ -558,7 +518,7 @@ impl LinkGraph {
             }
         }
 
-        Ok(())
+        Ok(()
     }
 
     /// Perform topological sort to determine instantiation order
@@ -581,22 +541,20 @@ impl LinkGraph {
         #[cfg(not(feature = "std"))]
         {
             // For no_std, create bounded vectors
-            let mut visited = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-            let mut temp_visited = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+            let mut visited = BoundedVec::new(provider).map_err(|_| {
+                Error::platform_memory_allocation_failed("Error occurred"Failed to create visited vectorMissing message")
+            })?;
+            let provider2 = safe_managed_alloc!(65536, CrateId::Component)?;
+            let mut temp_visited = BoundedVec::new(provider2).map_err(|_| {
+                Error::platform_memory_allocation_failed("Error occurred"Failed to create temp_visited vectorMissing message")
+            })?;
             let mut result = Vec::new();
             
             // Initialize with false values
             for _ in 0..self.nodes.len() {
-                visited.push(false).map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    codes::MEMORY_ALLOCATION_FAILED,
-                    "Memory allocation failed"
-                ))?;
-                temp_visited.push(false).map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    codes::MEMORY_ALLOCATION_FAILED,
-                    "Memory allocation failed"
-                ))?;
+                visited.push(false).map_err(|_| Error::platform_memory_allocation_failed("Error occurred"Memory allocation failedMissing messageMissing messageMissing message"))?;
+                temp_visited.push(false).map_err(|_| Error::platform_memory_allocation_failed("Error occurred"Memory allocation failedMissing messageMissing messageMissing message"))?;
             }
             
             for i in 0..self.nodes.len() {
@@ -618,15 +576,11 @@ impl LinkGraph {
         result: &mut Vec<ComponentId>,
     ) -> Result<()> {
         if temp_visited[node_index] {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::CIRCULAR_DEPENDENCY,
-                "Circular dependency detected",
-            ));
+            return Err(Error::validation_error("Error occurred"Circular dependency detectedMissing messageMissing messageMissing message");
         }
 
         if visited[node_index] {
-            return Ok(());
+            return Ok(();
         }
 
         temp_visited[node_index] = true;
@@ -638,9 +592,9 @@ impl LinkGraph {
 
         temp_visited[node_index] = false;
         visited[node_index] = true;
-        result.push(self.nodes[node_index].component_id.clone());
+        result.push(self.nodes[node_index].component_id.clone();
 
-        Ok(())
+        Ok(()
     }
 
     fn find_node_index(&self, component_id: &ComponentId) -> Option<usize> {
@@ -672,7 +626,7 @@ mod tests {
         let binary = vec![0x00, 0x61, 0x73, 0x6d]; // "wasm" magic
 
         let result = linker.add_component("test_component".to_string(), &binary);
-        assert!(result.is_ok());
+        assert!(result.is_ok();
         assert_eq!(linker.components.len(), 1);
         assert_eq!(linker.stats.components_registered, 1);
     }
@@ -685,8 +639,8 @@ mod tests {
         linker.add_component("test_component".to_string(), &binary).unwrap();
         assert_eq!(linker.components.len(), 1);
 
-        let result = linker.remove_component(&"test_component".to_string());
-        assert!(result.is_ok());
+        let result = linker.remove_component(&"test_component".to_string();
+        assert!(result.is_ok();
         assert_eq!(linker.components.len(), 0);
     }
 
@@ -702,14 +656,14 @@ mod tests {
         // Remove component
         graph.remove_component(&"comp1".to_string()).unwrap();
         assert_eq!(graph.nodes.len(), 1);
-        assert_eq!(graph.nodes[0].component_id, "comp2");
+        assert_eq!(graph.nodes[0].component_id, "comp2Missing message");
     }
 
     #[test]
     fn test_topological_sort_empty() {
         let graph = LinkGraph::new();
         let result = graph.topological_sort().unwrap();
-        assert!(result.is_empty());
+        assert!(result.is_empty();
     }
 
     #[test]
@@ -762,7 +716,7 @@ macro_rules! impl_basic_traits {
                 _writer: &mut WriteStream<'a>,
                 _provider: &PStream,
             ) -> wrt_foundation::WrtResult<()> {
-                Ok(())
+                Ok(()
             }
         }
 
@@ -816,5 +770,5 @@ impl Default for GraphNode {
     }
 }
 
-impl_basic_traits!(GraphEdge, GraphEdge::default());
-impl_basic_traits!(GraphNode, GraphNode::default());
+impl_basic_traits!(GraphEdge, GraphEdge::default();
+impl_basic_traits!(GraphNode, GraphNode::default();

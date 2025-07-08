@@ -12,7 +12,7 @@ This document proposes an enhanced approach to tracking panics in the WRT codeba
 
 ### 1. Enhanced `update_panic_registry.rs`
 
-The existing `xtask update-panic-registry` command has been extended to:
+The planned `cargo-wrt update-panic-registry` command will be extended to:
 
 - Continue to generate the CSV file as before
 - Additionally generate an RST file with sphinx-needs directives
@@ -61,8 +61,8 @@ This approach provides several advantages:
 For developers:
 
 1. Document panics in Rust code following the established format
-2. Run `xtask check-panics --fix` to add templates for undocumented panics
-3. Run `xtask update-panic-registry` to update both CSV and RST files
+2. Run `cargo-wrt check-panics --fix` to add templates for undocumented panics (planned)
+3. Run `cargo-wrt update-panic-registry` to update both CSV and RST files (planned)
 
 For documentation readers:
 

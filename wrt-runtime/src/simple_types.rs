@@ -10,13 +10,13 @@ use wrt_foundation::{
     prelude::{Clone, Copy, Debug},
 };
 use wrt_instructions::Value;
+use crate::bounded_runtime_infra::RuntimeProvider;
 
 // =============================================================================
 // CONCRETE RUNTIME TYPES
 // =============================================================================
 
-/// Default memory provider for runtime operations
-pub type RuntimeProvider = NoStdProvider<1048576>; // 1MB
+// RuntimeProvider definition moved to bounded_runtime_infra.rs to avoid conflicts
 
 /// Vector for local variables in function execution
 pub type LocalsVec = BoundedVec<Value, 64, RuntimeProvider>;

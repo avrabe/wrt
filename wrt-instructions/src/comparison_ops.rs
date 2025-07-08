@@ -111,12 +111,12 @@ where
     let val_b = context.pop_comparison_value()?;
     let float_bits_b = match val_b {
         Value::F32(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 operand")),
+        _ => return Err(Error::type_error("Expected F32 operand")),
     };
     let val_a = context.pop_comparison_value()?;
     let float_bits_a = match val_a {
         Value::F32(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 operand")),
+        _ => return Err(Error::type_error("Expected F32 operand")),
     };
     let math_bits_a = math::FloatBits32(float_bits_a.0);
     let math_bits_b = math::FloatBits32(float_bits_b.0);
@@ -132,12 +132,12 @@ where
     let val_b = context.pop_comparison_value()?;
     let float_bits_b = match val_b {
         Value::F64(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 operand")),
+        _ => return Err(Error::type_error("Expected F64 operand")),
     };
     let val_a = context.pop_comparison_value()?;
     let float_bits_a = match val_a {
         Value::F64(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 operand")),
+        _ => return Err(Error::type_error("Expected F64 operand")),
     };
     let math_bits_a = math::FloatBits64(float_bits_a.0);
     let math_bits_b = math::FloatBits64(float_bits_b.0);
@@ -151,100 +151,100 @@ impl<T: ComparisonContext> PureInstruction<T, Error> for ComparisonOp {
             // i32 comparison operations
             Self::I32Eq => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.eq operand")
+                    Error::type_error("Expected I32 for i32.eq operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.eq operand")
+                    Error::type_error("Expected I32 for i32.eq operand")
                 })?;
                 let result = math::i32_eq(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32Ne => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ne operand")
+                    Error::type_error("Expected I32 for i32.ne operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ne operand")
+                    Error::type_error("Expected I32 for i32.ne operand")
                 })?;
                 let result = math::i32_ne(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32LtS => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.lt_s operand")
+                    Error::type_error("Expected I32 for i32.lt_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.lt_s operand")
+                    Error::type_error("Expected I32 for i32.lt_s operand")
                 })?;
                 let result = math::i32_lt_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32LtU => {
                 let b = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.lt_u operand")
+                    Error::type_error("Expected I32 for i32.lt_u operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.lt_u operand")
+                    Error::type_error("Expected I32 for i32.lt_u operand")
                 })?;
                 let result = math::i32_lt_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32GtS => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.gt_s operand")
+                    Error::type_error("Expected I32 for i32.gt_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.gt_s operand")
+                    Error::type_error("Expected I32 for i32.gt_s operand")
                 })?;
                 let result = math::i32_gt_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32GtU => {
                 let b = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.gt_u operand")
+                    Error::type_error("Expected I32 for i32.gt_u operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.gt_u operand")
+                    Error::type_error("Expected I32 for i32.gt_u operand")
                 })?;
                 let result = math::i32_gt_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32LeS => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.le_s operand")
+                    Error::type_error("Expected I32 for i32.le_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.le_s operand")
+                    Error::type_error("Expected I32 for i32.le_s operand")
                 })?;
                 let result = math::i32_le_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32LeU => {
                 let b = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.le_u operand")
+                    Error::type_error("Expected I32 for i32.le_u operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.le_u operand")
+                    Error::type_error("Expected I32 for i32.le_u operand")
                 })?;
                 let result = math::i32_le_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32GeS => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ge_s operand")
+                    Error::type_error("Expected I32 for i32.ge_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ge_s operand")
+                    Error::type_error("Expected I32 for i32.ge_s operand")
                 })?;
                 let result = math::i32_ge_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32GeU => {
                 let b = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ge_u operand")
+                    Error::type_error("Expected I32 for i32.ge_u operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ge_u operand")
+                    Error::type_error("Expected I32 for i32.ge_u operand")
                 })?;
                 let result = math::i32_ge_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
@@ -253,100 +253,100 @@ impl<T: ComparisonContext> PureInstruction<T, Error> for ComparisonOp {
             // i64 comparison operations
             Self::I64Eq => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.eq operand")
+                    Error::type_error("Expected I64 for i64.eq operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.eq operand")
+                    Error::type_error("Expected I64 for i64.eq operand")
                 })?;
                 let result = math::i64_eq(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64Ne => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ne operand")
+                    Error::type_error("Expected I64 for i64.ne operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ne operand")
+                    Error::type_error("Expected I64 for i64.ne operand")
                 })?;
                 let result = math::i64_ne(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64LtS => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.lt_s operand")
+                    Error::type_error("Expected I64 for i64.lt_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.lt_s operand")
+                    Error::type_error("Expected I64 for i64.lt_s operand")
                 })?;
                 let result = math::i64_lt_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64LtU => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.lt_u operand")
+                    Error::type_error("Expected I64 for i64.lt_u operand")
                 })? as u64;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.lt_u operand")
+                    Error::type_error("Expected I64 for i64.lt_u operand")
                 })? as u64;
                 let result = math::i64_lt_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64GtS => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.gt_s operand")
+                    Error::type_error("Expected I64 for i64.gt_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.gt_s operand")
+                    Error::type_error("Expected I64 for i64.gt_s operand")
                 })?;
                 let result = math::i64_gt_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64GtU => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.gt_u operand")
+                    Error::type_error("Expected I64 for i64.gt_u operand")
                 })? as u64;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.gt_u operand")
+                    Error::type_error("Expected I64 for i64.gt_u operand")
                 })? as u64;
                 let result = math::i64_gt_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64LeS => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.le_s operand")
+                    Error::type_error("Expected I64 for i64.le_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.le_s operand")
+                    Error::type_error("Expected I64 for i64.le_s operand")
                 })?;
                 let result = math::i64_le_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64LeU => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.le_u operand")
+                    Error::type_error("Expected I64 for i64.le_u operand")
                 })? as u64;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.le_u operand")
+                    Error::type_error("Expected I64 for i64.le_u operand")
                 })? as u64;
                 let result = math::i64_le_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64GeS => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ge_s operand")
+                    Error::type_error("Expected I64 for i64.ge_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ge_s operand")
+                    Error::type_error("Expected I64 for i64.ge_s operand")
                 })?;
                 let result = math::i64_ge_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64GeU => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ge_u operand")
+                    Error::type_error("Expected I64 for i64.ge_u operand")
                 })? as u64;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ge_u operand")
+                    Error::type_error("Expected I64 for i64.ge_u operand")
                 })? as u64;
                 let result = math::i64_ge_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
@@ -371,14 +371,14 @@ impl<T: ComparisonContext> PureInstruction<T, Error> for ComparisonOp {
             // Test operations
             Self::I32Eqz => {
                 let val = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.eqz")
+                    Error::type_error("Expected I32 for i32.eqz")
                 })?;
                 let result = math::i32_eqz(val)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64Eqz => {
                 let val = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.eqz")
+                    Error::type_error("Expected I64 for i64.eqz")
                 })?;
                 let result = math::i64_eqz(val)?;
                 context.push_comparison_value(Value::I32(result))
@@ -462,7 +462,7 @@ mod tests {
 
         fn pop_comparison_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::runtime_stack_underflow("Stack underflow")
             })
         }
     }

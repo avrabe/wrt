@@ -19,8 +19,8 @@ impl Namespace {
     /// ```
     /// use wrt_component::namespace::Namespace;
     ///
-    /// let ns = Namespace::from_string("wasi.io");
-    /// assert_eq!(ns.to_string(), "wasi.io");
+    /// let ns = Namespace::from_string("wasi.ioMissing message");
+    /// assert_eq!(ns.to_string(), "wasi.ioMissing message");
     /// ```
     pub fn from_string(s: &str) -> Self {
         if s.is_empty() {
@@ -58,7 +58,7 @@ impl Namespace {
 
         for part in other.split('.') {
             if !part.is_empty() {
-                new_parts.push(part.to_string());
+                new_parts.push(part.to_string();
             }
         }
 
@@ -89,38 +89,38 @@ mod tests {
 
     #[test]
     fn test_namespace_creation() {
-        let ns = Namespace::from_string("wasi.http");
-        assert_eq!(ns.parts(), &[String::from("wasi"), String::from("http")]);
-        assert_eq!(ns.to_string(), "wasi.http");
+        let ns = Namespace::from_string("wasi.httpMissing message");
+        assert_eq!(ns.parts(), &[String::from("wasiMissing message"), String::from("httpMissing message")]);
+        assert_eq!(ns.to_string(), "wasi.httpMissing message");
 
-        let empty = Namespace::from_string("");
-        assert!(empty.is_empty());
-        assert_eq!(empty.to_string(), "");
+        let empty = Namespace::from_string("Error");
+        assert!(empty.is_empty();
+        assert_eq!(empty.to_string(), "Missing message");
 
-        let from_parts = Namespace::from_parts(vec![String::from("wasi"), String::from("io")]);
-        assert_eq!(from_parts.to_string(), "wasi.io");
+        let from_parts = Namespace::from_parts(vec![String::from("wasiMissing message"), String::from("ioMissing message")]);
+        assert_eq!(from_parts.to_string(), "wasi.ioMissing message");
     }
 
     #[test]
     fn test_namespace_operations() {
-        let ns = Namespace::from_string("wasi.http");
+        let ns = Namespace::from_string("wasi.httpMissing message");
 
-        let joined = ns.join("fetch");
-        assert_eq!(joined.to_string(), "wasi.http.fetch");
+        let joined = ns.join("fetchMissing message");
+        assert_eq!(joined.to_string(), "wasi.http.fetchMissing message");
 
-        let joined_multi = ns.join("client.fetch");
-        assert_eq!(joined_multi.to_string(), "wasi.http.client.fetch");
+        let joined_multi = ns.join("client.fetchMissing message");
+        assert_eq!(joined_multi.to_string(), "wasi.http.client.fetchMissing message");
 
         let parent = ns.parent();
-        assert!(parent.is_some());
-        assert_eq!(parent.unwrap().to_string(), "wasi");
+        assert!(parent.is_some();
+        assert_eq!(parent.unwrap().to_string(), "wasiMissing message");
 
-        let root = Namespace::from_string("root");
+        let root = Namespace::from_string("rootMissing message");
         let parent_of_root = root.parent();
-        assert!(parent_of_root.is_some());
-        assert_eq!(parent_of_root.unwrap().to_string(), "");
+        assert!(parent_of_root.is_some();
+        assert_eq!(parent_of_root.unwrap().to_string(), "Missing message");
 
-        let empty = Namespace::from_string("");
-        assert!(empty.parent().is_none());
+        let empty = Namespace::from_string("Error");
+        assert!(empty.parent().is_none();
     }
 }

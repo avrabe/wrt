@@ -49,7 +49,7 @@
 
 // Remove unused imports
 
-use crate::prelude::{BlockType, BoundedCapacity, BoundedVec, Debug, Error, ErrorCategory, PartialEq, PureInstruction, Result, Value, codes, str};
+use crate::prelude::{BlockType, Debug, Error, ErrorCategory, PartialEq, PureInstruction, Result, Value, codes, str, BoundedVec, BoundedCapacity};
 // use crate::validation::{Validate, ValidationContext}; // Currently unused
 
 
@@ -79,7 +79,7 @@ pub enum Block {
 }
 
 /// Represents a pure control flow operation for WebAssembly.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ControlOp {
     /// A basic block of instructions with a label that can be branched to
     Block(ControlBlockType),
@@ -134,6 +134,12 @@ pub enum ControlOp {
     BrOnNull(u32),
     /// Branch if reference is not null (`br_on_non_null`)
     BrOnNonNull(u32),
+}
+
+impl Default for ControlOp {
+    fn default() -> Self {
+        ControlOp::Nop
+    }
 }
 
 /// Return operation (return)
@@ -293,7 +299,7 @@ impl BrTable {
         }
         #[cfg(not(feature = "std"))]
         {
-            let provider = wrt_foundation::NoStdProvider::<8192>::new();
+            let provider = wrt_foundation::safe_managed_alloc!(8192, wrt_foundation::budget_aware_provider::CrateId::Instructions)?;
             let mut table = wrt_foundation::BoundedVec::new(provider).map_err(|_| {
                 Error::memory_error("Could not create BoundedVec")
             })?;
@@ -330,7 +336,7 @@ impl BrTable {
         {
             // For no_std, we create a temporary slice on the stack
             let mut slice_vec = [0u32; 256]; // Static array for no_std
-            let len = core::cmp::min(self.table.len(), 256);
+            let len = core::cmp::min(BoundedCapacity::len(&self.table), 256);
             for i in 0..len {
                 slice_vec[i] = self.table.get(i).map_err(|_| {
                     Error::runtime_error("Branch table index out of bounds")
@@ -423,7 +429,7 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
             Self::Loop(block_type) => context.enter_block(Block::Loop(*block_type)),
             Self::If(block_type) => {
                 let condition = context.pop_control_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for if condition")
+                    Error::type_error("Expected I32 for if condition")
                 })?;
 
                 if condition != 0 {
@@ -454,7 +460,7 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
             }
             Self::BrIf(label_idx) => {
                 let condition = context.pop_control_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for br_if condition")
+                    Error::type_error("Expected I32 for br_if condition")
                 })?;
 
                 if condition != 0 {
@@ -470,7 +476,11 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
             }
             Self::BrTable { table, default } => {
                 // Use from_slice for unified interface across all feature configurations
+                #[cfg(feature = "std")]
                 let slice: &[u32] = table.as_slice();
+                #[cfg(not(feature = "std"))]
+                let slice: &[u32] = table.as_slice().map_err(|_| Error::runtime_error("Failed to get table slice"))?;
+                
                 let br_table = BrTable::from_slice(slice, *default)?;
                 br_table.execute(context)
             }
@@ -546,7 +556,7 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
     }
 }
 
-#[cfg(all(test, any(feature = "std", )))]
+#[cfg(all(test, feature = "std"))]
 mod tests {
         use std::vec;
         use std::vec::Vec;
@@ -591,7 +601,7 @@ mod tests {
 
         fn pop_control_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::runtime_stack_underflow("Stack underflow")
             })
         }
 
@@ -606,11 +616,7 @@ mod tests {
 
         fn exit_block(&mut self) -> Result<Block> {
             self.blocks.pop().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    codes::EXECUTION_ERROR,
-                    "Invalid branch target",
-                )
+                Error::runtime_execution_error("Invalid branch target")
             })
         }
 
@@ -636,7 +642,7 @@ mod tests {
 
         fn trap(&mut self, _message: &str) -> Result<()> {
             self.trapped = true;
-            Err(Error::new(ErrorCategory::Runtime, codes::EXECUTION_ERROR, "Execution trapped"))
+            Err(Error::runtime_trap_error("Execution trapped"))
         }
 
         fn get_current_block(&self) -> Option<&Block> {

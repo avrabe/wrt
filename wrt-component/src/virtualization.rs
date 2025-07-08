@@ -5,7 +5,7 @@ use crate::{
 };
 
 // Placeholder types
-pub type ComponentInstanceId = u32;
+pub use crate::types::ComponentInstanceId;
 pub type ResourceHandle = u32;
 pub type ValType = u32;
 use core::{
@@ -14,7 +14,9 @@ use core::{
 };
 use wrt_foundation::{
     bounded_collections::{BoundedHashMap, BoundedVec},
-    safe_memory::SafeMemory,
+    safe_memory::{SafeMemory, NoStdProvider},
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 #[cfg(feature = "std")]
@@ -56,7 +58,51 @@ impl fmt::Display for VirtualizationError {
 #[cfg(feature = "std")]
 impl std::error::Error for VirtualizationError {}
 
-pub type VirtualizationResult<T> = Result<T, VirtualizationError>;
+// Conversion to wrt_error::Error for unified error handling
+impl From<VirtualizationError> for wrt_error::Error {
+    fn from(err: VirtualizationError) -> Self {
+        use wrt_error::{ErrorCategory, codes};
+        match err.kind {
+            VirtualizationErrorKind::CapabilityDenied => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_CAPABILITY_DENIED,
+                "Virtualization capability denied",
+            ),
+            VirtualizationErrorKind::ResourceExhaustion => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_RESOURCE_LIFECYCLE_ERROR,
+                "Virtualization resource exhausted",
+            ),
+            VirtualizationErrorKind::InvalidVirtualComponent => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_VIRTUALIZATION_ERROR,
+                "Invalid virtual component",
+            ),
+            VirtualizationErrorKind::MemoryViolation => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_VIRTUALIZATION_ERROR,
+                "Virtualization memory violation",
+            ),
+            VirtualizationErrorKind::ImportNotFound => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_INSTANTIATION_RUNTIME_ERROR,
+                "Virtual import not found",
+            ),
+            VirtualizationErrorKind::ExportConflict => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_INSTANTIATION_RUNTIME_ERROR,
+                "Virtual export conflict",
+            ),
+            VirtualizationErrorKind::VirtualizationNotSupported => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_VIRTUALIZATION_ERROR,
+                "Virtualization not supported",
+            ),
+        }
+    }
+}
+
+pub type VirtualizationResult<T> = wrt_error::Result<T>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Capability {
@@ -233,15 +279,21 @@ pub struct ResourceUsage {
 }
 
 impl VirtualizationManager {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> VirtualizationResult<Self> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let capability_grants = BoundedVec::new(provider).map_err(|_| VirtualizationError {
+            kind: VirtualizationErrorKind::ResourceExhaustion,
+            message: "Failed to create capability grants storage".to_string(),
+        })?;
+
+        Ok(Self {
             virtual_components: BoundedHashMap::new(),
-            capability_grants: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            capability_grants,
             host_exports: BoundedHashMap::new(),
             sandbox_registry: BoundedHashMap::new(),
             next_virtual_id: AtomicU32::new(1000),
             virtualization_enabled: AtomicBool::new(true),
-        }
+        })
     }
 
     pub fn enable_virtualization(&self) {
@@ -270,17 +322,35 @@ impl VirtualizationManager {
         }
 
         let instance_id =
-            ComponentInstanceId::new(self.next_virtual_id.fetch_add(1, Ordering::SeqCst));
+            ComponentInstanceId::new(self.next_virtual_id.fetch_add(1, Ordering::SeqCst);
 
         let virtual_component = VirtualComponent {
             instance_id,
             name: name.to_string(),
             parent,
-            children: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-            capabilities: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            children: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| VirtualizationError {
+                    kind: VirtualizationErrorKind::ResourceExhaustion,
+                    message: "Failed to create children storage".to_string(),
+                })?
+            },
+            capabilities: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| VirtualizationError {
+                    kind: VirtualizationErrorKind::ResourceExhaustion,
+                    message: "Failed to create capabilities storage".to_string(),
+                })?
+            },
             virtual_imports: BoundedHashMap::new(),
             virtual_exports: BoundedHashMap::new(),
-            memory_regions: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            memory_regions: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| VirtualizationError {
+                    kind: VirtualizationErrorKind::ResourceExhaustion,
+                    message: "Failed to create memory regions storage".to_string(),
+                })?
+            },
             isolation_level,
             resource_limits: ResourceLimits::default(),
             is_sandboxed: isolation_level != IsolationLevel::None,
@@ -355,7 +425,7 @@ impl VirtualizationManager {
             })?;
         }
 
-        Ok(())
+        Ok(()
     }
 
     pub fn check_capability(
@@ -364,7 +434,7 @@ impl VirtualizationManager {
         capability: &Capability,
     ) -> bool {
         if let Some(component) = self.virtual_components.get(&instance_id) {
-            component.capabilities.iter().any(|cap| self.capability_matches(cap, capability))
+            component.capabilities.iter().any(|cap| self.capability_matches(cap, capability)
         } else {
             false
         }
@@ -387,7 +457,7 @@ impl VirtualizationManager {
             message: "Too many virtual imports".to_string(),
         })?;
 
-        Ok(())
+        Ok(()
     }
 
     pub fn add_virtual_export(
@@ -407,7 +477,7 @@ impl VirtualizationManager {
             message: "Export already exists or too many exports".to_string(),
         })?;
 
-        Ok(())
+        Ok(()
     }
 
     pub fn allocate_virtual_memory(
@@ -516,7 +586,7 @@ impl VirtualizationManager {
                 self.check_resource_limits(component, &sandbox_state.resource_usage)?;
             }
         }
-        Ok(())
+        Ok(()
     }
 
     fn capability_matches(&self, granted: &Capability, requested: &Capability) -> bool {
@@ -651,13 +721,14 @@ impl VirtualizationManager {
             });
         }
 
-        Ok(())
+        Ok(()
     }
 }
 
 impl Default for VirtualizationManager {
     fn default() -> Self {
-        Self::new()
+        // Use new() which properly handles allocation or panic in development
+        Self::new().expect("VirtualizationManager allocation should not fail in default constructionMissing message")
     }
 }
 
@@ -665,12 +736,19 @@ pub fn create_memory_capability(max_size: usize) -> Capability {
     Capability::Memory { max_size }
 }
 
-pub fn create_network_capability(allowed_hosts: &[&str]) -> Capability {
-    let mut hosts = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+pub fn create_network_capability(allowed_hosts: &[&str]) -> VirtualizationResult<Capability> {
+    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+    let mut hosts = BoundedVec::new(provider).map_err(|_| VirtualizationError {
+        kind: VirtualizationErrorKind::ResourceExhaustion,
+        message: "Failed to create network hosts storage".to_string(),
+    })?;
     for host in allowed_hosts {
-        let _ = hosts.push(host.to_string());
+        hosts.push(host.to_string()).map_err(|_| VirtualizationError {
+            kind: VirtualizationErrorKind::ResourceExhaustion,
+            message: "Too many allowed hosts".to_string(),
+        })?;
     }
-    Capability::Network { allowed_hosts: hosts }
+    Ok(Capability::Network { allowed_hosts: hosts })
 }
 
 pub fn create_threading_capability(max_threads: u32) -> Capability {
@@ -683,34 +761,34 @@ mod tests {
 
     #[test]
     fn test_virtualization_manager_creation() {
-        let manager = VirtualizationManager::new();
-        assert!(manager.is_virtualization_enabled());
+        let manager = VirtualizationManager::new().unwrap();
+        assert!(manager.is_virtualization_enabled();
     }
 
     #[test]
     fn test_virtual_component_creation() {
-        let mut manager = VirtualizationManager::new();
+        let mut manager = VirtualizationManager::new().unwrap();
         let result =
             manager.create_virtual_component("test-component", None, IsolationLevel::Basic);
-        assert!(result.is_ok());
+        assert!(result.is_ok();
     }
 
     #[test]
     fn test_capability_granting() {
-        let mut manager = VirtualizationManager::new();
+        let mut manager = VirtualizationManager::new().unwrap();
         let instance_id = manager
             .create_virtual_component("test-component", None, IsolationLevel::Basic)
             .unwrap();
 
         let capability = create_memory_capability(1024);
         let result = manager.grant_capability(instance_id, capability.clone(), None, true);
-        assert!(result.is_ok());
-        assert!(manager.check_capability(instance_id, &capability));
+        assert!(result.is_ok();
+        assert!(manager.check_capability(instance_id, &capability);
     }
 
     #[test]
     fn test_virtual_memory_allocation() {
-        let mut manager = VirtualizationManager::new();
+        let mut manager = VirtualizationManager::new().unwrap();
         let instance_id = manager
             .create_virtual_component("test-component", None, IsolationLevel::Strong)
             .unwrap();
@@ -721,6 +799,6 @@ mod tests {
         let permissions = MemoryPermissions { read: true, write: true, execute: false };
 
         let result = manager.allocate_virtual_memory(instance_id, 1024, permissions);
-        assert!(result.is_ok());
+        assert!(result.is_ok();
     }
 }

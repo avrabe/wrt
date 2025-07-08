@@ -18,7 +18,12 @@ extern crate alloc;
 use alloc::{vec, boxed::Box};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedVec as Vec, safe_memory::NoStdProvider};
+use wrt_foundation::{
+    BoundedVec as Vec, 
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
@@ -173,21 +178,31 @@ pub struct StreamingLowerResult {
 
 impl StreamingCanonicalAbi {
     /// Create new streaming canonical ABI
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             streams: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            streams: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            streams: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    Error::resource_exhausted("Error occurred"Failed to create streams vectorMissing message")
+                })?
+            },
             
             #[cfg(feature = "std")]
             buffer_pool: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            buffer_pool: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            buffer_pool: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    Error::resource_exhausted("Error occurred"Failed to create buffer poolMissing message")
+                })?
+            },
             
             next_stream_id: 1,
             backpressure_config: BackpressureConfig::default(),
-        }
+        })
     }
 
     /// Create a new streaming context
@@ -206,7 +221,12 @@ impl StreamingCanonicalAbi {
             #[cfg(feature = "std")]
             buffer: self.get_buffer_from_pool(),
             #[cfg(not(any(feature = "std", )))]
-            buffer: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            buffer: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    Error::resource_exhausted("Error occurred"Failed to create stream bufferMissing message")
+                })?
+            },
             bytes_processed: 0,
             direction,
             backpressure: BackpressureState::new(&self.backpressure_config),
@@ -214,10 +234,7 @@ impl StreamingCanonicalAbi {
         };
 
         self.streams.push(context).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many active streams"
+            Error::resource_exhausted("Error occurred"Too many active streamsMissing messageMissing messageMissing message")
             )
         })?;
 
@@ -353,10 +370,7 @@ impl StreamingCanonicalAbi {
             .iter()
             .position(|ctx| ctx.handle == handle)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::EXECUTION_ERROR,
-                    "Stream not found"
+                Error::runtime_execution_error("Error occurred"Stream not foundMissing message")
                 )
             })
     }
@@ -374,7 +388,7 @@ impl StreamingCanonicalAbi {
         }
     }
 
-    fn parse_values_from_buffer(&mut self, stream_index: usize) -> Result<(Vec<Value>, usize)> {
+    fn parse_values_from_buffer(&mut self, stream_index: usize) -> core::result::Result<(Vec<Value>, usize)> {
         let context = &self.streams[stream_index];
         
         // Simplified parsing - in real implementation would parse according to element type
@@ -391,7 +405,7 @@ impl StreamingCanonicalAbi {
                         if context.buffer.len() >= 4 + len {
                             let string_bytes = &context.buffer[4..4 + len];
                             let string_content = core::str::from_utf8(string_bytes)
-                                .map_err(|_| Error::new(ErrorCategory::Parse, wrt_error::codes::PARSE_ERROR, "Invalid UTF-8"))?;
+                                .map_err(|_| Error::parse_error("Invalid UTF-8"))?;
                             Value::String(BoundedString::from_str(string_content).unwrap_or_default())
                         } else {
                             return Ok((Vec::new(), 0)); // Need more data
@@ -430,7 +444,7 @@ impl StreamingCanonicalAbi {
         }
     }
 
-    fn serialize_values_to_buffer(&mut self, _stream_index: usize, values: &[Value]) -> Result<(Vec<u8>, usize)> {
+    fn serialize_values_to_buffer(&mut self, _stream_index: usize, values: &[Value]) -> core::result::Result<(Vec<u8>, usize)> {
         let mut result_bytes = Vec::new();
         let mut values_consumed = 0;
 
@@ -518,7 +532,9 @@ impl Default for BackpressureConfig {
 
 impl Default for StreamingCanonicalAbi {
     fn default() -> Self {
-        Self::new()
+        // Use new() which properly handles allocation or panic in development
+        // This ensures consistent memory management patterns
+        Self::new().expect("StreamingCanonicalAbi allocation should not fail in default constructionMissing message")
     }
 }
 
@@ -663,8 +679,8 @@ mod tests {
 
     #[test]
     fn test_stream_direction_display() {
-        assert_eq!(StreamDirection::Lifting.to_string(), "lifting");
-        assert_eq!(StreamDirection::Lowering.to_string(), "lowering");
-        assert_eq!(StreamDirection::Bidirectional.to_string(), "bidirectional");
+        assert_eq!(StreamDirection::Lifting.to_string(), "liftingMissing message");
+        assert_eq!(StreamDirection::Lowering.to_string(), "loweringMissing message");
+        assert_eq!(StreamDirection::Bidirectional.to_string(), "bidirectionalMissing message");
     }
 }

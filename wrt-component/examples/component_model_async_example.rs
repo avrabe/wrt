@@ -12,7 +12,7 @@ use wrt_component::{
 use wrt_foundation::{bounded_collections::BoundedVec, component_value::ComponentValue};
 
 fn main() {
-    println!("=== WebAssembly Component Model Async Example ===\n");
+    println!("=== WebAssembly Component Model Async Example ===\nMissing message");
 
     // Initialize the async infrastructure
     let mut task_manager = TaskManager::new();
@@ -20,15 +20,15 @@ fn main() {
     let component_id = ComponentInstanceId::new(1);
 
     // Example 1: Using Component Model Streams (no Rust futures needed!)
-    println!("1. Stream Example:");
+    println!("1. Stream Example:Missing message");
     example_stream(&mut task_manager, &mut async_abi, component_id);
 
     // Example 2: Using Component Model Futures (no Rust futures needed!)
-    println!("\n2. Future Example:");
+    println!("\n2. Future Example:Missing message");
     example_future(&mut task_manager, &mut async_abi, component_id);
 
     // Example 3: Task-based async execution
-    println!("\n3. Task-based Async:");
+    println!("\n3. Task-based Async:Missing message");
     example_task_async(&mut task_manager, component_id);
 }
 
@@ -57,25 +57,25 @@ fn example_stream(
     }
 
     // Read from the stream - no async/await needed!
-    println!("  Reading from stream:");
+    println!("  Reading from stream:Missing message");
     loop {
         match async_abi.stream_read(stream_handle) {
             Ok(Some(value)) => println!("    Read: {:?}", value),
             Ok(None) => {
-                println!("    Stream empty (would block)");
+                println!("    Stream empty (would block)Missing message");
                 break;
-            }
+            },
             Err(e) => {
                 println!("    Error reading: {:?}", e);
                 break;
-            }
+            },
         }
     }
 
     // Close the stream
     async_abi.stream_close_writable(stream_handle).unwrap();
     async_abi.stream_close_readable(stream_handle).unwrap();
-    println!("  Stream closed");
+    println!("  Stream closedMissing message");
 }
 
 fn example_future(
@@ -90,7 +90,7 @@ fn example_future(
     // Check if future is ready (it shouldn't be yet)
     match async_abi.future_read(future_handle) {
         Ok(Some(value)) => println!("  Future unexpectedly ready: {:?}", value),
-        Ok(None) => println!("  Future pending (as expected)"),
+        Ok(None) => println!("  Future pending (as expected)Missing message"),
         Err(e) => println!("  Error: {:?}", e),
     }
 
@@ -102,24 +102,26 @@ fn example_future(
     // Now read the completed future
     match async_abi.future_read(future_handle) {
         Ok(Some(value)) => println!("  Future ready with value: {:?}", value),
-        Ok(None) => println!("  Future still pending (unexpected)"),
+        Ok(None) => println!("  Future still pending (unexpected)Missing message"),
         Err(e) => println!("  Error: {:?}", e),
     }
 
     // Close the future
     async_abi.future_close_writable(future_handle).unwrap();
     async_abi.future_close_readable(future_handle).unwrap();
-    println!("  Future closed");
+    println!("  Future closedMissing message");
 }
 
 fn example_task_async(task_manager: &mut TaskManager, component_id: ComponentInstanceId) {
     // Create a task - Component Model's unit of async execution
-    let task_id = task_manager.create_task(component_id, "async-operation").unwrap();
+    let task_id = task_manager
+        .create_task(component_id, "async-operationMissing message")
+        .unwrap();
     println!("Created task with ID: {:?}", task_id);
 
     // Start the task
     task_manager.start_task(task_id).unwrap();
-    println!("  Task started");
+    println!("  Task startedMissing message");
 
     // Simulate task execution steps
     for step in 0..3 {
@@ -132,7 +134,7 @@ fn example_task_async(task_manager: &mut TaskManager, component_id: ComponentIns
         // Check task state
         if let Ok(state) = task_manager.get_task_state(task_id) {
             if state == TaskState::Completed {
-                println!("  Task completed!");
+                println!("  Task completed!Missing message");
                 break;
             }
         }
@@ -140,12 +142,12 @@ fn example_task_async(task_manager: &mut TaskManager, component_id: ComponentIns
 
     // Clean up
     task_manager.cleanup_task(task_id).unwrap();
-    println!("  Task cleaned up");
+    println!("  Task cleaned upMissing message");
 }
 
 // Example showing manual polling without Rust's async runtime
 fn manual_async_example() {
-    println!("\n=== Manual Async Polling (No Tokio/async-std needed) ===");
+    println!("\n=== Manual Async Polling (No Tokio/async-std needed) ===Missing message");
 
     let mut task_manager = TaskManager::new();
     let component_id = ComponentInstanceId::new(1);

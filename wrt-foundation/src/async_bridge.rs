@@ -5,13 +5,15 @@
 //! the pluggable executor system.
 
 use core::future::Future;
+use core::marker::Unpin;
 use core::pin::Pin;
 use core::task::{Context, Poll};
-use core::marker::Unpin;
 
-use crate::async_executor_simple::{ExecutorError, with_async as block_on};
+use crate::async_executor_simple::{with_async as block_on, ExecutorError};
 #[cfg(feature = "component-model-async")]
-use crate::async_types::{ComponentFuture, ComponentStream, StreamHandle, ComponentFutureStatus, FutureHandle};
+use crate::async_types::{
+    ComponentFuture, ComponentFutureStatus, ComponentStream, FutureHandle, StreamHandle,
+};
 use crate::types::ValueType as ValType;
 use crate::values::Value;
 
@@ -31,16 +33,14 @@ impl<T> ComponentFutureBridge<T> {
 #[cfg(feature = "component-model-async")]
 impl<T: Clone + Send + 'static + Unpin> Future for ComponentFutureBridge<T> {
     type Output = Result<T, ExecutorError>;
-    
+
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // Get mutable reference to the inner data
         let this = self.get_mut();
-        
+
         // Check Component Model future status
         match this.component_future.poll_status() {
-            Ok(ComponentFutureStatus::Ready(value)) => {
-                Poll::Ready(Ok(value))
-            }
+            Ok(ComponentFutureStatus::Ready(value)) => Poll::Ready(Ok(value)),
             Ok(ComponentFutureStatus::Pending) => {
                 // Register waker to be notified when Component Model future completes
                 this.component_future.set_waker(cx.waker().clone());
@@ -62,7 +62,7 @@ impl<T> ComponentStreamBridge<T> {
     pub fn new(component_stream: ComponentStream<T>) -> Self {
         Self { component_stream }
     }
-    
+
     /// Poll for the next value from the stream
     pub fn poll_next(&mut self, _cx: &mut Context<'_>) -> Poll<Option<T>> {
         match self.component_stream.try_read() {
@@ -83,7 +83,7 @@ pub trait ComponentAsyncExt {
     fn into_future<T>(self) -> Result<ComponentFutureBridge<T>, ExecutorError>
     where
         T: Clone + Send + 'static;
-        
+
     /// Convert a Component Model stream to a bridged stream
     fn into_stream<T>(self) -> Result<ComponentStreamBridge<T>, ExecutorError>
     where
@@ -111,7 +111,7 @@ impl ComponentAsyncExt for Value {
             _ => Err(ExecutorError::Custom("Value is not a future")),
         }
     }
-    
+
     fn into_stream<T>(self) -> Result<ComponentStreamBridge<T>, ExecutorError>
     where
         T: Clone + Send + 'static,
@@ -142,7 +142,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_async_runtime_creation() {
         let runtime = AsyncRuntime::new();

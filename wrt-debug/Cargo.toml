@@ -19,6 +19,9 @@ std = ["wrt-error/std", "wrt-format/std", "wrt-foundation/std"]
 # This crate is no_std by default, this feature is a no-op for compatibility
 no_std = []
 
+# Allocation support for no_std environments
+alloc = ["wrt-foundation/alloc", "wrt-format/alloc"]
+
 # Static debug features (no runtime needed)
 line-info = []              # Line number information support (.debug_line)
 debug-info = ["abbrev"]     # Full debug info parsing (.debug_info)
@@ -30,10 +33,11 @@ static-debug = ["line-info", "debug-info", "function-info"] # All static feature
 runtime-inspection = ["static-debug"]  # Read runtime state
 runtime-variables = ["runtime-inspection"]  # Variable value inspection
 runtime-memory = ["runtime-inspection"]  # Memory inspection
+memory-profiling = ["runtime-memory"]  # Memory profiling and leak detection
 runtime-control = ["runtime-inspection"]  # Execution control
 runtime-breakpoints = ["runtime-control"]  # Breakpoint support
 runtime-stepping = ["runtime-control"]  # Step execution
-runtime-debug = ["runtime-variables", "runtime-memory", "runtime-breakpoints", "runtime-stepping"]  # All runtime features
+runtime-debug = ["runtime-variables", "runtime-memory", "runtime-breakpoints", "runtime-stepping", "memory-profiling"]  # All runtime features
 
 # WIT integration features
 wit-integration = ["runtime-debug", "std"]  # WIT source mapping and debugging
@@ -44,8 +48,22 @@ development = ["runtime-debug"]  # Full debugging
 production = ["static-debug"]  # Error reporting only
 full-debug = ["static-debug", "runtime-debug", "wit-integration"]  # Everything
 
+# Safety level presets using capability-based features
+qm = ["wrt-foundation/dynamic-allocation", "wrt-format/qm"]
+asil-a = ["wrt-foundation/bounded-collections", "wrt-format/asil-a"]
+asil-b = ["wrt-foundation/bounded-collections", "wrt-format/asil-b"]
+asil-c = ["wrt-foundation/static-memory-safety", "wrt-format/asil-c"]
+asil-d = ["wrt-foundation/asil-d", "wrt-format/asil-d"]
+
+# Legacy compatibility features
+safe-memory = ["asil-b"]
+safety-asil-b = ["asil-b"]
+safety-asil-c = ["asil-c"]
+safety-asil-d = ["asil-d"]
+
 # Disable panic handler for library builds to avoid conflicts
-disable-panic-handler = []
+kani = []
+
 
 [lib]
 name = "wrt_debug"

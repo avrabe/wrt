@@ -18,7 +18,7 @@ use wrt_format::{binary, wasmparser::SectionId};
 
 /// Displays a hexadecimal dump of a portion of a binary slice.
 fn hex_dump(data: &[u8], offset: usize, len: usize) {
-    let end = std::cmp::min(offset + len, data.len());
+    let end = std::cmp::min(offset + len, data.len();
     let chunk = &data[offset..end];
 
     for (i, bytes) in chunk.chunks(16).enumerate() {
@@ -29,41 +29,41 @@ fn hex_dump(data: &[u8], offset: usize, len: usize) {
         for (j, byte) in bytes.iter().enumerate() {
             print!("{:02x} ", byte);
             if j == 7 {
-                print!(" ");
+                print!(" Missing message");
             }
         }
 
         // Padding for last row if needed
         for _ in bytes.len()..16 {
-            print!("   ");
+            print!("   Missing message");
         }
         if bytes.len() <= 8 {
-            print!(" ");
+            print!(" Missing message");
         }
 
         // Print ASCII representation
-        print!(" |");
+        print!(" |Missing message");
         for byte in bytes {
             if *byte >= 32 && *byte <= 126 {
                 print!("{}", *byte as char);
             } else {
-                print!(".");
+                print!(".Missing message");
             }
         }
         for _ in bytes.len()..16 {
-            print!(" ");
+            print!(" Missing message");
         }
-        println!("|");
+        println!("|Missing message");
     }
 }
 
 /// Analyzes a WebAssembly module to extract information.
 fn analyze_module(binary: &[u8]) -> Result<()> {
-    println!("\n=== Module Analysis ===");
+    println!("\n=== Module Analysis ===Missing message");
 
     if !is_valid_module(binary) {
-        println!("Not a valid WebAssembly module");
-        return Ok(());
+        println!("Not a valid WebAssembly moduleMissing message");
+        return Ok(();
     }
 
     let mut offset = 8; // Skip magic and version
@@ -100,7 +100,10 @@ fn analyze_module(binary: &[u8]) -> Result<()> {
             _ => "Unknown",
         };
 
-        println!("Section {}: {} (size: {})", section_id, section_name, section_size);
+        println!(
+            "Section {}: {} (size: {})",
+            section_id, section_name, section_size
+        );
 
         // Analyze custom section
         if section_id == 0 {
@@ -154,7 +157,7 @@ fn analyze_module(binary: &[u8]) -> Result<()> {
                         // Function import
                         let (_, bytes_read) = binary::read_leb128_u32(binary, import_offset)?;
                         import_offset += bytes_read;
-                    }
+                    },
                     1 => {
                         // Table import
                         import_offset += 1; // element type
@@ -172,7 +175,7 @@ fn analyze_module(binary: &[u8]) -> Result<()> {
                                         + binary::leb128_size(binary, import_offset + 1)?,
                                 )?;
                         }
-                    }
+                    },
                     2 => {
                         // Memory import
                         if binary[import_offset] & 0x01 == 0 {
@@ -189,16 +192,16 @@ fn analyze_module(binary: &[u8]) -> Result<()> {
                                         + binary::leb128_size(binary, import_offset + 1)?,
                                 )?;
                         }
-                    }
+                    },
                     3 => {
                         // Global import
                         import_offset += 1; // value type
                         import_offset += 1; // mutability
-                    }
+                    },
                     _ => {
                         // Unknown kind, can't parse further
                         break;
-                    }
+                    },
                 }
 
                 println!("    Import {}: {}.{} ({})", i, module, name, kind_name);
@@ -242,13 +245,13 @@ fn analyze_module(binary: &[u8]) -> Result<()> {
         offset = section_end;
     }
 
-    Ok(())
+    Ok(()
 }
 
 /// Parses and displays information from the name section of a WebAssembly
 /// module.
 fn parse_name_section(module: &Module) -> Result<()> {
-    println!("\n=== Name Section Analysis ===");
+    println!("\n=== Name Section Analysis ===Missing message");
 
     let mut found_name_section = false;
 
@@ -286,7 +289,7 @@ fn parse_name_section(module: &Module) -> Result<()> {
                         // Module name
                         let (name, _) = binary::read_string(data, offset)?;
                         println!("Module name: {}", name);
-                    }
+                    },
                     1 => {
                         // Function names
                         let (count, bytes_read) = binary::read_leb128_u32(data, offset)?;
@@ -311,7 +314,7 @@ fn parse_name_section(module: &Module) -> Result<()> {
 
                             println!("  Function {}: {}", index, name);
                         }
-                    }
+                    },
                     2 => {
                         // Local names
                         let (count, bytes_read) = binary::read_leb128_u32(data, offset)?;
@@ -357,10 +360,10 @@ fn parse_name_section(module: &Module) -> Result<()> {
                                 println!("    Local {}: {}", local_index, name);
                             }
                         }
-                    }
+                    },
                     _ => {
                         println!("Unknown name subsection type: {}", name_type);
-                    }
+                    },
                 }
 
                 offset = subsection_end;
@@ -369,15 +372,15 @@ fn parse_name_section(module: &Module) -> Result<()> {
     }
 
     if !found_name_section {
-        println!("No name section found in the module");
+        println!("No name section found in the moduleMissing message");
     }
 
-    Ok(())
+    Ok(()
 }
 
 /// Analyzes memory usage in a WebAssembly module.
 fn analyze_memory_usage(module: &Module) -> Result<()> {
-    println!("\n=== Memory Usage Analysis ===");
+    println!("\n=== Memory Usage Analysis ===Missing message");
 
     // Check for memory definitions
     let memory_count = module.memories().len();
@@ -394,29 +397,34 @@ fn analyze_memory_usage(module: &Module) -> Result<()> {
         if let Some(max) = memory.maximum {
             println!("    maximum={} pages ({} bytes)", max, max as usize * 65536);
         } else {
-            println!("    no maximum specified");
+            println!("    no maximum specifiedMissing message");
         }
     }
 
     // Check for data sections
     let data_segments = module.data_sections();
-    println!("Data segments: {}", data_segments.len());
+    println!("Data segments: {}", data_segments.len();
 
     for (i, data) in data_segments.iter().enumerate() {
-        println!("  Data {}: memory={}, size={} bytes", i, data.memory_index, data.data.len());
+        println!(
+            "  Data {}: memory={}, size={} bytes",
+            i,
+            data.memory_index,
+            data.data.len()
+        );
 
         match &data.offset {
             wrt_decoder::DataSegmentOffset::Active(expr) => {
                 println!("    mode: active, offset expression: {:?}", expr);
-            }
+            },
             wrt_decoder::DataSegmentOffset::Passive => {
-                println!("    mode: passive");
-            }
+                println!("    mode: passiveMissing message");
+            },
         }
 
         // Print a short preview of the data content
         if !data.data.is_empty() {
-            let preview_len = std::cmp::min(16, data.data.len());
+            let preview_len = std::cmp::min(16, data.data.len();
             let preview = &data.data[0..preview_len];
 
             print!("    data (first {} bytes): ", preview_len);
@@ -434,12 +442,12 @@ fn analyze_memory_usage(module: &Module) -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(()
 }
 
 /// Analyzes a WebAssembly Component.
 fn analyze_component(binary: &[u8]) -> Result<()> {
-    println!("\n=== Component Analysis ===");
+    println!("\n=== Component Analysis ===Missing message");
 
     // Use the built-in component analyzer
     let summary = analyze_component(binary)?;
@@ -454,7 +462,7 @@ fn analyze_component(binary: &[u8]) -> Result<()> {
 
     // Display component imports
     if !imports.is_empty() {
-        println!("\nComponent Imports:");
+        println!("\nComponent Imports:Missing message");
         for import in &imports {
             println!("  {}.{}: {}", import.namespace, import.name, import.kind);
         }
@@ -462,15 +470,18 @@ fn analyze_component(binary: &[u8]) -> Result<()> {
 
     // Display component exports
     if !exports.is_empty() {
-        println!("\nComponent Exports:");
+        println!("\nComponent Exports:Missing message");
         for export in &exports {
-            println!("  {}: {} (index: {})", export.name, export.kind, export.index);
+            println!(
+                "  {}: {} (index: {})",
+                export.name, export.kind, export.index
+            );
         }
     }
 
     // Display module imports
     if !module_imports.is_empty() {
-        println!("\nModule Imports:");
+        println!("\nModule Imports:Missing message");
         for import in &module_imports {
             println!(
                 "  Module {}: {}.{} ({}, index: {})",
@@ -481,7 +492,7 @@ fn analyze_component(binary: &[u8]) -> Result<()> {
 
     // Display module exports
     if !module_exports.is_empty() {
-        println!("\nModule Exports:");
+        println!("\nModule Exports:Missing message");
         for export in &module_exports {
             println!(
                 "  Module {}: {} ({}, index: {})",
@@ -490,34 +501,37 @@ fn analyze_component(binary: &[u8]) -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(()
 }
 
 /// Analyzes the binary format of a WebAssembly file.
 fn analyze_binary_format(binary: &[u8]) -> Result<()> {
-    println!("\n=== Binary Format Analysis ===");
+    println!("\n=== Binary Format Analysis ===Missing message");
 
     // Check if file is long enough for header
     if binary.len() < 8 {
-        println!("File too short to be a valid WebAssembly binary");
-        return Ok(());
+        println!("File too short to be a valid WebAssembly binaryMissing message");
+        return Ok(();
     }
 
     // Check magic bytes
     let magic = &binary[0..4];
     let version = u32::from_le_bytes([binary[4], binary[5], binary[6], binary[7]]);
 
-    println!("Magic bytes: {:02x} {:02x} {:02x} {:02x}", magic[0], magic[1], magic[2], magic[3]);
+    println!(
+        "Magic bytes: {:02x} {:02x} {:02x} {:02x}",
+        magic[0], magic[1], magic[2], magic[3]
+    );
     println!("Version: {}", version);
 
     // Identify binary type
     if magic == b"\0asm" {
-        println!("File type: WebAssembly Module");
+        println!("File type: WebAssembly ModuleMissing message");
     } else if magic == b"\0age" {
-        println!("File type: WebAssembly Component");
+        println!("File type: WebAssembly ComponentMissing message");
     } else {
-        println!("File type: Unknown (not a valid WebAssembly binary)");
-        return Ok(());
+        println!("File type: Unknown (not a valid WebAssembly binary)Missing message");
+        return Ok(();
     }
 
     // Count and identify sections
@@ -583,18 +597,21 @@ fn analyze_binary_format(binary: &[u8]) -> Result<()> {
     }
 
     // Print section counts
-    println!("\nSection counts:");
+    println!("\nSection counts:Missing message");
     let section_names =
         if magic == b"\0asm" { &module_section_names } else { &component_section_names };
 
     for (id, count) in section_counts.iter() {
-        let name =
-            if *id < section_names.len() as u8 { section_names[*id as usize] } else { "Unknown" };
+        let name = if *id < section_names.len() as u8 {
+            section_names[*id as usize]
+        } else {
+            "Unknown"
+        };
 
         println!("  Section {}: {} (count: {})", id, name, count);
     }
 
-    Ok(())
+    Ok(()
 }
 
 fn main() -> Result<()> {
@@ -602,7 +619,7 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         println!("Usage: {} <path-to-wasm-file>", args[0]);
-        return Ok(());
+        return Ok(();
     }
 
     let path = &args[1];
@@ -612,7 +629,7 @@ fn main() -> Result<()> {
     let binary = fs::read(Path::new(path))?;
 
     // Print hexdump of the file header
-    println!("\n=== File Header Hexdump ===");
+    println!("\n=== File Header Hexdump ===Missing message");
     hex_dump(&binary, 0, 64);
 
     // Analyze binary format using wrt-format
@@ -645,12 +662,12 @@ fn main() -> Result<()> {
                 analyze_module(&binary)?;
                 parse_name_section(&module)?;
                 analyze_memory_usage(&module)?;
-            }
+            },
             Err(e) => {
                 println!("\nError: Failed to decode as WebAssembly module: {}", e);
-            }
+            },
         }
     }
 
-    Ok(())
+    Ok(()
 }

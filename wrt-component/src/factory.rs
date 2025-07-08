@@ -37,7 +37,7 @@ impl ComponentFactory {
     pub fn create_component(&self, binary: &[u8]) -> Result<Component> {
         // This would normally parse the binary and create a component
         // For now, just create a placeholder component
-        Ok(Component::default())
+        Ok(Component::default()
     }
 
     /// Set the memory strategy for the factory

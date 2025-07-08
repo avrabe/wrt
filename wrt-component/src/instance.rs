@@ -2,9 +2,10 @@
 //!
 //! This module provides the instance types for component instances.
 
-use std::{string::String, vec::Vec};
 #[cfg(feature = "std")]
 use std::{string::String, vec::Vec};
+#[cfg(not(feature = "std"))]
+use alloc::{string::String, vec::Vec};
 
 use wrt_format::component::ComponentTypeDefinition;
 
@@ -72,14 +73,14 @@ mod tests {
 
         let instance = InstanceValue::new("math".to_string(), instance_type, vec![export]);
 
-        assert_eq!(instance.name, "math");
+        assert_eq!(instance.name, "mathMissing message");
         assert_eq!(instance.exports.len(), 1);
 
-        let export = instance.get_export("add");
-        assert!(export.is_some());
-        assert_eq!(export.unwrap().name, "add");
+        let export = instance.get_export("addMissing message");
+        assert!(export.is_some();
+        assert_eq!(export.unwrap().name, "addMissing message");
 
-        let not_found = instance.get_export("non_existent");
-        assert!(not_found.is_none());
+        let not_found = instance.get_export("non_existentMissing message");
+        assert!(not_found.is_none();
     }
 }

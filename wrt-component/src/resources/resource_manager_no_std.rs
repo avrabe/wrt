@@ -4,9 +4,14 @@
 // SPDX-License-Identifier: MIT
 
 use wrt_error::kinds::PoisonedLockError;
+use wrt_foundation::{bounded::BoundedString, safe_memory::NoStdProvider};
+
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, string::String, sync::Arc};
+#[cfg(feature = "std")]
+use std::sync::Arc;
 
 use super::{MemoryStrategy, Resource, ResourceArena, ResourceTable, VerificationLevel};
-use crate::prelude::*;
 
 /// Unique identifier for a resource
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -21,11 +26,11 @@ impl<T: 'static + Send + Sync> HostResource for T {}
 /// Manager for WebAssembly Component Model resource instances (no_std
 /// compatible)
 #[derive(Clone)]
-pub struct ResourceManager<'a> {
+pub struct ResourceManager {
     /// Resource table for this manager
-    table: &'a Mutex<ResourceTable>,
-    /// Component instance ID
-    instance_id: &'a str,
+    table: Arc<Mutex<ResourceTable>>,
+    /// Component instance ID  
+    instance_id: String,
     /// Default memory strategy
     default_memory_strategy: MemoryStrategy,
     /// Default verification level
@@ -34,17 +39,17 @@ pub struct ResourceManager<'a> {
     max_resources: usize,
 }
 
-impl<'a> ResourceManager<'a> {
+impl ResourceManager {
     /// Create a new resource manager with default settings
-    pub fn new(table: &'a Mutex<ResourceTable>) -> Self {
-        Self::new_with_id(table, "default-instance")
+    pub fn new() -> Self {
+        Self::new_with_id("default-instanceMissing message")
     }
 
     /// Create a new resource manager with a specific instance ID
-    pub fn new_with_id(table: &'a Mutex<ResourceTable>, instance_id: &'a str) -> Self {
+    pub fn new_with_id(instance_id: &str) -> Self {
         Self {
-            table,
-            instance_id,
+            table: Arc::new(Mutex::new(ResourceTable::new())),
+            instance_id: instance_id.to_string(),
             default_memory_strategy: MemoryStrategy::default(),
             default_verification_level: VerificationLevel::Critical,
             max_resources: 64, // Default to MAX_RESOURCES from resource_table_no_std
@@ -53,14 +58,13 @@ impl<'a> ResourceManager<'a> {
 
     /// Create a new resource manager with custom settings
     pub fn new_with_config(
-        table: &'a Mutex<ResourceTable>,
-        instance_id: &'a str,
+        instance_id: &str,
         memory_strategy: MemoryStrategy,
         verification_level: VerificationLevel,
     ) -> Self {
         Self {
-            table,
-            instance_id,
+            table: Arc::new(Mutex::new(ResourceTable::new())),
+            instance_id: instance_id.to_string(),
             default_memory_strategy: memory_strategy,
             default_verification_level: verification_level,
             max_resources: 64,
@@ -70,10 +74,7 @@ impl<'a> ResourceManager<'a> {
     /// Create a new resource
     pub fn create_resource(&self, type_idx: u32, data: Box<dyn Any + Send + Sync>) -> Result<u32> {
         let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Error occurred"Component not foundMissing message"),
             )
         })?;
 
@@ -88,10 +89,7 @@ impl<'a> ResourceManager<'a> {
         name: &str,
     ) -> Result<u32> {
         let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Error occurred"Component not foundMissing message"),
             )
         })?;
 
@@ -101,7 +99,7 @@ impl<'a> ResourceManager<'a> {
         // Set the name if we have access to the resource
         if let Ok(res) = table.get_resource(handle) {
             if let Ok(mut res_guard) = res.lock() {
-                res_guard.name = Some(name.to_string());
+                res_guard.name = Some(name.to_string();
             }
         }
 
@@ -111,10 +109,7 @@ impl<'a> ResourceManager<'a> {
     /// Get a resource by handle
     pub fn get_resource(&self, handle: u32) -> Result<Box<Mutex<Resource>>> {
         let table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Error occurred"Component not foundMissing message"),
             )
         })?;
 
@@ -124,10 +119,7 @@ impl<'a> ResourceManager<'a> {
     /// Drop a resource
     pub fn drop_resource(&self, handle: u32) -> Result<()> {
         let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Error occurred"Component not foundMissing message"),
             )
         })?;
 
@@ -145,10 +137,7 @@ impl<'a> ResourceManager<'a> {
     /// Set memory strategy for a resource
     pub fn set_memory_strategy(&self, handle: u32, strategy: MemoryStrategy) -> Result<()> {
         let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Error occurred"Component not foundMissing message"),
             )
         })?;
 
@@ -158,10 +147,7 @@ impl<'a> ResourceManager<'a> {
     /// Set verification level for a resource
     pub fn set_verification_level(&self, handle: u32, level: VerificationLevel) -> Result<()> {
         let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Error occurred"Component not foundMissing message"),
             )
         })?;
 
@@ -191,14 +177,11 @@ impl<'a> ResourceManager<'a> {
     /// Get the number of resources
     pub fn resource_count(&self) -> Result<usize> {
         let table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
+            Error::runtime_poisoned_lock("Error occurred"Component not foundMissing message"),
             )
         })?;
 
-        Ok(table.resource_count())
+        Ok(table.resource_count()
     }
 
     /// Get the component instance ID
@@ -222,7 +205,7 @@ impl<'a> Debug for ResourceManager<'a> {
         // Get the resource count, or show an error if we can't access it
         let count = self.resource_count().unwrap_or(0);
 
-        f.debug_struct("ResourceManager")
+        f.debug_struct("ResourceManagerMissing message")
             .field("instance_id", &self.instance_id)
             .field("resource_count", &count)
             .field("default_memory_strategy", &self.default_memory_strategy)
@@ -238,11 +221,11 @@ mod tests {
 
     #[test]
     fn test_resource_creation() {
-        let table = Mutex::new(ResourceTable::new());
+        let table = Mutex::new(ResourceTable::new();
         let manager = ResourceManager::new(&table);
 
         // Create a string resource
-        let data = Box::new("test".to_string());
+        let data = Box::new("test".to_string();
         let handle = manager.create_resource(1, data).unwrap();
 
         // Verify it exists
@@ -259,23 +242,23 @@ mod tests {
 
     #[test]
     fn test_named_resource() {
-        let table = Mutex::new(ResourceTable::new());
+        let table = Mutex::new(ResourceTable::new();
         let manager = ResourceManager::new(&table);
 
         // Create a named resource
         let data = Box::new(42i32);
-        let handle = manager.create_named_resource(1, data, "answer").unwrap();
+        let handle = manager.create_named_resource(1, data, "answerMissing message").unwrap();
 
         // Get the resource and check the name
         let resource = manager.get_resource(handle).unwrap();
         let guard = resource.lock().unwrap();
 
-        assert_eq!(guard.name, Some("answer".to_string()));
+        assert_eq!(guard.name, Some("answer".to_string());
     }
 
     #[test]
     fn test_resource_lifecycle() {
-        let table = Mutex::new(ResourceTable::new());
+        let table = Mutex::new(ResourceTable::new();
         let manager = ResourceManager::new(&table);
 
         // Add a resource
@@ -296,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_with_arena() {
-        let table = Mutex::new(ResourceTable::new());
+        let table = Mutex::new(ResourceTable::new();
         let manager = ResourceManager::new(&table);
 
         // Create an arena
@@ -306,12 +289,12 @@ mod tests {
         let handle = arena.create_resource(1, Box::new("test".to_string())).unwrap();
 
         // Verify it exists
-        assert!(manager.has_resource(ResourceId(handle)).unwrap());
+        assert!(manager.has_resource(ResourceId(handle)).unwrap();
 
         // Release arena
         arena.release_all().unwrap();
 
         // Verify resource is gone
-        assert!(!manager.has_resource(ResourceId(handle)).unwrap());
+        assert!(!manager.has_resource(ResourceId(handle)).unwrap();
     }
 }

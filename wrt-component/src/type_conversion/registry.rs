@@ -1,11 +1,3 @@
-use std::{
-    any::{Any, TypeId},
-    boxed::Box,
-    collections::BTreeMap as HashMap,
-    fmt,
-    marker::PhantomData,
-    sync::Arc,
-};
 /// Type Conversion Registry
 ///
 /// This module implements a central registry for type conversions between
@@ -19,6 +11,19 @@ use std::{
     fmt,
     marker::PhantomData,
     sync::Arc,
+};
+
+#[cfg(not(feature = "std"))]
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap as HashMap,
+    sync::Arc,
+};
+#[cfg(not(feature = "std"))]
+use core::{
+    any::{Any, TypeId},
+    fmt,
+    marker::PhantomData,
 };
 
 /// Error type for conversion operations
@@ -52,14 +57,14 @@ impl fmt::Display for ConversionError {
             write!(f, "\nCaused by: {}", source)?;
         }
 
-        Ok(())
+        Ok(()
     }
 }
 
 #[cfg(feature = "std")]
 impl std::error::Error for ConversionError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.source.as_ref().map(|e| e.as_ref() as &(dyn std::error::Error + 'static))
+        self.source.as_ref().map(|e| e.as_ref() as &(dyn std::error::Error + 'static)
     }
 }
 
@@ -99,7 +104,7 @@ where
     From: Convertible,
     To: Convertible,
 {
-    fn convert(&self, from: &From) -> Result<To, ConversionError>;
+    fn convert(&self, from: &From) -> core::result::Result<To, ConversionError>;
 }
 
 /// Implementation for function-based converters
@@ -107,16 +112,16 @@ impl<From, To, F> Conversion<From, To> for F
 where
     From: Convertible,
     To: Convertible,
-    F: Fn(&From) -> Result<To, ConversionError> + Send + Sync,
+    F: Fn(&From) -> core::result::Result<To, ConversionError> + Send + Sync,
 {
-    fn convert(&self, from: &From) -> Result<To, ConversionError> {
+    fn convert(&self, from: &From) -> core::result::Result<To, ConversionError> {
         self(from)
     }
 }
 
 /// Type-erased conversion trait object
 trait AnyConversion: Send + Sync {
-    fn convert_any(&self, from: &dyn Any) -> Result<Box<dyn Any>, ConversionError>;
+    fn convert_any(&self, from: &dyn Any) -> core::result::Result<Box<dyn Any>, ConversionError>;
     fn source_type_id(&self) -> TypeId;
     fn target_type_id(&self) -> TypeId;
     fn source_type_name(&self) -> &'static str;
@@ -143,7 +148,7 @@ where
     To: Convertible + 'static,
     C: Conversion<From, To> + 'static,
 {
-    fn convert_any(&self, from: &dyn Any) -> Result<Box<dyn Any>, ConversionError> {
+    fn convert_any(&self, from: &dyn Any) -> core::result::Result<Box<dyn Any>, ConversionError> {
         // Try to downcast to the expected input type
         let from = from.downcast_ref::<From>().ok_or_else(|| ConversionError {
             kind: ConversionErrorKind::InvalidArgument,
@@ -157,7 +162,7 @@ where
         let result = self.converter.convert(from)?;
 
         // Box the result as Any
-        Ok(Box::new(result))
+        Ok(Box::new(result)
     }
 
     fn source_type_id(&self) -> TypeId {
@@ -206,7 +211,7 @@ impl TypeConversionRegistry {
     where
         From: Convertible + 'static,
         To: Convertible + 'static,
-        F: Fn(&From) -> Result<To, ConversionError> + Send + Sync + 'static,
+        F: Fn(&From) -> core::result::Result<To, ConversionError> + Send + Sync + 'static,
     {
         let adapter = ConversionAdapter {
             converter,
@@ -216,8 +221,8 @@ impl TypeConversionRegistry {
             _phantom_to: PhantomData,
         };
 
-        let key = (TypeId::of::<From>(), TypeId::of::<To>());
-        self.conversions.insert(key, Box::new(adapter));
+        let key = (TypeId::of::<From>(), TypeId::of::<To>();
+        self.conversions.insert(key, Box::new(adapter);
         self
     }
 
@@ -227,17 +232,17 @@ impl TypeConversionRegistry {
         From: Convertible + 'static,
         To: Convertible + 'static,
     {
-        let key = (TypeId::of::<From>(), TypeId::of::<To>());
+        let key = (TypeId::of::<From>(), TypeId::of::<To>();
         self.conversions.contains_key(&key)
     }
 
     /// Convert from one type to another
-    pub fn convert<From, To>(&self, from: &From) -> Result<To, ConversionError>
+    pub fn convert<From, To>(&self, from: &From) -> core::result::Result<To, ConversionError>
     where
         From: Convertible + 'static,
         To: Convertible + 'static,
     {
-        let key = (TypeId::of::<From>(), TypeId::of::<To>());
+        let key = (TypeId::of::<From>(), TypeId::of::<To>();
 
         // Look up the converter in the registry
         let converter = self.conversions.get(&key).ok_or_else(|| ConversionError {
@@ -314,15 +319,15 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a simple conversion function
-        registry.register(|src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
-            Ok(TestTargetType(src.0 * 2))
+        registry.register(|src: &TestSourceType| -> core::result::Result<TestTargetType, ConversionError> {
+            Ok(TestTargetType(src.0 * 2)
         });
 
         // Test the conversion
         let source = TestSourceType(21);
         let target = registry.convert::<TestSourceType, TestTargetType>(&source).unwrap();
 
-        assert_eq!(target, TestTargetType(42));
+        assert_eq!(target, TestTargetType(42);
     }
 
     #[test]
@@ -336,9 +341,9 @@ mod tests {
         let source = TestSourceType(42);
         let result = registry.convert::<TestSourceType, AnotherType>(&source);
 
-        assert!(result.is_err());
+        assert!(result.is_err();
         if let Err(err) = result {
-            assert!(matches!(err.kind, ConversionErrorKind::NoConverterFound));
+            assert!(matches!(err.kind, ConversionErrorKind::NoConverterFound);
         }
     }
 
@@ -347,13 +352,13 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a conversion
-        registry.register(|src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
-            Ok(TestTargetType(src.0))
+        registry.register(|src: &TestSourceType| -> core::result::Result<TestTargetType, ConversionError> {
+            Ok(TestTargetType(src.0)
         });
 
         // Check conversions
-        assert!(registry.can_convert::<TestSourceType, TestTargetType>());
-        assert!(!registry.can_convert::<TestTargetType, TestSourceType>());
+        assert!(registry.can_convert::<TestSourceType, TestTargetType>();
+        assert!(!registry.can_convert::<TestTargetType, TestSourceType>();
     }
 
     #[test]
@@ -361,7 +366,7 @@ mod tests {
         let mut registry = TypeConversionRegistry::new();
 
         // Register a conversion that may fail
-        registry.register(|src: &TestSourceType| -> Result<TestTargetType, ConversionError> {
+        registry.register(|src: &TestSourceType| -> core::result::Result<TestTargetType, ConversionError> {
             if src.0 < 0 {
                 return Err(ConversionError {
                     kind: ConversionErrorKind::OutOfRange,
@@ -371,21 +376,82 @@ mod tests {
                     source: None,
                 });
             }
-            Ok(TestTargetType(src.0))
+            Ok(TestTargetType(src.0)
         });
 
         // Test successful conversion
         let good_source = TestSourceType(42);
-        assert!(registry.convert::<TestSourceType, TestTargetType>(&good_source).is_ok());
+        assert!(registry.convert::<TestSourceType, TestTargetType>(&good_source).is_ok();
 
         // Test failed conversion
         let bad_source = TestSourceType(-1);
         let result = registry.convert::<TestSourceType, TestTargetType>(&bad_source);
 
-        assert!(result.is_err());
+        assert!(result.is_err();
         if let Err(err) = result {
-            assert!(matches!(err.kind, ConversionErrorKind::OutOfRange));
-            assert!(err.context.unwrap().contains("must be non-negative"));
+            assert!(matches!(err.kind, ConversionErrorKind::OutOfRange);
+            assert!(err.context.unwrap().contains("must be non-negativeMissing messageMissing messageMissing message");
         }
+    }
+
+    // ====== TESTS MIGRATED FROM SIMPLE_TEST.RS ======
+
+    #[test]
+    fn test_simple_format_to_types_conversion() {
+        use wrt_format::component::ValType as FormatValType;
+        use wrt_foundation::component_value::ValType as TypesValType;
+
+        let registry = TypeConversionRegistry::with_defaults();
+
+        // Test primitive types
+        let bool_type = FormatValType::Bool;
+        let result = registry.convert::<FormatValType, TypesValType>(&bool_type).unwrap();
+        assert!(matches!(result, TypesValType::Bool);
+
+        let s32_type = FormatValType::S32;
+        let result = registry.convert::<FormatValType, TypesValType>(&s32_type).unwrap();
+        assert!(matches!(result, TypesValType::S32);
+    }
+
+    #[test]
+    fn test_simple_types_to_format_conversion() {
+        use wrt_format::component::ValType as FormatValType;
+        use wrt_foundation::component_value::ValType as TypesValType;
+
+        let registry = TypeConversionRegistry::with_defaults();
+
+        // Test primitive types
+        let bool_type = TypesValType::Bool;
+        let result = registry.convert::<TypesValType, FormatValType>(&bool_type).unwrap();
+        assert!(matches!(result, FormatValType::Bool);
+
+        let s32_type = TypesValType::S32;
+        let result = registry.convert::<TypesValType, FormatValType>(&s32_type).unwrap();
+        assert!(matches!(result, FormatValType::S32);
+    }
+
+    // ====== TESTS MIGRATED FROM REGISTRY_TEST.RS ======
+
+    // Additional test types for registry testing
+    #[derive(Debug, PartialEq)]
+    struct SimpleSource(i32);
+
+    #[derive(Debug, PartialEq)]
+    struct SimpleTarget(i32);
+
+    #[test]
+    fn test_basic_registry_functionality() {
+        // Create a registry
+        let mut registry = TypeConversionRegistry::new();
+
+        // Register a simple conversion
+        registry.register(|src: &SimpleSource| -> core::result::Result<SimpleTarget, ConversionError> {
+            Ok(SimpleTarget(src.0 * 2)
+        });
+
+        // Test the conversion
+        let source = SimpleSource(21);
+        let result = registry.convert::<SimpleSource, SimpleTarget>(&source).unwrap();
+        assert_eq!(result, SimpleTarget(42);
     }
 }

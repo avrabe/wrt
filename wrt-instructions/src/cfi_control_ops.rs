@@ -24,10 +24,40 @@
 // Remove unused imports
 
 use crate::prelude::*;
+use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
 #[cfg(not(feature = "std"))]
-use wrt_foundation::NoStdProvider;
+use wrt_foundation::safe_memory::NoStdProvider;
 use crate::control_ops::BranchTarget;
 use crate::types::CfiTargetVec;
+
+/// Calling convention used in CFI validation
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CallingConvention {
+    /// WebAssembly calling convention
+    WebAssembly,
+    /// System V ABI (Unix-like systems)
+    SystemV,
+    /// Windows Fastcall convention
+    WindowsFastcall,
+}
+
+/// Software CFI configuration
+#[derive(Debug, Clone)]
+pub struct CfiSoftwareConfig {
+    /// Enable shadow stack protection
+    pub shadow_stack_enabled: bool,
+    /// Enable temporal validation
+    pub temporal_validation: bool,
+}
+
+impl Default for CfiSoftwareConfig {
+    fn default() -> Self {
+        Self {
+            shadow_stack_enabled: true,
+            temporal_validation: false,
+        }
+    }
+}
 
 /// CFI-enhanced control flow protection configuration
 #[derive(Debug, Clone)]
@@ -276,11 +306,7 @@ impl wrt_foundation::traits::FromBytes for CfiTargetType {
             3 => Ok(Self::Branch),
             4 => Ok(Self::BlockEntry),
             5 => Ok(Self::FunctionEntry),
-            _ => Err(wrt_foundation::Error::new(
-                wrt_foundation::ErrorCategory::Validation,
-                wrt_foundation::codes::VALIDATION_ERROR,
-                "Invalid discriminant for CfiTargetType",
-            )),
+            _ => Err(Error::validation_error("Invalid discriminant for CfiTargetType")),
         }
     }
 }
@@ -301,9 +327,9 @@ pub struct CfiLandingPad {
     pub valid_predecessors: crate::types::CfiTargetTypeVec,
 }
 
-impl Default for CfiLandingPad {
-    fn default() -> Self {
-        Self {
+impl CfiLandingPad {
+    pub fn try_default() -> Result<Self> {
+        Ok(Self {
             pad_id: 0,
             hardware_instruction: None,
             software_validation: None,
@@ -311,9 +337,35 @@ impl Default for CfiLandingPad {
                 #[cfg(feature = "std")]
                 { Vec::new() }
                 #[cfg(not(feature = "std"))]
-                { crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::default()).unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec")) }
+                { 
+                    let provider = safe_managed_alloc!(8192, CrateId::Instructions)?;
+                    crate::types::CfiTargetTypeVec::new(provider)
+                        .map_err(|_| Error::memory_error("Failed to create CfiTargetTypeVec"))?
+                }
             },
-        }
+        })
+    }
+}
+
+impl Default for CfiLandingPad {
+    fn default() -> Self {
+        Self::try_default().unwrap_or_else(|_| {
+            // Fallback for Default trait compatibility
+            Self {
+                pad_id: 0,
+                hardware_instruction: None,
+                software_validation: None,
+                valid_predecessors: {
+                    #[cfg(feature = "std")]
+                    { Vec::new() }
+                    #[cfg(not(feature = "std"))]
+                    { 
+                        // Use minimal fallback - this will panic if used, but needed for trait compat
+                        panic!("CfiLandingPad::default() fallback should not be used in no_std - use try_default() instead")
+                    }
+                },
+            }
+        })
     }
 }
 
@@ -428,11 +480,7 @@ impl wrt_foundation::traits::FromBytes for CfiExpectedValue {
                 let id = u32::from_le_bytes(id_bytes);
                 Ok(Self::CallSiteId(id))
             }
-            _ => Err(wrt_foundation::Error::new(
-                wrt_foundation::ErrorCategory::Validation,
-                wrt_foundation::codes::VALIDATION_ERROR,
-                "Invalid discriminant for CfiExpectedValue",
-            )),
+            _ => Err(Error::validation_error("Invalid discriminant for CfiExpectedValue")),
         }
     }
 }
@@ -580,7 +628,10 @@ impl wrt_foundation::traits::FromBytes for CfiValidationRequirement {
                 #[cfg(feature = "std")]
                 let mut valid_targets = Vec::with_capacity(len);
                 #[cfg(not(feature = "std"))]
-                let mut valid_targets = BoundedVec::new(NoStdProvider::default())?;
+                let mut valid_targets = {
+                    let provider = safe_managed_alloc!(8192, CrateId::Instructions)?;
+                    BoundedVec::new(provider)?
+                };
                 
                 for _ in 0..len {
                     #[cfg(feature = "std")]
@@ -598,11 +649,7 @@ impl wrt_foundation::traits::FromBytes for CfiValidationRequirement {
                 let max_duration = u64::from_le_bytes(duration_bytes);
                 Ok(Self::TemporalCheck { max_duration })
             }
-            _ => Err(wrt_foundation::Error::new(
-                wrt_foundation::ErrorCategory::Validation,
-                wrt_foundation::codes::VALIDATION_ERROR,
-                "Invalid discriminant for CfiValidationRequirement",
-            )),
+            _ => Err(Error::validation_error("Invalid discriminant for CfiValidationRequirement")),
         }
     }
 }
@@ -671,28 +718,155 @@ pub struct CfiExecutionContext {
     pub violation_count: u32,
     /// Performance metrics
     pub metrics: CfiMetrics,
+    /// Calling convention for platform-specific validation
+    pub calling_convention: CallingConvention,
+    /// Current stack depth for alignment checking
+    pub current_stack_depth: u32,
+    /// Software configuration for CFI
+    pub software_config: CfiSoftwareConfig,
+    /// Timestamp of last checkpoint for temporal validation
+    pub last_checkpoint_time: u64,
+    /// Maximum number of labels supported
+    pub max_labels: u32,
+    /// Valid branch targets for indirect jumps
+    #[cfg(feature = "std")]
+    pub valid_branch_targets: Vec<u32>,
+    #[cfg(not(feature = "std"))]
+    pub valid_branch_targets: wrt_foundation::bounded::BoundedVec<u32, 256, wrt_foundation::safe_memory::NoStdProvider<1024>>,
+    /// Maximum number of types supported
+    pub max_types: u32,
+    /// Type signatures for validation
+    #[cfg(feature = "std")]
+    pub type_signatures: Vec<u64>,
+    #[cfg(not(feature = "std"))]
+    pub type_signatures: wrt_foundation::bounded::BoundedVec<u64, 256, wrt_foundation::safe_memory::NoStdProvider<2048>>,
+    /// Maximum shadow stack depth
+    pub max_shadow_stack_depth: usize,
+    /// Indirect branch targets for validation
+    #[cfg(feature = "std")]
+    pub indirect_branch_targets: Vec<u32>,
+    #[cfg(not(feature = "std"))]
+    pub indirect_branch_targets: wrt_foundation::bounded::BoundedVec<u32, 128, wrt_foundation::safe_memory::NoStdProvider<512>>,
 }
 
-impl Default for CfiExecutionContext {
-    fn default() -> Self {
-        Self {
+impl CfiExecutionContext {
+    pub fn try_default() -> Result<Self> {
+        // Remove unused providers - they were placeholders
+        
+        Ok(Self {
             current_function: 0,
             current_instruction: 0,
             shadow_stack: {
                 #[cfg(feature = "std")]
                 { Vec::new() }
                 #[cfg(not(feature = "std"))]
-                { crate::types::ShadowStackVec::new(wrt_foundation::NoStdProvider::default()).unwrap_or_else(|_| panic!("Failed to create ShadowStackVec")) }
+                { 
+                    let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+                    crate::types::ShadowStackVec::new(provider)
+                        .map_err(|_| Error::memory_error("Failed to create ShadowStackVec"))?
+                }
             },
             landing_pad_expectations: {
                 #[cfg(feature = "std")]
                 { Vec::new() }
                 #[cfg(not(feature = "std"))]
-                { crate::types::LandingPadExpectationVec::new(wrt_foundation::NoStdProvider::default()).unwrap_or_else(|_| panic!("Failed to create LandingPadExpectationVec")) }
+                { 
+                    let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+                    crate::types::LandingPadExpectationVec::new(safe_managed_alloc!(8192, CrateId::Instructions)?)
+                        .map_err(|_| Error::memory_error("Failed to create LandingPadExpectationVec"))?
+                }
             },
             violation_count: 0,
             metrics: CfiMetrics::default(),
-        }
+            calling_convention: CallingConvention::WebAssembly,
+            current_stack_depth: 0,
+            software_config: CfiSoftwareConfig::default(),
+            last_checkpoint_time: 0,
+            max_labels: 256,
+            valid_branch_targets: {
+                #[cfg(feature = "std")]
+                { Vec::new() }
+                #[cfg(not(feature = "std"))]
+                { 
+                    let provider = safe_managed_alloc!(1024, CrateId::Instructions)?;
+                    wrt_foundation::bounded::BoundedVec::new(provider)
+                        .map_err(|_| Error::memory_error("Failed to create valid_branch_targets BoundedVec"))?
+                }
+            },
+            max_types: 256,
+            type_signatures: {
+                #[cfg(feature = "std")]
+                { Vec::new() }
+                #[cfg(not(feature = "std"))]
+                { 
+                    let provider = safe_managed_alloc!(2048, CrateId::Instructions)?;
+                    wrt_foundation::bounded::BoundedVec::new(provider)
+                        .map_err(|_| Error::memory_error("Failed to create type_signatures BoundedVec"))?
+                }
+            },
+            max_shadow_stack_depth: 1024,
+            indirect_branch_targets: {
+                #[cfg(feature = "std")]
+                { Vec::new() }
+                #[cfg(not(feature = "std"))]
+                { 
+                    let provider = safe_managed_alloc!(512, CrateId::Instructions)?;
+                    wrt_foundation::bounded::BoundedVec::new(provider)
+                        .map_err(|_| Error::memory_error("Failed to create indirect_branch_targets BoundedVec"))?
+                }
+            },
+        })
+    }
+}
+
+impl Default for CfiExecutionContext {
+    fn default() -> Self {
+        Self::try_default().unwrap_or_else(|_| {
+            // Fallback for Default trait compatibility - create minimal context
+            Self {
+                current_function: 0,
+                current_instruction: 0,
+                shadow_stack: {
+                    #[cfg(feature = "std")]
+                    { Vec::new() }
+                    #[cfg(not(feature = "std"))]
+                    { panic!("CfiExecutionContext::default() fallback should not be used in no_std - use try_default() instead") }
+                },
+                landing_pad_expectations: {
+                    #[cfg(feature = "std")]
+                    { Vec::new() }
+                    #[cfg(not(feature = "std"))]
+                    { panic!("CfiExecutionContext::default() fallback should not be used in no_std - use try_default() instead") }
+                },
+                violation_count: 0,
+                metrics: CfiMetrics::default(),
+                calling_convention: CallingConvention::WebAssembly,
+                current_stack_depth: 0,
+                software_config: CfiSoftwareConfig::default(),
+                last_checkpoint_time: 0,
+                max_labels: 256,
+                valid_branch_targets: {
+                    #[cfg(feature = "std")]
+                    { Vec::new() }
+                    #[cfg(not(feature = "std"))]
+                    { panic!("CfiExecutionContext::default() fallback should not be used in no_std - use try_default() instead") }
+                },
+                max_types: 256,
+                type_signatures: {
+                    #[cfg(feature = "std")]
+                    { Vec::new() }
+                    #[cfg(not(feature = "std"))]
+                    { panic!("CfiExecutionContext::default() fallback should not be used in no_std - use try_default() instead") }
+                },
+                max_shadow_stack_depth: 1024,
+                indirect_branch_targets: {
+                    #[cfg(feature = "std")]
+                    { Vec::new() }
+                    #[cfg(not(feature = "std"))]
+                    { panic!("CfiExecutionContext::default() fallback should not be used in no_std - use try_default() instead") }
+                },
+            }
+        })
     }
 }
 
@@ -880,6 +1054,14 @@ pub struct CfiMetrics {
     pub landing_pads_validated: u64,
     /// Shadow stack operations
     pub shadow_stack_operations: u64,
+    /// Total execution time for temporal validation
+    pub total_execution_time: u64,
+    /// Average instruction execution time
+    pub average_instruction_time: Option<u64>,
+    /// Last instruction execution time
+    pub last_instruction_time: u64,
+    /// Count of indirect branches taken
+    pub indirect_branches_taken: u64,
 }
 
 /// Default implementation of CFI control flow operations
@@ -910,7 +1092,11 @@ impl CfiControlFlowOps for DefaultCfiControlFlowOps {
                     #[cfg(feature = "std")]
                     { Vec::new() }
                     #[cfg(not(feature = "std"))]
-                    { crate::types::CfiRequirementVec::new(wrt_foundation::NoStdProvider::default()).unwrap_or_else(|_| panic!("Failed to create CfiRequirementVec")) }
+                    { 
+                        let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+                        crate::types::CfiRequirementVec::new(safe_managed_alloc!(8192, CrateId::Instructions)?)
+                            .map_err(|_| Error::memory_error("Failed to create CfiRequirementVec"))?
+                    }
                 },
             });
         }
@@ -958,9 +1144,11 @@ impl CfiControlFlowOps for DefaultCfiControlFlowOps {
                     { vec![table_idx] }
                     #[cfg(not(feature = "std"))]
                     {
-                        let mut targets = CfiTargetVec::new(wrt_foundation::NoStdProvider::<1024>::default())
-                            .unwrap_or_else(|_| panic!("Failed to create CfiTargetVec"));
-                        targets.push(table_idx).unwrap_or_else(|_| panic!("Failed to push to CfiTargetVec"));
+                        let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+                        let mut targets = CfiTargetVec::new(provider)
+                            .map_err(|_| Error::memory_error("Failed to create CfiTargetVec"))?;
+                        targets.push(table_idx)
+                            .map_err(|_| Error::memory_error("Failed to push to CfiTargetVec"))?;
                         targets
                     }
                 }, // Table entry validation
@@ -971,7 +1159,8 @@ impl CfiControlFlowOps for DefaultCfiControlFlowOps {
         let validation_requirements = {
             // For no_std environments, create minimal validation
             use crate::types::CfiRequirementVec;
-            let mut reqs = CfiRequirementVec::new(wrt_foundation::NoStdProvider::default())
+            let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+            let mut reqs = CfiRequirementVec::new(safe_managed_alloc!(8192, CrateId::Instructions)?)
                 .map_err(|_| Error::validation_error("Failed to create validation requirements"))?;
             reqs.push(CfiValidationRequirement::TypeSignatureCheck {
                 expected_type_index: type_idx,
@@ -1041,7 +1230,11 @@ impl CfiControlFlowOps for DefaultCfiControlFlowOps {
                     #[cfg(feature = "std")]
                     { Vec::new() }
                     #[cfg(not(feature = "std"))]
-                    { crate::types::CfiRequirementVec::new(wrt_foundation::NoStdProvider::default()).unwrap_or_else(|_| panic!("Failed to create CfiRequirementVec")) }
+                    { 
+                        let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+                        crate::types::CfiRequirementVec::new(safe_managed_alloc!(8192, CrateId::Instructions)?)
+                            .map_err(|_| Error::memory_error("Failed to create CfiRequirementVec"))?
+                    }
                 },
             });
         }
@@ -1058,14 +1251,16 @@ impl CfiControlFlowOps for DefaultCfiControlFlowOps {
             }
             #[cfg(not(feature = "std"))]
             {
-                let mut reqs = crate::types::CfiRequirementVec::new(wrt_foundation::NoStdProvider::<1024>::default())
-                    .unwrap_or_else(|_| panic!("Failed to create CfiRequirementVec"));
-                let mut targets = crate::types::CfiTargetVec::new(wrt_foundation::NoStdProvider::<1024>::default())
-                    .unwrap_or_else(|_| panic!("Failed to create CfiTargetVec"));
-                targets.push(target_offset).unwrap_or_else(|_| panic!("Failed to push to CfiTargetVec"));
+                let mut reqs = crate::types::CfiRequirementVec::new(safe_managed_alloc!(8192, CrateId::Instructions)?)
+                    .map_err(|_| Error::memory_error("Failed to create CfiRequirementVec"))?;
+                let mut targets = crate::types::CfiTargetVec::new(safe_managed_alloc!(8192, CrateId::Instructions)?)
+                    .map_err(|_| Error::memory_error("Failed to create CfiTargetVec"))?;
+                targets.push(target_offset)
+                    .map_err(|_| Error::memory_error("Failed to push to CfiTargetVec"))?;
                 reqs.push(CfiValidationRequirement::ControlFlowTargetCheck {
                     valid_targets: targets,
-                }).unwrap_or_else(|_| panic!("Failed to push to CfiRequirementVec"));
+                })
+                .map_err(|_| Error::memory_error("Failed to push to CfiRequirementVec"))?;
                 reqs
             }
         };
@@ -1107,7 +1302,7 @@ impl CfiControlFlowOps for DefaultCfiControlFlowOps {
             pad_id: self.generate_landing_pad_id(context),
             hardware_instruction,
             software_validation,
-            valid_predecessors: self.determine_valid_predecessors(target_type),
+            valid_predecessors: self.determine_valid_predecessors(target_type)?,
         };
 
         // Update metrics
@@ -1187,31 +1382,40 @@ impl DefaultCfiControlFlowOps {
             let expected_return = (context.current_function, context.current_instruction);
             if shadow_entry.return_address != expected_return {
                 context.violation_count += 1;
-                return Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::CFI_VIOLATION,
-                    "Shadow stack return address mismatch",
-                ));
+                return Err(Error::cfi_violation("Shadow stack return address mismatch"));
             }
             context.metrics.shadow_stack_operations += 1;
         } else {
             context.violation_count += 1;
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::CFI_VIOLATION,
-                "Shadow stack underflow",
-            ));
+            return Err(Error::cfi_violation("Shadow stack underflow"));
         }
         Ok(())
     }
 
     fn resolve_label_to_offset(
         &self,
-        _label_idx: u32,
-        _context: &CfiExecutionContext,
+        label_idx: u32,
+        context: &CfiExecutionContext,
     ) -> Result<u32> {
-        // TODO: Implement label resolution
-        Ok(0)
+        // ASIL-B: Validate label index bounds
+        if label_idx >= context.max_labels {
+            return Err(Error::validation_control_flow_error("Label index out of bounds"));
+        }
+        
+        // ASIL-B: Check if label is in valid targets
+        if !context.valid_branch_targets.is_empty() {
+            #[cfg(feature = "std")]
+            let contains_target = context.valid_branch_targets.contains(&label_idx);
+            #[cfg(not(feature = "std"))]
+            let contains_target = context.valid_branch_targets.contains(&label_idx).unwrap_or(false);
+            
+            if !contains_target {
+                return Err(Error::validation_control_flow_error("Invalid branch target"));
+            }
+        }
+        
+        // Return resolved label (in real implementation, would map to actual PC)
+        Ok(label_idx)
     }
 
     fn create_hardware_instruction(
@@ -1265,7 +1469,11 @@ impl DefaultCfiControlFlowOps {
                 #[cfg(feature = "std")]
                 { Vec::new() }
                 #[cfg(not(feature = "std"))]
-                { crate::types::CfiExpectedValueVec::new(wrt_foundation::NoStdProvider::default()).unwrap_or_else(|_| panic!("Failed to create CfiExpectedValueVec")) }
+                { 
+                    let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+                    crate::types::CfiExpectedValueVec::new(safe_managed_alloc!(8192, CrateId::Instructions)?)
+                        .map_err(|_| Error::memory_error("Failed to create CfiExpectedValueVec"))?
+                }
             }, // Would be populated based on context
             validation_function,
         })
@@ -1287,16 +1495,19 @@ impl DefaultCfiControlFlowOps {
         0 // Placeholder
     }
 
-    fn determine_valid_predecessors(&self, target_type: CfiTargetType) -> crate::types::CfiTargetTypeVec {
-        match target_type {
+    fn determine_valid_predecessors(&self, target_type: CfiTargetType) -> Result<crate::types::CfiTargetTypeVec> {
+        Ok(match target_type {
             CfiTargetType::IndirectCall => {
                 #[cfg(feature = "std")]
                 { vec![CfiTargetType::IndirectCall] }
                 #[cfg(not(feature = "std"))]
                 {
-                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<1024>::default())
-                        .unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec"));
-                    types.push(CfiTargetType::IndirectCall).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
+                    let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+                    let provider_8k = safe_managed_alloc!(8192, CrateId::Instructions)?;
+                    let mut types = crate::types::CfiTargetTypeVec::new(provider_8k)
+                        .map_err(|_| Error::memory_error("Failed to create CfiTargetTypeVec"))?;
+                    types.push(CfiTargetType::IndirectCall)
+                        .map_err(|_| Error::memory_error("Failed to push to CfiTargetTypeVec"))?;
                     types
                 }
             },
@@ -1305,10 +1516,14 @@ impl DefaultCfiControlFlowOps {
                 { vec![CfiTargetType::DirectCall, CfiTargetType::IndirectCall] }
                 #[cfg(not(feature = "std"))]
                 {
-                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<1024>::default())
-                        .unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec"));
-                    types.push(CfiTargetType::DirectCall).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
-                    types.push(CfiTargetType::IndirectCall).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
+                    let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+                    let provider_8k = safe_managed_alloc!(8192, CrateId::Instructions)?;
+                    let mut types = crate::types::CfiTargetTypeVec::new(provider_8k)
+                        .map_err(|_| Error::memory_error("Failed to create CfiTargetTypeVec"))?;
+                    types.push(CfiTargetType::DirectCall)
+                        .map_err(|_| Error::memory_error("Failed to push to CfiTargetTypeVec"))?;
+                    types.push(CfiTargetType::IndirectCall)
+                        .map_err(|_| Error::memory_error("Failed to push to CfiTargetTypeVec"))?;
                     types
                 }
             },
@@ -1317,9 +1532,12 @@ impl DefaultCfiControlFlowOps {
                 { vec![CfiTargetType::Branch] }
                 #[cfg(not(feature = "std"))]
                 {
-                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<1024>::default())
-                        .unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec"));
-                    types.push(CfiTargetType::Branch).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
+                    let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+                    let provider_8k = safe_managed_alloc!(8192, CrateId::Instructions)?;
+                    let mut types = crate::types::CfiTargetTypeVec::new(provider_8k)
+                        .map_err(|_| Error::memory_error("Failed to create CfiTargetTypeVec"))?;
+                    types.push(CfiTargetType::Branch)
+                        .map_err(|_| Error::memory_error("Failed to push to CfiTargetTypeVec"))?;
                     types
                 }
             },
@@ -1328,9 +1546,12 @@ impl DefaultCfiControlFlowOps {
                 { vec![CfiTargetType::Branch] }
                 #[cfg(not(feature = "std"))]
                 {
-                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<1024>::default())
-                        .unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec"));
-                    types.push(CfiTargetType::Branch).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
+                    let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+                    let provider_8k = safe_managed_alloc!(8192, CrateId::Instructions)?;
+                    let mut types = crate::types::CfiTargetTypeVec::new(provider_8k)
+                        .map_err(|_| Error::memory_error("Failed to create CfiTargetTypeVec"))?;
+                    types.push(CfiTargetType::Branch)
+                        .map_err(|_| Error::memory_error("Failed to push to CfiTargetTypeVec"))?;
                     types
                 }
             },
@@ -1339,10 +1560,14 @@ impl DefaultCfiControlFlowOps {
                 { vec![CfiTargetType::DirectCall, CfiTargetType::IndirectCall] }
                 #[cfg(not(feature = "std"))]
                 {
-                    let mut types = crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::<1024>::default())
-                        .unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec"));
-                    types.push(CfiTargetType::DirectCall).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
-                    types.push(CfiTargetType::IndirectCall).unwrap_or_else(|_| panic!("Failed to push to CfiTargetTypeVec"));
+                    let provider = safe_managed_alloc!(65536, CrateId::Instructions)?;
+                    let provider_8k = safe_managed_alloc!(8192, CrateId::Instructions)?;
+                    let mut types = crate::types::CfiTargetTypeVec::new(provider_8k)
+                        .map_err(|_| Error::memory_error("Failed to create CfiTargetTypeVec"))?;
+                    types.push(CfiTargetType::DirectCall)
+                        .map_err(|_| Error::memory_error("Failed to push to CfiTargetTypeVec"))?;
+                    types.push(CfiTargetType::IndirectCall)
+                        .map_err(|_| Error::memory_error("Failed to push to CfiTargetTypeVec"))?;
                     types
                 }
             }
@@ -1350,48 +1575,170 @@ impl DefaultCfiControlFlowOps {
                 #[cfg(feature = "std")]
                 { Vec::new() }
                 #[cfg(not(feature = "std"))]
-                { crate::types::CfiTargetTypeVec::new(wrt_foundation::NoStdProvider::default()).unwrap_or_else(|_| panic!("Failed to create CfiTargetTypeVec")) }
+                { 
+                    let provider = safe_managed_alloc!(8192, CrateId::Instructions)?;
+                    crate::types::CfiTargetTypeVec::new(provider)
+                        .map_err(|_| Error::memory_error("Failed to create CfiTargetTypeVec"))?
+                }
             },
-        }
+        })
     }
 
     // Validation helper methods
 
     fn validate_type_signature(
         &self,
-        _expected_type_index: u32,
-        _signature_hash: u64,
-        _context: &CfiExecutionContext,
+        expected_type_index: u32,
+        signature_hash: u64,
+        context: &CfiExecutionContext,
     ) -> Result<()> {
-        // TODO: Implement type signature validation
+        // ASIL-B: Validate type index bounds
+        if expected_type_index >= context.max_types {
+            return Err(Error::validation_value_type_error("Type index out of bounds"));
+        }
+        
+        // ASIL-B: Verify signature hash matches expected
+        // In a real implementation, would compute hash from actual type
+        #[cfg(feature = "std")]
+        let expected_hash_val = *context.type_signatures.get(expected_type_index as usize)
+            .ok_or(Error::validation_value_type_error("Type signature not found"))?;
+        #[cfg(not(feature = "std"))]
+        let expected_hash_val = context.type_signatures.get(expected_type_index as usize)?;
+            
+        if expected_hash_val != signature_hash {
+            return Err(Error::security_runtime_error("Type signature mismatch - potential CFI violation"));
+        }
+        
         Ok(())
     }
 
-    fn validate_shadow_stack(&self, _context: &CfiExecutionContext) -> Result<()> {
-        // TODO: Implement shadow stack validation
+    fn validate_shadow_stack(&self, context: &CfiExecutionContext) -> Result<()> {
+        // ASIL-B: Check shadow stack depth
+        if context.shadow_stack.len() > context.max_shadow_stack_depth {
+            return Err(Error::security_stack_overflow("Shadow stack overflow"));
+        }
+        
+        // ASIL-B: Validate shadow stack integrity
+        if context.shadow_stack.is_empty() && context.current_function != 0 {
+            return Err(Error::security_runtime_error("Shadow stack underflow - potential CFI violation"));
+        }
+        
+        // ASIL-B: Verify return address matches shadow stack
+        #[cfg(feature = "std")]
+        {
+            if let Some(expected_return) = context.shadow_stack.last() {
+                if expected_return.return_address != (context.current_function, context.current_instruction) {
+                    return Err(Error::runtime_error("Return address mismatch - potential ROP attack"));
+                }
+            }
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            if let Ok(Some(expected_return)) = context.shadow_stack.last() {
+                if expected_return.return_address != (context.current_function, context.current_instruction) {
+                    return Err(Error::runtime_error("Return address mismatch - potential ROP attack"));
+                }
+            }
+        }
+        
         Ok(())
     }
 
     fn validate_control_flow_target(
         &self,
-        _valid_targets: &[u32],
-        _context: &CfiExecutionContext,
+        valid_targets: &[u32],
+        context: &CfiExecutionContext,
     ) -> Result<()> {
-        // TODO: Implement control flow target validation
+        // ASIL-B: Ensure valid targets list is not empty
+        if valid_targets.is_empty() {
+            return Err(Error::validation_control_flow_error("No valid control flow targets specified"));
+        }
+        
+        // ASIL-B: Check current instruction is a valid target
+        let current_target = context.current_instruction;
+        if !valid_targets.iter().any(|&target| target == current_target) {
+            // Increment violation count for monitoring
+            // Note: In real implementation, would update mutable context
+            return Err(Error::security_runtime_error("Invalid control flow target - potential CFI violation"));
+        }
+        
+        // ASIL-B: Additional check for indirect branches
+        if context.metrics.indirect_branches_taken > 0 {
+            // Verify target is marked as valid indirect branch target
+            #[cfg(feature = "std")]
+            let contains_target = context.indirect_branch_targets.contains(&current_target);
+            #[cfg(not(feature = "std"))]
+            let contains_target = context.indirect_branch_targets.contains(&current_target).unwrap_or(false);
+            
+            if !contains_target {
+                return Err(Error::security_runtime_error("Invalid indirect branch target"));
+            }
+        }
+        
         Ok(())
     }
 
-    fn validate_calling_convention(&self, _context: &CfiExecutionContext) -> Result<()> {
-        // TODO: Implement calling convention validation
+    fn validate_calling_convention(&self, context: &CfiExecutionContext) -> Result<()> {
+        // ASIL-B: Validate stack alignment for calls
+        const REQUIRED_ALIGNMENT: u32 = 16; // Common for most ABIs
+        if context.current_stack_depth % REQUIRED_ALIGNMENT != 0 {
+            return Err(Error::runtime_unaligned_access("Stack misaligned for function call"));
+        }
+        
+        // ASIL-B: Check calling convention constraints
+        if context.calling_convention != CallingConvention::WebAssembly {
+            // Verify platform-specific constraints
+            match context.calling_convention {
+                CallingConvention::SystemV => {
+                    // Check red zone requirements
+                    if context.current_stack_depth < 128 {
+                        return Err(Error::runtime_error("Insufficient stack space for SystemV ABI"));
+                    }
+                }
+                CallingConvention::WindowsFastcall => {
+                    // Check shadow space requirements
+                    if context.current_stack_depth < 32 {
+                        return Err(Error::runtime_error("Insufficient shadow space for Windows ABI"));
+                    }
+                }
+                _ => {} // WebAssembly has no additional requirements
+            }
+        }
+        
         Ok(())
     }
 
     fn validate_temporal_properties(
         &self,
-        _max_duration: u64,
-        _context: &CfiExecutionContext,
+        max_duration: u64,
+        context: &CfiExecutionContext,
     ) -> Result<()> {
-        // TODO: Implement temporal validation
+        // ASIL-B: Check if temporal validation is enabled
+        if !context.software_config.temporal_validation {
+            return Ok(()); // Skip if not enabled
+        }
+        
+        // ASIL-B: Validate execution time bounds
+        let current_time = context.metrics.total_execution_time;
+        if current_time > max_duration {
+            return Err(Error::runtime_error("Execution time exceeded maximum allowed duration"));
+        }
+        
+        // ASIL-B: Check for timing anomalies that might indicate attacks
+        if let Some(avg_instruction_time) = context.metrics.average_instruction_time {
+            let current_instruction_time = context.metrics.last_instruction_time;
+            
+            // Flag if current instruction took >10x average time
+            if current_instruction_time > avg_instruction_time * 10 {
+                return Err(Error::security_runtime_error("Timing anomaly detected - potential side-channel attack"));
+            }
+        }
+        
+        // ASIL-B: Validate monotonic time progression
+        if context.metrics.total_execution_time < context.last_checkpoint_time {
+            return Err(Error::security_runtime_error("Time regression detected - potential clock manipulation"));
+        }
+        
         Ok(())
     }
 }

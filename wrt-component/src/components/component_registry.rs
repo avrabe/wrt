@@ -2,7 +2,7 @@
 //!
 //! This module provides registry functionality for components.
 
-use crate::{component::Component, prelude::*};
+use crate::{components::component::Component};
 
 /// Registry for WebAssembly components
 #[derive(Debug, Default)]
@@ -20,7 +20,7 @@ impl ComponentRegistry {
     /// Register a component by name
     pub fn register(&mut self, name: &str, component: Arc<Component>) -> Result<()> {
         self.components.insert(name.to_string(), component);
-        Ok(())
+        Ok(()
     }
 
     /// Get a component by name

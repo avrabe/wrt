@@ -15,7 +15,13 @@ use std::{boxed::Box, string::String, vec::Vec};
 use wrt_foundation::{bounded::BoundedVec, component_value::ComponentValue, prelude::*};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{bounded::{BoundedVec, BoundedString}, NoStdProvider};
+use wrt_foundation::{
+    bounded::{BoundedVec, BoundedString}, 
+    NoStdProvider,
+    safe_memory::NoStdProvider as _,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 #[cfg(feature = "std")]
 use wrt_foundation::component_value::ComponentValue;
@@ -195,18 +201,21 @@ pub struct WaitableSet {
 
 impl<T> Stream<T> {
     /// Create a new stream
-    pub fn new(handle: StreamHandle, element_type: ValType) -> Self {
-        Self {
+    pub fn new(handle: StreamHandle, element_type: ValType) -> WrtResult<Self> {
+        Ok(Self {
             handle,
             element_type,
             state: StreamState::Open,
             #[cfg(feature = "std")]
             buffer: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            buffer: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            buffer: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             readable_closed: false,
             writable_closed: false,
-        }
+        })
     }
 
     /// Check if stream is readable
@@ -262,9 +271,7 @@ impl<T> Future<T> {
     /// Set the future value
     pub fn set_value(&mut self, value: T) -> WrtResult<()> {
         if self.state != FutureState::Pending {
-            return Err(wrt_foundation::WrtError::InvalidState(
-                "Future already has a value or was cancelled".into(),
-            ));
+            return Err(wrt_error::Error::runtime_execution_error("Future already completed"));
         }
         self.value = Some(value);
         self.state = FutureState::Ready;
@@ -283,13 +290,13 @@ impl ErrorContext {
     /// Create a new error context
     #[cfg(feature = "std")]
     pub fn new(handle: ErrorContextHandle, message: String) -> Self {
-        Self { handle, message, stack_trace: None, debug_info: DebugInfo::new() }
+        Self { handle, message, stack_trace: None, debug_info: DebugInfo::new().unwrap_or_default() }
     }
 
     /// Create a new error context (no_std)
     #[cfg(not(any(feature = "std", )))]
-    pub fn new(handle: ErrorContextHandle, message: BoundedString<1024, NoStdProvider<65536>>) -> Self {
-        Self { handle, message, stack_trace: None, debug_info: DebugInfo::new() }
+    pub fn new(handle: ErrorContextHandle, message: BoundedString<1024, NoStdProvider<65536>>) -> WrtResult<Self> {
+        Ok(Self { handle, message, stack_trace: None, debug_info: DebugInfo::new()? })
     }
 
     /// Get debug string representation
@@ -300,7 +307,7 @@ impl ErrorContext {
             if let Some(trace) = &self.stack_trace {
                 result.push_str("\nStack trace:\n");
                 for frame in trace {
-                    result.push_str(&"Component not found");
+                    result.push_str(&format!("  {}\n", frame));
                 }
             }
             BoundedString::from_str(&result).unwrap_or_default()
@@ -315,15 +322,18 @@ impl ErrorContext {
 
 impl DebugInfo {
     /// Create new debug info
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> WrtResult<Self> {
+        Ok(Self {
             source_component: None,
             error_code: None,
             #[cfg(feature = "std")]
             properties: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            properties: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            properties: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
+        })
     }
 
     /// Add a property
@@ -336,30 +346,31 @@ impl DebugInfo {
     #[cfg(not(any(feature = "std", )))]
     pub fn add_property(&mut self, key: BoundedString<64, NoStdProvider<65536>>, value: ComponentValue) -> WrtResult<()> {
         self.properties.push((key, value)).map_err(|_| {
-            wrt_foundation::WrtError::ResourceExhausted("Too many debug properties".into())
+            wrt_error::Error::runtime_execution_error("Failed to add property")
         })
     }
 }
 
 impl WaitableSet {
     /// Create a new waitable set
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> WrtResult<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             waitables: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            waitables: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            waitables: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             ready_mask: 0,
-        }
+        })
     }
 
     /// Add a waitable to the set
     pub fn add(&mut self, waitable: Waitable) -> WrtResult<u32> {
         let index = self.waitables.len();
         if index >= 64 {
-            return Err(wrt_foundation::WrtError::ResourceExhausted(
-                "Too many waitables in set".into(),
-            ));
+            return Err(wrt_error::Error::runtime_execution_error("Too many waitables"));
         }
 
         #[cfg(feature = "std")]
@@ -369,7 +380,8 @@ impl WaitableSet {
         #[cfg(not(any(feature = "std", )))]
         {
             self.waitables.push(waitable).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Waitable set full".into())
+                wrt_error::Error::runtime_execution_error("Error occurred"
+                )
             })?;
         }
 
@@ -419,13 +431,30 @@ impl Default for FutureState {
 
 impl Default for DebugInfo {
     fn default() -> Self {
-        Self::new()
+        Self::new().unwrap_or_else(|_| {
+            Self {
+                source_component: None,
+                error_code: None,
+                #[cfg(feature = "std")]
+                properties: Vec::new(),
+                #[cfg(not(any(feature = "std", )))]
+                properties: BoundedVec::new_with_default_provider().unwrap(),
+            }
+        })
     }
 }
 
 impl Default for WaitableSet {
     fn default() -> Self {
-        Self::new()
+        Self::new().unwrap_or_else(|_| {
+            Self {
+                #[cfg(feature = "std")]
+                waitables: Vec::new(),
+                #[cfg(not(any(feature = "std", )))]
+                waitables: BoundedVec::new_with_default_provider().unwrap(),
+                ready_mask: 0,
+            }
+        })
     }
 }
 
@@ -468,7 +497,7 @@ mod tests {
 
     #[test]
     fn test_stream_lifecycle() {
-        let mut stream: Stream<Value> = Stream::new(StreamHandle(1), ValType::U32);
+        let mut stream: Stream<Value> = Stream::new(StreamHandle(1), ValType::U32).unwrap();
 
         assert!(stream.is_writable());
         assert!(!stream.is_readable()); // Empty buffer
@@ -513,7 +542,7 @@ mod tests {
         let error = ErrorContext::new(
             ErrorContextHandle(1),
             BoundedString::from_str("Test error").unwrap(),
-        );
+        ).unwrap();
 
         let debug_str = error.debug_string();
         assert!(debug_str.as_str().contains("Test error"));
@@ -521,7 +550,7 @@ mod tests {
 
     #[test]
     fn test_waitable_set() {
-        let mut set = WaitableSet::new();
+        let mut set = WaitableSet::new().unwrap();
 
         let idx1 = set.add(Waitable::StreamReadable(StreamHandle(1))).unwrap();
         let idx2 = set.add(Waitable::FutureReadable(FutureHandle(1))).unwrap();

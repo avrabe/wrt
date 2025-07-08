@@ -59,10 +59,9 @@
 //! let equivalent_dal = asil_c.convert_to(SafetyStandardType::Do178c);
 //! ```
 
-
 use core::sync::atomic::{AtomicU8, Ordering};
 
-use crate::{Error, ErrorCategory, WrtResult, codes};
+use crate::{codes, Error, ErrorCategory, WrtResult};
 
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -98,7 +97,7 @@ impl AsilLevel {
         match self {
             AsilLevel::QM => "QM",
             AsilLevel::AsilA => "ASIL-A",
-            AsilLevel::AsilB => "ASIL-B", 
+            AsilLevel::AsilB => "ASIL-B",
             AsilLevel::AsilC => "ASIL-C",
             AsilLevel::AsilD => "ASIL-D",
         }
@@ -128,10 +127,10 @@ impl AsilLevel {
     pub const fn verification_frequency(&self) -> u32 {
         match self {
             AsilLevel::QM => 0,
-            AsilLevel::AsilA => 1000,  // Every 1000 operations
-            AsilLevel::AsilB => 100,   // Every 100 operations
-            AsilLevel::AsilC => 10,    // Every 10 operations
-            AsilLevel::AsilD => 1,     // Every operation
+            AsilLevel::AsilA => 1000, // Every 1000 operations
+            AsilLevel::AsilB => 100,  // Every 100 operations
+            AsilLevel::AsilC => 10,   // Every 10 operations
+            AsilLevel::AsilD => 1,    // Every operation
         }
     }
 
@@ -139,9 +138,9 @@ impl AsilLevel {
     pub const fn max_error_rate(&self) -> f64 {
         match self {
             AsilLevel::QM => 1.0,       // No limit
-            AsilLevel::AsilA => 0.1,   // 10%
-            AsilLevel::AsilB => 0.01,  // 1%
-            AsilLevel::AsilC => 0.001, // 0.1%
+            AsilLevel::AsilA => 0.1,    // 10%
+            AsilLevel::AsilB => 0.01,   // 1%
+            AsilLevel::AsilC => 0.001,  // 0.1%
             AsilLevel::AsilD => 0.0001, // 0.01%
         }
     }
@@ -150,6 +149,60 @@ impl AsilLevel {
 impl Default for AsilLevel {
     fn default() -> Self {
         AsilLevel::QM
+    }
+}
+
+/// Safety level wrapper for ASIL integration
+///
+/// This type provides a common interface for safety level operations
+/// across the WRT system, wrapping the core AsilLevel enum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SafetyLevel {
+    asil: AsilLevel,
+}
+
+impl SafetyLevel {
+    /// Create a new safety level from an ASIL level
+    pub const fn new(asil: AsilLevel) -> Self {
+        Self { asil }
+    }
+
+    /// Get the underlying ASIL level
+    pub const fn asil_level(&self) -> AsilLevel {
+        self.asil
+    }
+
+    /// Check if this safety level requires memory protection
+    pub const fn requires_memory_protection(&self) -> bool {
+        self.asil.requires_memory_protection()
+    }
+
+    /// Check if this safety level requires runtime verification
+    pub const fn requires_runtime_verification(&self) -> bool {
+        self.asil.requires_runtime_verification()
+    }
+
+    /// Get the verification frequency for this safety level
+    pub const fn verification_frequency(&self) -> u32 {
+        self.asil.verification_frequency()
+    }
+}
+
+impl Default for SafetyLevel {
+    fn default() -> Self {
+        Self::new(AsilLevel::default())
+    }
+}
+
+impl From<AsilLevel> for SafetyLevel {
+    fn from(asil: AsilLevel) -> Self {
+        Self::new(asil)
+    }
+}
+
+impl core::fmt::Display for SafetyLevel {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.asil)
     }
 }
 
@@ -282,7 +335,7 @@ impl SeverityScore {
     pub const MIN: Self = Self(0);
     /// Maximum severity score (highest safety requirements)
     pub const MAX: Self = Self(1000);
-    
+
     /// Create a new severity score
     ///
     /// # Arguments
@@ -297,7 +350,7 @@ impl SeverityScore {
             Err(SafetyError::InvalidSeverityScore)
         }
     }
-    
+
     /// Get the raw severity score value
     pub const fn value(&self) -> u16 {
         self.0
@@ -334,32 +387,32 @@ impl SafetyStandard {
             SafetyStandard::Iso26262(AsilLevel::AsilB) => SeverityScore(500),
             SafetyStandard::Iso26262(AsilLevel::AsilC) => SeverityScore(750),
             SafetyStandard::Iso26262(AsilLevel::AsilD) => SeverityScore(1000),
-            
+
             // DO-178C mapping (aerospace)
             SafetyStandard::Do178c(DalLevel::DalE) => SeverityScore(0),
             SafetyStandard::Do178c(DalLevel::DalD) => SeverityScore(200),
             SafetyStandard::Do178c(DalLevel::DalC) => SeverityScore(400),
             SafetyStandard::Do178c(DalLevel::DalB) => SeverityScore(700),
             SafetyStandard::Do178c(DalLevel::DalA) => SeverityScore(1000),
-            
+
             // IEC 61508 mapping (industrial)
             SafetyStandard::Iec61508(SilLevel::Sil1) => SeverityScore(250),
             SafetyStandard::Iec61508(SilLevel::Sil2) => SeverityScore(500),
             SafetyStandard::Iec61508(SilLevel::Sil3) => SeverityScore(750),
             SafetyStandard::Iec61508(SilLevel::Sil4) => SeverityScore(1000),
-            
+
             // IEC 62304 mapping (medical device)
             SafetyStandard::Iec62304(MedicalClass::ClassA) => SeverityScore(200),
             SafetyStandard::Iec62304(MedicalClass::ClassB) => SeverityScore(500),
             SafetyStandard::Iec62304(MedicalClass::ClassC) => SeverityScore(1000),
-            
+
             // EN 50128 mapping (railway)
             SafetyStandard::En50128(RailwaySil::Sil0) => SeverityScore(0),
             SafetyStandard::En50128(RailwaySil::Sil1) => SeverityScore(200),
             SafetyStandard::En50128(RailwaySil::Sil2) => SeverityScore(400),
             SafetyStandard::En50128(RailwaySil::Sil3) => SeverityScore(700),
             SafetyStandard::En50128(RailwaySil::Sil4) => SeverityScore(1000),
-            
+
             // ISO 25119 mapping (agricultural)
             SafetyStandard::Iso25119(AgricultureLevel::AgPla) => SeverityScore(200),
             SafetyStandard::Iso25119(AgricultureLevel::AgPlb) => SeverityScore(400),
@@ -368,7 +421,7 @@ impl SafetyStandard {
             SafetyStandard::Iso25119(AgricultureLevel::AgPle) => SeverityScore(1000),
         }
     }
-    
+
     /// Get the name of the safety standard
     pub const fn standard_name(&self) -> &'static str {
         match self {
@@ -380,7 +433,7 @@ impl SafetyStandard {
             SafetyStandard::Iso25119(_) => "ISO 25119",
         }
     }
-    
+
     /// Get the level name within the standard
     pub const fn level_name(&self) -> &'static str {
         match self {
@@ -417,8 +470,8 @@ impl SafetyStandard {
 ///
 /// This implementation uses a conservative approach when mapping between safety standards:
 ///
-/// 1. **"No Safety" Level Restrictions**: Some standards (IEC 61508, IEC 62304, ISO 25119) 
-///    do not have equivalent "no safety" levels. QM (Quality Management) from ISO 26262 
+/// 1. **"No Safety" Level Restrictions**: Some standards (IEC 61508, IEC 62304, ISO 25119)
+///    do not have equivalent "no safety" levels. QM (Quality Management) from ISO 26262
 ///    cannot convert to these standards because they require some level of safety oversight.
 ///
 /// 2. **Conservative Fallback**: When severity scores don't map exactly, the system chooses
@@ -445,16 +498,16 @@ pub trait SafetyStandardConversion {
     ///
     /// ```rust
     /// use wrt_foundation::safety_system::*;
-    /// 
+    ///
     /// // QM cannot convert to medical - medical devices need safety classification
     /// let qm = SafetyStandard::Iso26262(AsilLevel::QM);
     /// assert!(qm.convert_to(SafetyStandardType::Iec62304).is_none());
-    /// 
+    ///
     /// // Industrial systems don't have "no safety" level
     /// assert!(qm.convert_to(SafetyStandardType::Iec61508).is_none());
     /// ```
     fn convert_to(&self, target_standard: SafetyStandardType) -> Option<SafetyStandard>;
-    
+
     /// Check if this level is compatible with another standard's level
     ///
     /// Returns `true` if this safety level provides equal or greater protection
@@ -464,7 +517,7 @@ pub trait SafetyStandardConversion {
     /// This maintains the invariant that higher-criticality systems can always
     /// interface with lower-criticality requirements.
     fn is_compatible_with(&self, other: &SafetyStandard) -> bool;
-    
+
     /// Get the minimum ASIL level that satisfies this standard
     ///
     /// This method provides a way to map any safety standard to an equivalent
@@ -476,7 +529,7 @@ pub trait SafetyStandardConversion {
 impl SafetyStandardConversion for SafetyStandard {
     fn convert_to(&self, target: SafetyStandardType) -> Option<SafetyStandard> {
         let severity = self.severity_score();
-        
+
         match target {
             SafetyStandardType::Iso26262 => {
                 Some(SafetyStandard::Iso26262(match severity.value() {
@@ -487,17 +540,15 @@ impl SafetyStandardConversion for SafetyStandard {
                     876..=1000 => AsilLevel::AsilD,
                     _ => return None,
                 }))
-            },
-            SafetyStandardType::Do178c => {
-                Some(SafetyStandard::Do178c(match severity.value() {
-                    0..=100 => DalLevel::DalE,
-                    101..=300 => DalLevel::DalD,
-                    301..=550 => DalLevel::DalC,
-                    551..=850 => DalLevel::DalB,
-                    851..=1000 => DalLevel::DalA,
-                    _ => return None,
-                }))
-            },
+            }
+            SafetyStandardType::Do178c => Some(SafetyStandard::Do178c(match severity.value() {
+                0..=100 => DalLevel::DalE,
+                101..=300 => DalLevel::DalD,
+                301..=550 => DalLevel::DalC,
+                551..=850 => DalLevel::DalB,
+                851..=1000 => DalLevel::DalA,
+                _ => return None,
+            })),
             SafetyStandardType::Iec61508 => {
                 if severity.value() == 0 {
                     // CONSERVATIVE DECISION: IEC 61508 is for functional safety of electrical/
@@ -512,7 +563,7 @@ impl SafetyStandardConversion for SafetyStandard {
                     876..=1000 => SilLevel::Sil4,
                     _ => return None,
                 }))
-            },
+            }
             SafetyStandardType::Iec62304 => {
                 if severity.value() == 0 {
                     // CONSERVATIVE DECISION: Medical device software (IEC 62304) inherently affects
@@ -521,45 +572,43 @@ impl SafetyStandardConversion for SafetyStandard {
                     return None; // Medical devices must have some safety classification
                 }
                 Some(SafetyStandard::Iec62304(match severity.value() {
-                    1..=350 => MedicalClass::ClassA,  // Non-life-threatening, no injury possible
-                    351..=750 => MedicalClass::ClassB, // Non-life-threatening, injury possible  
+                    1..=350 => MedicalClass::ClassA, // Non-life-threatening, no injury possible
+                    351..=750 => MedicalClass::ClassB, // Non-life-threatening, injury possible
                     751..=1000 => MedicalClass::ClassC, // Life-threatening or death possible
                     _ => return None,
                 }))
-            },
-            SafetyStandardType::En50128 => {
-                Some(SafetyStandard::En50128(match severity.value() {
-                    0..=100 => RailwaySil::Sil0,
-                    101..=300 => RailwaySil::Sil1,
-                    301..=550 => RailwaySil::Sil2,
-                    551..=850 => RailwaySil::Sil3,
-                    851..=1000 => RailwaySil::Sil4,
-                    _ => return None,
-                }))
-            },
+            }
+            SafetyStandardType::En50128 => Some(SafetyStandard::En50128(match severity.value() {
+                0..=100 => RailwaySil::Sil0,
+                101..=300 => RailwaySil::Sil1,
+                301..=550 => RailwaySil::Sil2,
+                551..=850 => RailwaySil::Sil3,
+                851..=1000 => RailwaySil::Sil4,
+                _ => return None,
+            })),
             SafetyStandardType::Iso25119 => {
                 if severity.value() == 0 {
                     // CONSERVATIVE DECISION: Agricultural machinery (ISO 25119) involves equipment
-                    // that can cause physical harm. Even low-risk systems must have AgPL-a 
+                    // that can cause physical harm. Even low-risk systems must have AgPL-a
                     // classification (no risk of injury to persons).
                     return None; // Agricultural systems must have some safety level
                 }
                 Some(SafetyStandard::Iso25119(match severity.value() {
-                    1..=300 => AgricultureLevel::AgPla,   // No risk of injury to persons
+                    1..=300 => AgricultureLevel::AgPla, // No risk of injury to persons
                     301..=500 => AgricultureLevel::AgPlb, // Light to moderate injury
                     501..=700 => AgricultureLevel::AgPlc, // Severe to life-threatening injury
                     701..=900 => AgricultureLevel::AgPld, // Life-threatening to fatal (one person)
                     901..=1000 => AgricultureLevel::AgPle, // Life-threatening to fatal (multiple persons)
                     _ => return None,
                 }))
-            },
+            }
         }
     }
-    
+
     fn is_compatible_with(&self, other: &SafetyStandard) -> bool {
         self.severity_score() >= other.severity_score()
     }
-    
+
     fn minimum_asil_equivalent(&self) -> AsilLevel {
         match self.severity_score().value() {
             0..=125 => AsilLevel::QM,
@@ -642,9 +691,9 @@ impl SafetyContext {
     pub fn effective_asil(&self) -> AsilLevel {
         let runtime_level = self.runtime_asil.load(Ordering::Acquire);
         let compile_level = self.compile_time_asil as u8;
-        
+
         let effective_level = runtime_level.max(compile_level);
-        
+
         // Safe to unwrap because we only store valid ASIL values
         match effective_level {
             0 => AsilLevel::QM,
@@ -661,7 +710,7 @@ impl SafetyContext {
     /// # One-Way Upgrade Policy (COUNTERINTUITIVE BEHAVIOR)
     ///
     /// This allows increasing the safety requirements at runtime, but NEVER decreasing
-    /// them below the compile-time level. This one-way policy prevents safety 
+    /// them below the compile-time level. This one-way policy prevents safety
     /// degradation attacks and ensures that systems always meet their design-time
     /// safety requirements.
     ///
@@ -690,25 +739,21 @@ impl SafetyContext {
     /// use wrt_foundation::safety_system::{SafetyContext, AsilLevel};
     ///
     /// let ctx = SafetyContext::new(AsilLevel::AsilB);
-    /// 
+    ///
     /// // This succeeds - upgrading to higher safety level
     /// assert!(ctx.upgrade_runtime_asil(AsilLevel::AsilC).is_ok());
-    /// 
+    ///
     /// // This fails - cannot downgrade below compile-time level
     /// assert!(ctx.upgrade_runtime_asil(AsilLevel::AsilA).is_err());
     /// ```
     pub fn upgrade_runtime_asil(&self, new_level: AsilLevel) -> WrtResult<()> {
         let new_level_u8 = new_level as u8;
         let compile_level_u8 = self.compile_time_asil as u8;
-        
+
         if new_level_u8 < compile_level_u8 {
-            return Err(Error::new(
-                ErrorCategory::Safety,
-                codes::SAFETY_VIOLATION,
-                "Cannot downgrade ASIL below compile-time level",
-            ));
+            return Err(Error::safety_violation("Cannot downgrade ASIL below compile-time level"));
         }
-        
+
         self.runtime_asil.store(new_level_u8, Ordering::Release);
         Ok(())
     }
@@ -723,7 +768,7 @@ impl SafetyContext {
     /// The new violation count after incrementing.
     pub fn record_violation(&self) -> u8 {
         let count = self.violation_count.fetch_add(1, Ordering::AcqRel) + 1;
-        
+
         // Trigger safety actions based on ASIL level
         let effective = self.effective_asil();
         match effective {
@@ -743,14 +788,14 @@ impl SafetyContext {
                 {
                     eprintln!("CRITICAL: Safety violation #{} detected at {}", count, effective);
                 }
-                
+
                 // In a real implementation, this might trigger:
                 // - System shutdown
                 // - Failsafe mode activation
                 // - Error reporting to safety monitor
             }
         }
-        
+
         count
     }
 
@@ -770,11 +815,11 @@ impl SafetyContext {
     pub fn should_verify(&self) -> bool {
         let effective = self.effective_asil();
         let frequency = effective.verification_frequency();
-        
+
         if frequency == 0 {
             return false; // QM level - no verification required
         }
-        
+
         let count = self.operation_count.fetch_add(1, Ordering::AcqRel) + 1;
         (count as u32) % frequency == 0
     }
@@ -798,14 +843,14 @@ impl SafetyContext {
     pub fn is_safe(&self) -> bool {
         let violations = self.violation_count();
         let operations = self.operation_count.load(Ordering::Acquire);
-        
+
         if operations == 0 {
             return true; // No operations yet
         }
-        
+
         let error_rate = violations as f64 / operations as f64;
         let max_rate = self.effective_asil().max_error_rate();
-        
+
         error_rate <= max_rate
     }
 }
@@ -861,9 +906,13 @@ impl Clone for UniversalSafetyContext {
         Self {
             primary_standard: self.primary_standard,
             secondary_standards: self.secondary_standards,
-            runtime_state: core::sync::atomic::AtomicU16::new(self.runtime_state.load(Ordering::SeqCst)),
+            runtime_state: core::sync::atomic::AtomicU16::new(
+                self.runtime_state.load(Ordering::SeqCst),
+            ),
             violation_count: AtomicU8::new(self.violation_count.load(Ordering::SeqCst)),
-            operation_count: core::sync::atomic::AtomicU32::new(self.operation_count.load(Ordering::SeqCst)),
+            operation_count: core::sync::atomic::AtomicU32::new(
+                self.operation_count.load(Ordering::SeqCst),
+            ),
         }
     }
 }
@@ -891,7 +940,7 @@ impl UniversalSafetyContext {
             operation_count: core::sync::atomic::AtomicU32::new(0),
         }
     }
-    
+
     /// Add secondary standard requirement
     ///
     /// This allows the context to satisfy multiple safety standards simultaneously.
@@ -910,18 +959,14 @@ impl UniversalSafetyContext {
                 return Ok(());
             }
         }
-        Err(Error::new(
-            ErrorCategory::Safety,
-            codes::SAFETY_VIOLATION,
-            "Too many secondary standards"
-        ))
+        Err(Error::safety_violation("Too many secondary standards"))
     }
-    
+
     /// Get the effective severity (highest of all standards)
     pub fn effective_severity(&self) -> SeverityScore {
         SeverityScore(self.runtime_state.load(Ordering::Acquire))
     }
-    
+
     /// Check if this context can handle a given standard
     ///
     /// Returns `true` if the effective severity is greater than or equal to
@@ -931,17 +976,17 @@ impl UniversalSafetyContext {
         let required_severity = required.severity_score();
         effective >= required_severity
     }
-    
+
     /// Get the primary safety standard
     pub fn primary_standard(&self) -> SafetyStandard {
         self.primary_standard
     }
-    
+
     /// Get all secondary standards
     pub fn secondary_standards(&self) -> &[Option<SafetyStandard>; 4] {
         &self.secondary_standards
     }
-    
+
     /// Record a safety violation
     ///
     /// This increments the violation counter and may trigger safety actions
@@ -951,10 +996,10 @@ impl UniversalSafetyContext {
     /// The new violation count after incrementing.
     pub fn record_violation(&self) -> u8 {
         let count = self.violation_count.fetch_add(1, Ordering::AcqRel) + 1;
-        
+
         // Trigger safety actions based on severity
         let effective_severity = self.effective_severity();
-        
+
         #[cfg(feature = "std")]
         {
             match effective_severity.value() {
@@ -962,35 +1007,47 @@ impl UniversalSafetyContext {
                     // Low severity - basic logging
                 }
                 201..=500 => {
-                    eprintln!("Safety violation #{} detected (severity: {})", count, effective_severity);
+                    eprintln!(
+                        "Safety violation #{} detected (severity: {})",
+                        count, effective_severity
+                    );
                 }
                 501..=800 => {
-                    eprintln!("HIGH SEVERITY: Safety violation #{} detected (severity: {})", count, effective_severity);
+                    eprintln!(
+                        "HIGH SEVERITY: Safety violation #{} detected (severity: {})",
+                        count, effective_severity
+                    );
                 }
                 801..=1000 => {
-                    eprintln!("CRITICAL: Safety violation #{} detected (severity: {})", count, effective_severity);
+                    eprintln!(
+                        "CRITICAL: Safety violation #{} detected (severity: {})",
+                        count, effective_severity
+                    );
                 }
                 _ => {
-                    eprintln!("UNKNOWN SEVERITY: Safety violation #{} detected (severity: {})", count, effective_severity);
+                    eprintln!(
+                        "UNKNOWN SEVERITY: Safety violation #{} detected (severity: {})",
+                        count, effective_severity
+                    );
                 }
             }
         }
-        
+
         count
     }
-    
+
     /// Get the current violation count
     pub fn violation_count(&self) -> u8 {
         self.violation_count.load(Ordering::Acquire)
     }
-    
+
     /// Check if periodic verification should be performed
     ///
     /// Based on the effective severity level, this determines whether verification
     /// should be performed for the current operation.
     pub fn should_verify(&self) -> bool {
         let effective_severity = self.effective_severity();
-        
+
         // Determine frequency based on severity
         let frequency = match effective_severity.value() {
             0..=200 => 0,      // No verification required
@@ -1000,19 +1057,19 @@ impl UniversalSafetyContext {
             801..=1000 => 1,   // Every operation
             _ => 1,            // Conservative fallback
         };
-        
+
         if frequency == 0 {
             return false;
         }
-        
+
         let count = self.operation_count.fetch_add(1, Ordering::AcqRel) + 1;
         count % frequency == 0
     }
-    
+
     /// Update effective severity based on all standards
     fn update_effective_severity(&self) {
         let mut max_severity = self.primary_standard.severity_score().value();
-        
+
         for standard_opt in &self.secondary_standards {
             if let Some(standard) = standard_opt {
                 let severity = standard.severity_score().value();
@@ -1021,10 +1078,10 @@ impl UniversalSafetyContext {
                 }
             }
         }
-        
+
         self.runtime_state.store(max_severity, Ordering::Release);
     }
-    
+
     /// Reset the safety context (for testing or system restart)
     ///
     /// # Safety
@@ -1035,7 +1092,7 @@ impl UniversalSafetyContext {
         self.violation_count.store(0, Ordering::Release);
         self.operation_count.store(0, Ordering::Release);
     }
-    
+
     /// Check if the context is in a safe state
     ///
     /// A context is considered unsafe if it has too many violations relative
@@ -1043,48 +1100,53 @@ impl UniversalSafetyContext {
     pub fn is_safe(&self) -> bool {
         let violations = self.violation_count();
         let operations = self.operation_count.load(Ordering::Acquire);
-        
+
         if operations == 0 {
             return true; // No operations yet
         }
-        
+
         let error_rate = violations as f64 / operations as f64;
-        
+
         // Calculate maximum error rate based on effective severity
         let max_rate = match self.effective_severity().value() {
-            0..=200 => 1.0,     // No limit for low severity
-            201..=400 => 0.1,   // 10% for low-medium severity
-            401..=600 => 0.01,  // 1% for medium severity
-            601..=800 => 0.001, // 0.1% for high severity
+            0..=200 => 1.0,       // No limit for low severity
+            201..=400 => 0.1,     // 10% for low-medium severity
+            401..=600 => 0.01,    // 1% for medium severity
+            601..=800 => 0.001,   // 0.1% for high severity
             801..=1000 => 0.0001, // 0.01% for critical severity
-            _ => 0.0001,        // Conservative fallback
+            _ => 0.0001,          // Conservative fallback
         };
-        
+
         error_rate <= max_rate
     }
-    
+
     /// Convert this context to work with a specific safety standard
     ///
     /// This method returns a new context that ensures compatibility with
     /// the target standard while maintaining the current effective severity.
-    pub fn convert_to_standard(&self, target: SafetyStandardType) -> Option<UniversalSafetyContext> {
+    pub fn convert_to_standard(
+        &self,
+        target: SafetyStandardType,
+    ) -> Option<UniversalSafetyContext> {
         let effective_severity = self.effective_severity();
-        
+
         // Find equivalent level in target standard
         let target_standard = SafetyStandard::Iso26262(AsilLevel::QM) // Dummy value
             .convert_to(target)?;
-            
+
         // Create new context with target as primary
         let mut new_context = Self::new(target_standard);
-        
+
         // Ensure effective severity is at least as high as current
         if target_standard.severity_score() < effective_severity {
             // Add a secondary standard to maintain effective severity
-            if let Some(backup_standard) = self.primary_standard.convert_to(SafetyStandardType::Iso26262) {
+            if let Some(backup_standard) =
+                self.primary_standard.convert_to(SafetyStandardType::Iso26262)
+            {
                 let _ = new_context.add_secondary_standard(backup_standard);
             }
         }
-        
+
         Some(new_context)
     }
 }
@@ -1118,13 +1180,9 @@ impl<'a> SafetyGuard<'a> {
         // Check if the context is in a safe state
         if !context.is_safe() {
             context.record_violation();
-            return Err(Error::new(
-                ErrorCategory::Safety,
-                codes::SAFETY_VIOLATION,
-                "Safety context is not in a safe state",
-            ));
+            return Err(Error::safety_violation("Safety context is not in a safe state"));
         }
-        
+
         Ok(Self {
             context,
             operation_name,
@@ -1151,11 +1209,7 @@ impl<'a> SafetyGuard<'a> {
         if self.context.should_verify() {
             verifier().map_err(|_| {
                 self.context.record_violation();
-                Error::new(
-                    ErrorCategory::Safety,
-                    codes::VERIFICATION_FAILED,
-                    "Safety verification failed",
-                )
+                Error::verification_failed("Safety verification failed")
             })?;
         }
         Ok(())
@@ -1213,19 +1267,13 @@ impl<'a> SafeMemoryAllocation<'a> {
     /// * `context` - The safety context for verification
     pub fn new(data: &'a mut [u8], context: &'a SafetyContext) -> WrtResult<Self> {
         let checksum = Self::calculate_checksum(data);
-        
-        Ok(Self {
-            data,
-            context,
-            checksum,
-        })
+
+        Ok(Self { data, context, checksum })
     }
 
     /// Calculate checksum for memory protection
     fn calculate_checksum(data: &[u8]) -> u32 {
-        data.iter().fold(0u32, |acc, &byte| {
-            acc.wrapping_add(byte as u32)
-        })
+        data.iter().fold(0u32, |acc, &byte| acc.wrapping_add(byte as u32))
     }
 
     /// Verify memory integrity
@@ -1234,11 +1282,7 @@ impl<'a> SafeMemoryAllocation<'a> {
             let current_checksum = Self::calculate_checksum(self.data);
             if current_checksum != self.checksum {
                 self.context.record_violation();
-                return Err(Error::new(
-                    ErrorCategory::Safety,
-                    codes::MEMORY_CORRUPTION_DETECTED,
-                    "Memory corruption detected",
-                ));
+                return Err(Error::memory_error("Memory corruption detected"));
             }
         }
         Ok(())
@@ -1313,43 +1357,41 @@ macro_rules! universal_safety_context {
     (Iso26262($level:ident)) => {
         $crate::safety_system::UniversalSafetyContext::new(
             $crate::safety_system::SafetyStandard::Iso26262(
-                $crate::safety_system::AsilLevel::$level
-            )
+                $crate::safety_system::AsilLevel::$level,
+            ),
         )
     };
     (Do178c($level:ident)) => {
         $crate::safety_system::UniversalSafetyContext::new(
-            $crate::safety_system::SafetyStandard::Do178c(
-                $crate::safety_system::DalLevel::$level
-            )
+            $crate::safety_system::SafetyStandard::Do178c($crate::safety_system::DalLevel::$level),
         )
     };
     (Iec61508($level:ident)) => {
         $crate::safety_system::UniversalSafetyContext::new(
             $crate::safety_system::SafetyStandard::Iec61508(
-                $crate::safety_system::SilLevel::$level
-            )
+                $crate::safety_system::SilLevel::$level,
+            ),
         )
     };
     (Iec62304($level:ident)) => {
         $crate::safety_system::UniversalSafetyContext::new(
             $crate::safety_system::SafetyStandard::Iec62304(
-                $crate::safety_system::MedicalClass::$level
-            )
+                $crate::safety_system::MedicalClass::$level,
+            ),
         )
     };
     (En50128($level:ident)) => {
         $crate::safety_system::UniversalSafetyContext::new(
             $crate::safety_system::SafetyStandard::En50128(
-                $crate::safety_system::RailwaySil::$level
-            )
+                $crate::safety_system::RailwaySil::$level,
+            ),
         )
     };
     (Iso25119($level:ident)) => {
         $crate::safety_system::UniversalSafetyContext::new(
             $crate::safety_system::SafetyStandard::Iso25119(
-                $crate::safety_system::AgricultureLevel::$level
-            )
+                $crate::safety_system::AgricultureLevel::$level,
+            ),
         )
     };
 }
@@ -1362,7 +1404,7 @@ macro_rules! assert_standard_compatibility {
     ($ctx:expr, Iso26262($level:ident)) => {
         const _: () = {
             let required = $crate::safety_system::SafetyStandard::Iso26262(
-                $crate::safety_system::AsilLevel::$level
+                $crate::safety_system::AsilLevel::$level,
             );
             // Note: This would need const evaluation support for full compile-time checking
             // For now, this serves as documentation and type checking
@@ -1371,35 +1413,35 @@ macro_rules! assert_standard_compatibility {
     ($ctx:expr, Do178c($level:ident)) => {
         const _: () = {
             let required = $crate::safety_system::SafetyStandard::Do178c(
-                $crate::safety_system::DalLevel::$level
+                $crate::safety_system::DalLevel::$level,
             );
         };
     };
     ($ctx:expr, Iec61508($level:ident)) => {
         const _: () = {
             let required = $crate::safety_system::SafetyStandard::Iec61508(
-                $crate::safety_system::SilLevel::$level
+                $crate::safety_system::SilLevel::$level,
             );
         };
     };
     ($ctx:expr, Iec62304($level:ident)) => {
         const _: () = {
             let required = $crate::safety_system::SafetyStandard::Iec62304(
-                $crate::safety_system::MedicalClass::$level
+                $crate::safety_system::MedicalClass::$level,
             );
         };
     };
     ($ctx:expr, En50128($level:ident)) => {
         const _: () = {
             let required = $crate::safety_system::SafetyStandard::En50128(
-                $crate::safety_system::RailwaySil::$level
+                $crate::safety_system::RailwaySil::$level,
             );
         };
     };
     ($ctx:expr, Iso25119($level:ident)) => {
         const _: () = {
             let required = $crate::safety_system::SafetyStandard::Iso25119(
-                $crate::safety_system::AgricultureLevel::$level
+                $crate::safety_system::AgricultureLevel::$level,
             );
         };
     };
@@ -1408,11 +1450,11 @@ macro_rules! assert_standard_compatibility {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    #[cfg(feature = "std")]
-    use std::{vec, format};
+
     #[cfg(all(not(feature = "std"), feature = "alloc"))]
-    use alloc::{vec, format};
+    use alloc::{format, vec};
+    #[cfg(feature = "std")]
+    use std::{format, vec};
 
     #[test]
     fn test_asil_level_ordering() {
@@ -1454,11 +1496,11 @@ mod tests {
     #[test]
     fn test_safety_context_upgrade() {
         let ctx = SafetyContext::new(AsilLevel::AsilB);
-        
+
         // Should be able to upgrade
         assert!(ctx.upgrade_runtime_asil(AsilLevel::AsilD).is_ok());
         assert_eq!(ctx.effective_asil(), AsilLevel::AsilD);
-        
+
         // Should not be able to downgrade below compile-time level
         assert!(ctx.upgrade_runtime_asil(AsilLevel::AsilA).is_err());
         assert_eq!(ctx.effective_asil(), AsilLevel::AsilD); // Should remain unchanged
@@ -1467,14 +1509,14 @@ mod tests {
     #[test]
     fn test_safety_context_violations() {
         let ctx = SafetyContext::new(AsilLevel::AsilA);
-        
+
         assert_eq!(ctx.violation_count(), 0);
         assert!(ctx.is_safe());
-        
+
         let count1 = ctx.record_violation();
         assert_eq!(count1, 1);
         assert_eq!(ctx.violation_count(), 1);
-        
+
         let count2 = ctx.record_violation();
         assert_eq!(count2, 2);
         assert_eq!(ctx.violation_count(), 2);
@@ -1483,14 +1525,14 @@ mod tests {
     #[test]
     fn test_safety_context_verification() {
         let ctx = SafetyContext::new(AsilLevel::AsilD);
-        
+
         // AsilD requires verification every operation
         assert!(ctx.should_verify());
         assert!(ctx.should_verify());
         assert!(ctx.should_verify());
-        
+
         let ctx_qm = SafetyContext::new(AsilLevel::QM);
-        
+
         // QM requires no verification
         assert!(!ctx_qm.should_verify());
         assert!(!ctx_qm.should_verify());
@@ -1500,13 +1542,13 @@ mod tests {
     #[test]
     fn test_safety_guard() -> WrtResult<()> {
         let ctx = SafetyContext::new(AsilLevel::AsilB);
-        
+
         let guard = SafetyGuard::new(&ctx, "test_operation")?;
         assert_eq!(guard.operation_name(), "test_operation");
-        
+
         // Verify that verification works
         guard.verify_if_required(|| Ok(()))?;
-        
+
         guard.complete()?;
         Ok(())
     }
@@ -1515,22 +1557,22 @@ mod tests {
     fn test_safe_memory_allocation() -> WrtResult<()> {
         let ctx = SafetyContext::new(AsilLevel::AsilC);
         let mut data = [1u8, 2u8, 3u8, 4u8];
-        
+
         let mut allocation = SafeMemoryAllocation::new(&mut data, &ctx)?;
-        
+
         // Should verify successfully initially
         allocation.verify_integrity()?;
-        
+
         // Modify data and update checksum
         {
             let data_mut = allocation.data_mut()?;
             data_mut[0] = 10;
         }
         allocation.update_checksum();
-        
+
         // Should still verify successfully
         allocation.verify_integrity()?;
-        
+
         Ok(())
     }
 
@@ -1543,11 +1585,9 @@ mod tests {
     #[test]
     fn test_safety_guarded_macro() -> WrtResult<()> {
         let ctx = SafetyContext::new(AsilLevel::AsilA);
-        
-        let result = safety_guarded!(&ctx, "test_macro_operation", {
-            42
-        });
-        
+
+        let result = safety_guarded!(&ctx, "test_macro_operation", { 42 });
+
         assert_eq!(result, 42);
         Ok(())
     }
@@ -1586,7 +1626,7 @@ mod tests {
     #[test]
     fn test_safety_standard_conversion() {
         let asil_c = SafetyStandard::Iso26262(AsilLevel::AsilC);
-        
+
         // Convert to DAL
         let dal_equivalent = asil_c.convert_to(SafetyStandardType::Do178c).unwrap();
         if let SafetyStandard::Do178c(level) = dal_equivalent {
@@ -1629,30 +1669,30 @@ mod tests {
     #[test]
     fn test_universal_safety_context_secondary_standards() -> WrtResult<()> {
         let mut ctx = UniversalSafetyContext::new(SafetyStandard::Iso26262(AsilLevel::AsilB));
-        
+
         // Add higher severity secondary standard
         ctx.add_secondary_standard(SafetyStandard::Do178c(DalLevel::DalA))?;
-        
+
         // Effective severity should be the highest (DAL-A = 1000)
         assert_eq!(ctx.effective_severity().value(), 1000);
-        
+
         // Should be able to handle both standards
         assert!(ctx.can_handle(SafetyStandard::Iso26262(AsilLevel::AsilB)));
         assert!(ctx.can_handle(SafetyStandard::Do178c(DalLevel::DalA)));
-        
+
         Ok(())
     }
 
     #[test]
     fn test_universal_safety_context_verification() {
         let ctx = UniversalSafetyContext::new(SafetyStandard::Iso26262(AsilLevel::AsilD));
-        
+
         // ASIL-D (severity 1000) should require verification every operation
         assert!(ctx.should_verify());
         assert!(ctx.should_verify());
-        
+
         let ctx_qm = UniversalSafetyContext::new(SafetyStandard::Iso26262(AsilLevel::QM));
-        
+
         // QM (severity 0) should require no verification
         assert!(!ctx_qm.should_verify());
     }
@@ -1660,10 +1700,10 @@ mod tests {
     #[test]
     fn test_universal_safety_context_violations() {
         let ctx = UniversalSafetyContext::new(SafetyStandard::Iso26262(AsilLevel::AsilB));
-        
+
         assert_eq!(ctx.violation_count(), 0);
         assert!(ctx.is_safe());
-        
+
         let count1 = ctx.record_violation();
         assert_eq!(count1, 1);
         assert_eq!(ctx.violation_count(), 1);
@@ -1689,7 +1729,7 @@ mod tests {
     fn test_universal_safety_context_macro() {
         let ctx = universal_safety_context!(Iso26262(AsilC));
         assert_eq!(ctx.primary_standard(), SafetyStandard::Iso26262(AsilLevel::AsilC));
-        
+
         let ctx_dal = universal_safety_context!(Do178c(DalB));
         assert_eq!(ctx_dal.primary_standard(), SafetyStandard::Do178c(DalLevel::DalB));
     }
@@ -1698,10 +1738,10 @@ mod tests {
     fn test_minimum_asil_equivalent() {
         let dal_a = SafetyStandard::Do178c(DalLevel::DalA);
         assert_eq!(dal_a.minimum_asil_equivalent(), AsilLevel::AsilD);
-        
+
         let sil_2 = SafetyStandard::Iec61508(SilLevel::Sil2);
         assert_eq!(sil_2.minimum_asil_equivalent(), AsilLevel::AsilB);
-        
+
         let class_a = SafetyStandard::Iec62304(MedicalClass::ClassA);
         assert_eq!(class_a.minimum_asil_equivalent(), AsilLevel::AsilA);
     }
@@ -1712,7 +1752,7 @@ mod tests {
         let sil_1 = SafetyStandard::Iec61508(SilLevel::Sil1);
         let converted_to_iso = sil_1.convert_to(SafetyStandardType::Iso26262);
         assert!(converted_to_iso.is_some());
-        
+
         // Test conversion to standards that require safety classification
         let qm = SafetyStandard::Iso26262(AsilLevel::QM);
         let converted_to_medical = qm.convert_to(SafetyStandardType::Iec62304);
@@ -1731,9 +1771,8 @@ mod tests {
             SafetyStandard::Do178c(DalLevel::DalA),
         ];
 
-        let mut severity_scores: Vec<_> = standards.iter()
-            .map(|s| s.severity_score().value())
-            .collect();
+        let mut severity_scores: Vec<_> =
+            standards.iter().map(|s| s.severity_score().value()).collect();
         severity_scores.sort();
 
         assert_eq!(severity_scores, vec![0, 200, 250, 750, 1000]);

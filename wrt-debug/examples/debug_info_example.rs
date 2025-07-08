@@ -42,13 +42,13 @@ pub extern "C" fn example_debug_info() {
                 let _file = line_info.file_index;
                 let _line = line_info.line;
                 let _column = line_info.column;
-            }
+            },
             Ok(None) => {
                 // No line information found
-            }
+            },
             Err(_e) => {
                 // Error finding line info
-            }
+            },
         }
     }
 }

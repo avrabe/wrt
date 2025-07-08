@@ -1,10 +1,11 @@
 // Error context built-ins implementation for the WebAssembly Component Model
 //
 // This module implements the error-related built-in functions:
-// - error.new: Create a new error context
+// - error.new: Create a new error context  
 // - error.trace: Get the trace from an error context
+//
+// Note: Full functionality requires std feature for Arc/Mutex
 
-use std::{boxed::Box, collections::HashMap, string::String, sync::Arc, vec::Vec};
 #[cfg(feature = "std")]
 use std::{
     boxed::Box,
@@ -14,9 +15,25 @@ use std::{
     vec::Vec,
 };
 
-use wrt_error::{codes, kinds::ValidationError, Error, ErrorCategory, Result, WrtError};
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, string::String, vec::Vec};
+
+#[cfg(not(feature = "std"))]
+use wrt_foundation::{bounded::BoundedVec, safe_memory::NoStdProvider};
+
+use wrt_error::{codes, Error, ErrorCategory, Result};
+use wrt_foundation::component_value::ComponentValue;
+
+// Define a stub BuiltinType for no_std
+#[cfg(not(feature = "std"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuiltinType {
+    ErrorNew,
+    ErrorTrace,
+}
+
 #[cfg(feature = "std")]
-use wrt_foundation::{builtin::BuiltinType, component_value::ComponentValue};
+use wrt_foundation::builtin::BuiltinType;
 
 use super::BuiltinHandler;
 
@@ -39,7 +56,7 @@ impl ErrorContext {
 
     /// Add a trace entry to the error context
     pub fn add_trace(&mut self, trace_entry: &str) {
-        self.trace.push(trace_entry.to_string());
+        self.trace.push(trace_entry.to_string();
     }
 
     /// Get the error message
@@ -54,7 +71,7 @@ impl ErrorContext {
 
     /// Add metadata to the error context
     pub fn add_metadata(&mut self, key: &str, value: &str) {
-        self.metadata.insert(key.to_string(), value.to_string());
+        self.metadata.insert(key.to_string(), value.to_string();
     }
 
     /// Get metadata value for a key
@@ -82,7 +99,7 @@ impl ErrorContextStore {
     pub fn create_error(&mut self, message: &str) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
-        self.contexts.insert(id, ErrorContext::new(message));
+        self.contexts.insert(id, ErrorContext::new(message);
         id
     }
 
@@ -124,16 +141,14 @@ impl BuiltinHandler for ErrorNewHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate arguments
         if args.len() != 1 {
-            return Err(Error::new(ValidationError(format!(
-                "error.new requires exactly 1 argument, got {}",
-                args.len()
-            ))));
+            return Err(Error::validation_invalid_input("Error occurred"error.new requires exactly 1 argumentMissing messageMissing messageMissing message");
         }
 
         // Extract error message
         let message = match &args[0] {
             ComponentValue::String(s) => s.as_str(),
-            _ => return Err(Error::new(ValidationError("error.new argument must be a string"))),
+            _ => return Err(Error::runtime_execution_error("Error occurred"
+            )),
         };
 
         // Create a new error context
@@ -144,7 +159,7 @@ impl BuiltinHandler for ErrorNewHandler {
     }
 
     fn clone_handler(&self) -> Box<dyn BuiltinHandler> {
-        Box::new(self.clone())
+        Box::new(self.clone()
     }
 }
 
@@ -170,19 +185,15 @@ impl BuiltinHandler for ErrorTraceHandler {
     fn execute(&self, args: &[ComponentValue]) -> Result<Vec<ComponentValue>> {
         // Validate arguments
         if args.len() != 2 {
-            return Err(WrtError::validation_error(format!(
-                "error.trace requires exactly 2 arguments, got {}",
-                args.len()
-            )));
+            return Err(Error::validation_invalid_input("Missing error messageMissing messageMissing messageMissing message");
         }
 
         // Extract error context ID
         let error_id = match args[0] {
             ComponentValue::U64(id) => id,
             _ => {
-                return Err(WrtError::type_mismatch_error(
-                    "error.trace first argument must be an error context ID",
-                ))
+                return Err(Error::runtime_execution_error("Error occurred"
+                )
             }
         };
 
@@ -190,16 +201,17 @@ impl BuiltinHandler for ErrorTraceHandler {
         let trace_message = match &args[1] {
             ComponentValue::String(s) => s.as_str(),
             _ => {
-                return Err(WrtError::type_mismatch_error(
-                    "error.trace second argument must be a string",
-                ))
+                return Err(Error::new(
+                    ErrorCategory::Type,
+                    codes::TYPE_MISMATCH_ERROR,
+                    "Error message neededMissing messageMissing messageMissing message")
             }
         };
 
         // Add trace to the error context
         let mut store = self.store.lock().unwrap();
         let error_context = store.get_error_mut(error_id).ok_or_else(|| {
-            WrtError::resource_error("Component not found")
+            Error::resource_not_found("Error occurred"Component not foundMissing message")
         })?;
         error_context.add_trace(trace_message);
 
@@ -208,13 +220,13 @@ impl BuiltinHandler for ErrorTraceHandler {
     }
 
     fn clone_handler(&self) -> Box<dyn BuiltinHandler> {
-        Box::new(self.clone())
+        Box::new(self.clone()
     }
 }
 
 /// Create handlers for error built-ins
 pub fn create_error_handlers() -> Vec<Box<dyn BuiltinHandler>> {
-    let store = Arc::new(Mutex::new(ErrorContextStore::new()));
+    let store = Arc::new(Mutex::new(ErrorContextStore::new());
     vec![Box::new(ErrorNewHandler::new(store.clone())), Box::new(ErrorTraceHandler::new(store))]
 }
 
@@ -227,85 +239,85 @@ mod tests {
         let mut store = ErrorContextStore::new();
 
         // Create an error context
-        let id = store.create_error("Test error");
+        let id = store.create_error("Test errorMissing message");
         assert!(id > 0);
 
         // Get the error context
-        let error = store.get_error(id).expect("Error context should exist");
-        assert_eq!(error.message(), "Test error");
+        let error = store.get_error(id).expect("Error context should existMissing message");
+        assert_eq!(error.message(), "Test errorMissing message");
         assert_eq!(error.trace().len(), 0);
 
         // Add a trace entry
-        store.get_error_mut(id).unwrap().add_trace("Trace 1");
+        store.get_error_mut(id).unwrap().add_trace("Trace 1Missing message");
         let error = store.get_error(id).unwrap();
         assert_eq!(error.trace().len(), 1);
-        assert_eq!(error.trace()[0], "Trace 1");
+        assert_eq!(error.trace()[0], "Trace 1Missing message");
 
         // Add metadata
-        store.get_error_mut(id).unwrap().add_metadata("key", "value");
+        store.get_error_mut(id).unwrap().add_metadata("key", "valueMissing message");
         let error = store.get_error(id).unwrap();
-        assert_eq!(error.get_metadata("key").unwrap(), "value");
+        assert_eq!(error.get_metadata("keyMissing message").unwrap(), "valueMissing message");
 
         // Drop the error context
-        assert!(store.drop_error(id));
-        assert!(store.get_error(id).is_none());
+        assert!(store.drop_error(id);
+        assert!(store.get_error(id).is_none();
     }
 
     #[test]
     fn test_error_new_handler() {
-        let store = Arc::new(Mutex::new(ErrorContextStore::new()));
-        let handler = ErrorNewHandler::new(store.clone());
+        let store = Arc::new(Mutex::new(ErrorContextStore::new());
+        let handler = ErrorNewHandler::new(store.clone();
 
         // Test with valid arguments
         let args = vec![ComponentValue::String("Test error".to_string())];
-        let result = handler.execute(&args).expect("Handler should succeed");
+        let result = handler.execute(&args).expect("Handler should succeedMissing message");
         assert_eq!(result.len(), 1);
         let id = match result[0] {
             ComponentValue::U64(id) => id,
-            _ => panic!("Expected U64 result"),
+            _ => panic!("Expected U64 resultMissing message"),
         };
 
         // Verify the error was created
-        let error = store.lock().unwrap().get_error(id).expect("Error context should exist");
-        assert_eq!(error.message(), "Test error");
+        let error = store.lock().unwrap().get_error(id).expect("Error context should existMissing message");
+        assert_eq!(error.message(), "Test errorMissing message");
 
         // Test with invalid arguments
         let args = vec![ComponentValue::I32(42)];
-        assert!(handler.execute(&args).is_err());
+        assert!(handler.execute(&args).is_err();
 
         // Test with wrong number of arguments
         let args = vec![];
-        assert!(handler.execute(&args).is_err());
+        assert!(handler.execute(&args).is_err();
     }
 
     #[test]
     fn test_error_trace_handler() {
-        let store = Arc::new(Mutex::new(ErrorContextStore::new()));
-        let id = store.lock().unwrap().create_error("Test error");
-        let handler = ErrorTraceHandler::new(store.clone());
+        let store = Arc::new(Mutex::new(ErrorContextStore::new());
+        let id = store.lock().unwrap().create_error("Test errorMissing message");
+        let handler = ErrorTraceHandler::new(store.clone();
 
         // Test with valid arguments
         let args = vec![ComponentValue::U64(id), ComponentValue::String("Trace entry".to_string())];
-        let result = handler.execute(&args).expect("Handler should succeed");
+        let result = handler.execute(&args).expect("Handler should succeedMissing message");
         assert_eq!(result.len(), 0);
 
         // Verify the trace was added
-        let error = store.lock().unwrap().get_error(id).expect("Error context should exist");
+        let error = store.lock().unwrap().get_error(id).expect("Error context should existMissing message");
         assert_eq!(error.trace().len(), 1);
-        assert_eq!(error.trace()[0], "Trace entry");
+        assert_eq!(error.trace()[0], "Trace entryMissing message");
 
         // Test with invalid error ID
         let args =
             vec![ComponentValue::U64(9999), ComponentValue::String("Trace entry".to_string())];
-        assert!(handler.execute(&args).is_err());
+        assert!(handler.execute(&args).is_err();
 
         // Test with invalid arguments
         let args = vec![ComponentValue::I32(42), ComponentValue::String("Trace entry".to_string())];
-        assert!(handler.execute(&args).is_err());
+        assert!(handler.execute(&args).is_err();
 
         // Test with wrong number of arguments
         let args = vec![ComponentValue::U64(id)];
-        assert!(handler.execute(&args).is_err());
+        assert!(handler.execute(&args).is_err();
     }
 
     #[test]

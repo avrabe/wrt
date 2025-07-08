@@ -4,6 +4,15 @@ version = "0.0.0"
 publish = false
 edition = "2021"
 
+[features]
+default = ["std"]
+std = []
+no_std = []
+safety-asil-b = []
+safety-asil-c = ["safety-asil-b"]
+safety-asil-d = ["safety-asil-c"]
+
+
 [package.metadata]
 cargo-fuzz = true
 

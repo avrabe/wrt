@@ -64,14 +64,23 @@ mod tests {
         assert_eq!(Value::default_for_type(&ValueType::I64).as_i64(), Some(0));
         assert_eq!(Value::default_for_type(&ValueType::F32).as_f32(), Some(0.0));
         assert_eq!(Value::default_for_type(&ValueType::F64).as_f64(), Some(0.0));
-        assert_eq!(Value::default_for_type(&ValueType::FuncRef).as_func_ref(), Some(None));
-        assert_eq!(Value::default_for_type(&ValueType::ExternRef).as_extern_ref(), Some(None));
+        assert_eq!(
+            Value::default_for_type(&ValueType::FuncRef).as_func_ref(),
+            Some(None)
+        );
+        assert_eq!(
+            Value::default_for_type(&ValueType::ExternRef).as_extern_ref(),
+            Some(None)
+        );
     }
 
     // Memory Tests
     #[test]
     fn test_memory_operations() {
-        let mem_type = MemoryType { min: 1, max: Some(10) };
+        let mem_type = MemoryType {
+            min: 1,
+            max: Some(10),
+        };
         let mut memory = new_memory(mem_type);
 
         // Test initial state
@@ -112,7 +121,11 @@ mod tests {
     // Table Tests
     #[test]
     fn test_table_operations() {
-        let table_type = TableType { element_type: ValueType::FuncRef, min: 1, max: Some(10) };
+        let table_type = TableType {
+            element_type: ValueType::FuncRef,
+            min: 1,
+            max: Some(10),
+        };
         let mut table = new_table(table_type);
 
         // Test initial state
@@ -137,7 +150,10 @@ mod tests {
     // Global Tests
     #[test]
     fn test_global_operations() {
-        let global_type = GlobalType { content_type: ValueType::I32, mutable: true };
+        let global_type = GlobalType {
+            content_type: ValueType::I32,
+            mutable: true,
+        };
         let mut global = new_global(global_type, Value::I32(42)).unwrap();
 
         // Test initial value
@@ -152,12 +168,18 @@ mod tests {
     #[test]
     fn test_global_type_checking() {
         // Test immutable global
-        let immutable_type = GlobalType { content_type: ValueType::I32, mutable: false };
+        let immutable_type = GlobalType {
+            content_type: ValueType::I32,
+            mutable: false,
+        };
         let immutable = new_global(immutable_type, Value::I32(42)).unwrap();
         assert!(!immutable.type_().mutable);
 
         // Test type mismatch
-        let global_type = GlobalType { content_type: ValueType::I32, mutable: true };
+        let global_type = GlobalType {
+            content_type: ValueType::I32,
+            mutable: true,
+        };
         assert!(new_global(global_type, Value::F64(2.5)).is_err());
     }
 
@@ -201,7 +223,10 @@ mod tests {
         let mut module = module_result.unwrap(); // Unwrap here
 
         // Add a type
-        module.types.push(FuncType { params: vec![ValueType::I32], results: vec![] });
+        module.types.push(FuncType {
+            params: vec![ValueType::I32],
+            results: vec![],
+        });
 
         // Add imports
         module.imports.push(Import {
@@ -227,7 +252,7 @@ mod tests {
             ExternType::Function(func_type) => {
                 assert_eq!(func_type.params, vec![ValueType::I32]);
                 assert!(func_type.results.is_empty());
-            }
+            },
             _ => panic!("Expected function import type"),
         }
 
@@ -239,7 +264,7 @@ mod tests {
             ExternType::Memory(mem_type) => {
                 assert_eq!(mem_type.limits.min, 1);
                 assert!(mem_type.limits.max.is_none());
-            }
+            },
             _ => panic!("Expected memory import type"),
         }
 
@@ -275,7 +300,10 @@ mod tests {
         );
         assert_eq!(operation_with_id.level, LogLevel::Warn);
         assert_eq!(operation_with_id.message, "Component message");
-        assert_eq!(operation_with_id.component_id, Some("test-component".to_string()));
+        assert_eq!(
+            operation_with_id.component_id,
+            Some("test-component".to_string())
+        );
     }
 
     // Error Tests
@@ -299,10 +327,16 @@ mod tests {
         assert_eq!(parse_error.to_string(), "Parse error: invalid syntax");
 
         let component_error = Error::Component("invalid interface".to_string());
-        assert_eq!(component_error.to_string(), "Component error: invalid interface");
+        assert_eq!(
+            component_error.to_string(),
+            "Component error: invalid interface"
+        );
 
         let custom_error = Error::Custom("custom error message".to_string());
-        assert_eq!(custom_error.to_string(), "Custom error: custom error message");
+        assert_eq!(
+            custom_error.to_string(),
+            "Custom error: custom error message"
+        );
     }
 
     #[test]

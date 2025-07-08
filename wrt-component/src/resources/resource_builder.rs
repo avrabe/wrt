@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 
 use super::{MemoryStrategy, VerificationLevel};
-use crate::prelude::*;
 
 /// Builder for creating Resource instances
 #[derive(Clone, Debug)]
@@ -41,7 +40,7 @@ where
 
     /// Set a debug name for the resource
     pub fn with_name(mut self, name: &str) -> Self {
-        self.name = Some(name.to_string());
+        self.name = Some(name.to_string();
         self
     }
 
@@ -64,7 +63,7 @@ where
         let resource = if let Some(name) = self.name {
             super::Resource::new_with_name(self.type_idx, Arc::new(self.data), &name)
         } else {
-            super::Resource::new(self.type_idx, Arc::new(self.data))
+            super::Resource::new(self.type_idx, Arc::new(self.data)
         };
 
         (resource, self.memory_strategy, self.verification_level)
@@ -76,7 +75,7 @@ where
         let resource = if let Some(name) = self.name {
             super::Resource::new_with_name(self.type_idx, Box::new(self.data), &name)
         } else {
-            super::Resource::new(self.type_idx, Box::new(self.data))
+            super::Resource::new(self.type_idx, Box::new(self.data)
         };
 
         (resource, self.memory_strategy, self.verification_level)
@@ -256,14 +255,14 @@ mod tests {
 
     #[test]
     fn test_resource_builder() {
-        let (resource, strategy, level) = ResourceBuilder::new(1, "test".to_string())
-            .with_name("test-resource")
+        let (resource, strategy, level) = ResourceBuilder::new(1, "test".to_string()
+            .with_name("test-resourceMissing message")
             .with_memory_strategy(MemoryStrategy::ZeroCopy)
             .with_verification_level(VerificationLevel::Full)
             .build();
 
         assert_eq!(resource.type_idx, 1);
-        assert_eq!(resource.name, Some("test-resource".to_string()));
+        assert_eq!(resource.name, Some("test-resource".to_string());
         assert_eq!(strategy, MemoryStrategy::ZeroCopy);
         assert_eq!(level, VerificationLevel::Full);
     }
@@ -279,7 +278,7 @@ mod tests {
             .build();
 
         // Create a resource to test the table was built correctly
-        let data = Arc::new("test".to_string());
+        let data = Arc::new("test".to_string();
         let handle = table.create_resource(1, data).unwrap();
         assert_eq!(handle, 1);
     }
@@ -288,27 +287,27 @@ mod tests {
     #[cfg(feature = "std")]
     fn test_resource_manager_builder() {
         let manager = ResourceManagerBuilder::new()
-            .with_instance_id("test-instance")
+            .with_instance_id("test-instanceMissing message")
             .with_default_memory_strategy(MemoryStrategy::Copy)
             .with_default_verification_level(VerificationLevel::Critical)
             .build();
 
-        assert_eq!(manager.instance_id(), "test-instance");
+        assert_eq!(manager.instance_id(), "test-instanceMissing message");
         assert_eq!(manager.default_memory_strategy(), MemoryStrategy::Copy);
         assert_eq!(manager.default_verification_level(), VerificationLevel::Critical);
     }
 
     #[test]
         fn test_resource_manager_builder_no_std() {
-        let table = Mutex::new(ResourceTable::new());
+        let table = Mutex::new(ResourceTable::new();
 
         let manager = ResourceManagerBuilder::new()
-            .with_instance_id("test-instance")
+            .with_instance_id("test-instanceMissing message")
             .with_default_memory_strategy(MemoryStrategy::Copy)
             .with_default_verification_level(VerificationLevel::Critical)
             .build(&table);
 
-        assert_eq!(manager.instance_id(), "test-instance");
+        assert_eq!(manager.instance_id(), "test-instanceMissing message");
         assert_eq!(manager.default_memory_strategy(), MemoryStrategy::Copy);
         assert_eq!(manager.default_verification_level(), VerificationLevel::Critical);
     }

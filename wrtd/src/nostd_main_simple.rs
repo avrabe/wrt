@@ -6,7 +6,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-use heapless::Vec;
+use crate::bounded_wrtd_infra::{
+    BoundedLogEntryVec, WrtdProvider, new_log_entry_vec
+};
 
 /// Configuration for no-std runtime
 #[derive(Debug, Clone)]
@@ -41,8 +43,8 @@ pub struct NoStdStats {
 pub struct NoStdRuntime {
     config: NoStdConfig,
     stats: NoStdStats,
-    // Fixed-size execution log
-    execution_log: Vec<u8, 32>,
+    // Fixed-size execution log using bounded collections
+    execution_log: BoundedLogEntryVec<u8>,
 }
 
 impl NoStdRuntime {
@@ -51,7 +53,7 @@ impl NoStdRuntime {
         Self {
             config,
             stats: NoStdStats::default(),
-            execution_log: Vec::new(),
+            execution_log: new_log_entry_vec(),
         }
     }
     

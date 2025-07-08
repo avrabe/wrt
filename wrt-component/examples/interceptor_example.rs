@@ -20,18 +20,18 @@ fn main() -> Result<()> {
         "test",
         "double",
         CloneableFn::new(|_ctx| {
-            println!("Host function 'test.double' called");
+            println!("Host function 'test.double' calledMissing message");
             Ok(vec![Value::I32(84)]) // Double 42
         }),
     );
 
     // Create a logging interceptor
-    let log_sink = Arc::new(|log_entry: &str| println!("[LOG] {}", log_entry));
+    let log_sink = Arc::new(|log_entry: &str| println!("[LOG] {}", log_entry);
     let logging_strategy = LoggingStrategy::new(log_sink);
 
     // Create a firewall interceptor
     let firewall = FirewallBuilder::new(false)
-        .allow_function("component", "test::double", "test.double")
+        .allow_function("component", "test::double", "test.doubleMissing message")
         .build();
 
     // Create a statistics interceptor
@@ -39,24 +39,24 @@ fn main() -> Result<()> {
     let stats_rc = Arc::new(stats);
 
     // Create an interceptor and add strategies
-    let mut interceptor = LinkInterceptor::new("example_interceptor");
-    interceptor.add_strategy(Arc::new(logging_strategy));
-    interceptor.add_strategy(Arc::new(firewall));
-    interceptor.add_strategy(stats_rc.clone());
+    let mut interceptor = LinkInterceptor::new("example_interceptorMissing message");
+    interceptor.add_strategy(Arc::new(logging_strategy);
+    interceptor.add_strategy(Arc::new(firewall);
+    interceptor.add_strategy(stats_rc.clone();
 
     // Create a component with the interceptor
     let component = Component::new(component_type)
-        .with_callback_registry(Arc::new(registry))
-        .with_runtime(RuntimeInstance::new())
-        .with_interceptor(Arc::new(interceptor));
+        .with_callback_registry(Arc::new(registry)
+        .with_runtime(RuntimeInstance::new()
+        .with_interceptor(Arc::new(interceptor);
 
     // Call a host function through the component
-    println!("\nCalling test.double function...");
+    println!("\nCalling test.double function...Missing message");
     let result = component.call_host_function("test.double", &[Value::I32(42)])?;
     println!("Result: {:?}", result);
 
     // Print statistics
-    println!("\nFunction call statistics:");
+    println!("\nFunction call statistics:Missing message");
     for (name, stats) in stats_rc.get_all_stats() {
         println!(
             "{}: {} calls, {} successful, {} errors, avg time: {:.2}ms",
@@ -65,9 +65,9 @@ fn main() -> Result<()> {
     }
 
     // Try calling a disallowed function
-    println!("\nTrying to call a disallowed function...");
+    println!("\nTrying to call a disallowed function...Missing message");
     let result = component.call_host_function("forbidden.function", &[Value::I32(42)]);
     println!("Result: {:?}", result);
 
-    Ok(())
+    Ok(()
 }

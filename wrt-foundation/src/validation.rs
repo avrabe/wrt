@@ -146,7 +146,10 @@ pub fn validate_checksum(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{traits::importance, verification::{VerificationLevel, Checksum}};
+    use crate::{
+        traits::importance,
+        verification::{Checksum, VerificationLevel},
+    };
     // For BoundedVec tests
     #[cfg(feature = "std")]
     use crate::safe_memory::StdProvider;
@@ -227,7 +230,8 @@ mod tests {
                 assert_eq!(expected, checksum1);
                 assert_eq!(actual, checksum2);
                 assert_eq!(description, "test_diff");
-            } // _ => panic!("Unexpected error type"), // Not needed if only one variant
+            }
+            Ok(_) => panic!("Expected error but got Ok"),
         }
     }
 }

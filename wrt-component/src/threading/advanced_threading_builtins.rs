@@ -14,7 +14,6 @@
 //! WebAssembly Component Model, including `thread.spawn_ref`, `thread.spawn_indirect`,
 //! and `thread.join` operations.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -22,7 +21,11 @@ extern crate alloc;
 use std::{boxed::Box, collections::HashMap, vec::Vec};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedVec as Vec, BoundedMap as HashMap, safe_memory::NoStdProvider};
+use wrt_foundation::{
+    BoundedVec as Vec, BoundedMap as HashMap, 
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use wrt_error::{Error, ErrorCategory, Result};
 use wrt_foundation::{
@@ -39,7 +42,7 @@ use wrt_foundation::BoundedString;
 
 // Type aliases for no_std compatibility
 #[cfg(not(feature = "std"))]
-type String = BoundedString<256, NoStdProvider<65536>>;
+type ThreadingString = BoundedString<256>;
 
 #[cfg(not(feature = "std"))]
 // For no_std, use a simpler ComponentValue representation
@@ -64,7 +67,7 @@ impl AdvancedThreadId {
     pub fn new() -> Self {
         static COUNTER: core::sync::atomic::AtomicU64 = 
             core::sync::atomic::AtomicU64::new(1);
-        Self(COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst))
+        Self(COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst)
     }
 
     pub fn as_u64(&self) -> u64 {
@@ -105,10 +108,7 @@ impl FunctionReference {
     #[cfg(not(any(feature = "std", )))]
     pub fn new(name: &str, signature: FunctionSignature, module_index: u32, function_index: u32) -> Result<Self> {
         let bounded_name = BoundedString::new_from_str(name)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Function name too long for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("Error occurred"
             ))?;
         Ok(Self {
             name: bounded_name,
@@ -135,7 +135,7 @@ pub struct IndirectCall {
     #[cfg(feature = "std")]
     pub arguments: Vec<ComponentValue>,
     #[cfg(not(any(feature = "std", )))]
-    pub arguments: BoundedVec<ComponentValue, 16, NoStdProvider<65536>>,
+    pub arguments: BoundedVec<ComponentValue, 16>,
 }
 
 impl IndirectCall {
@@ -152,10 +152,7 @@ impl IndirectCall {
     #[cfg(not(any(feature = "std", )))]
     pub fn new(table_index: u32, function_index: u32, type_index: u32, arguments: &[ComponentValue]) -> Result<Self> {
         let bounded_args = BoundedVec::new_from_slice(arguments)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Too many arguments for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("Error occurred"
             ))?;
         Ok(Self {
             table_index,
@@ -233,12 +230,12 @@ pub struct AdvancedThread {
     #[cfg(feature = "std")]
     pub child_threads: Vec<AdvancedThreadId>,
     #[cfg(not(any(feature = "std", )))]
-    pub child_threads: BoundedVec<AdvancedThreadId, MAX_THREADS, NoStdProvider<65536>>,
+    pub child_threads: BoundedVec<AdvancedThreadId, MAX_THREADS>,
 }
 
 impl AdvancedThread {
-    pub fn new(config: ThreadSpawnConfig) -> Self {
-        Self {
+    pub fn new(config: ThreadSpawnConfig) -> Result<Self> {
+        Ok(Self {
             id: AdvancedThreadId::new(),
             state: AdvancedThreadState::Starting,
             config,
@@ -253,14 +250,17 @@ impl AdvancedThread {
             #[cfg(feature = "std")]
             child_threads: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            child_threads: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            child_threads: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
+        })
     }
 
-    pub fn with_parent(config: ThreadSpawnConfig, parent_id: AdvancedThreadId) -> Self {
-        let mut thread = Self::new(config);
+    pub fn with_parent(config: ThreadSpawnConfig, parent_id: AdvancedThreadId) -> Result<Self> {
+        let mut thread = Self::new(config)?;
         thread.parent_thread = Some(parent_id);
-        thread
+        Ok(thread)
     }
 
     #[cfg(feature = "std")]
@@ -271,12 +271,9 @@ impl AdvancedThread {
     #[cfg(not(any(feature = "std", )))]
     pub fn add_child(&mut self, child_id: AdvancedThreadId) -> Result<()> {
         self.child_threads.push(child_id)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Too many child threads for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("Error occurred"
             ))?;
-        Ok(())
+        Ok(()
     }
 
     pub fn start(&mut self) {
@@ -316,17 +313,14 @@ impl AdvancedThread {
         #[cfg(feature = "std")]
         {
             self.thread_locals.insert(key, entry);
-            Ok(())
+            Ok(()
         }
         #[cfg(not(any(feature = "std", )))]
         {
             self.thread_locals.insert(key, entry)
-                .map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                    "Thread local storage full"
+                .map_err(|_| Error::runtime_execution_error("Error occurred"
                 ))?;
-            Ok(())
+            Ok(()
         }
     }
 
@@ -380,10 +374,7 @@ impl AdvancedThreadRegistry {
         #[cfg(not(any(feature = "std", )))]
         {
             self.threads.insert(id, thread)
-                .map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                    "Thread registry full"
+                .map_err(|_| Error::runtime_execution_error("Error occurred"
                 ))?;
             Ok(id)
         }
@@ -408,11 +399,12 @@ impl AdvancedThreadRegistry {
     pub fn cleanup_finished_threads(&mut self) {
         #[cfg(feature = "std")]
         {
-            self.threads.retain(|_, thread| !thread.state.is_finished());
+            self.threads.retain(|_, thread| !thread.state.is_finished();
         }
         #[cfg(not(any(feature = "std", )))]
         {
-            let mut finished_ids = BoundedVec::<AdvancedThreadId, MAX_THREADS>::new();
+            let provider = safe_managed_alloc!(MAX_THREADS * core::mem::size_of::<AdvancedThreadId>(), CrateId::Component).unwrap();
+            let mut finished_ids = BoundedVec::<AdvancedThreadId, MAX_THREADS>::new(provider).unwrap();
             for (id, thread) in self.threads.iter() {
                 if thread.state.is_finished() {
                     let _ = finished_ids.push(*id);
@@ -438,13 +430,10 @@ impl AdvancedThreadingBuiltins {
     /// Initialize the global advanced thread registry
     pub fn initialize() -> Result<()> {
         let mut registry_ref = ADVANCED_THREAD_REGISTRY.try_borrow_mut()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Advanced thread registry borrow failed"
+            .map_err(|_| Error::runtime_execution_error("Error occurred"
             ))?;
-        *registry_ref = Some(AdvancedThreadRegistry::new());
-        Ok(())
+        *registry_ref = Some(AdvancedThreadRegistry::new();
+        Ok(()
     }
 
     /// Get the global registry
@@ -456,15 +445,11 @@ impl AdvancedThreadingBuiltins {
             .map_err(|_| Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::INVALID_STATE,
-                "Advanced thread registry borrow failed"
-            ))?;
+                "Error message neededMissing messageMissing messageMissing message"))?;
         let registry = registry_ref.as_ref()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Advanced thread registry not initialized"
+            .ok_or_else(|| Error::runtime_execution_error("Error occurred"
             ))?;
-        Ok(f(registry))
+        Ok(f(registry)
     }
 
     /// Get the global registry mutably
@@ -476,13 +461,9 @@ impl AdvancedThreadingBuiltins {
             .map_err(|_| Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::INVALID_STATE,
-                "Advanced thread registry borrow failed"
-            ))?;
+                "Error message neededMissing messageMissing messageMissing message"))?;
         let registry = registry_ref.as_mut()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Advanced thread registry not initialized"
+            .ok_or_else(|| Error::runtime_execution_error("Error occurred"
             ))?;
         f(registry)
     }
@@ -495,9 +476,9 @@ impl AdvancedThreadingBuiltins {
         parent_id: Option<AdvancedThreadId>
     ) -> Result<AdvancedThreadId> {
         let thread = if let Some(parent) = parent_id {
-            AdvancedThread::with_parent(config, parent)
+            AdvancedThread::with_parent(config, parent)?
         } else {
-            AdvancedThread::new(config)
+            AdvancedThread::new(config)?
         };
 
         let thread_id = thread.id;
@@ -532,9 +513,9 @@ impl AdvancedThreadingBuiltins {
         parent_id: Option<AdvancedThreadId>
     ) -> Result<AdvancedThreadId> {
         let thread = if let Some(parent) = parent_id {
-            AdvancedThread::with_parent(config, parent)
+            AdvancedThread::with_parent(config, parent)?
         } else {
-            AdvancedThread::new(config)
+            AdvancedThread::new(config)?
         };
 
         let thread_id = thread.id;
@@ -573,16 +554,16 @@ impl AdvancedThreadingBuiltins {
                 match thread.state {
                     AdvancedThreadState::Completed => {
                         if let Some(result) = thread.result.take() {
-                            Ok(ThreadJoinResult::Success(result))
+                            Ok(ThreadJoinResult::Success(result)
                         } else {
                             Ok(ThreadJoinResult::Success(ComponentValue::I32(0))) // Default success
                         }
                     }
                     AdvancedThreadState::Failed => {
                         if let Some(error) = thread.error.take() {
-                            Ok(ThreadJoinResult::Error(error))
+                            Ok(ThreadJoinResult::Error(error)
                         } else {
-                            Ok(ThreadJoinResult::Error(ThreadError::ExecutionFailed))
+                            Ok(ThreadJoinResult::Error(ThreadError::ExecutionFailed)
                         }
                     }
                     AdvancedThreadState::Cancelled => {
@@ -591,11 +572,8 @@ impl AdvancedThreadingBuiltins {
                     _ => Ok(ThreadJoinResult::NotReady)
                 }
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Thread not found"
-                ))
+                Err(Error::runtime_execution_error("Error occurred"
+                )
             }
         })?
     }
@@ -616,13 +594,12 @@ impl AdvancedThreadingBuiltins {
         Self::with_registry_mut(|registry| {
             if let Some(thread) = registry.get_thread_mut(thread_id) {
                 thread.cancel();
-                Ok(())
+                Ok(()
             } else {
                 Err(Error::new(
                     ErrorCategory::Runtime,
                     wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Thread not found"
-                ))
+                    "Error message neededMissing messageMissing messageMissing message")
             }
         })?
     }
@@ -638,11 +615,8 @@ impl AdvancedThreadingBuiltins {
             if let Some(thread) = registry.get_thread_mut(thread_id) {
                 thread.set_thread_local(key, value, destructor)
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Thread not found"
-                ))
+                Err(Error::runtime_execution_error("Error occurred"
+                )
             }
         })?
     }
@@ -651,7 +625,7 @@ impl AdvancedThreadingBuiltins {
     pub fn thread_local_get(thread_id: AdvancedThreadId, key: u32) -> Result<Option<ComponentValue>> {
         Self::with_registry(|registry| {
             if let Some(thread) = registry.get_thread(thread_id) {
-                thread.get_thread_local(key).map(|entry| entry.value.clone())
+                thread.get_thread_local(key).map(|entry| entry.value.clone()
             } else {
                 None
             }
@@ -668,13 +642,13 @@ impl AdvancedThreadingBuiltins {
     pub fn cleanup_finished_threads() -> Result<()> {
         Self::with_registry_mut(|registry| {
             registry.cleanup_finished_threads();
-            Ok(())
+            Ok(()
         })?
     }
 
     /// Get thread count
     pub fn thread_count() -> Result<usize> {
-        Self::with_registry(|registry| registry.thread_count())
+        Self::with_registry(|registry| registry.thread_count()
     }
 }
 
@@ -720,15 +694,16 @@ pub mod advanced_threading_helpers {
                     }
                 }
             }
-            Ok(())
+            Ok(()
         })?;
         
         Ok(cancelled)
     }
 
     #[cfg(not(any(feature = "std", )))]
-    pub fn cancel_child_threads(parent_id: AdvancedThreadId) -> Result<BoundedVec<AdvancedThreadId, MAX_THREADS>, NoStdProvider<65536>> {
-        let mut cancelled = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+    pub fn cancel_child_threads(parent_id: AdvancedThreadId) -> Result<BoundedVec<AdvancedThreadId, MAX_THREADS>> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let mut cancelled = BoundedVec::new(provider)?;
         
         AdvancedThreadingBuiltins::with_registry_mut(|registry| {
             if let Some(parent) = registry.get_thread(parent_id) {
@@ -736,15 +711,12 @@ pub mod advanced_threading_helpers {
                     if let Some(child) = registry.get_thread_mut(child_id) {
                         child.cancel();
                         cancelled.push(child_id)
-                            .map_err(|_| Error::new(
-                                ErrorCategory::Memory,
-                                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                                "Too many cancelled threads for no_std environment"
+                            .map_err(|_| Error::runtime_execution_error("Error occurred"
                             ))?;
                     }
                 }
             }
-            Ok(())
+            Ok(()
         })?;
         
         Ok(cancelled)
@@ -756,7 +728,7 @@ pub mod advanced_threading_helpers {
         F: FnOnce(CancellationToken) -> Result<R>,
     {
         let token = CancellationToken::new();
-        with_cancellation_scope(token.clone(), || f(token))
+        with_cancellation_scope(token.clone(), || f(token)
     }
 }
 
@@ -788,7 +760,7 @@ mod tests {
                 0,
                 42
             );
-            assert_eq!(func_ref.name(), "test_function");
+            assert_eq!(func_ref.name(), "test_functionMissing message");
             assert_eq!(func_ref.module_index, 0);
             assert_eq!(func_ref.function_index, 42);
         }
@@ -801,7 +773,7 @@ mod tests {
                 0,
                 42
             ).unwrap();
-            assert_eq!(func_ref.name(), "test_function");
+            assert_eq!(func_ref.name(), "test_functionMissing message");
             assert_eq!(func_ref.module_index, 0);
             assert_eq!(func_ref.function_index, 42);
         }
@@ -818,7 +790,7 @@ mod tests {
             assert_eq!(indirect_call.function_index, 10);
             assert_eq!(indirect_call.type_index, 1);
             assert_eq!(indirect_call.argument_count(), 2);
-            assert_eq!(indirect_call.get_argument(0), Some(&ComponentValue::I32(42)));
+            assert_eq!(indirect_call.get_argument(0), Some(&ComponentValue::I32(42));
         }
 
         #[cfg(not(any(feature = "std", )))]
@@ -828,29 +800,29 @@ mod tests {
             assert_eq!(indirect_call.function_index, 10);
             assert_eq!(indirect_call.type_index, 1);
             assert_eq!(indirect_call.argument_count(), 2);
-            assert_eq!(indirect_call.get_argument(0), Some(&ComponentValue::I32(42)));
+            assert_eq!(indirect_call.get_argument(0), Some(&ComponentValue::I32(42));
         }
     }
 
     #[test]
     fn test_advanced_thread_state_methods() {
-        assert!(AdvancedThreadState::Starting.is_active());
-        assert!(AdvancedThreadState::Running.is_active());
-        assert!(!AdvancedThreadState::Completed.is_active());
-        assert!(!AdvancedThreadState::Cancelled.is_active());
-        assert!(!AdvancedThreadState::Failed.is_active());
+        assert!(AdvancedThreadState::Starting.is_active();
+        assert!(AdvancedThreadState::Running.is_active();
+        assert!(!AdvancedThreadState::Completed.is_active();
+        assert!(!AdvancedThreadState::Cancelled.is_active();
+        assert!(!AdvancedThreadState::Failed.is_active();
 
-        assert!(!AdvancedThreadState::Starting.is_finished());
-        assert!(!AdvancedThreadState::Running.is_finished());
-        assert!(AdvancedThreadState::Completed.is_finished());
-        assert!(AdvancedThreadState::Cancelled.is_finished());
-        assert!(AdvancedThreadState::Failed.is_finished());
+        assert!(!AdvancedThreadState::Starting.is_finished();
+        assert!(!AdvancedThreadState::Running.is_finished();
+        assert!(AdvancedThreadState::Completed.is_finished();
+        assert!(AdvancedThreadState::Cancelled.is_finished();
+        assert!(AdvancedThreadState::Failed.is_finished();
 
-        assert!(!AdvancedThreadState::Starting.can_join());
-        assert!(!AdvancedThreadState::Running.can_join());
-        assert!(AdvancedThreadState::Completed.can_join());
-        assert!(AdvancedThreadState::Cancelled.can_join());
-        assert!(AdvancedThreadState::Failed.can_join());
+        assert!(!AdvancedThreadState::Starting.can_join();
+        assert!(!AdvancedThreadState::Running.can_join();
+        assert!(AdvancedThreadState::Completed.can_join();
+        assert!(AdvancedThreadState::Cancelled.can_join();
+        assert!(AdvancedThreadState::Failed.can_join();
     }
 
     #[test]
@@ -859,18 +831,18 @@ mod tests {
             stack_size: Some(65536),
             priority: Some(5),
         };
-        let mut thread = AdvancedThread::new(config);
+        let mut thread = AdvancedThread::new(config).unwrap();
         
         assert_eq!(thread.state, AdvancedThreadState::Starting);
-        assert!(thread.result.is_none());
-        assert!(thread.error.is_none());
+        assert!(thread.result.is_none();
+        assert!(thread.error.is_none();
 
         thread.start();
         assert_eq!(thread.state, AdvancedThreadState::Running);
 
-        thread.complete(ComponentValue::Bool(true));
+        thread.complete(ComponentValue::Bool(true);
         assert_eq!(thread.state, AdvancedThreadState::Completed);
-        assert!(thread.result.is_some());
+        assert!(thread.result.is_some();
     }
 
     #[test]
@@ -879,7 +851,7 @@ mod tests {
             stack_size: Some(65536),
             priority: Some(5),
         };
-        let mut thread = AdvancedThread::new(config);
+        let mut thread = AdvancedThread::new(config).unwrap();
 
         // Set thread local value
         thread.set_thread_local(1, ComponentValue::I32(42), None).unwrap();
@@ -887,17 +859,17 @@ mod tests {
 
         // Get thread local values
         let entry1 = thread.get_thread_local(1).unwrap();
-        assert_eq!(entry1.value, ComponentValue::I32(42));
+        assert_eq!(entry1.value, ComponentValue::I32(42);
         assert_eq!(entry1.destructor, None);
 
         let entry2 = thread.get_thread_local(2).unwrap();
-        assert_eq!(entry2.value, ComponentValue::Bool(true));
-        assert_eq!(entry2.destructor, Some(100));
+        assert_eq!(entry2.value, ComponentValue::Bool(true);
+        assert_eq!(entry2.destructor, Some(100);
 
         // Remove thread local value
         let removed = thread.remove_thread_local(1);
-        assert!(removed.is_some());
-        assert!(thread.get_thread_local(1).is_none());
+        assert!(removed.is_some();
+        assert!(thread.get_thread_local(1).is_none();
     }
 
     #[test]
@@ -908,13 +880,13 @@ mod tests {
         };
         
         let parent_id = AdvancedThreadId::new();
-        let mut parent = AdvancedThread::new(config.clone());
+        let mut parent = AdvancedThread::new(config.clone()).unwrap();
         parent.id = parent_id;
 
-        let mut child = AdvancedThread::with_parent(config, parent_id);
+        let mut child = AdvancedThread::with_parent(config, parent_id).unwrap();
         let child_id = child.id;
         
-        assert_eq!(child.parent_thread, Some(parent_id));
+        assert_eq!(child.parent_thread, Some(parent_id);
         
         #[cfg(feature = "std")]
         parent.add_child(child_id);
@@ -933,18 +905,18 @@ mod tests {
             stack_size: Some(65536),
             priority: Some(5),
         };
-        let thread = AdvancedThread::new(config);
+        let thread = AdvancedThread::new(config).unwrap();
         let thread_id = thread.id;
 
         registry.register_thread(thread).unwrap();
         assert_eq!(registry.thread_count(), 1);
 
         let retrieved_thread = registry.get_thread(thread_id);
-        assert!(retrieved_thread.is_some());
+        assert!(retrieved_thread.is_some();
         assert_eq!(retrieved_thread.unwrap().id, thread_id);
 
         let removed_thread = registry.remove_thread(thread_id);
-        assert!(removed_thread.is_some());
+        assert!(removed_thread.is_some();
         assert_eq!(registry.thread_count(), 0);
     }
 
@@ -1014,7 +986,7 @@ mod tests {
 
         // Get thread local value
         let value = AdvancedThreadingBuiltins::thread_local_get(thread_id, 1).unwrap();
-        assert_eq!(value, Some(ComponentValue::I32(123)));
+        assert_eq!(value, Some(ComponentValue::I32(123));
 
         // Get non-existent value
         let missing = AdvancedThreadingBuiltins::thread_local_get(thread_id, 999).unwrap();

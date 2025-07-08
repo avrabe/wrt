@@ -177,7 +177,8 @@ pub fn verify_wasm_header(bytes: &[u8]) -> Result<()> {
 ///
 /// # Returns
 ///
-/// * `Result<NoStdProvider<MAX_MODULE_SIZE>>` - Memory provider initialized with the bytes
+/// * `Result<NoStdProvider<MAX_MODULE_SIZE>>` - Memory provider initialized
+///   with the bytes
 pub fn create_memory_provider(
     bytes: &[u8],
     _level: VerificationLevel,
@@ -195,7 +196,10 @@ pub fn create_memory_provider(
     // Write the bytes to the provider
     use wrt_foundation::safe_memory::Provider;
     provider.write_data(0, bytes).map_err(|_| {
-        create_error(NoAllocErrorCode::MemoryProviderError, "Failed to initialize memory provider")
+        create_error(
+            NoAllocErrorCode::MemoryProviderError,
+            "Failed to initialize memory provider",
+        )
     })?;
 
     Ok(provider)
@@ -465,23 +469,23 @@ pub fn decode_module_header(
                 {
                     header.has_name_section = true;
                 }
-            }
+            },
             SectionId::Memory => {
                 header.uses_memory = true;
-            }
+            },
             SectionId::Table => {
                 header.uses_tables = true;
-            }
+            },
             SectionId::Start => {
                 header.has_start_function = true;
-            }
+            },
             SectionId::Code => {
                 header.has_code_section = true;
-            }
+            },
             SectionId::Data => {
                 header.has_data_section = true;
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         // Move to next section

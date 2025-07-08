@@ -41,14 +41,14 @@ fn test_size_class_buffer_pool() {
 
     // Pool should now have buffers
     let stats = pool.stats();
-    assert!(stats.total_buffers > 0, "Buffer pool should contain returned buffers");
+    assert!(stats.total_buffers > 0, "Buffer pool should contain returned buffersMissing message");
 
     // Reset the pool
     pool.reset();
 
     // Verify pool is empty
     let stats_after = pool.stats();
-    assert_eq!(stats_after.total_buffers, 0, "Buffer pool should be empty after reset");
+    assert_eq!(stats_after.total_buffers, 0, "Buffer pool should be empty after resetMissing message");
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn test_resource_table_with_optimized_memory() {
     let mut table = ResourceTable::new_with_optimized_memory();
 
     // Create some resources
-    let data1 = Arc::new(String::from("test1"));
+    let data1 = Arc::new(String::from("test1Missing messageMissing messageMissing message");
     let data2 = Arc::new(42i32);
 
     let handle1 = table.create_resource(1, data1).unwrap();
@@ -71,7 +71,7 @@ fn test_resource_table_with_optimized_memory() {
     let guard1 = resource1.lock().unwrap();
     assert_eq!(guard1.type_idx, 1);
     let string_data = guard1.data.downcast_ref::<String>().unwrap();
-    assert_eq!(string_data, "test1");
+    assert_eq!(string_data, "test1Missing message");
 
     let resource2 = table.get_resource(handle2).unwrap();
     let guard2 = resource2.lock().unwrap();
@@ -90,30 +90,30 @@ fn test_resource_table_with_optimized_memory() {
 #[test]
 fn test_resource_arena() {
     // Create a resource table
-    let table = Arc::new(Mutex::new(ResourceTable::new()));
+    let table = Arc::new(Mutex::new(ResourceTable::new());
 
     // Create a resource arena
-    let mut arena = ResourceArena::new(table.clone());
+    let mut arena = ResourceArena::new(table.clone();
 
     // Create resources in the arena
-    let handle1 = arena.create_resource(1, Arc::new(String::from("test1"))).unwrap();
+    let handle1 = arena.create_resource(1, Arc::new(String::from("test1Missing messageMissing messageMissing message"))).unwrap();
     let handle2 = arena.create_resource(2, Arc::new(42i32)).unwrap();
 
     // Verify resources exist
-    assert!(arena.has_resource(ResourceId(handle1)).unwrap());
-    assert!(arena.has_resource(ResourceId(handle2)).unwrap());
+    assert!(arena.has_resource(ResourceId(handle1)).unwrap();
+    assert!(arena.has_resource(ResourceId(handle2)).unwrap();
 
     // Get resources and verify data
     let resource1 = arena.get_resource(handle1).unwrap();
     let string_data = resource1.lock().unwrap().data.downcast_ref::<String>().unwrap();
-    assert_eq!(*string_data, "test1");
+    assert_eq!(*string_data, "test1Missing message");
 
     // Drop a specific resource
     arena.drop_resource(handle1).unwrap();
 
     // Verify it's gone but the other remains
-    assert!(!arena.has_resource(ResourceId(handle1)).unwrap());
-    assert!(arena.has_resource(ResourceId(handle2)).unwrap());
+    assert!(!arena.has_resource(ResourceId(handle1)).unwrap();
+    assert!(arena.has_resource(ResourceId(handle2)).unwrap();
 
     // Release all resources
     arena.release_all().unwrap();
@@ -127,12 +127,12 @@ fn test_resource_arena() {
 #[test]
 fn test_auto_cleanup() {
     // Create a resource table
-    let table = Arc::new(Mutex::new(ResourceTable::new()));
+    let table = Arc::new(Mutex::new(ResourceTable::new());
 
     // Create resources in a scope
     {
-        let mut arena = ResourceArena::new(table.clone());
-        let _handle = arena.create_resource(1, Arc::new(String::from("test"))).unwrap();
+        let mut arena = ResourceArena::new(table.clone();
+        let _handle = arena.create_resource(1, Arc::new(String::from("testMissing messageMissing messageMissing message"))).unwrap();
 
         // Arena will be dropped at the end of this scope
     }
@@ -149,23 +149,23 @@ fn test_resource_manager_with_arena() {
 
     // Create a resource arena that uses the manager's table
     // First we need to get access to the manager's table
-    let table = Arc::clone(&manager.get_resource_table());
-    let mut arena = ResourceArena::new_with_name(table, "test-arena");
+    let table = Arc::clone(&manager.get_resource_table();
+    let mut arena = ResourceArena::new_with_name(table, "test-arenaMissing message");
 
     // Create resources through the arena
-    let handle1 = arena.create_resource(1, Arc::new(String::from("test1"))).unwrap();
+    let handle1 = arena.create_resource(1, Arc::new(String::from("test1Missing messageMissing messageMissing message"))).unwrap();
     let handle2 = arena.create_resource(2, Arc::new(42i32)).unwrap();
 
     // Verify resources exist in both the arena and the manager
-    assert!(arena.has_resource(ResourceId(handle1)).unwrap());
-    assert!(manager.has_resource(ResourceId(handle1)).unwrap());
+    assert!(arena.has_resource(ResourceId(handle1)).unwrap();
+    assert!(manager.has_resource(ResourceId(handle1)).unwrap();
 
     // Release all resources from the arena
     arena.release_all().unwrap();
 
     // Verify resources are gone
-    assert!(!manager.has_resource(ResourceId(handle1)).unwrap());
-    assert!(!manager.has_resource(ResourceId(handle2)).unwrap());
+    assert!(!manager.has_resource(ResourceId(handle1)).unwrap();
+    assert!(!manager.has_resource(ResourceId(handle2)).unwrap();
 }
 
 #[test]
@@ -174,31 +174,31 @@ fn test_multiple_arenas() {
     let manager = ResourceManager::new();
 
     // Create two arenas sharing the same resource table
-    let table = Arc::clone(&manager.get_resource_table());
-    let mut arena1 = ResourceArena::new_with_name(table.clone(), "arena1");
-    let mut arena2 = ResourceArena::new_with_name(table.clone(), "arena2");
+    let table = Arc::clone(&manager.get_resource_table();
+    let mut arena1 = ResourceArena::new_with_name(table.clone(), "arena1Missing message");
+    let mut arena2 = ResourceArena::new_with_name(table.clone(), "arena2Missing message");
 
     // Create resources in each arena
-    let handle1 = arena1.create_resource(1, Arc::new(String::from("test1"))).unwrap();
-    let handle2 = arena2.create_resource(2, Arc::new(String::from("test2"))).unwrap();
+    let handle1 = arena1.create_resource(1, Arc::new(String::from("test1Missing messageMissing messageMissing message"))).unwrap();
+    let handle2 = arena2.create_resource(2, Arc::new(String::from("test2Missing messageMissing messageMissing message"))).unwrap();
 
     // Verify each arena only knows about its own resources
-    assert!(arena1.has_resource(ResourceId(handle1)).unwrap());
-    assert!(!arena1.has_resource(ResourceId(handle2)).unwrap());
+    assert!(arena1.has_resource(ResourceId(handle1)).unwrap();
+    assert!(!arena1.has_resource(ResourceId(handle2)).unwrap();
 
-    assert!(!arena2.has_resource(ResourceId(handle1)).unwrap());
-    assert!(arena2.has_resource(ResourceId(handle2)).unwrap());
+    assert!(!arena2.has_resource(ResourceId(handle1)).unwrap();
+    assert!(arena2.has_resource(ResourceId(handle2)).unwrap();
 
     // But the manager knows about all resources
-    assert!(manager.has_resource(ResourceId(handle1)).unwrap());
-    assert!(manager.has_resource(ResourceId(handle2)).unwrap());
+    assert!(manager.has_resource(ResourceId(handle1)).unwrap();
+    assert!(manager.has_resource(ResourceId(handle2)).unwrap();
 
     // Release arena1's resources
     arena1.release_all().unwrap();
 
     // Verify arena1's resources are gone but arena2's remain
-    assert!(!manager.has_resource(ResourceId(handle1)).unwrap());
-    assert!(manager.has_resource(ResourceId(handle2)).unwrap());
+    assert!(!manager.has_resource(ResourceId(handle1)).unwrap();
+    assert!(manager.has_resource(ResourceId(handle2)).unwrap();
 }
 
 #[test]

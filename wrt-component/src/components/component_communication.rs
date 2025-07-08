@@ -35,23 +35,26 @@
 //! let result = router.dispatch_call(context)?;
 //! ```
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]
 use std::{vec::Vec, string::String, collections::HashMap, boxed::Box, format};
 
 #[cfg(all(not(feature = "std")))]
-use std::{vec::Vec, string::String, collections::BTreeMap as HashMap, boxed::Box, format};
+use alloc::{vec::Vec, string::String, collections::BTreeMap as HashMap, boxed::Box, format};
 
-#[cfg(not(any(feature = "std", )))]
-use wrt_foundation::{BoundedVec, BoundedString, BoundedMap as HashMap, safe_memory::NoStdProvider};
+#[cfg(not(feature = "std"))]
+use wrt_foundation::{bounded::{BoundedString, BoundedVec}, safe_memory::NoStdProvider};
 
-// Type aliases for no_std compatibility
-#[cfg(not(any(feature = "std", )))]
-type Vec<T> = BoundedVec<T, 64, NoStdProvider<65536>>;
-#[cfg(not(any(feature = "std", )))]
-type String = BoundedString<256, NoStdProvider<65536>>;
+// Note: Using alloc for no_std instead of wrt_foundation bounded types for now
+// #[cfg(not(any(feature = "std", )))]
+// use wrt_foundation::{BoundedVec, BoundedString, BoundedMap as HashMap, safe_memory::NoStdProvider};
+
+// Type aliases for no_std compatibility (commented out to avoid conflicts)
+// #[cfg(not(any(feature = "std", )))]
+// type Vec<T> = BoundedVec<T, 64, NoStdProvider<65536>>;
+// #[cfg(not(any(feature = "std", )))]
+// type String = BoundedString<256, NoStdProvider<65536>>;
 
 use wrt_error::{Error, ErrorCategory, Result, codes};
 use crate::canonical_abi::{ComponentType};
@@ -62,7 +65,7 @@ use crate::canonical_abi::ComponentValue;
 #[cfg(not(feature = "std"))]
 // For no_std, use a simpler ComponentValue representation
 use crate::types::Value as ComponentValue;
-use crate::component_instantiation::{InstanceId, ComponentInstance, FunctionSignature};
+use crate::components::component_instantiation::{InstanceId, ComponentInstance, FunctionSignature};
 use crate::resource_management::{ResourceHandle, ResourceManager as ComponentResourceManager};
 
 /// Maximum call stack depth to prevent infinite recursion
@@ -412,7 +415,7 @@ impl Default for ResourceTransferPolicy {
 impl CallRouter {
     /// Create a new call router
     pub fn new() -> Self {
-        Self::with_config(CallRouterConfig::default())
+        Self::with_config(CallRouterConfig::default()
     }
 
     /// Create a new call router with custom configuration
@@ -438,21 +441,14 @@ impl CallRouter {
 
         // Check call stack depth
         if self.call_stack.current_depth >= self.config.max_call_stack_depth {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::CALL_STACK_OVERFLOW,
-                "Call stack depth exceeded",
-            ));
+            return Err(Error::runtime_stack_overflow("Error occurred"Call stack depth exceededMissing messageMissing messageMissing message");
         }
 
         // Check concurrent call limits
         let active_calls_for_target = self.count_active_calls_for_instance(context.target_instance);
         if active_calls_for_target >= self.config.max_concurrent_calls_per_instance {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::RESOURCE_EXHAUSTED,
-                "Too many concurrent calls for target instance",
-            ));
+            return Err(Error::runtime_execution_error("Error occurred",
+            );
         }
 
         // Assign call ID and update state
@@ -472,7 +468,7 @@ impl CallRouter {
         self.call_stack.push_frame(frame)?;
 
         // Store active call context
-        self.active_calls.insert(context.call_id, context.clone());
+        self.active_calls.insert(context.call_id, context.clone();
 
         // Update statistics
         self.stats.total_calls += 1;
@@ -500,7 +496,7 @@ impl CallRouter {
                 self.stats.successful_calls += 1;
             }
             Err(e) => {
-                context.state = CallState::Failed("Component not found");
+                context.state = CallState::Failed(Missing message");
                 self.stats.failed_calls += 1;
             }
         }
@@ -528,19 +524,11 @@ impl CallRouter {
         return_types: Vec<ComponentType>,
     ) -> Result<CallContext> {
         if parameters.len() > MAX_CALL_PARAMETERS {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Too many parameters for function call",
-            ));
+            return Err(Error::validation_error("Error occurred"Too many parameters for function callMissing messageMissing messageMissing message");
         }
 
         if return_types.len() > MAX_CALL_RETURN_VALUES {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Too many return values for function call",
-            ));
+            return Err(Error::validation_error("Error occurred"Too many return values for function callMissing messageMissing messageMissing message");
         }
 
         Ok(CallContext {
@@ -577,22 +565,14 @@ impl CallRouter {
 
     fn validate_call_context(&self, context: &CallContext) -> Result<()> {
         if context.target_function.is_empty() {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Target function name cannot be empty",
-            ));
+            return Err(Error::validation_error("Error occurred"Target function name cannot be emptyMissing messageMissing messageMissing message");
         }
 
         if context.source_instance == context.target_instance {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Source and target instances cannot be the same",
-            ));
+            return Err(Error::validation_error("Error occurred"Source and target instances cannot be the sameMissing messageMissing messageMissing message");
         }
 
-        Ok(())
+        Ok(()
     }
 
     fn count_active_calls_for_instance(&self, instance_id: InstanceId) -> usize {
@@ -613,7 +593,7 @@ impl CallRouter {
         // - Endianness conversion
         // - String encoding conversion
         // - Resource handle marshaling
-        Ok(context.parameters.clone())
+        Ok(context.parameters.clone()
     }
 
     fn execute_target_function(
@@ -640,26 +620,19 @@ impl CallStack {
     /// Push a call frame onto the stack
     pub fn push_frame(&mut self, frame: CallFrame) -> Result<()> {
         if self.current_depth >= self.max_depth {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::CALL_STACK_OVERFLOW,
-                "Call stack overflow",
-            ));
+            return Err(Error::runtime_stack_overflow("Error occurred"Call stack overflowMissing messageMissing messageMissing message");
         }
 
         self.frames.push(frame);
         self.current_depth += 1;
-        Ok(())
+        Ok(()
     }
 
     /// Pop a call frame from the stack
     pub fn pop_frame(&mut self) -> Result<CallFrame> {
         if self.frames.is_empty() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_STATE,
-                "Cannot pop from empty call stack",
-            ));
+            return Err(Error::runtime_execution_error("Error occurred",
+            );
         }
 
         let frame = self.frames.pop().unwrap();
@@ -715,20 +688,16 @@ impl ParameterBridge {
         // - Type conversion
         // - Memory layout transformation
         // - Resource handle marshaling
-        Ok(parameters.to_vec())
+        Ok(parameters.to_vec()
     }
 
     fn validate_parameters(&self, parameters: &[ComponentValue]) -> Result<()> {
         if parameters.len() > MAX_CALL_PARAMETERS {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Too many parameters",
-            ));
+            return Err(Error::validation_error("Missing error messageMissing messageMissing messageMissing message");
         }
 
         // Additional parameter validation would go here
-        Ok(())
+        Ok(()
     }
 }
 
@@ -776,7 +745,7 @@ impl ResourceBridge {
     ) -> Result<()> {
         // Policy checking would be implemented here
         // For now, allow all transfers
-        Ok(())
+        Ok(()
     }
 }
 
@@ -828,7 +797,7 @@ pub fn create_parameter_bridge(
     source_context: MemoryContext,
     target_context: MemoryContext,
 ) -> ParameterBridge {
-    ParameterBridge::new(source_context, target_context, MarshalingConfig::default())
+    ParameterBridge::new(source_context, target_context, MarshalingConfig::default()
 }
 
 #[cfg(test)]
@@ -853,11 +822,11 @@ mod tests {
             vec![ComponentType::S32],
         );
         
-        assert!(context.is_ok());
+        assert!(context.is_ok();
         let context = context.unwrap();
         assert_eq!(context.source_instance, 1);
         assert_eq!(context.target_instance, 2);
-        assert_eq!(context.target_function, "test_function");
+        assert_eq!(context.target_function, "test_functionMissing message");
         assert_eq!(context.parameters.len(), 1);
     }
 
@@ -884,8 +853,8 @@ mod tests {
 
     #[test]
     fn test_parameter_bridge_creation() {
-        let source_context = create_memory_context(1, 1024, MemoryProtectionFlags::default());
-        let target_context = create_memory_context(2, 2048, MemoryProtectionFlags::default());
+        let source_context = create_memory_context(1, 1024, MemoryProtectionFlags::default();
+        let target_context = create_memory_context(2, 2048, MemoryProtectionFlags::default();
         let bridge = create_parameter_bridge(source_context, target_context);
         
         assert_eq!(bridge.source_memory_context.instance_id, 1);
@@ -938,7 +907,7 @@ macro_rules! impl_basic_traits {
                 _writer: &mut WriteStream<'a>,
                 _provider: &PStream,
             ) -> wrt_foundation::WrtResult<()> {
-                Ok(())
+                Ok(()
             }
         }
 
@@ -1054,12 +1023,12 @@ impl Default for ResourceTransferType {
 }
 
 // Apply macro to all types that need traits
-impl_basic_traits!(CallContext, CallContext::default());
-impl_basic_traits!(CallFrame, CallFrame::default());
-impl_basic_traits!(CallMetadata, CallMetadata::default());
-impl_basic_traits!(MemoryContext, MemoryContext::default());
-impl_basic_traits!(MemoryProtectionFlags, MemoryProtectionFlags::default());
-impl_basic_traits!(ResourceTransfer, ResourceTransfer::default());
+impl_basic_traits!(CallContext, CallContext::default();
+impl_basic_traits!(CallFrame, CallFrame::default();
+impl_basic_traits!(CallMetadata, CallMetadata::default();
+impl_basic_traits!(MemoryContext, MemoryContext::default();
+impl_basic_traits!(MemoryProtectionFlags, MemoryProtectionFlags::default();
+impl_basic_traits!(ResourceTransfer, ResourceTransfer::default();
 
 // Additional Default implementations
 impl Default for CallRouterConfig {
@@ -1103,6 +1072,6 @@ impl Default for StringEncoding {
 }
 
 // Apply traits to additional types
-impl_basic_traits!(CallRouterConfig, CallRouterConfig::default());
-impl_basic_traits!(MarshalingConfig, MarshalingConfig::default());
-impl_basic_traits!(ResourceTransferPolicy, ResourceTransferPolicy::default());
+impl_basic_traits!(CallRouterConfig, CallRouterConfig::default();
+impl_basic_traits!(MarshalingConfig, MarshalingConfig::default();
+impl_basic_traits!(ResourceTransferPolicy, ResourceTransferPolicy::default();

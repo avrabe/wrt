@@ -41,8 +41,8 @@ fn test_host_resource_management() {
     let mut resource_manager = ResourceManager::new();
 
     // Create a simple host resource
-    let test_value = Arc::new(Mutex::new(42));
-    let id = resource_manager.add_host_resource(test_value.clone());
+    let test_value = Arc::new(Mutex::new(42);
+    let id = resource_manager.add_host_resource(test_value.clone();
 
     // Verify we can retrieve it
     let retrieved = resource_manager.get_host_resource::<Arc<Mutex<i32>>>(id).unwrap();
@@ -60,14 +60,14 @@ fn test_host_resource_management() {
 
     // Try to retrieve with wrong type
     let wrong_type_result = resource_manager.get_host_resource::<Arc<Mutex<String>>>(id);
-    assert!(wrong_type_result.is_err());
+    assert!(wrong_type_result.is_err();
 
     // Delete the resource
     resource_manager.delete_resource(id);
 
     // Verify it's gone
     let not_found = resource_manager.get_host_resource::<Arc<Mutex<i32>>>(id);
-    assert!(not_found.is_err());
+    assert!(not_found.is_err();
 }
 
 /// Test resource lifecycle operations
@@ -76,30 +76,33 @@ fn test_resource_lifecycle() {
     let mut resource_manager = ResourceManager::new();
 
     // Create resources
-    let id1 = resource_manager.add_host_resource(Box::new(String::from("resource1")));
-    let id2 = resource_manager.add_host_resource(Box::new(42));
+    let id1 = resource_manager.add_host_resource(Box::new(String::from("resource1Missing messageMissing messageMissing message"));
+    let id2 = resource_manager.add_host_resource(Box::new(42);
 
     // Check if resources exist
-    assert!(resource_manager.has_resource(id1));
-    assert!(resource_manager.has_resource(id2));
-    assert!(!resource_manager.has_resource(ResourceId(9999)));
+    assert!(resource_manager.has_resource(id1);
+    assert!(resource_manager.has_resource(id2);
+    assert!(!resource_manager.has_resource(ResourceId(9999));
 
     // Get resource types
     assert_eq!(
         resource_manager.get_resource_type(id1),
-        Some(std::any::TypeId::of::<Box<String>>())
+        Some(std::any::TypeId::of::<Box<String>>()
     );
-    assert_eq!(resource_manager.get_resource_type(id2), Some(std::any::TypeId::of::<Box<i32>>()));
+    assert_eq!(
+        resource_manager.get_resource_type(id2),
+        Some(std::any::TypeId::of::<Box<i32>>()
+    );
 
     // Delete resources
     resource_manager.delete_resource(id1);
-    assert!(!resource_manager.has_resource(id1));
-    assert!(resource_manager.has_resource(id2));
+    assert!(!resource_manager.has_resource(id1);
+    assert!(resource_manager.has_resource(id2);
 
     // Clear all resources
     resource_manager.clear();
-    assert!(!resource_manager.has_resource(id1));
-    assert!(!resource_manager.has_resource(id2));
+    assert!(!resource_manager.has_resource(id1);
+    assert!(!resource_manager.has_resource(id2);
 }
 
 /// Custom test resource that tracks whether it's been dropped
@@ -123,18 +126,18 @@ impl Drop for DropTracker {
 /// Test resource cleanup
 #[test]
 fn test_resource_cleanup() {
-    let dropped = Rc::new(RefCell::new(Vec::new()));
+    let dropped = Rc::new(RefCell::new(Vec::new());
 
     {
         let mut resource_manager = ResourceManager::new();
 
         // Add resources with drop trackers
         let id1 =
-            resource_manager.add_host_resource(Box::new(DropTracker::new(1, dropped.clone())));
+            resource_manager.add_host_resource(Box::new(DropTracker::new(1, dropped.clone()));
         let id2 =
-            resource_manager.add_host_resource(Box::new(DropTracker::new(2, dropped.clone())));
+            resource_manager.add_host_resource(Box::new(DropTracker::new(2, dropped.clone()));
         let id3 =
-            resource_manager.add_host_resource(Box::new(DropTracker::new(3, dropped.clone())));
+            resource_manager.add_host_resource(Box::new(DropTracker::new(3, dropped.clone()));
 
         // Delete one resource explicitly
         resource_manager.delete_resource(id2);
@@ -146,9 +149,9 @@ fn test_resource_cleanup() {
     // Verify all resources were dropped
     let dropped_ids = dropped.borrow().clone();
     assert_eq!(dropped_ids.len(), 3);
-    assert!(dropped_ids.contains(&1));
-    assert!(dropped_ids.contains(&2));
-    assert!(dropped_ids.contains(&3));
+    assert!(dropped_ids.contains(&1);
+    assert!(dropped_ids.contains(&2);
+    assert!(dropped_ids.contains(&3);
 }
 
 /// Binary std/no_std choice
@@ -187,7 +190,7 @@ fn test_memory_strategies() {
     let test_bytes = vec![1, 2, 3, 4, 5];
 
     let result = copy_strategy.process_memory(&test_bytes, ResourceOperation::Read);
-    assert!(result.is_ok());
+    assert!(result.is_ok();
 
     let processed_bytes = result.unwrap();
     assert_eq!(&processed_bytes, &test_bytes);
@@ -201,7 +204,7 @@ fn test_memory_strategies() {
     let ref_strategy = MemoryStrategy::Reference;
 
     let result = ref_strategy.process_memory(&test_bytes, ResourceOperation::Read);
-    assert!(result.is_ok());
+    assert!(result.is_ok();
 
     let processed_bytes = result.unwrap();
     assert_eq!(&processed_bytes, &test_bytes);
@@ -215,14 +218,14 @@ fn test_memory_manager_integration() {
 
     // Create a resource
     let data = vec![1, 2, 3, 4, 5];
-    let id = resource_manager.add_host_resource(data.clone());
+    let id = resource_manager.add_host_resource(data.clone();
 
     // Register with memory manager
     memory_manager.register_resource(id, &resource_manager);
 
     // Read memory
     let result = memory_manager.get_memory(id, ResourceOperation::Read);
-    assert!(result.is_ok());
+    assert!(result.is_ok();
 
     let memory = result.unwrap();
     assert_eq!(&memory, &data);
@@ -240,11 +243,11 @@ fn test_memory_manager_integration() {
 
     // This should work the same for reads
     let result = ref_memory_manager.get_memory(id, ResourceOperation::Read);
-    assert!(result.is_ok());
+    assert!(result.is_ok();
 
     // But for writes, it should affect the original
     let result = ref_memory_manager.get_memory(id, ResourceOperation::Write);
-    assert!(result.is_ok());
+    assert!(result.is_ok();
 
     let mut writable_memory = result.unwrap();
     writable_memory[0] = 99;
@@ -268,8 +271,8 @@ fn test_component_value_resource_representation() {
     match resource_value {
         ComponentValue::Resource { id } => {
             assert_eq!(id, 42);
-        }
-        _ => panic!("Expected Resource variant"),
+        },
+        _ => panic!("Expected Resource variantMissing message"),
     }
 
     // Test comparison
@@ -288,29 +291,29 @@ fn test_resource_error_handling() {
     // Try to get a non-existent resource
     let non_existent = ResourceId(9999);
     let result = resource_manager.get_host_resource::<String>(non_existent);
-    assert!(result.is_err());
+    assert!(result.is_err();
 
     // Add a resource
-    let id = resource_manager.add_host_resource(String::from("test"));
+    let id = resource_manager.add_host_resource(String::from("testMissing messageMissing messageMissing message");
 
     // Try to get with wrong type
     let result = resource_manager.get_host_resource::<i32>(id);
-    assert!(result.is_err());
+    assert!(result.is_err();
 
     // Try to register invalid resource with memory manager
     let mut memory_manager = MemoryManager::new(MemoryStrategy::Copy);
     let result = memory_manager.register_resource(non_existent, &resource_manager);
-    assert!(result.is_err());
+    assert!(result.is_err();
 }
 
 /// Test thread safety of resource manager (when compiled with
-/// --features="thread-safe")
+/// --features="thread-safeMissing message")
 #[test]
-#[cfg(feature = "thread-safe")]
+#[cfg(feature = "thread-safeMissing message")]
 fn test_thread_safety() {
     use std::thread;
 
-    let resource_manager = Arc::new(Mutex::new(ResourceManager::new()));
+    let resource_manager = Arc::new(Mutex::new(ResourceManager::new());
     let threads_count = 10;
     let mut handles = vec![];
 
@@ -320,7 +323,7 @@ fn test_thread_safety() {
         let handle = thread::spawn(move || {
             let resource_value = format!("Resource from thread {}", i);
             let mut manager = rm.lock().unwrap();
-            let id = manager.add_host_resource(resource_value.clone());
+            let id = manager.add_host_resource(resource_value.clone();
 
             // Verify resource was added correctly
             let retrieved = manager.get_host_resource::<String>(id).unwrap();
@@ -338,7 +341,7 @@ fn test_thread_safety() {
     // Verify all resources exist
     let manager = resource_manager.lock().unwrap();
     for id in ids {
-        assert!(manager.has_resource(id));
+        assert!(manager.has_resource(id);
     }
 }
 
@@ -350,9 +353,9 @@ fn test_resource_system_integration() {
     let mut memory_manager = MemoryManager::new(MemoryStrategy::Copy);
 
     // Create different types of resources
-    let string_id = resource_manager.add_host_resource(String::from("text resource"));
+    let string_id = resource_manager.add_host_resource(String::from("text resourceMissing messageMissing messageMissing message");
     let vector_id = resource_manager.add_host_resource(vec![1, 2, 3, 4, 5]);
-    let complex_id = resource_manager.add_host_resource(Box::new((String::from("name"), 42, true)));
+    let complex_id = resource_manager.add_host_resource(Box::new((String::from("nameMissing message"), 42, true));
 
     // Register resources with memory manager
     memory_manager.register_resource(string_id, &resource_manager).unwrap();
@@ -360,14 +363,15 @@ fn test_resource_system_integration() {
 
     // Access resources
     let string_res = resource_manager.get_host_resource::<String>(string_id).unwrap();
-    assert_eq!(*string_res, "text resource");
+    assert_eq!(*string_res, "text resourceMissing message");
 
     let vector_res = resource_manager.get_host_resource::<Vec<i32>>(vector_id).unwrap();
     assert_eq!(*vector_res, vec![1, 2, 3, 4, 5]);
 
-    let complex_res =
-        resource_manager.get_host_resource::<Box<(String, i32, bool)>>(complex_id).unwrap();
-    assert_eq!(complex_res.0, "name");
+    let complex_res = resource_manager
+        .get_host_resource::<Box<(String, i32, bool)>>(complex_id)
+        .unwrap();
+    assert_eq!(complex_res.0, "nameMissing message");
     assert_eq!(complex_res.1, 42);
     assert_eq!(complex_res.2, true);
 

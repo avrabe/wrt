@@ -269,9 +269,9 @@ mod tests {
         let mut pool = SizeClassBufferPool::new();
 
         // Allocate and return some buffers
-        pool.return_buffer(pool.allocate(64));
-        pool.return_buffer(pool.allocate(128));
-        pool.return_buffer(pool.allocate(4096));
+        pool.return_buffer(pool.allocate(64);
+        pool.return_buffer(pool.allocate(128);
+        pool.return_buffer(pool.allocate(4096);
 
         // Check stats before reset
         let stats_before = pool.stats();

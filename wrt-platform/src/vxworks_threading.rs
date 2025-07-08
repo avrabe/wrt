@@ -1,3 +1,4 @@
+
 use crate::vxworks_memory::VxWorksContext;
 use core::ffi::c_void;
 use wrt_error::{Error, ErrorKind};
@@ -168,20 +169,16 @@ impl VxWorksThread {
             if task_id == 0 {
                 // Cleanup on failure
                 unsafe { let _ = Box::from_raw(closure_ptr as *mut ThreadEntryPoint); }
-                return Err(Error::new(
-                    ErrorKind::Platform,
-                    "Failed to spawn VxWorks task"
+                return Err(Error::runtime_execution_error("
                 ));
             }
 
             self.task_id = Some(task_id);
         }
         
-        #[cfg(not(target_os = "vxworks"))]
+        #[cfg(not(target_os = "))]
         {
-            return Err(Error::new(
-                ErrorKind::Platform,
-                "VxWorks task spawning not supported on this platform"
+            return Err(Error::runtime_execution_error("
             ));
         }
 
@@ -190,7 +187,7 @@ impl VxWorksThread {
 
     /// Spawn a POSIX thread (RTP context)
     fn spawn_posix_thread(&mut self, config: VxWorksThreadConfig, f: ThreadEntryPoint) -> Result<(), Error> {
-        #[cfg(target_os = "vxworks")]
+        #[cfg(target_os = ")]
         {
             extern "C" fn thread_wrapper(arg: *mut c_void) -> *mut c_void {
                 let closure: Box<ThreadEntryPoint> = unsafe { Box::from_raw(arg as *mut ThreadEntryPoint) };
@@ -205,10 +202,7 @@ impl VxWorksThread {
             let attr_result = unsafe { pthread_attr_init(&mut attr) };
             if attr_result != 0 {
                 unsafe { let _ = Box::from_raw(closure_ptr as *mut ThreadEntryPoint); }
-                return Err(Error::new(
-                    ErrorKind::Platform,
-                    "Failed to initialize POSIX thread attributes"
-                ));
+                return Err(Error::runtime_execution_error("Failed to initialize thread attributes"));
             }
 
             // Set stack size
@@ -236,7 +230,7 @@ impl VxWorksThread {
                 unsafe { let _ = Box::from_raw(closure_ptr as *mut ThreadEntryPoint); }
                 return Err(Error::new(
                     ErrorKind::Platform,
-                    "Failed to create POSIX thread"
+                    "Failed to create POSIX thread",
                 ));
             }
 
@@ -245,10 +239,7 @@ impl VxWorksThread {
         
         #[cfg(not(target_os = "vxworks"))]
         {
-            return Err(Error::new(
-                ErrorKind::Platform,
-                "POSIX thread creation not supported on this platform"
-            ));
+            return Err(Error::runtime_execution_error("VxWorks thread spawn not supported on this platform"));
         }
 
         Ok(())
@@ -272,10 +263,7 @@ impl VxWorksThread {
                     if let Some(pthread) = self.pthread {
                         let result = unsafe { pthread_join(pthread, core::ptr::null_mut()) };
                         if result != 0 {
-                            return Err(Error::new(
-                                ErrorKind::Platform,
-                                "Failed to join POSIX thread"
-                            ));
+                            return Err(Error::runtime_execution_error("Failed to join POSIX thread"));
                         }
                     }
                 }
@@ -284,10 +272,7 @@ impl VxWorksThread {
         
         #[cfg(not(target_os = "vxworks"))]
         {
-            return Err(Error::new(
-                ErrorKind::Platform,
-                "Thread join not supported on this platform"
-            ));
+            return Err(Error::runtime_execution_error("VxWorks thread join not supported on this platform"));
         }
 
         Ok(())
@@ -306,10 +291,7 @@ impl VxWorksThread {
                     if let Some(pthread) = self.pthread {
                         let result = unsafe { pthread_detach(pthread) };
                         if result != 0 {
-                            return Err(Error::new(
-                                ErrorKind::Platform,
-                                "Failed to detach POSIX thread"
-                            ));
+                            return Err(Error::runtime_execution_error("Failed to detach POSIX thread"));
                         }
                     }
                     Ok(())
@@ -319,10 +301,7 @@ impl VxWorksThread {
         
         #[cfg(not(target_os = "vxworks"))]
         {
-            Err(Error::new(
-                ErrorKind::Platform,
-                "Thread detach not supported on this platform"
-            ))
+            Err(Error::runtime_execution_error("VxWorks thread detach not supported on this platform"))
         }
     }
 
@@ -363,10 +342,7 @@ impl VxWorksThread {
         
         #[cfg(not(target_os = "vxworks"))]
         {
-            Err(Error::new(
-                ErrorKind::Platform,
-                "Thread yield not supported on this platform"
-            ))
+            Err(Error::runtime_execution_error("VxWorks thread yield not supported on this platform"))
         }
     }
 
@@ -379,20 +355,14 @@ impl VxWorksThread {
             
             let result = unsafe { taskDelay(ticks as i32) };
             if result != 0 {
-                return Err(Error::new(
-                    ErrorKind::Platform,
-                    "VxWorks task delay failed"
-                ));
+                return Err(Error::runtime_execution_error("Failed to delay VxWorks task"));
             }
             Ok(())
         }
         
         #[cfg(not(target_os = "vxworks"))]
         {
-            Err(Error::new(
-                ErrorKind::Platform,
-                "Thread sleep not supported on this platform"
-            ))
+            Err(Error::runtime_execution_error("VxWorks thread sleep not supported on this platform"))
         }
     }
 }

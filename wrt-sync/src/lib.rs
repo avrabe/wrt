@@ -21,7 +21,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-/// Synchronization primitives for Wasmtime, supporting both std and `no_std`
+/// Synchronization primitives for WRT, supporting both std and `no_std`
 /// environments.
 ///
 /// This module provides essential synchronization tools like `WrtMutex` and

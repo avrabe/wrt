@@ -5,6 +5,7 @@ use wrt_foundation::{
     NoStdProvider,
 };
 
+use crate::bounded_debug_infra;
 /// Runtime variable inspection implementation
 /// Provides the ability to read variable values from runtime state
 use crate::{
@@ -44,13 +45,19 @@ pub struct VariableDefinition<'a> {
 /// Runtime variable inspector
 pub struct VariableInspector<'a> {
     /// Variable definitions from DWARF
-    variables: BoundedVec<VariableDefinition<'a>, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>>,
+    variables: BoundedVec<
+        VariableDefinition<'a>,
+        MAX_DWARF_FILE_TABLE,
+        crate::bounded_debug_infra::DebugProvider,
+    >,
 }
 
 impl<'a> VariableInspector<'a> {
     /// Create a new variable inspector
     pub fn new() -> Self {
-        Self { variables: BoundedVec::new(NoStdProvider) }
+        Self {
+            variables: BoundedVec::new(NoStdProvider),
+        }
     }
 
     /// Add a variable definition from DWARF
@@ -60,7 +67,9 @@ impl<'a> VariableInspector<'a> {
 
     /// Find all variables in scope at the given PC
     pub fn find_variables_at_pc(&self, pc: u32) -> impl Iterator<Item = &VariableDefinition<'a>> {
-        self.variables.iter().filter(move |var| pc >= var.scope.start_pc && pc < var.scope.end_pc)
+        self.variables
+            .iter()
+            .filter(move |var| pc >= var.scope.start_pc && pc < var.scope.end_pc)
     }
 
     /// Read a variable's value from runtime state
@@ -83,7 +92,7 @@ impl<'a> VariableInspector<'a> {
                         address: None,
                     }
                 })
-            }
+            },
             DwarfLocation::Memory(addr) => {
                 // Read from memory address
                 let size = size_for_type(&var.var_type) as usize;
@@ -98,7 +107,7 @@ impl<'a> VariableInspector<'a> {
                         address: Some(*addr),
                     }
                 })
-            }
+            },
             DwarfLocation::FrameOffset(offset) => {
                 // Calculate address from frame pointer
                 if let Some(fp) = state.fp() {
@@ -118,11 +127,11 @@ impl<'a> VariableInspector<'a> {
                 } else {
                     None
                 }
-            }
+            },
             DwarfLocation::Expression(_) => {
                 // Complex DWARF expressions not yet supported
                 None
-            }
+            },
         }
     }
 
@@ -132,8 +141,9 @@ impl<'a> VariableInspector<'a> {
         pc: u32,
         state: &dyn RuntimeState,
         memory: &dyn DebugMemory,
-    ) -> BoundedVec<LiveVariable<'a>, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>> {
-        let mut live_vars = BoundedVec::new(NoStdProvider::<1024>::default());
+    ) -> BoundedVec<LiveVariable<'a>, MAX_DWARF_FILE_TABLE, crate::bounded_debug_infra::DebugProvider>
+    {
+        let mut live_vars = crate::bounded_debug_infra::create_debug_vec();
 
         for var_def in self.find_variables_at_pc(pc) {
             let value = self.read_variable(var_def, state, memory);
@@ -185,19 +195,19 @@ impl<'a> ValueDisplay<'a> {
         match &self.value.var_type {
             BasicType::Bool => {
                 writer(if self.value.bytes[0] != 0 { "true" } else { "false" })?;
-            }
+            },
             BasicType::SignedInt(4) => {
                 if let Some(val) = self.value.as_i32() {
                     let mut buf = [0u8; 11]; // -2147483648
                     writer(format_i32(val, &mut buf))?;
                 }
-            }
+            },
             BasicType::UnsignedInt(4) => {
                 if let Some(val) = self.value.as_u32() {
                     let mut buf = [0u8; 10]; // 4294967295
                     writer(format_u32(val, &mut buf))?;
                 }
-            }
+            },
             BasicType::Float(4) => {
                 if let Some(val) = self.value.as_f32() {
                     // Simplified float display
@@ -206,7 +216,7 @@ impl<'a> ValueDisplay<'a> {
                     writer(format_u32(val.to_bits(), &mut buf))?;
                     writer(">")?;
                 }
-            }
+            },
             BasicType::Float(8) => {
                 if let Some(val) = self.value.as_f64() {
                     // Simplified float display
@@ -216,7 +226,7 @@ impl<'a> ValueDisplay<'a> {
                     writer(format_hex_u64(bits, &mut buf))?;
                     writer(">")?;
                 }
-            }
+            },
             BasicType::Pointer => {
                 writer("0x")?;
                 if let Some(addr) = self.value.address {
@@ -226,7 +236,7 @@ impl<'a> ValueDisplay<'a> {
                     let mut buf = [0u8; 8];
                     writer(format_hex_u32(val, &mut buf))?;
                 }
-            }
+            },
             _ => {
                 // Unknown type - show hex bytes
                 writer("<")?;
@@ -238,7 +248,7 @@ impl<'a> ValueDisplay<'a> {
                     writer(format_hex_u8(self.value.bytes[i as usize], &mut buf))?;
                 }
                 writer(">")?;
-            }
+            },
         }
 
         Ok(())
@@ -363,7 +373,11 @@ mod tests {
             name: None,
             var_type: BasicType::SignedInt(4),
             location: DwarfLocation::Register(0),
-            scope: VariableScope { start_pc: 0x1000, end_pc: 0x2000, depth: 0 },
+            scope: VariableScope {
+                start_pc: 0x1000,
+                end_pc: 0x2000,
+                depth: 0,
+            },
             file_index: 0,
             line: 0,
         };

@@ -1,12 +1,10 @@
-use std::{string::String, vec, vec::Vec};
+use crate::prelude::*;
+
 /// Registry-based type conversions
 ///
 /// This module implements conversions between format and runtime types using
 /// the TypeConversionRegistry, providing a consistent and extensible approach
 /// to type conversion.
-
-#[cfg(feature = "std")]
-use std::{string::String, vec, vec::Vec};
 
 use wrt_format::component::{
     ComponentTypeDefinition, ExternType as FormatExternType, ValType as FormatValType,
@@ -28,7 +26,7 @@ use super::{
 /// Register ValType conversions in the TypeConversionRegistry
 pub fn register_valtype_conversions(registry: &mut TypeConversionRegistry) {
     // Format ValType to Types ValType - primitive types
-    registry.register(|format_val_type: &FormatValType| -> Result<ValType, ConversionError> {
+    registry.register(|format_val_type: &FormatValType| -> core::result::Result<ValType, ConversionError> {
         match format_val_type {
             FormatValType::Bool => Ok(ValType::Bool),
             FormatValType::S8 => Ok(ValType::S8),
@@ -60,7 +58,7 @@ pub fn register_valtype_conversions(registry: &mut TypeConversionRegistry) {
     });
 
     // Types ValType to Format ValType - primitive types
-    registry.register(|types_val_type: &ValType| -> Result<FormatValType, ConversionError> {
+    registry.register(|types_val_type: &ValType| -> core::result::Result<FormatValType, ConversionError> {
         match types_val_type {
             ValType::Bool => Ok(FormatValType::Bool),
             ValType::S8 => Ok(FormatValType::S8),
@@ -92,7 +90,7 @@ pub fn register_valtype_conversions(registry: &mut TypeConversionRegistry) {
     });
 
     // ValueType to FormatValType conversion
-    registry.register(|value_type: &ValueType| -> Result<FormatValType, ConversionError> {
+    registry.register(|value_type: &ValueType| -> core::result::Result<FormatValType, ConversionError> {
         match value_type {
             ValueType::I32 => Ok(FormatValType::S32),
             ValueType::I64 => Ok(FormatValType::S64),
@@ -112,7 +110,7 @@ pub fn register_valtype_conversions(registry: &mut TypeConversionRegistry) {
     });
 
     // FormatValType to ValueType conversion
-    registry.register(|format_val_type: &FormatValType| -> Result<ValueType, ConversionError> {
+    registry.register(|format_val_type: &FormatValType| -> core::result::Result<ValueType, ConversionError> {
         match format_val_type {
             FormatValType::S32 => Ok(ValueType::I32),
             FormatValType::S64 => Ok(ValueType::I64),
@@ -122,14 +120,14 @@ pub fn register_valtype_conversions(registry: &mut TypeConversionRegistry) {
                 kind: ConversionErrorKind::InvalidVariant,
                 source_type: "FormatValType",
                 target_type: "ValueType",
-                context: Some("Component not found"),
+                context: Some("Component not foundMissing message"),
                 source: None,
             }),
         }
     });
 
     // ValueType to ValType conversion
-    registry.register(|value_type: &ValueType| -> Result<ValType, ConversionError> {
+    registry.register(|value_type: &ValueType| -> core::result::Result<ValType, ConversionError> {
         match value_type {
             ValueType::I32 => Ok(ValType::S32),
             ValueType::I64 => Ok(ValType::S64),
@@ -164,16 +162,16 @@ mod tests {
         // Test Format to Types ValType
         let format_val_type = FormatValType::S32;
         let types_val_type = registry.convert::<FormatValType, ValType>(&format_val_type).unwrap();
-        assert!(matches!(types_val_type, ValType::S32));
+        assert!(matches!(types_val_type, ValType::S32);
 
         // Test Types to Format ValType
         let types_val_type = ValType::Bool;
         let format_val_type = registry.convert::<ValType, FormatValType>(&types_val_type).unwrap();
-        assert!(matches!(format_val_type, FormatValType::Bool));
+        assert!(matches!(format_val_type, FormatValType::Bool);
 
         // Test ValueType to FormatValType
         let value_type = ValueType::I32;
         let format_val_type = registry.convert::<ValueType, FormatValType>(&value_type).unwrap();
-        assert!(matches!(format_val_type, FormatValType::S32));
+        assert!(matches!(format_val_type, FormatValType::S32);
     }
 }

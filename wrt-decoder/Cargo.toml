@@ -9,6 +9,9 @@ readme = "README.md"
 keywords = ["wasm", "webassembly", "decoder", "parser", "runtime"]
 categories = ["wasm", "parsing", "no-std", "embedded"]
 
+[lints]
+workspace = true
+
 [dependencies]
 # Error handling
 wrt-error = { workspace = true, default-features = false }
@@ -21,6 +24,9 @@ wrt-foundation = { workspace = true, default-features = false }
 log = { version = "0.4", optional = true }
 # WAT parsing (for testing)
 wat = { version = "1.231.0", optional = true }
+# TOML configuration (for tooling)
+toml = { version = "0.8", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
 criterion = "0.6"
@@ -32,12 +38,28 @@ wat = "1.231.0"
 [features]
 default = []
 # Binary choice: std OR no_std (no alloc middle ground)
-std = ["wrt-format/std", "wrt-foundation/std"]
+std = ["wrt-format/std", "wrt-foundation/std", "wrt-foundation/wrt-allocator", "dep:toml", "dep:serde"]
 # For compatibility with verification script
 # This is a no-op since the crate is no_std by default
 no_std = []
+
+# Allocation support for no_std environments
+alloc = ["wrt-foundation/alloc", "wrt-format/alloc"]
 optimize = []
-safety = ["wrt-foundation/safety", "wrt-format/safety"]
+
+# Safety level presets using capability-based features
+qm = ["wrt-foundation/dynamic-allocation", "wrt-format/qm"]
+asil-a = ["wrt-foundation/bounded-collections", "wrt-format/asil-a"]
+asil-b = ["wrt-foundation/bounded-collections", "wrt-format/asil-b"]
+asil-c = ["wrt-foundation/static-memory-safety", "wrt-format/asil-c"]
+asil-d = ["wrt-foundation/asil-d", "wrt-format/asil-d"]
+
+# Legacy compatibility features
+safe-memory = ["asil-b"]
+safety-asil-b = ["asil-b"]
+safety-asil-c = ["asil-c"]
+safety-asil-d = ["asil-d"]
+
 wat = ["dep:wat", "std"]
 
 # Component Model features
@@ -58,45 +80,6 @@ component-model-all = [
 conversion = ["wrt-format/conversion"]
 
 # Disable panic handler for library builds to avoid conflicts
-disable-panic-handler = []
+kani = []
 
-[lints.rust]
-unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)', 'cfg(kani)', 'cfg(coverage)', 'cfg(doc)'] }
-# Rule 1
-# pointer_cast is not a valid Rust lint
-# Rule 9
-missing_docs = "deny"
-unsafe_code = "forbid"
 
-[lints.clippy]
-# Rule 1: Language subset
-inline_asm_x86_att_syntax = "deny"
-transmute_ptr_to_ref = "deny"
-type_id = "deny"
-dyn_trait = "deny"
-float_arithmetic = "deny"
-# Rule 2: Unsafe usage
-ptr_offset_with_cast = "deny"
-# Rule 3: Error handling & panics
-unwrap_used = "deny"
-panic = "deny" # Also covers Rule 4
-expect_used = "deny"
-result_unit_err = "deny"
-let_underscore_drop = "deny"
-must_use_candidate = "warn"
-must_use_unit = "warn"
-# Rule 4: Control-flow soundness
-match_wildcard_for_single_variants = "deny"
-never_loop = "deny"
-unreachable = "deny" # Also related to Rule 4
-# Rule 5: Memory & concurrency safety
-static_mut_refs = "deny"
-arc_mutate = "deny"
-# Rule 8: Static analysis gates (CI)
-pedantic = "warn"
-# Rule 9: Documentation
-debug_assert_with_mut_call = "warn"
-
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"] 

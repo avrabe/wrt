@@ -13,7 +13,6 @@
 //! This module provides implementation of the `task.*` built-in functions
 //! required by the WebAssembly Component Model for managing async tasks.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -35,7 +34,12 @@ use core::cell::RefCell as AtomicRefCell;
 use wrt_foundation::component_value::ComponentValue;
 
 #[cfg(not(any(feature = "std", )))]
-use wrt_foundation::{BoundedString, BoundedVec};
+use wrt_foundation::{
+    BoundedString, BoundedVec,
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use crate::task_cancellation::{CancellationToken, with_cancellation_scope};
 
@@ -53,7 +57,7 @@ impl TaskId {
     pub fn new() -> Self {
         static TASK_COUNTER: core::sync::atomic::AtomicU64 = 
             core::sync::atomic::AtomicU64::new(1);
-        Self(TASK_COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst))
+        Self(TASK_COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst)
     }
 
     pub fn as_u64(&self) -> u64 {
@@ -119,12 +123,9 @@ impl TaskReturn {
     #[cfg(not(any(feature = "std", )))]
     pub fn from_binary(data: &[u8]) -> Result<Self> {
         let bounded_data = BoundedVec::new_from_slice(data)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Task return data too large for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("Error occurred"
             ))?;
-        Ok(Self::Binary(bounded_data))
+        Ok(Self::Binary(bounded_data)
     }
 
     pub fn void() -> Self {
@@ -227,18 +228,14 @@ impl Task {
     #[cfg(not(any(feature = "std", )))]
     pub fn set_metadata(&mut self, key: &str, value: ComponentValue) -> Result<()> {
         let bounded_key = BoundedString::new_from_str(key)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Metadata key too long for no_std environment"
+            .map_err(|_| Error::runtime_execution_error("Error occurred"
             ))?;
         self.metadata.insert(bounded_key, value)
             .map_err(|_| Error::new(
                 ErrorCategory::Memory,
                 wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Task metadata storage full"
-            ))?;
-        Ok(())
+                "Error message neededMissing messageMissing messageMissing message"))?;
+        Ok(()
     }
 
     #[cfg(feature = "std")]
@@ -299,10 +296,7 @@ impl TaskRegistry {
         #[cfg(not(any(feature = "std", )))]
         {
             self.tasks.insert(id, task)
-                .map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                    "Task registry full"
+                .map_err(|_| Error::runtime_execution_error("Error occurred"
                 ))?;
             Ok(id)
         }
@@ -327,7 +321,7 @@ impl TaskRegistry {
     pub fn cleanup_finished_tasks(&mut self) {
         #[cfg(feature = "std")]
         {
-            self.tasks.retain(|_, task| !task.status.is_finished());
+            self.tasks.retain(|_, task| !task.status.is_finished();
         }
         #[cfg(not(any(feature = "std", )))]
         {
@@ -358,13 +352,10 @@ impl TaskBuiltins {
     /// Initialize the global task registry
     pub fn initialize() -> Result<()> {
         let mut registry_ref = TASK_REGISTRY.try_borrow_mut()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Task registry borrow failed"
+            .map_err(|_| Error::runtime_execution_error("Error occurred"
             ))?;
-        *registry_ref = Some(TaskRegistry::new());
-        Ok(())
+        *registry_ref = Some(TaskRegistry::new();
+        Ok(()
     }
 
     /// Get the global task registry
@@ -376,15 +367,11 @@ impl TaskBuiltins {
             .map_err(|_| Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::INVALID_STATE,
-                "Task registry borrow failed"
-            ))?;
+                "Error message neededMissing messageMissing messageMissing message"))?;
         let registry = registry_ref.as_ref()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Task registry not initialized"
+            .ok_or_else(|| Error::runtime_execution_error("Error occurred"
             ))?;
-        Ok(f(registry))
+        Ok(f(registry)
     }
 
     /// Get the global task registry mutably
@@ -396,13 +383,9 @@ impl TaskBuiltins {
             .map_err(|_| Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::INVALID_STATE,
-                "Task registry borrow failed"
-            ))?;
+                "Error message neededMissing messageMissing messageMissing message"))?;
         let registry = registry_ref.as_mut()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Task registry not initialized"
+            .ok_or_else(|| Error::runtime_execution_error("Error occurred"
             ))?;
         f(registry)
     }
@@ -427,13 +410,12 @@ impl TaskBuiltins {
         Self::with_registry_mut(|registry| {
             if let Some(task) = registry.get_task_mut(task_id) {
                 task.complete(return_value);
-                Ok(())
+                Ok(()
             } else {
                 Err(Error::new(
                     ErrorCategory::Runtime,
                     wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Task not found"
-                ))
+                    "Error message neededMissing messageMissing messageMissing message")
             }
         })?
     }
@@ -456,13 +438,10 @@ impl TaskBuiltins {
         Self::with_registry_mut(|registry| {
             if let Some(task) = registry.get_task_mut(task_id) {
                 task.cancel();
-                Ok(())
+                Ok(()
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Task not found"
-                ))
+                Err(Error::runtime_execution_error("Error occurred"
+                )
             }
         })?
     }
@@ -503,18 +482,15 @@ impl TaskBuiltins {
                 #[cfg(feature = "std")]
                 {
                     task.set_metadata(key.to_string(), value);
-                    Ok(())
+                    Ok(()
                 }
                 #[cfg(not(any(feature = "std", )))]
                 {
                     task.set_metadata(key, value)
                 }
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Task not found"
-                ))
+                Err(Error::runtime_execution_error("Error occurred"
+                )
             }
         })?
     }
@@ -523,13 +499,13 @@ impl TaskBuiltins {
     pub fn cleanup_finished_tasks() -> Result<()> {
         Self::with_registry_mut(|registry| {
             registry.cleanup_finished_tasks();
-            Ok(())
+            Ok(()
         })?
     }
 
     /// Get task count
     pub fn task_count() -> Result<usize> {
-        Self::with_registry(|registry| registry.task_count())
+        Self::with_registry(|registry| registry.task_count()
     }
 }
 
@@ -567,7 +543,7 @@ pub mod task_helpers {
         let task_id = TaskBuiltins::task_start()?;
         
         // Execute within cancellation scope
-        let result = with_cancellation_scope(token.clone(), || f(token.clone()));
+        let result = with_cancellation_scope(token.clone(), || f(token.clone());
         
         match result {
             Ok(Ok(value)) => {
@@ -594,15 +570,14 @@ pub mod task_helpers {
 
     #[cfg(not(any(feature = "std", )))]
     pub fn wait_for_tasks(task_ids: &[TaskId]) -> Result<BoundedVec<Option<TaskReturn>, MAX_TASKS, NoStdProvider<65536>>> {
-        let mut results = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let mut results = BoundedVec::new(provider).map_err(|_| {
+            Error::runtime_execution_error("Error occurred"Failed to create results vectorMissing message")
+        })?;
         for &task_id in task_ids {
             let result = TaskBuiltins::task_wait(task_id)?;
             results.push(result)
-                .map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                    "Too many task results for no_std environment"
-                ))?;
+                .map_err(|_| Error::runtime_execution_error("Error occurred"Failed to add task resultMissing messageMissing messageMissing message"))?;
         }
         Ok(results)
     }
@@ -623,31 +598,31 @@ impl From<()> for TaskReturn {
 
 impl From<bool> for TaskReturn {
     fn from(value: bool) -> Self {
-        Self::Value(ComponentValue::Bool(value))
+        Self::Value(ComponentValue::Bool(value)
     }
 }
 
 impl From<i32> for TaskReturn {
     fn from(value: i32) -> Self {
-        Self::Value(ComponentValue::I32(value))
+        Self::Value(ComponentValue::I32(value)
     }
 }
 
 impl From<i64> for TaskReturn {
     fn from(value: i64) -> Self {
-        Self::Value(ComponentValue::I64(value))
+        Self::Value(ComponentValue::I64(value)
     }
 }
 
 impl From<f32> for TaskReturn {
     fn from(value: f32) -> Self {
-        Self::Value(ComponentValue::F32(value))
+        Self::Value(ComponentValue::F32(value)
     }
 }
 
 impl From<f64> for TaskReturn {
     fn from(value: f64) -> Self {
-        Self::Value(ComponentValue::F64(value))
+        Self::Value(ComponentValue::F64(value)
     }
 }
 
@@ -666,54 +641,54 @@ mod tests {
 
     #[test]
     fn test_task_status_methods() {
-        assert!(TaskStatus::Pending.is_active());
-        assert!(TaskStatus::Running.is_active());
-        assert!(!TaskStatus::Completed.is_active());
-        assert!(!TaskStatus::Cancelled.is_active());
-        assert!(!TaskStatus::Failed.is_active());
+        assert!(TaskStatus::Pending.is_active();
+        assert!(TaskStatus::Running.is_active();
+        assert!(!TaskStatus::Completed.is_active();
+        assert!(!TaskStatus::Cancelled.is_active();
+        assert!(!TaskStatus::Failed.is_active();
 
-        assert!(!TaskStatus::Pending.is_finished());
-        assert!(!TaskStatus::Running.is_finished());
-        assert!(TaskStatus::Completed.is_finished());
-        assert!(TaskStatus::Cancelled.is_finished());
-        assert!(TaskStatus::Failed.is_finished());
+        assert!(!TaskStatus::Pending.is_finished();
+        assert!(!TaskStatus::Running.is_finished();
+        assert!(TaskStatus::Completed.is_finished();
+        assert!(TaskStatus::Cancelled.is_finished();
+        assert!(TaskStatus::Failed.is_finished();
     }
 
     #[test]
     fn test_task_return_creation() {
-        let value_return = TaskReturn::from_component_value(ComponentValue::I32(42));
-        assert!(value_return.as_component_value().is_some());
-        assert_eq!(value_return.as_component_value().unwrap(), &ComponentValue::I32(42));
+        let value_return = TaskReturn::from_component_value(ComponentValue::I32(42);
+        assert!(value_return.as_component_value().is_some();
+        assert_eq!(value_return.as_component_value().unwrap(), &ComponentValue::I32(42);
 
         let void_return = TaskReturn::void();
-        assert!(void_return.is_void());
-        assert!(void_return.as_component_value().is_none());
+        assert!(void_return.is_void();
+        assert!(void_return.as_component_value().is_none();
     }
 
     #[test]
     fn test_task_lifecycle() {
         let mut task = Task::new();
         assert_eq!(task.status, TaskStatus::Pending);
-        assert!(task.return_value.is_none());
+        assert!(task.return_value.is_none();
 
         task.start();
         assert_eq!(task.status, TaskStatus::Running);
 
-        let return_value = TaskReturn::from_component_value(ComponentValue::Bool(true));
+        let return_value = TaskReturn::from_component_value(ComponentValue::Bool(true);
         task.complete(return_value);
         assert_eq!(task.status, TaskStatus::Completed);
-        assert!(task.return_value.is_some());
+        assert!(task.return_value.is_some();
     }
 
     #[test]
     fn test_task_cancellation() {
         let mut task = Task::new();
-        assert!(!task.is_cancelled());
+        assert!(!task.is_cancelled();
 
         task.start();
         task.cancel();
         assert_eq!(task.status, TaskStatus::Cancelled);
-        assert!(task.is_cancelled());
+        assert!(task.is_cancelled();
     }
 
     #[test]
@@ -727,11 +702,11 @@ mod tests {
         assert_eq!(registry.task_count(), 1);
 
         let retrieved_task = registry.get_task(task_id);
-        assert!(retrieved_task.is_some());
+        assert!(retrieved_task.is_some();
         assert_eq!(retrieved_task.unwrap().id, task_id);
 
         let removed_task = registry.remove_task(task_id);
-        assert!(removed_task.is_some());
+        assert!(removed_task.is_some();
         assert_eq!(registry.task_count(), 0);
     }
 
@@ -746,7 +721,7 @@ mod tests {
         assert_eq!(status, TaskStatus::Running);
 
         // Test task completion
-        let return_value = TaskReturn::from_component_value(ComponentValue::I32(42));
+        let return_value = TaskReturn::from_component_value(ComponentValue::I32(42);
         TaskBuiltins::task_return(task_id, return_value).unwrap();
         
         let final_status = TaskBuiltins::task_status(task_id).unwrap();
@@ -754,7 +729,7 @@ mod tests {
 
         // Test task wait
         let result = TaskBuiltins::task_wait(task_id).unwrap();
-        assert!(result.is_some());
+        assert!(result.is_some();
     }
 
     #[test]
@@ -763,27 +738,27 @@ mod tests {
         let task_id = TaskBuiltins::task_start().unwrap();
 
         // Set metadata
-        TaskBuiltins::set_task_metadata(task_id, "test_key", ComponentValue::Bool(true)).unwrap();
+        TaskBuiltins::set_task_metadata(task_id, Missing messageMissing messageMissing message")).unwrap();
 
         // Get metadata
-        let value = TaskBuiltins::get_task_metadata(task_id, "test_key").unwrap();
-        assert!(value.is_some());
-        assert_eq!(value.unwrap(), ComponentValue::Bool(true));
+        let value = TaskBuiltins::get_task_metadata(task_id, "test_keyMissing message").unwrap();
+        assert!(value.is_some();
+        assert_eq!(value.unwrap(), ComponentValue::Bool(true);
 
         // Get non-existent metadata
-        let missing = TaskBuiltins::get_task_metadata(task_id, "missing_key").unwrap();
-        assert!(missing.is_none());
+        let missing = TaskBuiltins::get_task_metadata(task_id, "missing_keyMissing message").unwrap();
+        assert!(missing.is_none();
     }
 
     #[test]
     fn test_conversion_traits() {
         let bool_return: TaskReturn = true.into();
-        assert_eq!(bool_return.as_component_value().unwrap(), &ComponentValue::Bool(true));
+        assert_eq!(bool_return.as_component_value().unwrap(), &ComponentValue::Bool(true);
 
         let i32_return: TaskReturn = 42i32.into();
-        assert_eq!(i32_return.as_component_value().unwrap(), &ComponentValue::I32(42));
+        assert_eq!(i32_return.as_component_value().unwrap(), &ComponentValue::I32(42);
 
         let void_return: TaskReturn = ().into();
-        assert!(void_return.is_void());
+        assert!(void_return.is_void();
     }
 }

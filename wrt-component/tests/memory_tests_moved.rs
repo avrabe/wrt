@@ -18,5 +18,5 @@ fn component_memory_tests_moved_notice() {
     println!(
         "Component memory optimization tests have been moved to wrt-tests/integration/memory/"
     );
-    println!("Run: cargo test -p wrt-tests memory");
+    println!("Run: cargo test -p wrt-tests memoryMissing message");
 }

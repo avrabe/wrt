@@ -10,14 +10,15 @@
 //!
 //! This example showcases the newly implemented async features including:
 //! - Async context management (context.get/set)
-//! - Task management built-ins (task.start/return/status/wait)  
+//! - Task management built-ins (task.start/return/status/wait)
 //! - Waitable set operations (waitable-set.new/add/wait)
 //! - Error context built-ins (error-context.new/debug-message)
 
 use wrt_foundation::component_value::ComponentValue;
 
 // Note: This example is designed to demonstrate the API structure
-// The actual compilation depends on resolving dependency issues in wrt-decoder and wrt-runtime
+// The actual compilation depends on resolving dependency issues in wrt-decoder
+// and wrt-runtime
 
 #[cfg(feature = "std")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -49,13 +50,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     demo_fixed_length_lists()?;
 
     println!("\nAll Component Model features demonstrated successfully!");
-    Ok(())
+    Ok(()
 }
 
 #[cfg(feature = "std")]
 fn demo_async_context() -> Result<(), Box<dyn std::error::Error>> {
-    // Note: These would be the actual API calls once compilation issues are resolved
-    
+    // Note: These would be the actual API calls once compilation issues are
+    // resolved
+
     println!("  • Creating async context...");
     // let context = wrt_component::AsyncContext::new();
     println!("    ✓ Context created");
@@ -63,13 +65,13 @@ fn demo_async_context() -> Result<(), Box<dyn std::error::Error>> {
     println!("  • Setting context value...");
     // wrt_component::AsyncContextManager::set_context_value(
     //     wrt_component::ContextKey::new("user_id".to_string()),
-    //     wrt_component::ContextValue::from_component_value(ComponentValue::I32(123))
+    //     wrt_component::ContextValue::from_component_value(ComponentValue::I32(123)
     // )?;
     println!("    ✓ Value set: user_id = 123");
 
     println!("  • Getting context value...");
     // let value = wrt_component::AsyncContextManager::get_context_value(
-    //     &wrt_component::ContextKey::new("user_id".to_string())
+    //     &wrt_component::ContextKey::new("user_id".to_string()
     // )?;
     println!("    ✓ Retrieved value: user_id = 123");
 
@@ -80,7 +82,7 @@ fn demo_async_context() -> Result<(), Box<dyn std::error::Error>> {
     // }
     println!("    ✓ Context scope completed");
 
-    Ok(())
+    Ok(()
 }
 
 #[cfg(feature = "std")]
@@ -116,7 +118,7 @@ fn demo_task_management() -> Result<(), Box<dyn std::error::Error>> {
     // let result = wrt_component::TaskBuiltins::task_wait(task_id)?;
     println!("    ✓ Task result retrieved: true");
 
-    Ok(())
+    Ok(()
 }
 
 #[cfg(feature = "std")]
@@ -145,14 +147,16 @@ fn demo_waitable_sets() -> Result<(), Box<dyn std::error::Error>> {
     println!("    ✓ Set contains 1 waitable");
 
     println!("  • Polling for ready waitables...");
-    // let wait_result = wrt_component::WaitableSetBuiltins::waitable_set_wait(set_id)?;
+    // let wait_result =
+    // wrt_component::WaitableSetBuiltins::waitable_set_wait(set_id)?;
     println!("    ✓ Poll result: Timeout (no waitables ready)");
 
     println!("  • Removing waitable...");
-    // let removed = wrt_component::WaitableSetBuiltins::waitable_set_remove(set_id, waitable_id)?;
+    // let removed = wrt_component::WaitableSetBuiltins::waitable_set_remove(set_id,
+    // waitable_id)?;
     println!("    ✓ Waitable removed: true");
 
-    Ok(())
+    Ok(()
 }
 
 #[cfg(feature = "std")]
@@ -169,7 +173,9 @@ fn demo_error_contexts() -> Result<(), Box<dyn std::error::Error>> {
     println!("    ✓ Error context created with ID: error_101");
 
     println!("  • Getting debug message...");
-    // let message = wrt_component::ErrorContextBuiltins::error_context_debug_message(context_id)?;
+    // let message =
+    // wrt_component::ErrorContextBuiltins::error_context_debug_message(context_id)?
+    // ;
     println!("    ✓ Debug message: 'Demonstration error'");
 
     println!("  • Adding stack frame...");
@@ -186,19 +192,20 @@ fn demo_error_contexts() -> Result<(), Box<dyn std::error::Error>> {
     // wrt_component::ErrorContextBuiltins::error_context_set_metadata(
     //     context_id,
     //     "component".to_string(),
-    //     ComponentValue::String("async_demo".to_string())
+    //     ComponentValue::String("async_demo".to_string()
     // )?;
     println!("    ✓ Metadata set: component = 'async_demo'");
 
     println!("  • Getting stack trace...");
-    // let stack_trace = wrt_component::ErrorContextBuiltins::error_context_stack_trace(context_id)?;
+    // let stack_trace =
+    // wrt_component::ErrorContextBuiltins::error_context_stack_trace(context_id)?;
     println!("    ✓ Stack trace retrieved");
 
     println!("  • Dropping error context...");
     // wrt_component::ErrorContextBuiltins::error_context_drop(context_id)?;
     println!("    ✓ Error context dropped");
 
-    Ok(())
+    Ok(()
 }
 
 #[cfg(not(feature = "std"))]
@@ -248,7 +255,8 @@ fn demo_advanced_threading() -> Result<(), Box<dyn std::error::Error>> {
     println!("    ✓ Indirect call created: table[0][10](123)");
 
     println!("  • Spawning thread with indirect call...");
-    // let indirect_thread_id = wrt_component::AdvancedThreadingBuiltins::thread_spawn_indirect(
+    // let indirect_thread_id =
+    // wrt_component::AdvancedThreadingBuiltins::thread_spawn_indirect(
     //     indirect_call, config, None
     // )?;
     println!("    ✓ Thread spawned with ID: thread_indirect_789");
@@ -269,14 +277,16 @@ fn demo_advanced_threading() -> Result<(), Box<dyn std::error::Error>> {
     println!("    ✓ Retrieved value: 'thread_data'");
 
     println!("  • Checking thread state...");
-    // let state = wrt_component::AdvancedThreadingBuiltins::thread_state(thread_id)?;
+    // let state =
+    // wrt_component::AdvancedThreadingBuiltins::thread_state(thread_id)?;
     println!("    ✓ Thread state: Running");
 
     println!("  • Joining thread...");
-    // let join_result = wrt_component::AdvancedThreadingBuiltins::thread_join(thread_id)?;
+    // let join_result =
+    // wrt_component::AdvancedThreadingBuiltins::thread_join(thread_id)?;
     println!("    ✓ Join result: Success(42)");
 
-    Ok(())
+    Ok(()
 }
 
 #[cfg(feature = "std")]
@@ -299,9 +309,9 @@ fn demo_fixed_length_lists() -> Result<(), Box<dyn std::error::Error>> {
     println!("    ✓ Added elements: [10, 20, 30]");
 
     println!("  • Checking list properties...");
-    // println!("    • Current length: {}", list.current_length());
-    // println!("    • Remaining capacity: {}", list.remaining_capacity());
-    // println!("    • Is full: {}", list.is_full());
+    // println!("    • Current length: {}", list.current_length();
+    // println!("    • Remaining capacity: {}", list.remaining_capacity();
+    // println!("    • Is full: {}", list.is_full();
     println!("    ✓ Length: 3, Remaining: 2, Full: false");
 
     println!("  • Creating list with predefined elements...");
@@ -342,14 +352,14 @@ fn demo_fixed_length_lists() -> Result<(), Box<dyn std::error::Error>> {
     // let fixed_list_type = wrt_component::ExtendedValueType::FixedLengthList(0);
     println!("    ✓ Extended types support both standard and fixed-length lists");
 
-    Ok(())
+    Ok(()
 }
 
 // Helper function to demonstrate practical usage patterns
 #[cfg(feature = "std")]
 fn demonstrate_async_patterns() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nAdvanced Async Patterns:");
-    
+
     // Pattern 1: Async context with scoped execution
     println!("  • Scoped async execution pattern...");
     // wrt_component::with_async_context! {
@@ -357,16 +367,16 @@ fn demonstrate_async_patterns() -> Result<(), Box<dyn std::error::Error>> {
     //     {
     //         // Set context for this scope
     //         wrt_component::async_context_canonical_builtins::set_typed_context_value(
-    //             "operation_id", 
+    //             "operation_id",
     //             "op_12345"
     //         )?;
-    //         
+    //
     //         // Execute task in this context
     //         let task_id = wrt_component::task_helpers::with_task(|| {
-    //             Ok(ComponentValue::String("Operation completed".to_string()))
+    //             Ok(ComponentValue::String("Operation completed".to_string())
     //         })?;
-    //         
-    //         Ok(())
+    //
+    //         Ok(()
     //     }
     // }?;
     println!("    ✓ Scoped execution completed");
@@ -383,7 +393,8 @@ fn demonstrate_async_patterns() -> Result<(), Box<dyn std::error::Error>> {
     //         state: wrt_component::FutureState::Resolved(ComponentValue::I32(42)),
     //     },
     // ];
-    // let result = wrt_component::waitable_set_helpers::wait_for_any_future(futures)?;
+    // let result =
+    // wrt_component::waitable_set_helpers::wait_for_any_future(futures)?;
     println!("    ✓ Multi-future wait completed");
 
     // Pattern 3: Error context with chaining
@@ -391,7 +402,8 @@ fn demonstrate_async_patterns() -> Result<(), Box<dyn std::error::Error>> {
     // let root_error = wrt_component::error_context_helpers::create_simple(
     //     "Root cause error".to_string()
     // )?;
-    // let chained_error = wrt_component::error_context_helpers::create_with_stack_trace(
+    // let chained_error =
+    // wrt_component::error_context_helpers::create_with_stack_trace(
     //     "Higher level error".to_string(),
     //     "handler_function".to_string(),
     //     Some("handler.rs".to_string()),
@@ -399,7 +411,7 @@ fn demonstrate_async_patterns() -> Result<(), Box<dyn std::error::Error>> {
     // )?;
     println!("    ✓ Error context chaining completed");
 
-    Ok(())
+    Ok(()
 }
 
 // Integration test demonstrating component interoperability
@@ -412,11 +424,11 @@ mod tests {
     fn test_async_feature_integration() {
         // This test would verify that all async features work together
         // Note: Currently disabled due to dependency compilation issues
-        
+
         // Test async context + task management
         // Test waitable sets + error contexts
         // Test error propagation through async boundaries
-        
+
         println!("Integration test would run here once dependencies are resolved");
     }
 

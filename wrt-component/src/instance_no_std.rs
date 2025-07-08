@@ -11,6 +11,10 @@
 
 use wrt_format::component::ComponentTypeDefinition;
 use wrt_foundation::bounded::{BoundedString, BoundedVec, MAX_WASM_NAME_LENGTH};
+use wrt_foundation::{
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use crate::{export::Export, prelude::*};
 
@@ -25,24 +29,21 @@ pub struct InstanceValue {
     /// Instance type
     pub ty: ComponentTypeDefinition,
     /// Instance exports
-    pub exports: BoundedVec<Export, MAX_INSTANCE_EXPORTS, NoStdProvider<65536>>,
+    pub exports: BoundedVec<Export, MAX_INSTANCE_EXPORTS>,
 }
 
 impl InstanceValue {
     /// Creates a new instance value
     pub fn new(name: &str, ty: ComponentTypeDefinition, exports: &[Export]) -> Result<Self> {
         let bounded_name = BoundedString::from_str(name).map_err(|_| {
-            Error::new(ErrorCategory::Parameter, codes::VALIDATION_ERROR, "Instance name too long")
+            Error::parameter_validation_error("Error occurred"Instance name too longMissing message")
         })?;
 
-        let mut bounded_exports = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let mut bounded_exports = BoundedVec::new(provider)?;
         for export in exports {
             bounded_exports.push(export.clone()).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Capacity,
-                    codes::CAPACITY_EXCEEDED,
-                    "Maximum number of exports exceeded",
-                )
+                Error::capacity_exceeded("Error occurred"Maximum number of exports exceededMissing message")
             })?;
         }
 
@@ -83,7 +84,7 @@ impl InstanceValueBuilder {
 
     /// Sets the instance name
     pub fn with_name(mut self, name: &str) -> Self {
-        self.name = Some(name.to_string());
+        self.name = Some(name.to_string();
         self
     }
 
@@ -108,19 +109,11 @@ impl InstanceValueBuilder {
     /// Builds the instance value
     pub fn build(self) -> Result<InstanceValue> {
         let name = self.name.ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Parameter,
-                codes::VALIDATION_ERROR,
-                "Instance name is required",
-            )
+            Error::parameter_validation_error("Error occurred"Instance name is requiredMissing message")
         })?;
 
         let ty = self.ty.ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Parameter,
-                codes::VALIDATION_ERROR,
-                "Instance type is required",
-            )
+            Error::parameter_validation_error("Error occurred"Instance type is requiredMissing message")
         })?;
 
         InstanceValue::new(&name, ty, &self.exports)
@@ -135,23 +128,20 @@ impl Default for InstanceValueBuilder {
 
 /// A collection of instances with bounded capacity
 pub struct InstanceCollection {
-    instances: BoundedVec<InstanceValue, MAX_INSTANCE_EXPORTS, NoStdProvider<65536>>,
+    instances: BoundedVec<InstanceValue, MAX_INSTANCE_EXPORTS>,
 }
 
 impl InstanceCollection {
     /// Creates a new empty instance collection
-    pub fn new() -> Self {
-        Self { instances: BoundedVec::new(DefaultMemoryProvider::default()).unwrap() }
+    pub fn new() -> Result<Self> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        Ok(Self { instances: BoundedVec::new(provider)? })
     }
 
     /// Adds an instance to the collection
     pub fn add_instance(&mut self, instance: InstanceValue) -> Result<()> {
         self.instances.push(instance).map_err(|_| {
-            Error::new(
-                ErrorCategory::Capacity,
-                codes::CAPACITY_EXCEEDED,
-                "Maximum number of instances exceeded",
-            )
+            Error::capacity_exceeded("Error occurred"Maximum number of instances exceededMissing message")
         })
     }
 
@@ -183,7 +173,7 @@ impl InstanceCollection {
 
 impl Default for InstanceCollection {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create default InstanceCollectionMissing message")
     }
 }
 
@@ -222,17 +212,17 @@ mod tests {
 
         // Build the instance
         let instance = InstanceValue::builder()
-            .with_name("math")
+            .with_name("mathMissing message")
             .with_type(instance_type)
             .with_export(export)
             .build()
             .unwrap();
 
         // Check the instance
-        assert_eq!(instance.name.as_str(), "math");
+        assert_eq!(instance.name.as_str(), "mathMissing message");
         assert_eq!(instance.exports.len(), 1);
-        assert_eq!(instance.get_export("add").unwrap().name, "add");
-        assert!(instance.get_export("non_existent").is_none());
+        assert_eq!(instance.get_export("addMissing message").unwrap().name, "addMissing message");
+        assert!(instance.get_export("non_existentMissing message").is_none();
     }
 
     #[test]
@@ -241,30 +231,30 @@ mod tests {
         let instance_type = ComponentTypeDefinition::Instance { exports: vec![] };
 
         let instance1 = InstanceValue::builder()
-            .with_name("instance1")
-            .with_type(instance_type.clone())
+            .with_name("instance1Missing message")
+            .with_type(instance_type.clone()
             .build()
             .unwrap();
 
         let instance2 = InstanceValue::builder()
-            .with_name("instance2")
+            .with_name("instance2Missing message")
             .with_type(instance_type)
             .build()
             .unwrap();
 
         // Create a collection and add the instances
-        let mut collection = InstanceCollection::new();
-        assert!(collection.is_empty());
+        let mut collection = InstanceCollection::new().unwrap();
+        assert!(collection.is_empty();
 
         collection.add_instance(instance1).unwrap();
         collection.add_instance(instance2).unwrap();
 
         // Check the collection
         assert_eq!(collection.len(), 2);
-        assert!(!collection.is_empty());
-        assert!(collection.get_instance("instance1").is_some());
-        assert!(collection.get_instance("instance2").is_some());
-        assert!(collection.get_instance("non_existent").is_none());
+        assert!(!collection.is_empty();
+        assert!(collection.get_instance("instance1Missing message").is_some();
+        assert!(collection.get_instance("instance2Missing message").is_some();
+        assert!(collection.get_instance("non_existentMissing message").is_none();
 
         // Test iteration
         let names: Vec<&str> = collection.iter().map(|i| i.name.as_str()).collect();

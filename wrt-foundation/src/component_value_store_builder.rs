@@ -117,12 +117,12 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentValueStoreBu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::safe_memory::NoStdProvider;
+    use crate::memory_sizing::SmallProvider;
 
     #[test]
     fn test_component_value_store_builder() {
         // Create a builder with default settings
-        let builder = ComponentValueStoreBuilder::<NoStdProvider<1024>>::new();
+        let builder = ComponentValueStoreBuilder::<SmallProvider>::new();
 
         // Build the store
         let store = builder.build().unwrap();
@@ -134,9 +134,9 @@ mod tests {
     #[test]
     fn test_component_value_store_builder_with_options() {
         // Create a builder with custom settings
-        let provider = NoStdProvider::<1024>::with_verification_level(VerificationLevel::Full);
+        let provider = SmallProvider::with_verification_level(VerificationLevel::Full);
 
-        let builder = ComponentValueStoreBuilder::<NoStdProvider<1024>>::new()
+        let builder = ComponentValueStoreBuilder::<SmallProvider>::new()
             .with_provider(provider.clone())
             .with_verification_level(VerificationLevel::Full)
             .with_initial_values_capacity(100)

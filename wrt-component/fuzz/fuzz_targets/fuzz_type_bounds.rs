@@ -78,13 +78,13 @@ fuzz_target!(|data: &[u8]| {
             data[data_offset + 1],
             data.get(data_offset + 2).copied().unwrap_or(0),
             data.get(data_offset + 3).copied().unwrap_or(0),
-        ]));
+        ]);
         let type2 = TypeId(u32::from_le_bytes([
             data.get(data_offset + 4).copied().unwrap_or(0),
             data.get(data_offset + 5).copied().unwrap_or(0),
             data.get(data_offset + 6).copied().unwrap_or(0),
             data.get(data_offset + 7).copied().unwrap_or(0),
-        ]));
+        ]);
         
         // These operations should handle arbitrary type IDs gracefully
         let _ = bounds_checker.is_subtype(type1, type2);
@@ -103,7 +103,7 @@ fuzz_target!(|data: &[u8]| {
     for i in 0..type_ids.len().min(2) {
         for j in 0..type_ids.len().min(2) {
             if i != j {
-                assert!(!bounds_checker.is_subtype(type_ids[i], type_ids[j]));
+                assert!(!bounds_checker.is_subtype(type_ids[i], type_ids[j]);
             }
         }
     }

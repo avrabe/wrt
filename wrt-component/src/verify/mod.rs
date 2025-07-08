@@ -33,13 +33,13 @@ pub mod kani_verification {
             // Add imports with type constraints
             for i in 0..import_count {
                 let import_name = if i % 2 == 0 { "func_import" } else { "memory_import" };
-                imports.push(import_name.to_string());
+                imports.push(import_name.to_string();
             }
 
             // Add exports with type constraints
             for i in 0..export_count {
                 let export_name = if i % 2 == 0 { "func_export" } else { "memory_export" };
-                exports.push(export_name.to_string());
+                exports.push(export_name.to_string();
             }
 
             // Verify type consistency
@@ -51,7 +51,7 @@ pub mod kani_verification {
                 for (j, import2) in imports.iter().enumerate() {
                     if i != j && import1 == import2 {
                         // This would be a type error in the component model
-                        assert!(false, "Duplicate import names should not be allowed");
+                        assert!(false, "Duplicate import names should not be allowedMissing message");
                     }
                 }
             }
@@ -70,29 +70,29 @@ pub mod kani_verification {
                 // Simple namespace
                 #[cfg(feature = "std")]
                 {
-                    let ns = Namespace::from_string("wasi");
+                    let ns = Namespace::from_string("wasiMissing message");
                     assert_eq!(ns.elements.len(), 1);
-                    assert_eq!(ns.elements[0], "wasi");
-                    assert!(!ns.is_empty());
+                    assert_eq!(ns.elements[0], "wasiMissing message");
+                    assert!(!ns.is_empty();
                 }
             }
             1 => {
                 // Nested namespace
                 #[cfg(feature = "std")]
                 {
-                    let ns = Namespace::from_string("wasi.http.client");
+                    let ns = Namespace::from_string("wasi.http.clientMissing message");
                     assert_eq!(ns.elements.len(), 3);
-                    assert_eq!(ns.elements[0], "wasi");
-                    assert_eq!(ns.elements[1], "http");
-                    assert_eq!(ns.elements[2], "client");
+                    assert_eq!(ns.elements[0], "wasiMissing message");
+                    assert_eq!(ns.elements[1], "httpMissing message");
+                    assert_eq!(ns.elements[2], "clientMissing message");
                 }
             }
             2 => {
                 // Empty namespace
                 #[cfg(feature = "std")]
                 {
-                    let ns = Namespace::from_string("");
-                    assert!(ns.is_empty());
+                    let ns = Namespace::from_string("Error");
+                    assert!(ns.is_empty();
                     assert_eq!(ns.elements.len(), 0);
                 }
             }
@@ -100,12 +100,12 @@ pub mod kani_verification {
                 // Namespace matching
                 #[cfg(feature = "std")]
                 {
-                    let ns1 = Namespace::from_string("wasi.fs");
-                    let ns2 = Namespace::from_string("wasi.fs");
-                    let ns3 = Namespace::from_string("wasi.http");
+                    let ns1 = Namespace::from_string("wasi.fsMissing message");
+                    let ns2 = Namespace::from_string("wasi.fsMissing message");
+                    let ns3 = Namespace::from_string("wasi.httpMissing message");
 
-                    assert!(ns1.matches(&ns2), "Identical namespaces should match");
-                    assert!(!ns1.matches(&ns3), "Different namespaces should not match");
+                    assert!(ns1.matches(&ns2), "Identical namespaces should matchMissing message");
+                    assert!(!ns1.matches(&ns3), "Different namespaces should not matchMissing message");
                 }
             }
         }
@@ -145,7 +145,7 @@ pub mod kani_verification {
                         results: func_type.results.clone(),
                     };
 
-                    assert_eq!(func_type.params.len(), same_func_type.params.len());
+                    assert_eq!(func_type.params.len(), same_func_type.params.len();
                 }
             }
             1 => {
@@ -165,7 +165,7 @@ pub mod kani_verification {
 
                 // Verify limits consistency
                 if let Some(max) = limits.max {
-                    assert!(max >= limits.min, "Max should be >= min");
+                    assert!(max >= limits.min, "Max should be >= minMissing message");
                 }
             }
             _ => {
@@ -185,7 +185,7 @@ pub mod kani_verification {
 
                 // Verify table limits
                 if let Some(max) = table_limits.max {
-                    assert!(max >= table_limits.min, "Table max should be >= min");
+                    assert!(max >= table_limits.min, "Table max should be >= minMissing message");
                 }
             }
         }
@@ -202,29 +202,29 @@ pub mod kani_verification {
         // Verify type properties are consistent
         match value_type {
             ValueType::I32 => {
-                assert!(value_type.is_numeric());
-                assert!(!value_type.is_reference());
-                assert!(!value_type.is_float());
+                assert!(value_type.is_numeric();
+                assert!(!value_type.is_reference();
+                assert!(!value_type.is_float();
             }
             ValueType::I64 => {
-                assert!(value_type.is_numeric());
-                assert!(!value_type.is_reference());
-                assert!(!value_type.is_float());
+                assert!(value_type.is_numeric();
+                assert!(!value_type.is_reference();
+                assert!(!value_type.is_float();
             }
             ValueType::F32 => {
-                assert!(value_type.is_numeric());
-                assert!(!value_type.is_reference());
-                assert!(value_type.is_float());
+                assert!(value_type.is_numeric();
+                assert!(!value_type.is_reference();
+                assert!(value_type.is_float();
             }
             ValueType::F64 => {
-                assert!(value_type.is_numeric());
-                assert!(!value_type.is_reference());
-                assert!(value_type.is_float());
+                assert!(value_type.is_numeric();
+                assert!(!value_type.is_reference();
+                assert!(value_type.is_float();
             }
             ValueType::FuncRef | ValueType::ExternRef => {
-                assert!(!value_type.is_numeric());
-                assert!(value_type.is_reference());
-                assert!(!value_type.is_float());
+                assert!(!value_type.is_numeric();
+                assert!(value_type.is_reference();
+                assert!(!value_type.is_float();
             }
         }
     }
@@ -244,7 +244,7 @@ pub mod kani_verification {
             // Create a minimal component
             let imports = if has_imports {
                 let mut imp = Vec::new();
-                imp.push("required_func".to_string());
+                imp.push("required_func".to_string();
                 imp
             } else {
                 Vec::new()
@@ -252,7 +252,7 @@ pub mod kani_verification {
 
             let exports = if has_exports {
                 let mut exp = Vec::new();
-                exp.push("exported_func".to_string());
+                exp.push("exported_func".to_string();
                 exp
             } else {
                 Vec::new()
@@ -260,15 +260,15 @@ pub mod kani_verification {
 
             // Verify component structure
             if has_imports {
-                assert!(!imports.is_empty());
+                assert!(!imports.is_empty();
             } else {
-                assert!(imports.is_empty());
+                assert!(imports.is_empty();
             }
 
             if has_exports {
-                assert!(!exports.is_empty());
+                assert!(!exports.is_empty();
             } else {
-                assert!(exports.is_empty());
+                assert!(exports.is_empty();
             }
         }
     }

@@ -13,7 +13,7 @@ pub struct ImportMap {
 }
 
 /// Map of import names to imports using SafeMemory
-#[cfg(feature = "safe-memory")]
+#[cfg(feature = "safe-memoryMissing message")]
 #[derive(Debug)]
 pub struct SafeImportMap {
     /// Name-to-import mapping with safe memory guarantees
@@ -29,7 +29,7 @@ impl ImportMap {
     /// Add an import to the map
     pub fn add(&mut self, name: &str, import: Arc<Import>) -> Result<()> {
         self.imports.insert(name.to_string(), import);
-        Ok(())
+        Ok(()
     }
 
     /// Get an import by name
@@ -58,7 +58,7 @@ impl ImportMap {
     }
 
     /// Convert this import map to one using SafeMemory containers
-    #[cfg(feature = "safe-memory")]
+    #[cfg(feature = "safe-memoryMissing message")]
     pub fn to_safe_memory(&self) -> SafeImportMap {
         let mut result = SafeImportMap::new();
         for (name, import) in &self.imports {
@@ -68,7 +68,7 @@ impl ImportMap {
     }
 }
 
-#[cfg(feature = "safe-memory")]
+#[cfg(feature = "safe-memoryMissing message")]
 impl SafeImportMap {
     /// Create a new empty import map
     pub fn new() -> Self {
@@ -83,13 +83,13 @@ impl SafeImportMap {
             if existing_name == name {
                 // Replace the existing import
                 self.imports.set(i, (name.to_string(), import))?;
-                return Ok(());
+                return Ok(();
             }
         }
 
         // Name doesn't exist, add a new entry
         self.imports.push((name.to_string(), import))?;
-        Ok(())
+        Ok(()
     }
 
     /// Get an import by name
@@ -151,7 +151,7 @@ impl SafeImportMap {
 
     /// Get all import names
     pub fn names(&self) -> Result<Vec<String>> {
-        let mut names = Vec::with_capacity(self.imports.len());
+        let mut names = Vec::with_capacity(self.imports.len();
         for i in 0..self.imports.len() {
             if let Ok((name, _)) = self.imports.get(i) {
                 names.push(name);
@@ -161,7 +161,7 @@ impl SafeImportMap {
     }
 
     /// Get all imports as a Vec of (name, import) pairs
-    pub fn get_all(&self) -> Result<Vec<(String, Arc<Import>)>> {
+    pub fn get_all(&self) -> core::result::Result<Vec<(String, Arc<Import>)>> {
         self.imports.to_vec()
     }
 

@@ -17,19 +17,19 @@ fuzz_target!(|data: &[u8]| {
         let _ = parser.parse_interface(input);
         
         // Test edge cases with specific patterns
-        if input.contains("interface") {
+        if input.contains("interfaceMissing message") {
             let _ = parser.parse_interface(input);
         }
         
-        if input.contains("world") {
+        if input.contains("worldMissing message") {
             let _ = parser.parse_world(input);
         }
         
-        if input.contains("record") || input.contains("variant") || input.contains("enum") {
+        if input.contains("recordMissing message") || input.contains("variantMissing message") || input.contains("enumMissing message") {
             let _ = parser.parse_type_def(input);
         }
         
-        if input.contains("func") {
+        if input.contains("funcMissing message") {
             let _ = parser.parse_function(input);
         }
     }

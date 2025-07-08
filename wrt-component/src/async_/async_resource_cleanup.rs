@@ -5,9 +5,9 @@
 //! It integrates with the post-return mechanism to ensure proper resource management.
 
 #[cfg(not(feature = "std"))]
-use core::{fmt, mem};
+use core::fmt;
 #[cfg(feature = "std")]
-use std::{fmt, mem};
+use std::fmt;
 
 #[cfg(feature = "std")]
 use std::{
@@ -21,12 +21,14 @@ use std::{
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
     prelude::*,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 use crate::async_::async_types::{StreamHandle, FutureHandle, ErrorContextHandle};
 use crate::types::{Value};
 // Note: ComponentInstanceId and TypeId may not exist - using placeholders
-pub type ComponentInstanceId = u32;
+pub use crate::types::ComponentInstanceId;
 pub type TypeId = u32;
 
 use wrt_error::{Error, ErrorCategory, Result};
@@ -44,7 +46,7 @@ pub struct AsyncResourceCleanupManager {
     #[cfg(feature = "std")]
     cleanup_entries: BTreeMap<ComponentInstanceId, Vec<AsyncCleanupEntry>>,
     #[cfg(not(any(feature = "std", )))]
-    cleanup_entries: BoundedVec<(ComponentInstanceId, BoundedVec<AsyncCleanupEntry, MAX_ASYNC_RESOURCES_PER_INSTANCE, NoStdProvider<65536>>), MAX_CLEANUP_ENTRIES>,
+    cleanup_entries: BoundedVec<(ComponentInstanceId, BoundedVec<AsyncCleanupEntry, MAX_ASYNC_RESOURCES_PER_INSTANCE>), MAX_CLEANUP_ENTRIES>,
     
     /// Global cleanup statistics
     stats: AsyncCleanupStats,
@@ -159,7 +161,7 @@ pub enum AsyncCleanupData {
         #[cfg(feature = "std")]
         cleanup_id: String,
         #[cfg(not(any(feature = "std", )))]
-        cleanup_id: BoundedString<64, NoStdProvider<65536>>,
+        cleanup_id: BoundedString<64>,
         data: u64, // Generic data field
     },
 }
@@ -209,15 +211,18 @@ pub enum CleanupResult {
 
 impl AsyncResourceCleanupManager {
     /// Create a new async resource cleanup manager
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self, Error> {
+        Ok(Self {
             #[cfg(feature = "std")]
             cleanup_entries: BTreeMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            cleanup_entries: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            cleanup_entries: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             stats: AsyncCleanupStats::default(),
             next_cleanup_id: 1,
-        }
+        })
     }
 
     /// Register a cleanup entry for an instance
@@ -256,7 +261,8 @@ impl AsyncResourceCleanupManager {
         
         #[cfg(not(any(feature = "std", )))]
         let entries = {
-            let mut found_entries = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+            let mut found_entries = BoundedVec::new(provider)?;
             let mut index_to_remove = None;
             
             for (i, (id, entries)) in self.cleanup_entries.iter().enumerate() {
@@ -318,7 +324,7 @@ impl AsyncResourceCleanupManager {
         }
         #[cfg(not(any(feature = "std", )))]
         {
-            Ok(results.into_vec())
+            Ok(results)
         }
     }
 
@@ -404,11 +410,7 @@ impl AsyncResourceCleanupManager {
             for (id, entries) in &mut self.cleanup_entries {
                 if *id == instance_id {
                     entries.push(entry).map_err(|_| {
-                        Error::new(
-                            ErrorCategory::Resource,
-                            wrt_error::codes::RESOURCE_EXHAUSTED,
-                            "Too many cleanup entries for instance"
-                        )
+                        Error::runtime_execution_error("Failed to add cleanup entry to instance")
                     })?;
                     found = true;
                     break;
@@ -416,21 +418,17 @@ impl AsyncResourceCleanupManager {
             }
             
             if !found {
-                let mut new_entries = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                let mut new_entries = BoundedVec::new(provider)?;
                 new_entries.push(entry).map_err(|_| {
                     Error::new(
                         ErrorCategory::Resource,
                         wrt_error::codes::RESOURCE_EXHAUSTED,
-                        "Failed to create cleanup entry"
-                    )
+                        "Failed to create bounded vector for cleanup entries")
                 })?;
                 
                 self.cleanup_entries.push((instance_id, new_entries)).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Resource,
-                        wrt_error::codes::RESOURCE_EXHAUSTED,
-                        "Too many cleanup instances"
-                    )
+                    Error::runtime_execution_error("Failed to add cleanup entry to manager")
                 })?;
             }
         }
@@ -444,8 +442,8 @@ impl AsyncResourceCleanupManager {
         Ok(())
     }
 
-    #[cfg(not(any(feature = "std", )))]
-    fn sort_entries_by_priority(&self, entries: &mut BoundedVec<AsyncCleanupEntry, MAX_ASYNC_RESOURCES_PER_INSTANCE, NoStdProvider<65536>>) {
+    #[cfg(not(any(feature = "std")))]
+    fn sort_entries_by_priority(&self, entries: &mut BoundedVec<AsyncCleanupEntry, MAX_ASYNC_RESOURCES_PER_INSTANCE>) {
         // Simple bubble sort for no_std
         for i in 0..entries.len() {
             for j in 0..(entries.len() - 1 - i) {
@@ -538,7 +536,7 @@ impl AsyncResourceCleanupManager {
 
 impl Default for AsyncResourceCleanupManager {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create AsyncResourceCleanupManager with default settings")
     }
 }
 
@@ -575,13 +573,13 @@ mod tests {
 
     #[test]
     fn test_cleanup_manager_creation() {
-        let manager = AsyncResourceCleanupManager::new();
+        let manager = AsyncResourceCleanupManager::new().unwrap();
         assert_eq!(manager.get_stats().total_created, 0);
     }
 
     #[test]
     fn test_register_stream_cleanup() {
-        let mut manager = AsyncResourceCleanupManager::new();
+        let mut manager = AsyncResourceCleanupManager::new().unwrap();
         let instance_id = ComponentInstanceId(1);
         let handle = StreamHandle(42);
         
@@ -605,7 +603,7 @@ mod tests {
 
     #[test]
     fn test_execute_cleanups() {
-        let mut manager = AsyncResourceCleanupManager::new();
+        let mut manager = AsyncResourceCleanupManager::new().unwrap();
         let instance_id = ComponentInstanceId(1);
         
         // Register multiple cleanups
@@ -651,7 +649,7 @@ mod tests {
 
     #[test]
     fn test_cleanup_priority_ordering() {
-        let mut manager = AsyncResourceCleanupManager::new();
+        let mut manager = AsyncResourceCleanupManager::new().unwrap();
         let instance_id = ComponentInstanceId(1);
         
         // Register cleanups with different priorities
@@ -689,7 +687,7 @@ mod tests {
 
     #[test]
     fn test_clear_instance() {
-        let mut manager = AsyncResourceCleanupManager::new();
+        let mut manager = AsyncResourceCleanupManager::new().unwrap();
         let instance_id = ComponentInstanceId(1);
         
         manager.register_cleanup(
@@ -722,7 +720,7 @@ mod tests {
 
     #[test]
     fn test_stats_tracking() {
-        let mut manager = AsyncResourceCleanupManager::new();
+        let mut manager = AsyncResourceCleanupManager::new().unwrap();
         let instance_id = ComponentInstanceId(1);
         
         // Register different types of cleanups

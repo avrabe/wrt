@@ -13,6 +13,8 @@ use wrt_foundation::{
     bounded_collections::{BoundedHashMap, BoundedVec},
     component_value::ComponentValue,
     safe_memory::SafeMemory,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 // Enable vec! and format! macros for no_std
@@ -25,7 +27,7 @@ use alloc::{vec, format};
 use std::{string::String, vec::Vec};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedString as String, BoundedVec as Vec, safe_memory::NoStdProvider};
+use wrt_foundation::{BoundedString as String, BoundedVec as Vec};
 
 const MAX_HANDLE_REPRESENTATIONS: usize = 1024;
 const MAX_HANDLE_OPERATIONS: usize = 512;
@@ -60,7 +62,56 @@ impl fmt::Display for HandleRepresentationError {
 #[cfg(feature = "std")]
 impl std::error::Error for HandleRepresentationError {}
 
-pub type HandleRepresentationResult<T> = Result<T, HandleRepresentationError>;
+// Conversion to wrt_error::Error for unified error handling
+impl From<HandleRepresentationError> for wrt_error::Error {
+    fn from(err: HandleRepresentationError) -> Self {
+        use wrt_error::{ErrorCategory, codes};
+        match err.kind {
+            HandleRepresentationErrorKind::InvalidHandle => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_HANDLE_REPRESENTATION_ERROR,
+                "Invalid resource handle",
+            ),
+            HandleRepresentationErrorKind::TypeMismatch => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_ABI_RUNTIME_ERROR,
+                "Handle type mismatch",
+            ),
+            HandleRepresentationErrorKind::AccessDenied => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_CAPABILITY_DENIED,
+                "Handle access denied",
+            ),
+            HandleRepresentationErrorKind::HandleNotFound => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_HANDLE_REPRESENTATION_ERROR,
+                "Resource handle not found",
+            ),
+            HandleRepresentationErrorKind::OperationNotSupported => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_ABI_RUNTIME_ERROR,
+                "Handle operation not supported",
+            ),
+            HandleRepresentationErrorKind::ResourceExhausted => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_RESOURCE_LIFECYCLE_ERROR,
+                "Handle resource exhausted",
+            ),
+            HandleRepresentationErrorKind::ValidationFailed => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_CONFIGURATION_INVALID,
+                "Handle validation failed",
+            ),
+            HandleRepresentationErrorKind::CapabilityRequired => Self::new(
+                ErrorCategory::ComponentRuntime,
+                codes::COMPONENT_CAPABILITY_DENIED,
+                "Handle operation requires capability",
+            ),
+        }
+    }
+}
+
+pub type HandleRepresentationResult<T> = wrt_error::Result<T>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HandleRepresentation {
@@ -113,15 +164,15 @@ pub struct HandleMetadata {
     pub last_accessed: u64,
     pub access_count: u32,
     pub creator_component: ComponentInstanceId,
-    pub tags: BoundedVec<String, 16, NoStdProvider<65536>>,
+    pub tags: BoundedVec<String, 16>,
     pub custom_data: BoundedHashMap<String, ComponentValue, 32>,
 }
 
 #[derive(Debug, Clone)]
 pub enum HandleOperation {
-    Read { fields: BoundedVec<String, 16, NoStdProvider<65536>> },
+    Read { fields: BoundedVec<String, 16> },
     Write { fields: BoundedVec<(String, ComponentValue), 16> },
-    Call { method: String, args: BoundedVec<ComponentValue, 16, NoStdProvider<65536>> },
+    Call { method: String, args: BoundedVec<ComponentValue, 16> },
     Drop,
     Share { target_component: ComponentInstanceId },
     Borrow { mutable: bool },
@@ -132,7 +183,7 @@ pub enum HandleOperation {
 pub struct HandleAccessPolicy {
     pub component_id: ComponentInstanceId,
     pub resource_type: TypeId,
-    pub allowed_operations: BoundedVec<HandleOperation, 32, NoStdProvider<65536>>,
+    pub allowed_operations: BoundedVec<HandleOperation, 32>,
     pub required_capability: Option<Capability>,
     pub expiry: Option<u64>,
 }
@@ -141,7 +192,7 @@ pub struct HandleRepresentationManager {
     representations:
         BoundedHashMap<ResourceHandle, HandleRepresentation, MAX_HANDLE_REPRESENTATIONS>,
     metadata: BoundedHashMap<ResourceHandle, HandleMetadata, MAX_HANDLE_METADATA>,
-    access_policies: BoundedVec<HandleAccessPolicy, MAX_ACCESS_POLICIES, NoStdProvider<65536>>,
+    access_policies: BoundedVec<HandleAccessPolicy, MAX_ACCESS_POLICIES>,
     type_registry: GenerativeTypeRegistry,
     bounds_checker: TypeBoundsChecker,
     virt_manager: Option<VirtualizationManager>,
@@ -150,17 +201,20 @@ pub struct HandleRepresentationManager {
 }
 
 impl HandleRepresentationManager {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> HandleRepresentationResult<Self> {
+        Ok(Self {
             representations: BoundedHashMap::new(),
             metadata: BoundedHashMap::new(),
-            access_policies: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            access_policies: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             type_registry: GenerativeTypeRegistry::new(),
             bounds_checker: TypeBoundsChecker::new(),
             virt_manager: None,
             next_handle_id: AtomicU32::new(1),
             strict_type_checking: AtomicBool::new(true),
-        }
+        })
     }
 
     pub fn with_virtualization(mut self, virt_manager: VirtualizationManager) -> Self {
@@ -204,7 +258,10 @@ impl HandleRepresentationManager {
             last_accessed: self.get_current_time(),
             access_count: 0,
             creator_component: component_id,
-            tags: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            tags: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             custom_data: BoundedHashMap::new(),
         };
 
@@ -382,7 +439,7 @@ impl HandleRepresentationManager {
             }
         }
 
-        Ok(())
+        Ok(()
     }
 
     pub fn get_handle_metadata(&self, handle: ResourceHandle) -> Option<&HandleMetadata> {
@@ -404,7 +461,7 @@ impl HandleRepresentationManager {
         })?;
 
         updater(metadata);
-        Ok(())
+        Ok(()
     }
 
     pub fn validate_handle_type(
@@ -431,7 +488,7 @@ impl HandleRepresentationManager {
             }
         }
 
-        Ok(())
+        Ok(()
     }
 
     fn verify_access(
@@ -511,7 +568,7 @@ impl HandleRepresentationManager {
             self.check_virtualization_capabilities(component_id, operation, virt_manager)?;
         }
 
-        Ok(())
+        Ok(()
     }
 
     fn has_shared_access(&self, component_id: ComponentInstanceId, handle: ResourceHandle) -> bool {
@@ -564,7 +621,7 @@ impl HandleRepresentationManager {
             }
         }
 
-        Ok(())
+        Ok(()
     }
 
     fn check_virtualization_capabilities(
@@ -578,7 +635,7 @@ impl HandleRepresentationManager {
             HandleOperation::Call { .. } => {
                 // May require specific capability for external calls
                 // This is a simplified check - real implementation would be more sophisticated
-                Ok(())
+                Ok(()
             }
             _ => Ok(()),
         }
@@ -590,7 +647,7 @@ impl HandleRepresentationManager {
         fields: &[String],
     ) -> HandleRepresentationResult<Option<ComponentValue>> {
         // This is a placeholder - actual implementation would read from the resource
-        Ok(Some(ComponentValue::I32(42)))
+        Ok(Some(ComponentValue::I32(42))
     }
 
     fn handle_write_operation(
@@ -609,7 +666,7 @@ impl HandleRepresentationManager {
         args: &[ComponentValue],
     ) -> HandleRepresentationResult<Option<ComponentValue>> {
         // This is a placeholder - actual implementation would call the method
-        Ok(Some(ComponentValue::String("Component operation error".to_string())))
+        Ok(Some(ComponentValue::String("Component operation error".to_string()))
     }
 
     fn handle_drop_operation(
@@ -630,7 +687,7 @@ impl HandleRepresentationManager {
         let new_handle =
             self.share_handle(component_id, target_component, handle, AccessRights::read_only())?;
 
-        Ok(Some(ComponentValue::U32(new_handle.id())))
+        Ok(Some(ComponentValue::U32(new_handle.id()))
     }
 
     fn handle_borrow_operation(
@@ -640,7 +697,7 @@ impl HandleRepresentationManager {
         mutable: bool,
     ) -> HandleRepresentationResult<Option<ComponentValue>> {
         // This is a placeholder - actual implementation would create a borrowed reference
-        Ok(Some(ComponentValue::Bool(true)))
+        Ok(Some(ComponentValue::Bool(true))
     }
 
     fn handle_return_operation(
@@ -668,7 +725,7 @@ impl HandleRepresentationManager {
 
 impl Default for HandleRepresentationManager {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create default HandleRepresentationManagerMissing message")
     }
 }
 
@@ -722,8 +779,8 @@ mod tests {
 
     #[test]
     fn test_handle_representation_manager_creation() {
-        let manager = HandleRepresentationManager::new();
-        assert!(manager.strict_type_checking.load(Ordering::Acquire));
+        let manager = HandleRepresentationManager::new().unwrap();
+        assert!(manager.strict_type_checking.load(Ordering::Acquire);
     }
 
     #[test]
@@ -747,14 +804,14 @@ mod tests {
 
     #[test]
     fn test_handle_creation() {
-        let mut manager = HandleRepresentationManager::new();
+        let mut manager = HandleRepresentationManager::new().unwrap();
         let component_id = ComponentInstanceId::new(1);
 
         let resource_type =
-            manager.type_registry.create_resource_type(component_id, "test-resource").unwrap();
+            manager.type_registry.create_resource_type(component_id, "test-resourceMissing message").unwrap();
 
         let handle = manager
-            .create_handle(component_id, resource_type, AccessRights::full_access())
+            .create_handle(component_id, resource_type, AccessRights::full_access()
             .unwrap();
 
         assert!(handle.id() > 0);

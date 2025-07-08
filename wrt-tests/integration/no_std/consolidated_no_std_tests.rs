@@ -3,7 +3,6 @@
 //! This module consolidates all the no_std_compatibility_test.rs files from across all crates
 //! into a single comprehensive test suite. Each crate's no_std functionality is thoroughly tested.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // External crate imports for no_std environment
 extern crate alloc;
@@ -26,11 +25,7 @@ mod tests {
 
         #[test]
         fn test_error_creation() {
-            let error = Error::new(
-                ErrorCategory::Core, 
-                codes::INVALID_MEMORY_ACCESS, 
-                "Invalid memory access"
-            );
+            let error = Error::core_invalid_memory_access("Invalid memory access");
 
             assert_eq!(error.category, ErrorCategory::Core);
             assert_eq!(error.code, codes::INVALID_MEMORY_ACCESS);
@@ -42,11 +37,7 @@ mod tests {
             assert!(ok_result.is_ok());
             assert_eq!(ok_result.unwrap(), 42);
 
-            let error = Error::new(
-                ErrorCategory::Core, 
-                codes::INVALID_MEMORY_ACCESS, 
-                "Invalid memory access"
-            );
+            let error = Error::core_invalid_memory_access("Invalid memory access");
             let err_result: Result<i32> = Err(error);
             assert!(err_result.is_err());
 
@@ -289,7 +280,8 @@ mod tests {
         use super::*;
         use wrt_platform::{PageAllocator, FutexLike, WASM_PAGE_SIZE};
         use wrt_platform::sync::{SpinFutex, SpinFutexBuilder};
-        use wrt_platform::memory::{NoStdProvider, NoStdProviderBuilder, VerificationLevel};
+        use wrt_platform::memory::{NoStdProvider, VerificationLevel};
+        use wrt_foundation::{WrtProviderFactory, budget_aware_provider::CrateId};
         use core::time::Duration;
 
         #[test]
@@ -313,10 +305,7 @@ mod tests {
 
         #[test]
         fn test_nostd_memory_provider() {
-            let provider = NoStdProviderBuilder::new()
-                .with_size(2048)
-                .with_verification_level(VerificationLevel::Standard)
-                .build();
+            let provider = safe_managed_alloc!(2048, CrateId::Platform).expect("Failed to create provider");
 
             assert_eq!(provider.verification_level(), VerificationLevel::Standard);
             assert!(provider.capacity() <= 4096); // Capped at 4096 in stub implementation
@@ -554,10 +543,7 @@ mod tests {
             use wrt_foundation::ValueType;
 
             // Test that we can use error handling with foundation types
-            let error = Error::new(
-                ErrorCategory::Validation,
-                1,
-                "Invalid value type",
+            let error = Error::runtime_execution_error(",
             );
 
             let _value_type = ValueType::I32;
@@ -590,7 +576,7 @@ mod tests {
 // ===========================================
 
 // Panic handler disabled to avoid conflicts with workspace builds
-// #[cfg(all(not(feature = "std"), not(test)))]
+// #[cfg(all(not(feature = "), not(test)))]
 // #[panic_handler]
 // fn panic(_info: &core::panic::PanicInfo) -> ! {
 //     loop {}

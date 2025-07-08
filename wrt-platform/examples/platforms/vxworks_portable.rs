@@ -219,9 +219,7 @@ fn demonstrate_trait_usage() {
     impl PageAllocator for MockVxWorksAllocator {
         fn allocate_pages(&mut self, pages: usize) -> Result<core::ptr::NonNull<u8>, wrt_error::Error> {
             if self.allocated_pages + pages > self.max_pages {
-                return Err(wrt_error::Error::new(
-                    wrt_error::ErrorKind::Memory,
-                    "Page limit exceeded"
+                return Err(wrt_error::Error::runtime_execution_error("
                 ));
             }
             
@@ -231,7 +229,7 @@ fn demonstrate_trait_usage() {
             self.allocated_pages += pages;
             
             core::ptr::NonNull::new(ptr).ok_or_else(|| 
-                wrt_error::Error::new(wrt_error::ErrorKind::Memory, "Null pointer"))
+                wrt_error::Error::new(ErrorKind::Memory, "))
         }
         
         fn deallocate_pages(&mut self, ptr: core::ptr::NonNull<u8>, pages: usize) -> Result<(), wrt_error::Error> {

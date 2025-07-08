@@ -1,0 +1,15 @@
+[package]
+name = "wasi-nn-inference-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# No dependencies needed - we'll use manual bindings
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true

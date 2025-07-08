@@ -123,14 +123,14 @@ impl PureExecutionContext for ExecutionContext {
         #[cfg(feature = "safety")]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::core_stack_underflow("Stack underflow")
             })
         }
 
         #[cfg(not(feature = "safety"))]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::core_stack_underflow("Stack underflow")
             })
         }
     }
@@ -138,11 +138,7 @@ impl PureExecutionContext for ExecutionContext {
     fn pop_value_expected(&mut self, expected_type: ValueType) -> Result<Value> {
         let value = PureExecutionContext::pop_value(self)?;
         if value.value_type() != expected_type {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                codes::TYPE_MISMATCH,
-                "Type mismatch: unexpected value type",
-            ));
+            return Err(Error::type_error("Type mismatch: unexpected value type"));
         }
         Ok(value)
     }
@@ -228,14 +224,14 @@ impl PureExecutionContext for TestExecutionContext {
         #[cfg(feature = "safety")]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::core_stack_underflow("Stack underflow")
             })
         }
 
         #[cfg(not(feature = "safety"))]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::core_stack_underflow("Stack underflow")
             })
         }
     }
@@ -243,11 +239,7 @@ impl PureExecutionContext for TestExecutionContext {
     fn pop_value_expected(&mut self, expected_type: ValueType) -> Result<Value> {
         let value = PureExecutionContext::pop_value(self)?;
         if value.value_type() != expected_type {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                codes::TYPE_MISMATCH,
-                "Type mismatch: unexpected value type",
-            ));
+            return Err(Error::type_error("Type mismatch: unexpected value type"));
         }
         Ok(value)
     }

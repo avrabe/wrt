@@ -14,6 +14,9 @@ use std::{boxed::Box, collections::BTreeMap, vec::Vec};
 
 use wrt_foundation::{
     bounded::BoundedVec, component_value::ComponentValue, prelude::*, resource::ResourceHandle,
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 use crate::{
@@ -44,13 +47,13 @@ pub struct TaskManager {
     /// All tasks in the system
     #[cfg(feature = "std")]
     tasks: BTreeMap<TaskId, Task>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     tasks: BoundedVec<(TaskId, Task), MAX_TASKS, NoStdProvider<65536>>,
 
     /// Ready queue for runnable tasks
     #[cfg(feature = "std")]
     ready_queue: Vec<TaskId>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     ready_queue: BoundedVec<TaskId, MAX_TASKS, NoStdProvider<65536>>,
 
     /// Currently executing task
@@ -80,12 +83,12 @@ pub struct Task {
     /// Subtasks spawned by this task
     #[cfg(feature = "std")]
     pub subtasks: Vec<TaskId>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub subtasks: BoundedVec<TaskId, MAX_SUBTASKS, NoStdProvider<65536>>,
     /// Borrowed resource handles
     #[cfg(feature = "std")]
     pub borrowed_handles: Vec<ResourceHandle>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub borrowed_handles: BoundedVec<ResourceHandle, 64, NoStdProvider<65536>>,
     /// Task-local storage
     pub context: TaskContext,
@@ -94,7 +97,7 @@ pub struct Task {
     /// Return values (when completed)
     #[cfg(feature = "std")]
     pub return_values: Option<Vec<Value>>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub return_values: Option<BoundedVec<Value, 16, NoStdProvider<65536>>>,
     /// Error context (if failed)
     pub error_context: Option<ErrorContextHandle>,
@@ -142,12 +145,12 @@ pub struct TaskContext {
     /// Call stack for this task
     #[cfg(feature = "std")]
     pub call_stack: Vec<CallFrame>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub call_stack: BoundedVec<CallFrame, MAX_TASK_CALL_DEPTH, NoStdProvider<65536>>,
     /// Task-local storage
     #[cfg(feature = "std")]
     pub storage: BTreeMap<String, ComponentValue>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub storage: BoundedVec<(BoundedString<64, NoStdProvider<65536>>, ComponentValue), 32, NoStdProvider<65536>>,
     /// Task creation time (simplified)
     pub created_at: u64,
@@ -165,7 +168,7 @@ pub struct CallFrame {
     /// Local variables
     #[cfg(feature = "std")]
     pub locals: Vec<Value>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub locals: BoundedVec<Value, 32, NoStdProvider<65536>>,
     /// Return address
     pub return_address: Option<u32>,
@@ -188,21 +191,31 @@ pub enum TaskResult {
 
 impl TaskManager {
     /// Create a new task manager
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> WrtResult<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             tasks: BTreeMap::new(),
-            #[cfg(not(any(feature = "std", )))]
-            tasks: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            tasks: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    wrt_error::Error::runtime_execution_error("Error occurred"Failed to create task storageMissing message")
+                })?
+            },
             #[cfg(feature = "std")]
             ready_queue: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            ready_queue: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            ready_queue: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    wrt_error::Error::runtime_execution_error("Error occurred"Failed to create ready queueMissing message")
+                })?
+            },
             current_task: None,
             next_task_id: 0,
             resource_manager: ResourceLifecycleManager::new(),
             max_concurrent_tasks: MAX_TASKS,
-        }
+        })
     }
 
     /// Set maximum concurrent tasks
@@ -219,9 +232,8 @@ impl TaskManager {
     ) -> WrtResult<TaskId> {
         // Check task limit
         if self.tasks.len() >= self.max_concurrent_tasks {
-            return Err(wrt_foundation::WrtError::ResourceExhausted(
-                "Maximum concurrent tasks reached".into(),
-            ));
+            return Err(wrt_error::Error::runtime_execution_error("Error occurred"
+            );
         }
 
         let task_id = TaskId(self.next_task_id);
@@ -234,23 +246,43 @@ impl TaskManager {
             parent: self.current_task,
             #[cfg(feature = "std")]
             subtasks: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            subtasks: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            subtasks: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    wrt_error::Error::runtime_execution_error("Error occurred"Failed to create subtasks storageMissing message")
+                })?
+            },
             #[cfg(feature = "std")]
             borrowed_handles: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            borrowed_handles: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            borrowed_handles: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    wrt_error::Error::runtime_execution_error("Error occurred"Failed to create borrowed handles storageMissing message")
+                })?
+            },
             context: TaskContext {
                 component_instance,
                 function_index,
                 #[cfg(feature = "std")]
                 call_stack: Vec::new(),
-                #[cfg(not(any(feature = "std", )))]
-                call_stack: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                #[cfg(not(feature = "std"))]
+                call_stack: {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider).map_err(|_| {
+                        wrt_error::Error::runtime_execution_error("Error occurred"Failed to create call stack storageMissing message")
+                    })?
+                },
                 #[cfg(feature = "std")]
                 storage: BTreeMap::new(),
-                #[cfg(not(any(feature = "std", )))]
-                storage: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                #[cfg(not(feature = "std"))]
+                storage: {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider).map_err(|_| {
+                        wrt_error::Error::runtime_execution_error("Error occurred"Failed to create task storageMissing message")
+                    })?
+                },
                 created_at: self.get_current_time(),
                 deadline: None,
             },
@@ -266,7 +298,7 @@ impl TaskManager {
                 {
                     parent_task.subtasks.push(task_id);
                 }
-                #[cfg(not(any(feature = "std", )))]
+                #[cfg(not(feature = "std"))]
                 {
                     let _ = parent_task.subtasks.push(task_id);
                 }
@@ -278,10 +310,11 @@ impl TaskManager {
         {
             self.tasks.insert(task_id, task);
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             self.tasks.push((task_id, task)).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Task storage full".into())
+                wrt_error::Error::runtime_execution_error("Error occurred"
+                )
             })?;
         }
 
@@ -297,7 +330,7 @@ impl TaskManager {
         {
             self.tasks.get(&task_id)
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             self.tasks.iter().find(|(id, _)| *id == task_id).map(|(_, task)| task)
         }
@@ -309,7 +342,7 @@ impl TaskManager {
         {
             self.tasks.get_mut(&task_id)
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             self.tasks.iter_mut().find(|(id, _)| *id == task_id).map(|(_, task)| task)
         }
@@ -325,15 +358,16 @@ impl TaskManager {
                 {
                     self.ready_queue.push(task_id);
                 }
-                #[cfg(not(any(feature = "std", )))]
+                #[cfg(not(feature = "std"))]
                 {
                     self.ready_queue.push(task_id).map_err(|_| {
-                        wrt_foundation::WrtError::ResourceExhausted("Ready queue full".into())
+                        wrt_error::Error::runtime_execution_error("Error occurred"
+                        )
                     })?;
                 }
             }
         }
-        Ok(())
+        Ok(()
     }
 
     /// Get next ready task
@@ -343,10 +377,10 @@ impl TaskManager {
             if self.ready_queue.is_empty() {
                 None
             } else {
-                Some(self.ready_queue.remove(0))
+                Some(self.ready_queue.remove(0)
             }
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             if self.ready_queue.is_empty() {
                 None
@@ -368,12 +402,15 @@ impl TaskManager {
             if task.state == TaskState::Ready {
                 task.state = TaskState::Running;
                 self.current_task = Some(task_id);
-                Ok(())
+                Ok(()
             } else {
-                Err(wrt_foundation::WrtError::InvalidState("Task is not ready to run".into()))
+                Err(wrt_error::Error::runtime_execution_error("Error occurred"
+                )
             }
         } else {
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_error::Error::new(wrt_error::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Error message neededMissing messageMissing messageMissing message")
         }
     }
 
@@ -386,14 +423,15 @@ impl TaskManager {
                 {
                     task.return_values = Some(values);
                 }
-                #[cfg(not(any(feature = "std", )))]
+                #[cfg(not(feature = "std"))]
                 {
-                    let mut bounded_values = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    let mut bounded_values = BoundedVec::new(provider).map_err(|_| {
+                        wrt_error::Error::runtime_execution_error("Error occurred"Failed to create return values storageMissing message")
+                    })?;
                     for value in values {
                         bounded_values.push(value).map_err(|_| {
-                            wrt_foundation::WrtError::ResourceExhausted(
-                                "Too many return values".into(),
-                            )
+                            wrt_error::Error::runtime_execution_error("Error occurred"Failed to store return valueMissing message")
                         })?;
                     }
                     task.return_values = Some(bounded_values);
@@ -403,12 +441,15 @@ impl TaskManager {
                 self.cleanup_task_resources(task_id)?;
 
                 self.current_task = task.parent;
-                Ok(())
+                Ok(()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_error::Error::new(wrt_error::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Error message neededMissing messageMissing messageMissing message")
             }
         } else {
-            Err(wrt_foundation::WrtError::InvalidState("No current task".into()))
+            Err(wrt_error::Error::runtime_execution_error("Error occurred"
+            )
         }
     }
 
@@ -427,18 +468,17 @@ impl TaskManager {
                 self.current_task = task.parent;
 
                 // Return special value indicating we're waiting
-                Ok(u32::MAX) // Convention: MAX means "blocking"
-            } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Ok(u32::MAX) // Convention: MAX means Missing messageMissing messageMissing message")
             }
         } else {
-            Err(wrt_foundation::WrtError::InvalidState("No current task".into()))
+            Err(wrt_error::Error::runtime_execution_error("Error occurred"
+            )
         }
     }
 
     /// Poll waitables without blocking
     pub fn task_poll(&self, waitables: &WaitableSet) -> WrtResult<Option<u32>> {
-        Ok(waitables.first_ready())
+        Ok(waitables.first_ready()
     }
 
     /// Yield current task voluntarily
@@ -452,18 +492,21 @@ impl TaskManager {
                 {
                     self.ready_queue.push(task_id);
                 }
-                #[cfg(not(any(feature = "std", )))]
+                #[cfg(not(feature = "std"))]
                 {
                     let _ = self.ready_queue.push(task_id);
                 }
 
                 self.current_task = task.parent;
-                Ok(())
+                Ok(()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_error::Error::runtime_execution_error("Error occurred"
+                )
             }
         } else {
-            Err(wrt_foundation::WrtError::InvalidState("No current task".into()))
+            Err(wrt_error::Error::new(wrt_error::ErrorCategory::Validation,
+                wrt_error::errors::codes::INVALID_INPUT,
+                "Error message neededMissing messageMissing messageMissing message")
         }
     }
 
@@ -488,7 +531,7 @@ impl TaskManager {
                 }
             }
         }
-        Ok(())
+        Ok(()
     }
 
     /// Handle backpressure for a task
@@ -514,7 +557,7 @@ impl TaskManager {
                 }
             }
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             for (task_id, task) in &mut self.tasks {
                 if task.state == TaskState::Waiting {
@@ -532,7 +575,7 @@ impl TaskManager {
             self.make_ready(task_id)?;
         }
 
-        Ok(())
+        Ok(()
     }
 
     /// Clean up resources owned by a task
@@ -544,7 +587,7 @@ impl TaskManager {
                 let _ = self.resource_manager.drop_resource(*handle);
             }
         }
-        Ok(())
+        Ok(()
     }
 
     /// Get current time (simplified)
@@ -574,11 +617,7 @@ impl TaskManager {
     }
 }
 
-impl Default for TaskManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// Default implementation removed - use TaskManager::new() which returns Result
 
 impl fmt::Display for TaskState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -611,28 +650,28 @@ mod tests {
 
     #[test]
     fn test_task_manager_creation() {
-        let manager = TaskManager::new();
+        let manager = TaskManager::new().unwrap();
         assert_eq!(manager.task_count(), 0);
         assert_eq!(manager.ready_task_count(), 0);
-        assert!(!manager.has_ready_tasks());
+        assert!(!manager.has_ready_tasks();
         assert_eq!(manager.current_task_id(), None);
     }
 
     #[test]
     fn test_spawn_task() {
-        let mut manager = TaskManager::new();
+        let mut manager = TaskManager::new().unwrap();
 
         let task_id = manager.spawn_task(TaskType::ComponentFunction, 1, Some(0)).unwrap();
 
-        assert_eq!(task_id, TaskId(0));
+        assert_eq!(task_id, TaskId(0);
         assert_eq!(manager.task_count(), 1);
         assert_eq!(manager.ready_task_count(), 1);
-        assert!(manager.has_ready_tasks());
+        assert!(manager.has_ready_tasks();
     }
 
     #[test]
     fn test_task_execution_cycle() {
-        let mut manager = TaskManager::new();
+        let mut manager = TaskManager::new().unwrap();
 
         // Spawn task
         let task_id = manager.spawn_task(TaskType::ComponentFunction, 1, Some(0)).unwrap();
@@ -644,7 +683,7 @@ mod tests {
 
         // Switch to task
         manager.switch_to_task(task_id).unwrap();
-        assert_eq!(manager.current_task_id(), Some(task_id));
+        assert_eq!(manager.current_task_id(), Some(task_id);
 
         let task = manager.get_task(task_id).unwrap();
         assert_eq!(task.state, TaskState::Running);
@@ -652,7 +691,7 @@ mod tests {
 
     #[test]
     fn test_task_return() {
-        let mut manager = TaskManager::new();
+        let mut manager = TaskManager::new().unwrap();
 
         let task_id = manager.spawn_task(TaskType::ComponentFunction, 1, Some(0)).unwrap();
 
@@ -664,12 +703,12 @@ mod tests {
 
         let task = manager.get_task(task_id).unwrap();
         assert_eq!(task.state, TaskState::Completed);
-        assert!(task.return_values.is_some());
+        assert!(task.return_values.is_some();
     }
 
     #[test]
     fn test_task_yield() {
-        let mut manager = TaskManager::new();
+        let mut manager = TaskManager::new().unwrap();
 
         let task_id = manager.spawn_task(TaskType::ComponentFunction, 1, Some(0)).unwrap();
 
@@ -683,7 +722,7 @@ mod tests {
 
     #[test]
     fn test_task_cancel() {
-        let mut manager = TaskManager::new();
+        let mut manager = TaskManager::new().unwrap();
 
         let task_id = manager.spawn_task(TaskType::ComponentFunction, 1, Some(0)).unwrap();
 
@@ -695,7 +734,7 @@ mod tests {
 
     #[test]
     fn test_subtask_tracking() {
-        let mut manager = TaskManager::new();
+        let mut manager = TaskManager::new().unwrap();
 
         // Spawn parent task
         let parent_id = manager.spawn_task(TaskType::ComponentFunction, 1, Some(0)).unwrap();
@@ -706,23 +745,23 @@ mod tests {
         let child_id = manager.spawn_task(TaskType::AsyncOperation, 1, Some(1)).unwrap();
 
         let parent = manager.get_task(parent_id).unwrap();
-        assert!(parent.subtasks.contains(&child_id));
+        assert!(parent.subtasks.contains(&child_id);
 
         let child = manager.get_task(child_id).unwrap();
-        assert_eq!(child.parent, Some(parent_id));
+        assert_eq!(child.parent, Some(parent_id);
     }
 
     #[test]
     fn test_task_state_display() {
-        assert_eq!(TaskState::Starting.to_string(), "starting");
-        assert_eq!(TaskState::Running.to_string(), "running");
-        assert_eq!(TaskState::Completed.to_string(), "completed");
+        assert_eq!(TaskState::Starting.to_string(), "startingMissing message");
+        assert_eq!(TaskState::Running.to_string(), "runningMissing message");
+        assert_eq!(TaskState::Completed.to_string(), "completedMissing message");
     }
 
     #[test]
     fn test_task_type_display() {
-        assert_eq!(TaskType::ComponentFunction.to_string(), "component-function");
-        assert_eq!(TaskType::AsyncOperation.to_string(), "async-operation");
-        assert_eq!(TaskType::Background.to_string(), "background");
+        assert_eq!(TaskType::ComponentFunction.to_string(), "component-functionMissing message");
+        assert_eq!(TaskType::AsyncOperation.to_string(), "async-operationMissing message");
+        assert_eq!(TaskType::Background.to_string(), "backgroundMissing message");
     }
 }

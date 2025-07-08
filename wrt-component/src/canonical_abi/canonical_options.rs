@@ -5,7 +5,9 @@
 //! post-return functions, and memory management.
 
 #[cfg(not(feature = "std"))]
-use std::sync::{Arc, RwLock};
+use alloc::sync::Arc;
+#[cfg(not(feature = "std"))]
+use wrt_sync::RwLock;
 #[cfg(feature = "std")]
 use std::sync::{Arc, RwLock};
 
@@ -15,7 +17,6 @@ use wrt_foundation::prelude::*;
 use crate::{
     canonical_abi::canonical_realloc::{ReallocManager, StringEncoding, ComponentInstanceId},
     memory_layout::MemoryLayout,
-    prelude::*,
 };
 
 // Type alias for compatibility
@@ -36,6 +37,8 @@ pub struct CanonicalOptions {
     pub instance_id: ComponentInstanceId,
     /// Binary std/no_std choice
     pub realloc_manager: Option<Arc<RwLock<ReallocManager>>>,
+    /// Memory.grow function index (MVP spec addition)
+    pub memory_grow: Option<u32>,
 }
 
 /// Canonical lift context with full memory management
@@ -79,6 +82,7 @@ impl CanonicalOptions {
             string_encoding: StringEncoding::Utf8,
             instance_id,
             realloc_manager: None,
+            memory_grow: None,
         }
     }
 
@@ -107,6 +111,12 @@ impl CanonicalOptions {
         self
     }
 
+    /// Set memory.grow function (MVP spec addition)
+    pub fn with_memory_grow(mut self, func_index: u32) -> Self {
+        self.memory_grow = Some(func_index);
+        self
+    }
+
     /// Binary std/no_std choice
     pub fn has_realloc(&self) -> bool {
         self.realloc.is_some() && self.realloc_manager.is_some()
@@ -115,6 +125,11 @@ impl CanonicalOptions {
     /// Check if post-return is available
     pub fn has_post_return(&self) -> bool {
         self.post_return.is_some()
+    }
+
+    /// Check if memory.grow is available (MVP spec addition)
+    pub fn has_memory_grow(&self) -> bool {
+        self.memory_grow.is_some()
     }
 }
 
@@ -125,7 +140,7 @@ impl<'a> CanonicalLiftContext<'a> {
     }
 
     /// Binary std/no_std choice
-    pub fn allocate(&mut self, size: usize, align: usize) -> Result<i32, ComponentError> {
+    pub fn allocate(&mut self, size: usize, align: usize) -> core::result::Result<i32, ComponentError> {
         if size == 0 {
             return Ok(0);
         }
@@ -147,7 +162,7 @@ impl<'a> CanonicalLiftContext<'a> {
     }
 
     /// Read bytes from memory
-    pub fn read_bytes(&self, ptr: i32, len: usize) -> Result<Vec<u8>, ComponentError> {
+    pub fn read_bytes(&self, ptr: i32, len: usize) -> core::result::Result<Vec<u8>, ComponentError> {
         if ptr < 0 {
             return Err(ComponentError::TypeMismatch);
         }
@@ -159,7 +174,7 @@ impl<'a> CanonicalLiftContext<'a> {
     }
 
     /// Read a string from memory with the configured encoding
-    pub fn read_string(&self, ptr: i32, len: usize) -> Result<String, ComponentError> {
+    pub fn read_string(&self, ptr: i32, len: usize) -> core::result::Result<String, ComponentError> {
         let bytes = self.read_bytes(ptr, len)?;
 
         match self.options.string_encoding {
@@ -185,7 +200,7 @@ impl<'a> CanonicalLiftContext<'a> {
     }
 
     /// Binary std/no_std choice
-    pub fn cleanup(mut self) -> Result<(), ComponentError> {
+    pub fn cleanup(mut self) -> core::result::Result<(), ComponentError> {
         // Binary std/no_std choice
         if let Some(manager) = &self.options.realloc_manager {
             let mut mgr = manager.write().map_err(|_| ComponentError::ResourceNotFound(0))?;
@@ -216,7 +231,7 @@ impl<'a> CanonicalLowerContext<'a> {
     }
 
     /// Binary std/no_std choice
-    pub fn allocate(&mut self, size: usize, align: usize) -> Result<i32, ComponentError> {
+    pub fn allocate(&mut self, size: usize, align: usize) -> core::result::Result<i32, ComponentError> {
         if size == 0 {
             return Ok(0);
         }
@@ -238,7 +253,7 @@ impl<'a> CanonicalLowerContext<'a> {
     }
 
     /// Write bytes to memory
-    pub fn write_bytes(&mut self, ptr: i32, data: &[u8]) -> Result<(), ComponentError> {
+    pub fn write_bytes(&mut self, ptr: i32, data: &[u8]) -> core::result::Result<(), ComponentError> {
         if ptr < 0 {
             return Err(ComponentError::TypeMismatch);
         }
@@ -250,7 +265,7 @@ impl<'a> CanonicalLowerContext<'a> {
     }
 
     /// Write a string to memory with the configured encoding
-    pub fn write_string(&mut self, s: &str) -> Result<(i32, usize), ComponentError> {
+    pub fn write_string(&mut self, s: &str) -> core::result::Result<(i32, usize), ComponentError> {
         let encoded = match self.options.string_encoding {
             StringEncoding::Utf8 => s.as_bytes().to_vec(),
             StringEncoding::Utf16Le => s.encode_utf16().flat_map(|c| c.to_le_bytes()).collect(),
@@ -281,7 +296,7 @@ impl<'a> CanonicalLowerContext<'a> {
     }
 
     /// Binary std/no_std choice
-    pub fn finish(self) -> Result<Vec<TempAllocation>, ComponentError> {
+    pub fn finish(self) -> core::result::Result<Vec<TempAllocation>, ComponentError> {
         // Binary std/no_std choice
         Ok(self.allocations)
     }
@@ -295,6 +310,7 @@ pub struct CanonicalOptionsBuilder {
     string_encoding: StringEncoding,
     instance_id: ComponentInstanceId,
     realloc_manager: Option<Arc<RwLock<ReallocManager>>>,
+    memory_grow: Option<u32>,
 }
 
 impl CanonicalOptionsBuilder {
@@ -306,6 +322,7 @@ impl CanonicalOptionsBuilder {
             string_encoding: StringEncoding::Utf8,
             instance_id,
             realloc_manager: None,
+            memory_grow: None,
         }
     }
 
@@ -325,6 +342,11 @@ impl CanonicalOptionsBuilder {
         self
     }
 
+    pub fn with_memory_grow(mut self, func_index: u32) -> Self {
+        self.memory_grow = Some(func_index);
+        self
+    }
+
     pub fn build(self) -> CanonicalOptions {
         let mut options = CanonicalOptions::new(self.memory, self.instance_id);
 
@@ -334,6 +356,10 @@ impl CanonicalOptionsBuilder {
 
         if let Some(func_index) = self.post_return {
             options = options.with_post_return(func_index);
+        }
+
+        if let Some(func_index) = self.memory_grow {
+            options = options.with_memory_grow(func_index);
         }
 
         options.with_string_encoding(self.string_encoding)

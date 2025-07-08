@@ -128,7 +128,9 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
             size: 8, // ptr + len
             alignment: 4,
             offset: None,
-            details: CanonicalLayoutDetails::String { encoding: StringEncoding::UTF8 },
+            details: CanonicalLayoutDetails::String {
+                encoding: StringEncoding::UTF8,
+            },
         },
         ValType::Record(fields) => {
             let mut field_layouts = Vec::with_capacity(fields.len());
@@ -166,9 +168,11 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 size: total_size,
                 alignment: max_alignment,
                 offset: None,
-                details: CanonicalLayoutDetails::Record { fields: field_layouts },
+                details: CanonicalLayoutDetails::Record {
+                    fields: field_layouts,
+                },
             }
-        }
+        },
         ValType::Variant(cases) => {
             let case_count = cases.len();
             let tag_size = if case_count <= 256 {
@@ -215,7 +219,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                     cases: case_layouts,
                 },
             }
-        }
+        },
         ValType::List(_element_type) => {
             // element_type is ValTypeRef, needs type store to resolve
             let element_layout = CanonicalLayout {
@@ -233,7 +237,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                     fixed_length: None,
                 },
             }
-        }
+        },
         ValType::FixedList(_element_type, length) => {
             // element_type is ValTypeRef, needs type store to resolve
             let element_layout = CanonicalLayout {
@@ -252,7 +256,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                     fixed_length: Some(*length),
                 },
             }
-        }
+        },
         ValType::Tuple(elements) => {
             let mut field_layouts = Vec::with_capacity(elements.len());
             let mut total_size = 0;
@@ -287,9 +291,11 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 size: total_size,
                 alignment: max_alignment,
                 offset: None,
-                details: CanonicalLayoutDetails::Record { fields: field_layouts },
+                details: CanonicalLayoutDetails::Record {
+                    fields: field_layouts,
+                },
             }
-        }
+        },
         ValType::Flags(names) => {
             let byte_count = names.len().div_ceil(8);
             CanonicalLayout {
@@ -298,7 +304,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Primitive,
             }
-        }
+        },
         ValType::Enum(_) => {
             // Enums are represented as a tag
             CanonicalLayout {
@@ -307,7 +313,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Primitive,
             }
-        }
+        },
         ValType::Option(_inner_type) => {
             // Option type is equivalent to variant with None and Some cases
             // inner_type is ValTypeRef, needs type store to resolve
@@ -335,7 +341,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                     ],
                 },
             }
-        }
+        },
         ValType::Result { ok: _, err: _ } => {
             // Result type now has ok and err as Option<ValTypeRef>
             // needs type store to resolve
@@ -357,10 +363,13 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Variant {
                     tag_size: tag_size as u8,
-                    cases: vec![("Ok".to_string(), Some(ok_layout)), ("Err".to_string(), None)],
+                    cases: vec![
+                        ("Ok".to_string(), Some(ok_layout)),
+                        ("Err".to_string(), None),
+                    ],
                 },
             }
-        }
+        },
         ValType::Own(_) | ValType::Borrow(_) => {
             // Resource handles are represented as 32-bit integers
             CanonicalLayout {
@@ -369,7 +378,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Resource { handle_bits: 32 },
             }
-        }
+        },
         ValType::ErrorContext => {
             // Error context represented as a structure
             CanonicalLayout {
@@ -378,7 +387,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Primitive,
             }
-        }
+        },
         ValType::Ref(_) => {
             // Reference types are represented as 32-bit indices
             CanonicalLayout {
@@ -387,7 +396,7 @@ pub fn calculate_layout<P: wrt_foundation::MemoryProvider + Default + Clone + Pa
                 offset: None,
                 details: CanonicalLayoutDetails::Primitive,
             }
-        }
+        },
     }
 }
 
@@ -502,39 +511,37 @@ mod tests {
     fn _test_record_layout() {
         // TODO: Implement BoundedVec construction for ValType::Record
         // Currently commented out due to compilation issues with vec! macro
-        /*
-        #[cfg(feature = "std")]
-        type TestProvider = wrt_foundation::StdMemoryProvider;
-        #[cfg(all(not(feature = "std")))]
-        type TestProvider = wrt_foundation::NoStdProvider<1024>;
-        #[cfg(not(any(feature = "std")))]
-        type TestProvider = wrt_foundation::NoStdProvider<1024>;
-
-        let record_type = ValType::Record(vec![
-            ("a".to_string(), ValType::<TestProvider>::Bool),
-            ("b".to_string(), ValType::<TestProvider>::S32),
-            ("c".to_string(), ValType::<TestProvider>::S16),
-        ]);
-
-        let layout = calculate_layout::<TestProvider>(&record_type);
-        assert_eq!(layout.alignment, 4);
-
-        // Note: The exact size depends on padding rules but should be at least 8 bytes
-        // (0-1: bool, 2-3: padding, 4-7: i32, 8-9: i16, 10-11: padding)
-        assert!(layout.size >= 8);
-
-        if let CanonicalLayoutDetails::Record { fields } = &layout.details {
-            assert_eq!(fields.len(), 3);
-            assert_eq!(fields[0].0, "a");
-            assert_eq!(fields[0].1.offset, Some(0));
-            assert_eq!(fields[1].0, "b");
-            assert_eq!(fields[1].1.offset, Some(4));
-            assert_eq!(fields[2].0, "c");
-            assert!(fields[2].1.offset.unwrap() >= 8);
-        } else {
-            panic!("Expected Record layout details");
-        }
-        */
+        // #[cfg(feature = "std")]
+        // type TestProvider = wrt_foundation::StdMemoryProvider;
+        // #[cfg(all(not(feature = "std")))]
+        // type TestProvider = wrt_foundation::NoStdProvider<1024>;
+        // #[cfg(not(any(feature = "std")))]
+        // type TestProvider = wrt_foundation::NoStdProvider<1024>;
+        //
+        // let record_type = ValType::Record(vec![
+        // ("a".to_string(), ValType::<TestProvider>::Bool),
+        // ("b".to_string(), ValType::<TestProvider>::S32),
+        // ("c".to_string(), ValType::<TestProvider>::S16),
+        // ]);
+        //
+        // let layout = calculate_layout::<TestProvider>(&record_type);
+        // assert_eq!(layout.alignment, 4);
+        //
+        // Note: The exact size depends on padding rules but should be at least
+        // 8 bytes (0-1: bool, 2-3: padding, 4-7: i32, 8-9: i16, 10-11:
+        // padding) assert!(layout.size >= 8);
+        //
+        // if let CanonicalLayoutDetails::Record { fields } = &layout.details {
+        // assert_eq!(fields.len(), 3);
+        // assert_eq!(fields[0].0, "a");
+        // assert_eq!(fields[0].1.offset, Some(0));
+        // assert_eq!(fields[1].0, "b");
+        // assert_eq!(fields[1].1.offset, Some(4));
+        // assert_eq!(fields[2].0, "c");
+        // assert!(fields[2].1.offset.unwrap() >= 8);
+        // } else {
+        // panic!("Expected Record layout details");
+        // }
     }
 
     // TODO: Fix ValType variant construction with BoundedVec
@@ -543,31 +550,30 @@ mod tests {
     // #[cfg(feature = "std")]
     fn _test_variant_layout() {
         // TODO: Implement BoundedVec construction for ValType::Variant
-        /*
-        #[cfg(feature = "std")]
-        type TestProvider = wrt_foundation::StdMemoryProvider;
-        #[cfg(all(not(feature = "std")))]
-        type TestProvider = wrt_foundation::NoStdProvider<1024>;
-        #[cfg(not(any(feature = "std")))]
-        type TestProvider = wrt_foundation::NoStdProvider<1024>;
-
-        let variant_type = ValType::Variant(vec![
-            ("a".to_string(), Some(ValType::<TestProvider>::Bool)),
-            ("b".to_string(), Some(ValType::<TestProvider>::S32)),
-            ("c".to_string(), None),
-        ]);
-
-        let layout = calculate_layout::<TestProvider>(&variant_type);
-        assert_eq!(layout.alignment, 4);
-        assert_eq!(layout.size, 8); // 0: tag, 1-3: padding, 4-7: payload (i32)
-
-        if let CanonicalLayoutDetails::Variant { tag_size, cases } = &layout.details {
-            assert_eq!(*tag_size, 1);
-            assert_eq!(cases.len(), 3);
-        } else {
-            panic!("Expected Variant layout details");
-        }
-        */
+        // #[cfg(feature = "std")]
+        // type TestProvider = wrt_foundation::StdMemoryProvider;
+        // #[cfg(all(not(feature = "std")))]
+        // type TestProvider = wrt_foundation::NoStdProvider<1024>;
+        // #[cfg(not(any(feature = "std")))]
+        // type TestProvider = wrt_foundation::NoStdProvider<1024>;
+        //
+        // let variant_type = ValType::Variant(vec![
+        // ("a".to_string(), Some(ValType::<TestProvider>::Bool)),
+        // ("b".to_string(), Some(ValType::<TestProvider>::S32)),
+        // ("c".to_string(), None),
+        // ]);
+        //
+        // let layout = calculate_layout::<TestProvider>(&variant_type);
+        // assert_eq!(layout.alignment, 4);
+        // assert_eq!(layout.size, 8); // 0: tag, 1-3: padding, 4-7: payload
+        // (i32)
+        //
+        // if let CanonicalLayoutDetails::Variant { tag_size, cases } =
+        // &layout.details { assert_eq!(*tag_size, 1);
+        // assert_eq!(cases.len(), 3);
+        // } else {
+        // panic!("Expected Variant layout details");
+        // }
     }
 
     // TODO: Fix ValType FixedList construction with ValTypeRef
@@ -575,34 +581,34 @@ mod tests {
     // #[ignore]
     // #[cfg(feature = "std")]
     fn _test_fixed_list_layout() {
-        // TODO: Fix ValType::FixedList construction - uses Box instead of ValTypeRef
-        /*
-        #[cfg(feature = "std")]
-        type TestProvider = wrt_foundation::StdMemoryProvider;
-        #[cfg(all(not(feature = "std")))]
-        type TestProvider = wrt_foundation::NoStdProvider<1024>;
-        #[cfg(not(any(feature = "std")))]
-        type TestProvider = wrt_foundation::NoStdProvider<1024>;
-
+        // TODO: Fix ValType::FixedList construction - uses Box instead of
+        // ValTypeRef
+        // #[cfg(feature = "std")]
+        // type TestProvider = wrt_foundation::StdMemoryProvider;
+        // #[cfg(all(not(feature = "std")))]
+        // type TestProvider = wrt_foundation::NoStdProvider<1024>;
+        // #[cfg(not(any(feature = "std")))]
+        // type TestProvider = wrt_foundation::NoStdProvider<1024>;
+        //
         // Test fixed-length list layout
-        let element_type = ValType::<TestProvider>::U32;
-        let length = 10;
-        let fixed_list_type = ValType::FixedList(Box::new(element_type), length);
-
-        let layout = calculate_layout::<TestProvider>(&fixed_list_type);
-
+        // let element_type = ValType::<TestProvider>::U32;
+        // let length = 10;
+        // let fixed_list_type = ValType::FixedList(Box::new(element_type),
+        // length);
+        //
+        // let layout = calculate_layout::<TestProvider>(&fixed_list_type);
+        //
         // Each u32 is 4 bytes, so 10 elements = 40 bytes
-        assert_eq!(layout.size, 40);
-        assert_eq!(layout.alignment, 4);
-
-        if let CanonicalLayoutDetails::List { element, fixed_length } = &layout.details {
-            assert_eq!(element.size, 4);
-            assert_eq!(element.alignment, 4);
-            assert_eq!(fixed_length, &Some(10));
-        } else {
-            panic!("Expected List layout details");
-        }
-        */
+        // assert_eq!(layout.size, 40);
+        // assert_eq!(layout.alignment, 4);
+        //
+        // if let CanonicalLayoutDetails::List { element, fixed_length } =
+        // &layout.details { assert_eq!(element.size, 4);
+        // assert_eq!(element.alignment, 4);
+        // assert_eq!(fixed_length, &Some(10));
+        // } else {
+        // panic!("Expected List layout details");
+        // }
     }
 
     #[test]

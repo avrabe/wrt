@@ -16,6 +16,10 @@ pub mod memory;
 pub mod core;
 pub mod documentation;
 
+// Formal verification module (requires KANI feature)
+#[cfg(any(doc, kani, feature = "kani"))]
+pub mod formal_verification;
+
 /// Run all integration tests
 pub fn run_all_integration_tests() -> TestResult {
     let mut runner = TestRunner::new("WRT Integration Tests");
@@ -31,6 +35,10 @@ pub fn run_all_integration_tests() -> TestResult {
     runner.add_test_suite("Memory", || memory::run_tests())?;
     runner.add_test_suite("Core", || core::run_tests())?;
     runner.add_test_suite("Documentation", || documentation::run_tests())?;
+    
+    // Add formal verification suite (when available)
+    #[cfg(any(doc, kani, feature = "kani"))]
+    runner.add_test_suite("Formal Verification", || formal_verification::run_tests())?;
     
     runner.run_all()
 }
@@ -97,5 +105,12 @@ mod tests {
     fn documentation_suite() {
         let result = documentation::run_tests();
         assert!(result.is_success(), "Documentation tests failed: {:?}", result);
+    }
+    
+    #[test]
+    #[cfg(any(doc, kani, feature = "kani"))]
+    fn formal_verification_suite() {
+        let result = formal_verification::run_tests();
+        assert!(result.is_success(), "Formal verification tests failed: {:?}", result);
     }
 }

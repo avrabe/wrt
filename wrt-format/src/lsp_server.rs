@@ -3,21 +3,21 @@
 //! This module provides the foundation for WIT language server support,
 //! enabling IDE features like syntax highlighting, error reporting, and more.
 
-#[cfg(feature = "std")]
-use std::{collections::BTreeMap, vec::Vec, sync::{Arc, Mutex}};
 #[cfg(all(not(feature = "std")))]
-use std::{collections::BTreeMap, vec::Vec, sync::Arc};
-
-use wrt_foundation::{
-    BoundedString, NoStdProvider,
-    prelude::*,
+use std::{collections::BTreeMap, sync::Arc, vec::Vec};
+#[cfg(feature = "std")]
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+    vec::Vec,
 };
 
 use wrt_error::{Error, Result};
+use wrt_foundation::{prelude::*, BoundedString, NoStdProvider};
 
 use crate::{
     ast::*,
-    incremental_parser::{IncrementalParserCache, ChangeType, SourceChange},
+    incremental_parser::{ChangeType, IncrementalParserCache, SourceChange},
 };
 
 /// LSP position (line and character)
@@ -160,13 +160,13 @@ pub struct DocumentSymbol {
 pub struct WitLanguageServer {
     /// Parser cache for incremental parsing
     parser_cache: Arc<Mutex<IncrementalParserCache>>,
-    
+
     /// Open documents
     documents: BTreeMap<String, TextDocumentItem>,
-    
+
     /// Current diagnostics
     diagnostics: BTreeMap<String, Vec<Diagnostic>>,
-    
+
     /// Server capabilities
     capabilities: ServerCapabilities,
 }
@@ -212,21 +212,23 @@ impl WitLanguageServer {
             capabilities: ServerCapabilities::default(),
         }
     }
-    
+
     /// Get server capabilities
     pub fn capabilities(&self) -> &ServerCapabilities {
         &self.capabilities
     }
-    
+
     /// Open a document
     pub fn open_document(&mut self, document: TextDocumentItem) -> Result<()> {
-        let uri = document.uri.as_str()
+        let uri = document
+            .uri
+            .as_str()
             .map_err(|_| Error::parse_error("Invalid URI"))?
             .to_string();
-        
+
         // Set up parser for this document
         let file_id = self.uri_to_file_id(&uri);
-        
+
         // Combine lines into full text
         let mut full_text = String::new();
         for line in &document.text {
@@ -235,39 +237,48 @@ impl WitLanguageServer {
                 full_text.push('\n');
             }
         }
-        
+
         // Parse the document
         if let Ok(mut cache) = self.parser_cache.lock() {
             let parser = cache.get_parser(file_id);
             parser.set_source(&full_text)?;
         }
-        
+
         // Store document
         self.documents.insert(uri.clone(), document);
-        
+
         // Run diagnostics
         self.update_diagnostics(&uri)?;
-        
+
         Ok(())
     }
-    
+
     /// Update document content
-    pub fn update_document(&mut self, uri: &str, changes: Vec<TextDocumentContentChangeEvent>, version: i32) -> Result<()> {
+    pub fn update_document(
+        &mut self,
+        uri: &str,
+        changes: Vec<TextDocumentContentChangeEvent>,
+        version: i32,
+    ) -> Result<()> {
         let file_id = self.uri_to_file_id(uri);
-        
+
         // Apply changes to parser
         if let Ok(mut cache) = self.parser_cache.lock() {
             let parser = cache.get_parser(file_id);
-            
+
             for change in changes {
-                let provider = NoStdProvider::<1024>::new();
-                
+                let provider = wrt_foundation::safe_managed_alloc!(
+                    1024,
+                    wrt_foundation::budget_aware_provider::CrateId::Format
+                )
+                .map_err(|_| Error::memory_error("Failed to allocate memory provider"))?;
+
                 if let Some(range) = change.range {
                     // Incremental change
                     let offset = self.position_to_offset(uri, range.start)?;
                     let end_offset = self.position_to_offset(uri, range.end)?;
                     let length = end_offset - offset;
-                    
+
                     let source_change = SourceChange {
                         change_type: ChangeType::Replace {
                             offset,
@@ -276,7 +287,7 @@ impl WitLanguageServer {
                         },
                         text: Some(change.text),
                     };
-                    
+
                     parser.apply_change(source_change)?;
                 } else {
                     // Full document change
@@ -284,56 +295,51 @@ impl WitLanguageServer {
                 }
             }
         }
-        
+
         // Update document version
         if let Some(doc) = self.documents.get_mut(uri) {
             doc.version = version;
         }
-        
+
         // Run diagnostics
         self.update_diagnostics(uri)?;
-        
+
         Ok(())
     }
-    
+
     /// Get hover information
     pub fn hover(&self, uri: &str, position: Position) -> Result<Option<Hover>> {
         let file_id = self.uri_to_file_id(uri);
         let offset = self.position_to_offset(uri, position)?;
-        
+
         // Get AST from parser
         let ast = if let Ok(mut cache) = self.parser_cache.lock() {
             cache.get_parser(file_id).get_ast().cloned()
         } else {
             None
         };
-        
+
         if let Some(ast) = ast {
             // Find node at position
             if let Some(node_info) = self.find_node_at_offset(&ast, offset) {
-                let provider = NoStdProvider::<1024>::new();
+                let provider = wrt_foundation::safe_managed_alloc!(
+                    1024,
+                    wrt_foundation::budget_aware_provider::CrateId::Format
+                )
+                .map_err(|_| Error::memory_error("Failed to allocate memory provider"))?;
                 let hover_text = match node_info {
                     NodeInfo::Function(name) => {
-                        BoundedString::from_str(
-                            &format!("Function: {}", name), 
-                            provider
-                        ).ok()
-                    }
+                        BoundedString::from_str(&format!("Function: {}", name), provider).ok()
+                    },
                     NodeInfo::Type(name) => {
-                        BoundedString::from_str(
-                            &format!("Type: {}", name), 
-                            provider
-                        ).ok()
-                    }
+                        BoundedString::from_str(&format!("Type: {}", name), provider).ok()
+                    },
                     NodeInfo::Interface(name) => {
-                        BoundedString::from_str(
-                            &format!("Interface: {}", name), 
-                            provider
-                        ).ok()
-                    }
+                        BoundedString::from_str(&format!("Interface: {}", name), provider).ok()
+                    },
                     _ => None,
                 };
-                
+
                 if let Some(contents) = hover_text {
                     return Ok(Some(Hover {
                         contents,
@@ -342,15 +348,19 @@ impl WitLanguageServer {
                 }
             }
         }
-        
+
         Ok(None)
     }
-    
+
     /// Get completion items
     pub fn completion(&self, _uri: &str, _position: Position) -> Result<Vec<CompletionItem>> {
         let mut items = Vec::new();
-        let provider = NoStdProvider::<1024>::new();
-        
+        let provider = wrt_foundation::safe_managed_alloc!(
+            1024,
+            wrt_foundation::budget_aware_provider::CrateId::Format
+        )
+        .map_err(|_| Error::memory_error("Failed to allocate memory provider"))?;
+
         // Add keyword completions
         let keywords = [
             ("interface", CompletionItemKind::Keyword),
@@ -367,7 +377,7 @@ impl WitLanguageServer {
             ("import", CompletionItemKind::Keyword),
             ("export", CompletionItemKind::Keyword),
         ];
-        
+
         for (keyword, kind) in keywords {
             if let Ok(label) = BoundedString::from_str(keyword, provider.clone()) {
                 items.push(CompletionItem {
@@ -379,63 +389,63 @@ impl WitLanguageServer {
                 });
             }
         }
-        
+
         // Add type completions
         let primitive_types = [
-            "u8", "u16", "u32", "u64",
-            "s8", "s16", "s32", "s64",
-            "f32", "f64",
-            "bool", "string", "char",
+            "u8", "u16", "u32", "u64", "s8", "s16", "s32", "s64", "f32", "f64", "bool", "string",
+            "char",
         ];
-        
+
         for type_name in primitive_types {
             if let Ok(label) = BoundedString::from_str(type_name, provider.clone()) {
                 items.push(CompletionItem {
                     label,
                     kind: CompletionItemKind::Type,
-                    detail: Some(BoundedString::from_str("Primitive type", provider.clone()).unwrap()),
+                    detail: Some(
+                        BoundedString::from_str("Primitive type", provider.clone()).unwrap(),
+                    ),
                     documentation: None,
                     insert_text: None,
                 });
             }
         }
-        
+
         Ok(items)
     }
-    
+
     /// Get document symbols
     pub fn document_symbols(&self, uri: &str) -> Result<Vec<DocumentSymbol>> {
         let file_id = self.uri_to_file_id(uri);
         let mut symbols = Vec::new();
-        
+
         // Get AST from parser
         let ast = if let Ok(mut cache) = self.parser_cache.lock() {
             cache.get_parser(file_id).get_ast().cloned()
         } else {
             None
         };
-        
+
         if let Some(ast) = ast {
             self.extract_symbols(&ast, &mut symbols)?;
         }
-        
+
         Ok(symbols)
     }
-    
+
     /// Update diagnostics for a document
     fn update_diagnostics(&mut self, uri: &str) -> Result<()> {
         let _file_id = self.uri_to_file_id(uri);
         let diagnostics = Vec::new();
-        
+
         // Get parser errors (if any)
         // In a real implementation, the parser would provide error information
-        
+
         // Store diagnostics
         self.diagnostics.insert(uri.to_string(), diagnostics);
-        
+
         Ok(())
     }
-    
+
     /// Convert URI to file ID
     fn uri_to_file_id(&self, uri: &str) -> u32 {
         // Simple hash of URI for file ID
@@ -445,12 +455,12 @@ impl WitLanguageServer {
         }
         hash
     }
-    
+
     /// Convert position to offset
     fn position_to_offset(&self, uri: &str, position: Position) -> Result<u32> {
         if let Some(doc) = self.documents.get(uri) {
             let mut offset = 0u32;
-            
+
             for (line_idx, line) in doc.text.iter().enumerate() {
                 if line_idx == position.line as usize {
                     return Ok(offset + position.character);
@@ -458,10 +468,10 @@ impl WitLanguageServer {
                 offset += line.as_str().map(|s| s.len() as u32 + 1).unwrap_or(1);
             }
         }
-        
+
         Err(Error::parse_error("Position out of bounds"))
     }
-    
+
     /// Find node at offset
     fn find_node_at_offset(&self, ast: &WitDocument, offset: u32) -> Option<NodeInfo> {
         // Simplified node finding - real implementation would traverse AST
@@ -471,11 +481,15 @@ impl WitLanguageServer {
             None
         }
     }
-    
+
     /// Extract symbols from AST
     fn extract_symbols(&self, ast: &WitDocument, symbols: &mut Vec<DocumentSymbol>) -> Result<()> {
-        let provider = NoStdProvider::<1024>::new();
-        
+        let provider = wrt_foundation::safe_managed_alloc!(
+            1024,
+            wrt_foundation::budget_aware_provider::CrateId::Format
+        )
+        .map_err(|_| Error::memory_error("Failed to allocate memory provider"))?;
+
         // Extract package symbol
         if let Some(ref package) = ast.package {
             if let Ok(name) = BoundedString::from_str("package", provider.clone()) {
@@ -489,14 +503,14 @@ impl WitLanguageServer {
                 });
             }
         }
-        
+
         // Extract interface symbols
         #[cfg(feature = "std")]
         for item in &ast.items {
             match item {
                 TopLevelItem::Interface(interface) => {
                     let mut children = Vec::new();
-                    
+
                     // Extract function symbols
                     for interface_item in &interface.items {
                         match interface_item {
@@ -508,7 +522,7 @@ impl WitLanguageServer {
                                     selection_range: self.span_to_range(func.name.span),
                                     children: Vec::new(),
                                 });
-                            }
+                            },
                             InterfaceItem::Type(type_decl) => {
                                 children.push(DocumentSymbol {
                                     name: type_decl.name.name.clone(),
@@ -517,13 +531,13 @@ impl WitLanguageServer {
                                     selection_range: self.span_to_range(type_decl.name.span),
                                     children: Vec::new(),
                                 });
-                            }
+                            },
                             InterfaceItem::Use(_use_decl) => {
                                 // Skip use declarations for now
-                            }
+                            },
                         }
                     }
-                    
+
                     symbols.push(DocumentSymbol {
                         name: interface.name.name.clone(),
                         kind: SymbolKind::Interface,
@@ -531,20 +545,26 @@ impl WitLanguageServer {
                         selection_range: self.span_to_range(interface.name.span),
                         children,
                     });
-                }
-                _ => {} // Handle other top-level items
+                },
+                _ => {}, // Handle other top-level items
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Convert SourceSpan to Range
     fn span_to_range(&self, span: SourceSpan) -> Range {
         // Simplified conversion - real implementation would use line/column mapping
         Range {
-            start: Position { line: 0, character: span.start },
-            end: Position { line: 0, character: span.end },
+            start: Position {
+                line: 0,
+                character: span.start,
+            },
+            end: Position {
+                line: 0,
+                character: span.end,
+            },
         }
     }
 }
@@ -569,10 +589,10 @@ impl Default for WitLanguageServer {
 pub trait LspRequestHandler {
     /// Handle hover request
     fn handle_hover(&self, uri: &str, position: Position) -> Result<Option<Hover>>;
-    
+
     /// Handle completion request
     fn handle_completion(&self, uri: &str, position: Position) -> Result<Vec<CompletionItem>>;
-    
+
     /// Handle document symbols request
     fn handle_document_symbols(&self, uri: &str) -> Result<Vec<DocumentSymbol>>;
 }
@@ -582,11 +602,11 @@ impl LspRequestHandler for WitLanguageServer {
     fn handle_hover(&self, uri: &str, position: Position) -> Result<Option<Hover>> {
         self.hover(uri, position)
     }
-    
+
     fn handle_completion(&self, uri: &str, position: Position) -> Result<Vec<CompletionItem>> {
         self.completion(uri, position)
     }
-    
+
     fn handle_document_symbols(&self, uri: &str) -> Result<Vec<DocumentSymbol>> {
         self.document_symbols(uri)
     }
@@ -595,20 +615,29 @@ impl LspRequestHandler for WitLanguageServer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_position_range() {
-        let pos = Position { line: 5, character: 10 };
-        let range = Range {
-            start: Position { line: 5, character: 5 },
-            end: Position { line: 5, character: 15 },
+        let pos = Position {
+            line: 5,
+            character: 10,
         };
-        
+        let range = Range {
+            start: Position {
+                line: 5,
+                character: 5,
+            },
+            end: Position {
+                line: 5,
+                character: 15,
+            },
+        };
+
         assert!(pos.line >= range.start.line);
         assert!(pos.character >= range.start.character);
         assert!(pos.character <= range.end.character);
     }
-    
+
     #[cfg(feature = "std")]
     #[test]
     fn test_server_creation() {
@@ -617,7 +646,7 @@ mod tests {
         assert!(server.capabilities().hover_provider);
         assert!(server.capabilities().completion_provider);
     }
-    
+
     #[test]
     fn test_diagnostic_severity() {
         assert_eq!(DiagnosticSeverity::Error as u8, 1);

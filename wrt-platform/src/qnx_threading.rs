@@ -4,6 +4,7 @@
 //! features for deterministic, real-time thread execution with resource
 //! isolation and priority inheritance.
 
+
 use core::{
     fmt::{self, Debug},
     sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
@@ -151,11 +152,7 @@ impl PlatformThreadHandle for QnxThreadHandle {
         let result = unsafe { ffi::pthread_join(self.tid, &mut retval) };
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to join thread",
-            ));
+            return Err(Error::runtime_execution_error("QNX thread creation failed"));
         }
 
         // Get the result
@@ -166,8 +163,7 @@ impl PlatformThreadHandle for QnxThreadHandle {
             None => Err(Error::new(
                 ErrorCategory::Platform,
                 1,
-                "Thread completed without result",
-            )),
+                ")),
         }
     }
 
@@ -283,11 +279,7 @@ impl QnxThreadPool {
         
         // Initialize attributes
         if unsafe { ffi::pthread_attr_init(&mut attr) } != 0 {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to initialize thread attributes",
-            ));
+            return Err(Error::runtime_execution_error("QNX thread priority setting failed"));
         }
 
         // Set scheduling policy (FIFO for determinism)
@@ -296,8 +288,7 @@ impl QnxThreadPool {
             return Err(Error::new(
                 ErrorCategory::Platform,
                 1,
-                "Failed to set scheduling policy",
-            ));
+                "Failed to set thread scheduling policy"));
         }
 
         // Set priority
@@ -310,11 +301,7 @@ impl QnxThreadPool {
 
         if unsafe { ffi::pthread_attr_setschedparam(&mut attr, &sched_param) } != 0 {
             unsafe { ffi::pthread_attr_destroy(&mut attr) };
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to set thread priority",
-            ));
+            return Err(Error::runtime_execution_error("QNX thread join failed"));
         }
 
         // Set stack size
@@ -328,19 +315,14 @@ impl QnxThreadPool {
             return Err(Error::new(
                 ErrorCategory::Platform,
                 1,
-                "Failed to set stack size",
-            ));
+                "Failed to set thread stack size"));
         }
 
         // Don't inherit scheduling from parent
         if unsafe { ffi::pthread_attr_setinheritsched(&mut attr, ffi::PTHREAD_EXPLICIT_SCHED) } != 0
         {
             unsafe { ffi::pthread_attr_destroy(&mut attr) };
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to set scheduling inheritance",
-            ));
+            return Err(Error::runtime_execution_error("QNX thread state query failed"));
         }
 
         Ok(attr)
@@ -382,11 +364,7 @@ impl PlatformThreadPool for QnxThreadPool {
     fn spawn_wasm_thread(&self, task: WasmTask) -> Result<ThreadHandle> {
         // Check if shutting down
         if self.shutdown.load(Ordering::Acquire) {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Thread pool is shutting down",
-            ));
+            return Err(Error::runtime_execution_error("Thread pool is shutting down"));
         }
 
         // Check thread limit
@@ -395,7 +373,7 @@ impl PlatformThreadPool for QnxThreadPool {
             return Err(Error::new(
                 ErrorCategory::Resource,
                 1,
-                "Thread pool limit reached",
+                "Thread pool has reached maximum thread limit",
             ));
         }
 
@@ -451,11 +429,7 @@ impl PlatformThreadPool for QnxThreadPool {
             unsafe {
                 let _ = Box::from_raw(context_ptr);
             }
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to create thread",
-            ));
+            return Err(Error::runtime_execution_error("Failed to create QNX thread"));
         }
 
         // Create handle
@@ -512,8 +486,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "Requires QNX system to run"]
-    fn test_qnx_thread_pool_basic() {
+    #[ignore = ") {
         let config = ThreadPoolConfig {
             max_threads: 4,
             priority_range: (ThreadPriority::Low, ThreadPriority::High),

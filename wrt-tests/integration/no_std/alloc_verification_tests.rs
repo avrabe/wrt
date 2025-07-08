@@ -7,7 +7,6 @@
 //! It's specifically designed to catch regressions in the alloc feature set.
 
 // Binary std/no_std choice
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // External crate imports
 extern crate alloc;
@@ -116,16 +115,13 @@ mod tests {
     #[test]
     fn test_error_with_context() {
         // Binary std/no_std choice
-        let error = Error::new(
-            ErrorCategory::Resource,
-            42,
-            "This is a test error with context".to_string(),
+        let error = Error::runtime_execution_error(".to_string(),
         );
         
         // Check the error message
         assert_eq!(error.code(), 42);
         assert_eq!(error.category(), ErrorCategory::Resource);
-        assert!(error.to_string().contains("test error with context"));
+        assert!(error.to_string().contains("));
     }
     
     #[test]

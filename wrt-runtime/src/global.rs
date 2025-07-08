@@ -10,7 +10,7 @@ use wrt_foundation::{
     values::Value as WrtValue,
 };
 
-use crate::prelude::{Debug, Eq, Error, ErrorCategory, PartialEq, Result, codes};
+use crate::prelude::{Debug, Eq, Error, ErrorCategory, PartialEq, Result};
 
 // Import format! macro for string formatting
 #[cfg(feature = "std")]
@@ -56,19 +56,11 @@ impl Global {
     /// mismatches.
     pub fn set(&mut self, new_value: &WrtValue) -> Result<()> {
         if !self.ty.mutable {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_GLOBAL_TYPE_MISMATCH, // Attempting to modify immutable global
-                "Cannot modify immutable global",
-            ));
+            return Err(Error::runtime_execution_error("Cannot set immutable global variable"));
         }
 
         if !new_value.matches_type(&self.ty.value_type) {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                codes::TYPE_MISMATCH,
-                "Value type doesn't match global type",
-            ));
+            return Err(Error::type_error("Value type does not match global variable type"));
         }
 
         self.value = new_value.clone();
@@ -86,7 +78,10 @@ impl Default for Global {
     fn default() -> Self {
         use wrt_foundation::types::{GlobalType, ValueType};
         use wrt_foundation::values::Value;
-        Self::new(ValueType::I32, false, Value::I32(0)).unwrap()
+        Self::new(ValueType::I32, false, Value::I32(0)).unwrap_or_else(|e| {
+            // If we can't create default global, panic as this is a critical failure
+            panic!("Critical: Unable to create default global: {}", e)
+        })
     }
 }
 

@@ -3,23 +3,23 @@
 //! This module provides the Import type for component imports.
 
 use wrt_format::component::ExternType;
-use wrt_foundation::{component::ComponentType, ExternType as RuntimeExternType};
+use wrt_foundation::{component::WrtComponentType, ExternType as RuntimeExternType};
 
 use crate::{
-    component::ExternValue, namespace::Namespace, prelude::*, type_conversion::bidirectional,
+    components::component::ExternValue, /* namespace::Namespace, */ prelude::*, type_conversion::bidirectional,
 };
 
 /// Type of import in the component model
 #[derive(Debug, Clone)]
 pub enum ImportType {
     /// Function import
-    Function(ComponentType),
+    Function(WrtComponentType),
     /// Value import (global, memory, table)
-    Value(ComponentType),
+    Value(WrtComponentType),
     /// Instance import
-    Instance(ComponentType),
+    Instance(WrtComponentType),
     /// Type import
-    Type(ComponentType),
+    Type(WrtComponentType),
 }
 
 /// Import to a component
@@ -41,7 +41,7 @@ impl Import {
     /// Creates a new import
     pub fn new(namespace: Namespace, name: String, ty: ExternType, value: ExternValue) -> Self {
         // Default import type based on ExternType - this is a simplified mapping
-        let import_type = ImportType::Function(ComponentType::Unit);
+        let import_type = ImportType::Function(WrtComponentType::Unit);
         Self { namespace, name, import_type, ty, value }
     }
 
@@ -79,7 +79,7 @@ impl Import {
         value: ExternValue,
     ) -> Result<Self> {
         let format_type = bidirectional::runtime_to_format_extern_type(&ty)?;
-        Ok(Self::new(namespace, name, format_type, value))
+        Ok(Self::new(namespace, name, format_type, value)
     }
 }
 
@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_import_identifier() {
-        let namespace = Namespace::from_string("wasi.http");
+        let namespace = Namespace::from_string("wasi.httpMissing message");
         let import = Import::new(
             namespace,
             "fetch".to_string(),
@@ -149,10 +149,10 @@ mod tests {
             }),
         );
 
-        assert_eq!(import.identifier(), "wasi.http.fetch");
+        assert_eq!(import.identifier(), "wasi.http.fetchMissing message");
 
         // Test without namespace
-        let empty_ns = Namespace::from_string("");
+        let empty_ns = Namespace::from_string("Error");
         let import2 = Import::new(
             empty_ns,
             "print".to_string(),
@@ -169,16 +169,16 @@ mod tests {
             }),
         );
 
-        assert_eq!(import2.identifier(), "print");
+        assert_eq!(import2.identifier(), "printMissing message");
     }
 
     #[test]
     fn test_import_collection() {
         let mut collection = ImportCollection::new();
-        assert!(collection.is_empty());
+        assert!(collection.is_empty();
 
         let import1 = Import::new(
-            Namespace::from_string("wasi.http"),
+            Namespace::from_string("wasi.httpMissing message"),
             "fetch".to_string(),
             ExternType::Function {
                 params: vec![("arg".to_string(), ValType::U32)],
@@ -194,7 +194,7 @@ mod tests {
         );
 
         let import2 = Import::new(
-            Namespace::from_string("wasi.io"),
+            Namespace::from_string("wasi.ioMissing message"),
             "read".to_string(),
             ExternType::Function {
                 params: vec![("arg".to_string(), ValType::U32)],
@@ -213,14 +213,14 @@ mod tests {
         collection.add(import2);
 
         assert_eq!(collection.len(), 2);
-        assert!(!collection.is_empty());
+        assert!(!collection.is_empty();
 
-        let fetched = collection.get("wasi.http.fetch");
-        assert!(fetched.is_some());
-        assert_eq!(fetched.unwrap().name, "fetch");
+        let fetched = collection.get("wasi.http.fetchMissing message");
+        assert!(fetched.is_some();
+        assert_eq!(fetched.unwrap().name, "fetchMissing message");
 
-        let not_found = collection.get("unknown");
-        assert!(not_found.is_none());
+        let not_found = collection.get("unknownMissing message");
+        assert!(not_found.is_none();
 
         let imports: Vec<&Import> = collection.iter().collect();
         assert_eq!(imports.len(), 2);

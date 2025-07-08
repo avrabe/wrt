@@ -19,7 +19,11 @@ extern crate alloc;
 use alloc::{vec, boxed::Box};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedVec as Vec, BoundedMap as BTreeMap, safe_memory::NoStdProvider};
+use wrt_foundation::{
+    BoundedVec as Vec, BoundedMap as BTreeMap, 
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use wrt_foundation::{
     bounded::BoundedVec, prelude::*, WrtResult,
@@ -125,7 +129,7 @@ pub struct AsyncOperation {
     #[cfg(feature = "std")]
     pub context: Vec<u8>,
     #[cfg(not(any(feature = "std", )))]
-    pub context: BoundedVec<u8, MAX_ASYNC_CONTEXT_SIZE, NoStdProvider<65536>>,
+    pub context: BoundedVec<u8>,
     /// Task handle for cancellation
     pub task_handle: Option<u32>,
 }
@@ -206,19 +210,19 @@ pub struct AsyncCanonicalAbi {
     #[cfg(feature = "std")]
     streams: BTreeMap<StreamHandle, Box<dyn StreamValue>>,
     #[cfg(not(any(feature = "std", )))]
-    streams: BoundedVec<(StreamHandle, StreamValueEnum), MAX_ASYNC_RESOURCES>,
+    streams: BoundedVec<(StreamHandle, StreamValueEnum)>,
 
     /// Future registry
     #[cfg(feature = "std")]
     futures: BTreeMap<FutureHandle, Box<dyn FutureValue>>,
     #[cfg(not(any(feature = "std", )))]
-    futures: BoundedVec<(FutureHandle, FutureValueEnum), MAX_ASYNC_RESOURCES>,
+    futures: BoundedVec<(FutureHandle, FutureValueEnum)>,
 
     /// Error context registry
     #[cfg(feature = "std")]
     error_contexts: BTreeMap<ErrorContextHandle, ErrorContext>,
     #[cfg(not(any(feature = "std", )))]
-    error_contexts: BoundedVec<(ErrorContextHandle, ErrorContext), MAX_ASYNC_RESOURCES>,
+    error_contexts: BoundedVec<(ErrorContextHandle, ErrorContext)>,
 
     /// Next handle IDs
     next_stream_handle: u32,
@@ -284,26 +288,35 @@ pub struct ConcreteFuture<T> {
 
 impl AsyncCanonicalAbi {
     /// Create a new async canonical ABI
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> WrtResult<Self> {
+        Ok(Self {
             canonical_abi: CanonicalAbi::new(),
             task_manager: TaskManager::new(),
             #[cfg(feature = "std")]
             streams: BTreeMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            streams: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            streams: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             #[cfg(feature = "std")]
             futures: BTreeMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            futures: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            futures: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             #[cfg(feature = "std")]
             error_contexts: BTreeMap::new(),
             #[cfg(not(any(feature = "std", )))]
-            error_contexts: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            error_contexts: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             next_stream_handle: 0,
             next_future_handle: 0,
             next_error_context_handle: 0,
-        }
+        })
     }
 
     /// Create a new stream
@@ -322,7 +335,7 @@ impl AsyncCanonicalAbi {
         {
             let stream_enum = StreamValueEnum::Values(stream);
             self.streams.push((handle, stream_enum)).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many streams".into())
+                wrt_error::Error::resource_exhausted("Too many streams")
             })?;
         }
 
@@ -336,7 +349,7 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.read()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_error::Error::runtime_execution_error("Invalid stream handle"))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -360,8 +373,9 @@ impl AsyncCanonicalAbi {
                                 }
                                 #[cfg(not(feature = "std"))]
                                 {
-                                    let mut values = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-                                    values.push(value).map_err(|_| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+                                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                                    let mut values = BoundedVec::new(provider)?;
+                                    values.push(value).map_err(|_| wrt_error::Error::runtime_execution_error("Failed to push value"))?;
                                     Ok(AsyncReadResult::Values(values))
                                 }
                             }
@@ -369,7 +383,9 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_error::Error::new(wrt_error::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid stream handle"))
         }
     }
 
@@ -380,7 +396,7 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.write(values)
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -390,15 +406,11 @@ impl AsyncCanonicalAbi {
                     return match stream {
                         StreamValueEnum::Values(ref mut s) => {
                             if s.writable_closed {
-                                return Err(wrt_foundation::WrtError::InvalidState(
-                                    "Stream write end is closed".into(),
-                                ));
+                                return Err(wrt_error::Error::runtime_execution_error("Stream is closed"));
                             }
                             for value in values {
                                 s.buffer.push(value.clone()).map_err(|_| {
-                                    wrt_foundation::WrtError::ResourceExhausted(
-                                        "Stream buffer full".into(),
-                                    )
+                                    wrt_error::Error::resource_exhausted("Buffer full")
                                 })?;
                             }
                             s.state = StreamState::Ready;
@@ -407,7 +419,7 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
         }
     }
 
@@ -418,7 +430,7 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.cancel_read()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -433,7 +445,7 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
         }
     }
 
@@ -444,7 +456,7 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.cancel_write()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -459,7 +471,7 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
         }
     }
 
@@ -470,7 +482,7 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.close_readable()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -485,7 +497,7 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
         }
     }
 
@@ -496,7 +508,7 @@ impl AsyncCanonicalAbi {
             if let Some(stream) = self.streams.get_mut(&stream_handle) {
                 stream.close_writable()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -511,7 +523,7 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
         }
     }
 
@@ -531,7 +543,7 @@ impl AsyncCanonicalAbi {
         {
             let future_enum = FutureValueEnum::Value(future);
             self.futures.push((handle, future_enum)).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many futures".into())
+                wrt_error::Error::resource_exhausted("Too many futures")
             })?;
         }
 
@@ -545,7 +557,7 @@ impl AsyncCanonicalAbi {
             if let Some(future) = self.futures.get_mut(&future_handle) {
                 future.read()
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -562,8 +574,9 @@ impl AsyncCanonicalAbi {
                                     }
                                     #[cfg(not(feature = "std"))]
                                     {
-                                        let mut values = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-                                        values.push(value).map_err(|_| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+                                        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                                        let mut values = BoundedVec::new(provider)?;
+                                        values.push(value).map_err(|_| wrt_error::Error::runtime_execution_error("Failed to push value"))?;
                                         Ok(AsyncReadResult::Values(values))
                                     }
                                 } else {
@@ -573,11 +586,13 @@ impl AsyncCanonicalAbi {
                             FutureState::Cancelled => Ok(AsyncReadResult::Closed),
                             FutureState::Error => Ok(AsyncReadResult::Closed),
                             FutureState::Pending => Ok(AsyncReadResult::Blocked),
-                        },
-                    };
+                        }
+                    }
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_error::Error::new(wrt_error::ErrorCategory::Validation,
+                    wrt_error::errors::codes::INVALID_INPUT,
+                    "Invalid stream handle"))
         }
     }
 
@@ -588,7 +603,7 @@ impl AsyncCanonicalAbi {
             if let Some(future) = self.futures.get_mut(&future_handle) {
                 future.write(value)
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -600,7 +615,7 @@ impl AsyncCanonicalAbi {
                     };
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
         }
     }
 
@@ -622,7 +637,7 @@ impl AsyncCanonicalAbi {
         #[cfg(not(any(feature = "std", )))]
         {
             self.error_contexts.push((handle, error_context)).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many error contexts".into())
+                wrt_error::Error::resource_exhausted("Too many error contexts")
             })?;
         }
 
@@ -633,13 +648,13 @@ impl AsyncCanonicalAbi {
     pub fn error_context_debug_string(
         &self,
         handle: ErrorContextHandle,
-    ) -> WrtResult<BoundedString<2048, NoStdProvider<65536>>> {
+    ) -> WrtResult<BoundedString<2048>> {
         #[cfg(feature = "std")]
         {
             if let Some(error_context) = self.error_contexts.get(&handle) {
                 Ok(error_context.debug_string())
             } else {
-                Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+                Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -649,7 +664,7 @@ impl AsyncCanonicalAbi {
                     return Ok(error_context.debug_string());
                 }
             }
-            Err(wrt_foundation::WrtError::invalid_input("Invalid input"))
+            Err(wrt_error::Error::runtime_execution_error("Invalid handle"))
         }
     }
 
@@ -722,7 +737,7 @@ impl AsyncCanonicalAbi {
         values: &[u8],
         target_types: &[ValType],
         context: &CanonicalLiftContext,
-    ) -> Result<AsyncLiftResult> {
+    ) -> WrtResult<AsyncLiftResult> {
         // Check for immediate values first
         if self.can_lift_immediately(values, target_types)? {
             let lifted_values = self.lift_immediate(values, target_types, &context.options)?;
@@ -750,11 +765,7 @@ impl AsyncCanonicalAbi {
             context: values.to_vec(),
             #[cfg(not(any(feature = "std", )))]
             context: BoundedVec::from_slice(values).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    wrt_error::codes::RESOURCE_EXHAUSTED,
-                    "Async context too large"
-                )
+                Error::runtime_execution_error("Context too large")
             })?,
             task_handle: None,
         };
@@ -768,7 +779,7 @@ impl AsyncCanonicalAbi {
         &mut self,
         values: &[Value],
         context: &CanonicalLowerContext,
-    ) -> Result<AsyncLowerResult> {
+    ) -> WrtResult<AsyncLowerResult> {
         // Check for immediate lowering
         if self.can_lower_immediately(values)? {
             let lowered_bytes = self.lower_immediate(values, &context.options)?;
@@ -796,7 +807,10 @@ impl AsyncCanonicalAbi {
             #[cfg(feature = "std")]
             context: Vec::new(), // Values will be serialized separately
             #[cfg(not(any(feature = "std", )))]
-            context: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            context: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             task_handle: None,
         };
 
@@ -805,7 +819,7 @@ impl AsyncCanonicalAbi {
     }
 
     // Private helper methods for async operations
-    fn can_lift_immediately(&self, _values: &[u8], target_types: &[ValType]) -> Result<bool> {
+    fn can_lift_immediately(&self, _values: &[u8], target_types: &[ValType]) -> WrtResult<bool> {
         // Check if all target types are immediately liftable (not async types)
         for ty in target_types {
             match ty {
@@ -816,7 +830,7 @@ impl AsyncCanonicalAbi {
         Ok(true)
     }
 
-    fn can_lower_immediately(&self, values: &[Value]) -> Result<bool> {
+    fn can_lower_immediately(&self, values: &[Value]) -> WrtResult<bool> {
         // Check if all values are immediately lowerable (not async values)
         for value in values {
             match value {
@@ -827,12 +841,12 @@ impl AsyncCanonicalAbi {
         Ok(true)
     }
 
-    fn lift_immediate(&self, values: &[u8], target_types: &[ValType], options: &CanonicalOptions) -> Result<Vec<Value>> {
+    fn lift_immediate(&self, values: &[u8], target_types: &[ValType], options: &CanonicalOptions) -> WrtResult<Vec<Value>> {
         // Use the stub canonical ABI lifting
         async_canonical_lifting::async_canonical_lift(values, target_types, options)
     }
 
-    fn lower_immediate(&self, values: &[Value], options: &CanonicalOptions) -> Result<Vec<u8>> {
+    fn lower_immediate(&self, values: &[Value], options: &CanonicalOptions) -> WrtResult<Vec<u8>> {
         // Use the stub canonical ABI lowering
         async_canonical_lifting::async_canonical_lower(values, options)
     }
@@ -860,18 +874,14 @@ where
 
     fn write(&mut self, values: &[Value]) -> WrtResult<()> {
         if self.inner.writable_closed {
-            return Err(wrt_foundation::WrtError::InvalidState(
-                "Stream write end is closed".into(),
-            ));
+            return Err(wrt_error::Error::runtime_execution_error("Stream is closed"));
         }
 
         for value in values {
             if let Ok(typed_value) = T::try_from(value.clone()) {
                 self.inner.buffer.push(typed_value);
             } else {
-                return Err(wrt_foundation::WrtError::TypeError(
-                    "Value type mismatch for stream".into(),
-                ));
+                return Err(wrt_error::Error::type_mismatch_error("Value type mismatch"));
             }
         }
         self.inner.state = StreamState::Ready;
@@ -935,7 +945,7 @@ where
         if let Ok(typed_value) = T::try_from(value.clone()) {
             self.inner.set_value(typed_value)
         } else {
-            Err(wrt_foundation::WrtError::TypeError("Value type mismatch for future".into()))
+            Err(wrt_error::Error::type_mismatch_error("Value type mismatch for future"))
         }
     }
 
@@ -974,7 +984,7 @@ where
 
 impl Default for AsyncCanonicalAbi {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create AsyncCanonicalAbi")
     }
 }
 
@@ -1010,7 +1020,7 @@ mod tests {
 
     #[test]
     fn test_async_canonical_abi_creation() {
-        let abi = AsyncCanonicalAbi::new();
+        let abi = AsyncCanonicalAbi::new().unwrap();
         assert_eq!(abi.streams.len(), 0);
         assert_eq!(abi.futures.len(), 0);
         assert_eq!(abi.error_contexts.len(), 0);
@@ -1018,7 +1028,7 @@ mod tests {
 
     #[test]
     fn test_stream_lifecycle() {
-        let mut abi = AsyncCanonicalAbi::new();
+        let mut abi = AsyncCanonicalAbi::new().unwrap();
 
         // Create stream
         let stream_handle = abi.stream_new(&ValType::U32).unwrap();
@@ -1044,7 +1054,7 @@ mod tests {
 
     #[test]
     fn test_future_lifecycle() {
-        let mut abi = AsyncCanonicalAbi::new();
+        let mut abi = AsyncCanonicalAbi::new().unwrap();
 
         // Create future
         let future_handle = abi.future_new(&ValType::String).unwrap();
@@ -1070,7 +1080,7 @@ mod tests {
 
     #[test]
     fn test_error_context() {
-        let mut abi = AsyncCanonicalAbi::new();
+        let mut abi = AsyncCanonicalAbi::new().unwrap();
 
         let handle = abi.error_context_new("Test error").unwrap();
         let debug_string = abi.error_context_debug_string(handle).unwrap();
@@ -1084,7 +1094,7 @@ mod tests {
 
     #[test]
     fn test_task_operations() {
-        let mut abi = AsyncCanonicalAbi::new();
+        let mut abi = AsyncCanonicalAbi::new().unwrap();
 
         // Test yield
         assert!(abi.task_yield().is_err()); // No current task
@@ -1095,7 +1105,7 @@ mod tests {
 
     #[test]
     fn test_async_lift_immediate() {
-        let mut abi = AsyncCanonicalAbi::new();
+        let mut abi = AsyncCanonicalAbi::new().unwrap();
         let context = CanonicalLiftContext::default();
         let values = vec![42u8, 0, 0, 0];
         let types = vec![ValType::U32];
@@ -1111,7 +1121,7 @@ mod tests {
 
     #[test]
     fn test_async_lift_stream() {
-        let mut abi = AsyncCanonicalAbi::new();
+        let mut abi = AsyncCanonicalAbi::new().unwrap();
         let context = CanonicalLiftContext::default();
         let values = vec![];
         let types = vec![ValType::Stream(Box::new(ValType::U32))];
@@ -1126,7 +1136,7 @@ mod tests {
 
     #[test]
     fn test_async_lower_immediate() {
-        let mut abi = AsyncCanonicalAbi::new();
+        let mut abi = AsyncCanonicalAbi::new().unwrap();
         let context = CanonicalLowerContext::default();
         let values = vec![Value::U32(42)];
 
@@ -1140,7 +1150,7 @@ mod tests {
 
     #[test]
     fn test_async_lower_stream() {
-        let mut abi = AsyncCanonicalAbi::new();
+        let mut abi = AsyncCanonicalAbi::new().unwrap();
         let context = CanonicalLowerContext::default();
         let stream_handle = StreamHandle(42);
         let values = vec![Value::Stream(stream_handle)];

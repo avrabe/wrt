@@ -10,7 +10,6 @@
 // Conditional imports based on runtime mode
 #[cfg(feature = "std-runtime")]
 use std::{
-    collections::HashMap,
     env, 
     fs,
     path::PathBuf,
@@ -18,21 +17,35 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(feature = "std-runtime")]
+use crate::bounded_wrtd_infra::{
+    BoundedServiceMap, BoundedLogEntryVec, WrtdProvider,
+    new_service_map, new_log_entry_vec
+};
+
 #[cfg(feature = "alloc-runtime")]
 extern crate alloc;
 
 #[cfg(feature = "alloc-runtime")]
 use std::{
-    collections::BTreeMap,
     string::{String, ToString},
-    vec::Vec,
+};
+
+#[cfg(feature = "alloc-runtime")]
+use crate::bounded_wrtd_infra::{
+    BoundedServiceMap, BoundedLogEntryVec, WrtdProvider,
+    new_service_map, new_log_entry_vec
 };
 
 #[cfg(feature = "nostd-runtime")]
 use heapless::{
     String,
-    Vec,
     FnvIndexMap as Map,
+};
+
+#[cfg(feature = "nostd-runtime")]
+use crate::bounded_wrtd_infra::{
+    BoundedLogEntryVec, WrtdProvider, new_log_entry_vec
 };
 
 /// Configuration for the runtime daemon
@@ -78,7 +91,7 @@ pub mod std_runtime {
     pub struct StdRuntime {
         config: WrtdConfig,
         stats: Mutex<RuntimeStats>,
-        module_cache: Mutex<HashMap<String, Vec<u8>>>,
+        module_cache: Mutex<BoundedServiceMap<BoundedLogEntryVec<u8>>>,
     }
     
     impl StdRuntime {
@@ -87,7 +100,7 @@ pub mod std_runtime {
             Self {
                 config,
                 stats: Mutex::new(RuntimeStats::default()),
-                module_cache: Mutex::new(HashMap::new()),
+                module_cache: Mutex::new(new_service_map()),
             }
         }
         
@@ -195,7 +208,7 @@ pub mod alloc_runtime {
     pub struct AllocRuntime {
         config: WrtdConfig,
         stats: RuntimeStats,
-        module_cache: BTreeMap<String, Vec<u8>>,
+        module_cache: BoundedServiceMap<BoundedLogEntryVec<u8>>,
     }
     
     impl AllocRuntime {
@@ -204,7 +217,7 @@ pub mod alloc_runtime {
             Self {
                 config,
                 stats: RuntimeStats::default(),
-                module_cache: BTreeMap::new(),
+                module_cache: new_service_map(),
             }
         }
         
@@ -276,8 +289,8 @@ pub mod nostd_runtime {
     pub struct NoStdRuntime {
         config: WrtdConfig,
         stats: RuntimeStats,
-        // Using heapless collections with fixed capacity
-        execution_log: Vec<u8, 64>, // Log last 64 execution events
+        // Using bounded collections with fixed capacity
+        execution_log: BoundedLogEntryVec<u8>, // Log execution events
     }
     
     impl NoStdRuntime {
@@ -286,7 +299,7 @@ pub mod nostd_runtime {
             Self {
                 config,
                 stats: RuntimeStats::default(),
-                execution_log: Vec::new(),
+                execution_log: new_log_entry_vec(),
             }
         }
         

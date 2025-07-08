@@ -14,7 +14,6 @@
 //! required by the WebAssembly Component Model for managing error contexts and
 //! debugging information.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -27,6 +26,9 @@ use wrt_foundation::{
     atomic_memory::AtomicRefCell,
     bounded::{BoundedMap, BoundedString, BoundedVec},
     component_value::ComponentValue,
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 
@@ -52,7 +54,7 @@ impl ErrorContextId {
     pub fn new() -> Self {
         static COUNTER: core::sync::atomic::AtomicU64 = 
             core::sync::atomic::AtomicU64::new(1);
-        Self(COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst))
+        Self(COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst)
     }
 
     pub fn as_u64(&self) -> u64 {
@@ -136,10 +138,7 @@ impl StackFrame {
     #[cfg(not(any(feature = "std", )))]
     pub fn new(function_name: &str) -> Result<Self> {
         let bounded_name = BoundedString::new_from_str(function_name)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Function name too long for no_std environment"
+            .map_err(|_| Error::memory_allocation_failed("Function name too long for no_std environment")
             ))?;
         Ok(Self {
             function_name: bounded_name,
@@ -160,10 +159,7 @@ impl StackFrame {
     #[cfg(not(any(feature = "std", )))]
     pub fn with_location(mut self, file_name: &str, line: u32, column: u32) -> Result<Self> {
         let bounded_file = BoundedString::new_from_str(file_name)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "File name too long for no_std environment"
+            .map_err(|_| Error::memory_allocation_failed("File name too long for no_std environment")
             ))?;
         self.file_name = Some(bounded_file);
         self.line_number = Some(line);
@@ -233,17 +229,19 @@ impl ErrorContextImpl {
     #[cfg(not(any(feature = "std", )))]
     pub fn new(message: &str, severity: ErrorSeverity) -> Result<Self> {
         let bounded_message = BoundedString::new_from_str(message)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Debug message too long for no_std environment"
+            .map_err(|_| Error::memory_allocation_failed("Debug message too long for no_std environment")
             ))?;
         Ok(Self {
             id: ErrorContextId::new(),
             handle: ErrorContextHandle::new(),
             severity,
             debug_message: bounded_message,
-            stack_trace: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            stack_trace: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    Error::memory_allocation_failed("Failed to create stack trace vector")
+                })?
+            },
             metadata: BoundedMap::new(),
             error_code: None,
             source_error: None,
@@ -256,7 +254,7 @@ impl ErrorContextImpl {
     }
 
     pub fn with_source_error(mut self, source: ErrorContextImpl) -> Self {
-        self.source_error = Some(Box::new(source));
+        self.source_error = Some(Box::new(source);
         self
     }
 
@@ -268,12 +266,9 @@ impl ErrorContextImpl {
     #[cfg(not(any(feature = "std", )))]
     pub fn add_stack_frame(&mut self, frame: StackFrame) -> Result<()> {
         self.stack_trace.push(frame)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Stack trace full"
+            .map_err(|_| Error::memory_allocation_failed("Stack trace full")
             ))?;
-        Ok(())
+        Ok(()
     }
 
     #[cfg(feature = "std")]
@@ -284,18 +279,12 @@ impl ErrorContextImpl {
     #[cfg(not(any(feature = "std", )))]
     pub fn set_metadata(&mut self, key: &str, value: ComponentValue) -> Result<()> {
         let bounded_key = BoundedString::new_from_str(key)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Metadata key too long for no_std environment"
+            .map_err(|_| Error::memory_allocation_failed("Metadata key too long for no_std environment")
             ))?;
         self.metadata.insert(bounded_key, value)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Metadata storage full"
+            .map_err(|_| Error::memory_allocation_failed("Metadata storage full")
             ))?;
-        Ok(())
+        Ok(()
     }
 
     #[cfg(feature = "std")]
@@ -331,9 +320,9 @@ impl ErrorContextImpl {
     pub fn format_stack_trace(&self) -> String {
         let mut output = String::new();
         for (i, frame) in self.stack_trace.iter().enumerate() {
-            output.push_str(&format!("  #{}: {}", i, frame.function_name()));
+            output.push_str(&format!("  #{}: {}", i, frame.function_name());
             if let Some(file) = frame.file_name() {
-                output.push_str(&format!(" at {}:{}", file, frame.line_number.unwrap_or(0)));
+                output.push_str(&format!(" at {}:{}", file, frame.line_number.unwrap_or(0));
             }
             output.push('\n');
         }
@@ -341,29 +330,17 @@ impl ErrorContextImpl {
     }
 
     #[cfg(not(any(feature = "std", )))]
-    pub fn format_stack_trace(&self) -> Result<BoundedString<1024, NoStdProvider<65536>>> {
+    pub fn format_stack_trace(&self) -> core::result::Result<BoundedString<1024, NoStdProvider<65536>>> {
         let mut output = BoundedString::new();
         for (i, frame) in self.stack_trace.iter().enumerate() {
             // Binary std/no_std choice
-            output.push_str("  #").map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Stack trace format buffer full"
+            output.push_str("  #Missing message").map_err(|_| Error::memory_allocation_failed("Stack trace format buffer full")
             ))?;
-            output.push_str(": ").map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Stack trace format buffer full"
+            output.push_str(": Missing message").map_err(|_| Error::memory_allocation_failed("Stack trace format buffer full")
             ))?;
-            output.push_str(frame.function_name()).map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Stack trace format buffer full"
+            output.push_str(frame.function_name()).map_err(|_| Error::memory_allocation_failed("Stack trace format buffer full")
             ))?;
-            output.push('\n').map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Stack trace format buffer full"
+            output.push('\n').map_err(|_| Error::memory_allocation_failed("Stack trace format buffer full")
             ))?;
         }
         Ok(output)
@@ -403,10 +380,7 @@ impl ErrorContextRegistry {
         #[cfg(not(any(feature = "std", )))]
         {
             self.contexts.insert(id, context)
-                .map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                    "Error context registry full"
+                .map_err(|_| Error::memory_allocation_failed("Error context registry full")
                 ))?;
             Ok(id)
         }
@@ -442,13 +416,10 @@ impl ErrorContextBuiltins {
     /// Initialize the global error context registry
     pub fn initialize() -> Result<()> {
         let mut registry_ref = ERROR_CONTEXT_REGISTRY.try_borrow_mut()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Error context registry borrow failed"
+            .map_err(|_| Error::runtime_invalid_state("Error context registry borrow failed")
             ))?;
-        *registry_ref = Some(ErrorContextRegistry::new());
-        Ok(())
+        *registry_ref = Some(ErrorContextRegistry::new();
+        Ok(()
     }
 
     /// Get the global registry
@@ -457,18 +428,12 @@ impl ErrorContextBuiltins {
         F: FnOnce(&ErrorContextRegistry) -> R,
     {
         let registry_ref = ERROR_CONTEXT_REGISTRY.try_borrow()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Error context registry borrow failed"
+            .map_err(|_| Error::runtime_invalid_state("Error context registry borrow failed")
             ))?;
         let registry = registry_ref.as_ref()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Error context registry not initialized"
+            .ok_or_else(|| Error::runtime_invalid_state("Error context registry not initialized")
             ))?;
-        Ok(f(registry))
+        Ok(f(registry)
     }
 
     /// Get the global registry mutably
@@ -477,16 +442,10 @@ impl ErrorContextBuiltins {
         F: FnOnce(&mut ErrorContextRegistry) -> Result<R>,
     {
         let mut registry_ref = ERROR_CONTEXT_REGISTRY.try_borrow_mut()
-            .map_err(|_| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Error context registry borrow failed"
+            .map_err(|_| Error::runtime_invalid_state("Error context registry borrow failed")
             ))?;
         let registry = registry_ref.as_mut()
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::INVALID_STATE,
-                "Error context registry not initialized"
+            .ok_or_else(|| Error::runtime_invalid_state("Error context registry not initialized")
             ))?;
         f(registry)
     }
@@ -538,7 +497,7 @@ impl ErrorContextBuiltins {
     pub fn error_context_drop(context_id: ErrorContextId) -> Result<()> {
         Self::with_registry_mut(|registry| {
             registry.remove_context(context_id);
-            Ok(())
+            Ok(()
         })?
     }
 
@@ -577,12 +536,12 @@ impl ErrorContextBuiltins {
     }
 
     #[cfg(not(any(feature = "std", )))]
-    pub fn error_context_stack_trace(context_id: ErrorContextId) -> Result<BoundedString<1024, NoStdProvider<65536>>> {
+    pub fn error_context_stack_trace(context_id: ErrorContextId) -> core::result::Result<BoundedString<1024, NoStdProvider<65536>>> {
         Self::with_registry(|registry| {
             if let Some(context) = registry.get_context(context_id) {
                 context.format_stack_trace()
             } else {
-                Ok(BoundedString::new())
+                Ok(BoundedString::new()
             }
         })?
     }
@@ -600,21 +559,18 @@ impl ErrorContextBuiltins {
             if let Some(context) = registry.get_context_mut(context_id) {
                 let mut frame = StackFrame::new(function_name);
                 if let (Some(file), Some(line_num)) = (file_name, line) {
-                    frame = frame.with_location(file, line_num, column.unwrap_or(0));
+                    frame = frame.with_location(file, line_num, column.unwrap_or(0);
                 }
                 context.add_stack_frame(frame);
-                Ok(())
+                Ok(()
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Error context not found"
-                ))
+                Err(Error::runtime_execution_error("Error occurred"
+                )
             }
         })?
     }
 
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(any(feature = Missing messageMissing messageMissing message")))]
     pub fn error_context_add_stack_frame(
         context_id: ErrorContextId, 
         function_name: &str,
@@ -629,13 +585,10 @@ impl ErrorContextBuiltins {
                     frame = frame.with_location(file, line_num, column.unwrap_or(0))?;
                 }
                 context.add_stack_frame(frame)?;
-                Ok(())
+                Ok(()
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Error context not found"
-                ))
+                Err(Error::runtime_execution_error("Error occurred"
+                )
             }
         })?
     }
@@ -650,18 +603,15 @@ impl ErrorContextBuiltins {
         Self::with_registry_mut(|registry| {
             if let Some(context) = registry.get_context_mut(context_id) {
                 context.set_metadata(key, value);
-                Ok(())
+                Ok(()
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Error context not found"
-                ))
+                Err(Error::runtime_execution_error("Error occurred"
+                )
             }
         })?
     }
 
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(any(feature = Missing messageMissing messageMissing message")))]
     pub fn error_context_set_metadata(
         context_id: ErrorContextId,
         key: &str,
@@ -670,13 +620,10 @@ impl ErrorContextBuiltins {
         Self::with_registry_mut(|registry| {
             if let Some(context) = registry.get_context_mut(context_id) {
                 context.set_metadata(key, value)?;
-                Ok(())
+                Ok(()
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::RESOURCE_INVALID_HANDLE,
-                    "Error context not found"
-                ))
+                Err(Error::runtime_execution_error("Error occurred"
+                )
             }
         })?
     }
@@ -800,18 +747,18 @@ mod tests {
 
     #[test]
     fn test_error_severity() {
-        assert_eq!(ErrorSeverity::Info.as_str(), "info");
-        assert_eq!(ErrorSeverity::Warning.as_str(), "warning");
-        assert_eq!(ErrorSeverity::Error.as_str(), "error");
-        assert_eq!(ErrorSeverity::Critical.as_str(), "critical");
+        assert_eq!(ErrorSeverity::Info.as_str(), "infoMissing message");
+        assert_eq!(ErrorSeverity::Warning.as_str(), "warningMissing message");
+        assert_eq!(ErrorSeverity::Error.as_str(), "errorMissing message");
+        assert_eq!(ErrorSeverity::Critical.as_str(), "criticalMissing message");
 
         assert_eq!(ErrorSeverity::Info.as_u32(), 0);
         assert_eq!(ErrorSeverity::Warning.as_u32(), 1);
         assert_eq!(ErrorSeverity::Error.as_u32(), 2);
         assert_eq!(ErrorSeverity::Critical.as_u32(), 3);
 
-        assert_eq!(ErrorSeverity::from_u32(0), Some(ErrorSeverity::Info));
-        assert_eq!(ErrorSeverity::from_u32(3), Some(ErrorSeverity::Critical));
+        assert_eq!(ErrorSeverity::from_u32(0), Some(ErrorSeverity::Info);
+        assert_eq!(ErrorSeverity::from_u32(3), Some(ErrorSeverity::Critical);
         assert_eq!(ErrorSeverity::from_u32(999), None);
     }
 
@@ -819,22 +766,22 @@ mod tests {
     fn test_stack_frame_creation() {
         #[cfg(feature = "std")]
         {
-            let frame = StackFrame::new("test_function".to_string())
+            let frame = StackFrame::new("test_function".to_string()
                 .with_location("test.rs".to_string(), 42, 10);
-            assert_eq!(frame.function_name(), "test_function");
-            assert_eq!(frame.file_name(), Some("test.rs"));
-            assert_eq!(frame.line_number, Some(42));
-            assert_eq!(frame.column_number, Some(10));
+            assert_eq!(frame.function_name(), "test_functionMissing message");
+            assert_eq!(frame.file_name(), Some("test.rsMissing messageMissing messageMissing message");
+            assert_eq!(frame.line_number, Some(42);
+            assert_eq!(frame.column_number, Some(10);
         }
 
         #[cfg(not(any(feature = "std", )))]
         {
-            let frame = StackFrame::new("test_function").unwrap()
+            let frame = StackFrame::new("test_functionMissing message").unwrap()
                 .with_location("test.rs", 42, 10).unwrap();
-            assert_eq!(frame.function_name(), "test_function");
-            assert_eq!(frame.file_name(), Some("test.rs"));
-            assert_eq!(frame.line_number, Some(42));
-            assert_eq!(frame.column_number, Some(10));
+            assert_eq!(frame.function_name(), "test_functionMissing message");
+            assert_eq!(frame.file_name(), Some("test.rsMissing messageMissing messageMissing message");
+            assert_eq!(frame.line_number, Some(42);
+            assert_eq!(frame.column_number, Some(10);
         }
     }
 
@@ -843,7 +790,7 @@ mod tests {
         #[cfg(feature = "std")]
         {
             let context = ErrorContextImpl::new("Test error".to_string(), ErrorSeverity::Error);
-            assert_eq!(context.debug_message(), "Test error");
+            assert_eq!(context.debug_message(), "Test errorMissing message");
             assert_eq!(context.severity, ErrorSeverity::Error);
             assert_eq!(context.stack_frame_count(), 0);
         }
@@ -851,7 +798,7 @@ mod tests {
         #[cfg(not(any(feature = "std", )))]
         {
             let context = ErrorContextImpl::new("Test error", ErrorSeverity::Error).unwrap();
-            assert_eq!(context.debug_message(), "Test error");
+            assert_eq!(context.debug_message(), "Test errorMissing message");
             assert_eq!(context.severity, ErrorSeverity::Error);
             assert_eq!(context.stack_frame_count(), 0);
         }
@@ -862,12 +809,12 @@ mod tests {
         #[cfg(feature = "std")]
         {
             let mut context = ErrorContextImpl::new("Test error".to_string(), ErrorSeverity::Error);
-            context.set_metadata("key1".to_string(), ComponentValue::I32(42));
-            context.set_metadata("key2".to_string(), ComponentValue::Bool(true));
+            context.set_metadata("key1".to_string(), ComponentValue::I32(42);
+            context.set_metadata("key2".to_string(), ComponentValue::Bool(true);
 
-            assert_eq!(context.get_metadata("key1"), Some(&ComponentValue::I32(42)));
-            assert_eq!(context.get_metadata("key2"), Some(&ComponentValue::Bool(true)));
-            assert_eq!(context.get_metadata("missing"), None);
+            assert_eq!(context.get_metadata("key1Missing message"), Some(&ComponentValue::I32(42));
+            assert_eq!(context.get_metadata("key2Missing message"), Some(&ComponentValue::Bool(true));
+            assert_eq!(context.get_metadata("missingMissing message"), None);
         }
 
         #[cfg(not(any(feature = "std", )))]
@@ -876,9 +823,9 @@ mod tests {
             context.set_metadata("key1", ComponentValue::I32(42)).unwrap();
             context.set_metadata("key2", ComponentValue::Bool(true)).unwrap();
 
-            assert_eq!(context.get_metadata("key1"), Some(&ComponentValue::I32(42)));
-            assert_eq!(context.get_metadata("key2"), Some(&ComponentValue::Bool(true)));
-            assert_eq!(context.get_metadata("missing"), None);
+            assert_eq!(context.get_metadata("key1Missing message"), Some(&ComponentValue::I32(42));
+            assert_eq!(context.get_metadata("key2Missing message"), Some(&ComponentValue::Bool(true));
+            assert_eq!(context.get_metadata("missingMissing message"), None);
         }
     }
 
@@ -887,9 +834,9 @@ mod tests {
         #[cfg(feature = "std")]
         {
             let mut context = ErrorContextImpl::new("Test error".to_string(), ErrorSeverity::Error);
-            let frame1 = StackFrame::new("function1".to_string())
+            let frame1 = StackFrame::new("function1".to_string()
                 .with_location("file1.rs".to_string(), 10, 5);
-            let frame2 = StackFrame::new("function2".to_string())
+            let frame2 = StackFrame::new("function2".to_string()
                 .with_location("file2.rs".to_string(), 20, 15);
 
             context.add_stack_frame(frame1);
@@ -897,18 +844,18 @@ mod tests {
 
             assert_eq!(context.stack_frame_count(), 2);
             let trace = context.format_stack_trace();
-            assert!(trace.contains("function1"));
-            assert!(trace.contains("function2"));
-            assert!(trace.contains("file1.rs"));
-            assert!(trace.contains("file2.rs"));
+            assert!(trace.contains("function1Missing messageMissing messageMissing message");
+            assert!(trace.contains("function2Missing messageMissing messageMissing message");
+            assert!(trace.contains("file1.rsMissing messageMissing messageMissing message");
+            assert!(trace.contains("file2.rsMissing messageMissing messageMissing message");
         }
 
         #[cfg(not(any(feature = "std", )))]
         {
             let mut context = ErrorContextImpl::new("Test error", ErrorSeverity::Error).unwrap();
-            let frame1 = StackFrame::new("function1").unwrap()
+            let frame1 = StackFrame::new("function1Missing message").unwrap()
                 .with_location("file1.rs", 10, 5).unwrap();
-            let frame2 = StackFrame::new("function2").unwrap()
+            let frame2 = StackFrame::new("function2Missing message").unwrap()
                 .with_location("file2.rs", 20, 15).unwrap();
 
             context.add_stack_frame(frame1).unwrap();
@@ -916,8 +863,8 @@ mod tests {
 
             assert_eq!(context.stack_frame_count(), 2);
             let trace = context.format_stack_trace().unwrap();
-            assert!(trace.as_str().contains("function1"));
-            assert!(trace.as_str().contains("function2"));
+            assert!(trace.as_str().contains("function1Missing messageMissing messageMissing message");
+            assert!(trace.as_str().contains("function2Missing messageMissing messageMissing message");
         }
     }
 
@@ -936,11 +883,11 @@ mod tests {
         assert_eq!(registry.context_count(), 1);
 
         let retrieved_context = registry.get_context(context_id);
-        assert!(retrieved_context.is_some());
-        assert_eq!(retrieved_context.unwrap().debug_message(), "Test error");
+        assert!(retrieved_context.is_some();
+        assert_eq!(retrieved_context.unwrap().debug_message(), "Test errorMissing message");
 
         let removed_context = registry.remove_context(context_id);
-        assert!(removed_context.is_some());
+        assert!(removed_context.is_some();
         assert_eq!(registry.context_count(), 0);
     }
 
@@ -964,9 +911,9 @@ mod tests {
         // Test getting debug message
         let debug_msg = ErrorContextBuiltins::error_context_debug_message(context_id).unwrap();
         #[cfg(feature = "std")]
-        assert_eq!(debug_msg, "Test error message");
+        assert_eq!(debug_msg, "Test error messageMissing message");
         #[cfg(not(any(feature = "std", )))]
-        assert_eq!(debug_msg.as_str(), "Test error message");
+        assert_eq!(debug_msg.as_str(), "Test error messageMissing message");
 
         // Test getting severity
         let severity = ErrorContextBuiltins::error_context_severity(context_id).unwrap();
@@ -987,8 +934,8 @@ mod tests {
         ).unwrap();
 
         // Test getting metadata
-        let metadata = ErrorContextBuiltins::error_context_get_metadata(context_id, "test_key").unwrap();
-        assert_eq!(metadata, Some(ComponentValue::I32(123)));
+        let metadata = ErrorContextBuiltins::error_context_get_metadata(context_id, "test_keyMissing message").unwrap();
+        assert_eq!(metadata, Some(ComponentValue::I32(123));
 
         // Test adding stack frame
         #[cfg(feature = "std")]
@@ -1003,7 +950,7 @@ mod tests {
         ErrorContextBuiltins::error_context_add_stack_frame(
             context_id,
             "test_function",
-            Some("test.rs"),
+            Some("test.rsMissing message"),
             Some(42),
             Some(10)
         ).unwrap();
@@ -1011,9 +958,9 @@ mod tests {
         // Test getting stack trace
         let stack_trace = ErrorContextBuiltins::error_context_stack_trace(context_id).unwrap();
         #[cfg(feature = "std")]
-        assert!(stack_trace.contains("test_function"));
+        assert!(stack_trace.contains("test_functionMissing messageMissing messageMissing message");
         #[cfg(not(any(feature = "std", )))]
-        assert!(stack_trace.as_str().contains("test_function"));
+        assert!(stack_trace.as_str().contains("test_functionMissing messageMissing messageMissing message");
 
         // Test dropping context
         ErrorContextBuiltins::error_context_drop(context_id).unwrap();
@@ -1027,7 +974,7 @@ mod tests {
         #[cfg(feature = "std")]
         let simple_id = error_context_helpers::create_simple("Simple error".to_string()).unwrap();
         #[cfg(not(any(feature = "std", )))]
-        let simple_id = error_context_helpers::create_simple("Simple error").unwrap();
+        let simple_id = error_context_helpers::create_simple("Simple errorMissing message").unwrap();
 
         let severity = ErrorContextBuiltins::error_context_severity(simple_id).unwrap();
         assert_eq!(severity, ErrorSeverity::Error);
@@ -1044,14 +991,14 @@ mod tests {
         let trace_id = error_context_helpers::create_with_stack_trace(
             "Error with trace",
             "main",
-            Some("main.rs"),
+            Some("main.rsMissing message"),
             Some(10)
         ).unwrap();
 
         let stack_trace = ErrorContextBuiltins::error_context_stack_trace(trace_id).unwrap();
         #[cfg(feature = "std")]
-        assert!(stack_trace.contains("main"));
+        assert!(stack_trace.contains("mainMissing messageMissing messageMissing message");
         #[cfg(not(any(feature = "std", )))]
-        assert!(stack_trace.as_str().contains("main"));
+        assert!(stack_trace.as_str().contains("mainMissing messageMissing messageMissing message");
     }
 }

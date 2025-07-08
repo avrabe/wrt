@@ -5,9 +5,9 @@
 //! - `stream<T>`: Multi-value async sequence
 //! - `error-context`: Error propagation for async operations
 
-use core::task::Waker;
 use crate::types::ValueType as ValType;
 use crate::values::Value;
+use core::task::Waker;
 
 /// Maximum number of buffered values in a stream
 pub const MAX_STREAM_BUFFER: usize = 64;
@@ -40,33 +40,28 @@ pub struct ComponentFuture<T> {
 impl<T> ComponentFuture<T> {
     /// Create a new Component Model future
     pub fn new(handle: FutureHandle, value_type: ValType) -> Self {
-        Self {
-            handle,
-            value_type,
-            status: ComponentFutureStatus::Pending,
-            waker: None,
-        }
+        Self { handle, value_type, status: ComponentFutureStatus::Pending, waker: None }
     }
-    
+
     /// Get the future's handle
     pub fn id(&self) -> u32 {
         self.handle.0
     }
-    
+
     /// Poll the future's status
-    pub fn poll_status(&mut self) -> Result<ComponentFutureStatus<T>, &'static str> 
+    pub fn poll_status(&mut self) -> Result<ComponentFutureStatus<T>, &'static str>
     where
         T: Clone,
     {
         // In a real implementation, this would check with the Component Model runtime
         Ok(self.status.clone())
     }
-    
+
     /// Set a waker to be notified when the future completes
     pub fn set_waker(&mut self, waker: Waker) {
         self.waker = Some(waker);
     }
-    
+
     /// Complete the future with a value
     pub fn complete(&mut self, value: T) {
         self.status = ComponentFutureStatus::Ready(value);
@@ -110,7 +105,7 @@ impl<T> ComponentStream<T> {
             write_waker: None,
         }
     }
-    
+
     /// Try to read a value from the stream
     pub fn try_read(&mut self) -> Result<Option<T>, &'static str> {
         if let Some(value) = self.buffer_item.take() {
@@ -121,31 +116,31 @@ impl<T> ComponentStream<T> {
             Err("No values available")
         }
     }
-    
+
     /// Try to write a value to the stream
     pub fn try_write(&mut self, value: T) -> Result<(), &'static str> {
         if self.state != StreamState::Open {
             return Err("Stream closed for writing");
         }
-        
+
         if self.buffer_item.is_some() {
             return Err("Stream buffer full");
         }
-        
+
         self.buffer_item = Some(value);
-        
+
         if let Some(waker) = self.read_waker.take() {
             waker.wake();
         }
-        
+
         Ok(())
     }
-    
+
     /// Check if the stream is closed
     pub fn is_closed(&self) -> bool {
         self.state == StreamState::Closed && self.buffer_item.is_none()
     }
-    
+
     /// Close the stream for writing
     pub fn close_write(&mut self) {
         self.state = StreamState::WriteClosed;
@@ -153,12 +148,12 @@ impl<T> ComponentStream<T> {
             waker.wake();
         }
     }
-    
+
     /// Set a waker for read availability
     pub fn set_read_waker(&mut self, waker: Waker) {
         self.read_waker = Some(waker);
     }
-    
+
     /// Set a waker for write availability
     pub fn set_write_waker(&mut self, waker: Waker) {
         self.write_waker = Some(waker);
@@ -179,19 +174,15 @@ pub struct ErrorContext {
 impl ErrorContext {
     /// Create a new error context
     pub fn new(message: &'static str) -> Self {
-        Self {
-            message,
-            code: None,
-            trace: None,
-        }
+        Self { message, code: None, trace: None }
     }
-    
+
     /// Add an error code
     pub fn with_code(mut self, code: u32) -> Self {
         self.code = Some(code);
         self
     }
-    
+
     /// Add a trace or additional context
     pub fn with_trace(mut self, trace: &'static str) -> Self {
         self.trace = Some(trace);
@@ -207,7 +198,7 @@ impl Value {
         // For now, we use I32 as a placeholder
         Value::I32(handle as i32)
     }
-    
+
     /// Create a stream value
     pub fn stream(handle: u32) -> Self {
         // In a real implementation, this would be a new Value variant
@@ -219,46 +210,40 @@ impl Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_component_future() {
-        let mut future: ComponentFuture<u32> = ComponentFuture::new(
-            FutureHandle(1),
-            ValType::I32
-        );
-        
+        let mut future: ComponentFuture<u32> = ComponentFuture::new(FutureHandle(1), ValType::I32);
+
         // Initially pending
         assert!(matches!(future.poll_status().unwrap(), ComponentFutureStatus::Pending));
-        
+
         // Complete the future
         future.complete(42);
         assert!(matches!(future.poll_status().unwrap(), ComponentFutureStatus::Ready(42)));
     }
-    
+
     #[test]
     fn test_component_stream() {
-        let mut stream: ComponentStream<u32> = ComponentStream::new(
-            StreamHandle(1),
-            ValType::I32
-        );
-        
+        let mut stream: ComponentStream<u32> = ComponentStream::new(StreamHandle(1), ValType::I32);
+
         // Write some values
         stream.try_write(1).unwrap();
         stream.try_write(2).unwrap();
         stream.try_write(3).unwrap();
-        
+
         // Read values
         assert_eq!(stream.try_read().unwrap(), Some(1));
         assert_eq!(stream.try_read().unwrap(), Some(2));
         assert_eq!(stream.try_read().unwrap(), Some(3));
-        
+
         // No more values
         assert!(stream.try_read().is_err());
-        
+
         // Close and check
         stream.close_write();
         assert!(!stream.is_closed()); // Still have buffered values
-        
+
         stream.state = StreamState::Closed;
         assert!(stream.is_closed()); // Now fully closed
     }

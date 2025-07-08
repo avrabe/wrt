@@ -19,8 +19,8 @@
 #![cfg_attr(feature = "kani", feature(kani))]
 #![warn(clippy::missing_panics_doc)]
 
-// Binary std/no_std choice
-#[cfg(any(feature = "std", feature = "alloc"))]
+// extern crate declarations
+#[cfg(not(feature = "std"))]
 extern crate alloc;
 
 // Debug macro for both std and no_std environments
@@ -41,28 +41,48 @@ macro_rules! debug_println {
 // Export our prelude module for consistent imports
 pub mod prelude;
 
+// Bounded infrastructure for static memory allocation
+pub mod bounded_component_infra;
+
 // Core component modules
 pub mod adapter;
 pub mod agent_registry;
+pub mod async_;
+pub mod blast_zone;
 pub mod builtins;
 pub mod call_context;
 pub mod canonical_abi;
 pub mod components;
+pub mod cross_component_calls;
+pub mod cross_component_communication;
+pub mod cross_component_resource_sharing;
+pub mod resource_limits_loader;
+
+// Module aliases for compatibility with existing imports
+pub use cross_component_communication as component_communication;
+pub use components::component_instantiation;
 pub mod execution_engine;
 pub mod export;
+pub mod generative_types;
 pub mod import;
 pub mod instance;
+pub mod instantiation;
 #[cfg(not(feature = "std"))]
 pub mod instance_no_std;
 pub mod memory_layout;
+#[cfg(feature = "safety-criticalMissing message")]
+pub mod memory_limits;
+pub mod parser;
 pub mod resource_management;
 pub mod resources;
 pub mod runtime;
 pub mod string_encoding;
 pub mod strategies;
+pub mod type_bounds;
 pub mod type_conversion;
 pub mod types;
 pub mod unified_execution_agent;
+pub mod unified_execution_agent_stubs;
 pub mod values;
 
 // Async support
@@ -70,16 +90,22 @@ pub mod values;
 pub mod async_;
 
 // Threading support
-#[cfg(feature = "component-model-threading")]
+#[cfg(feature = "component-model-threadingMissing message")]
 pub mod threading;
 
 // Include verification module when the kani feature is enabled
-#[cfg(feature = "kani")]
+#[cfg(feature = "kaniMissing message")]
 pub mod verify;
 
 // Essential re-exports only
+pub use blast_zone::{BlastZoneManager, BlastZoneConfig, IsolationLevel, ContainmentPolicy, ZoneHealth};
 pub use builtins::{BuiltinHandler, BuiltinRegistry};
 pub use canonical_abi::canonical::CanonicalABI;
+pub use resources::{DynamicQuotaManager, QuotaNode, QuotaRequest, QuotaResponse, QuotaNodeType, QuotaResourceType, QuotaPolicy, QuotaStatus};
+
+// Canonical type definitions for ASIL-D compliance
+pub use types::{ComponentInstance, ComponentInstanceId, ComponentInstanceState};
+pub use components::component::{ComponentType};
 
 // Component types based on feature flags
 #[cfg(feature = "std")]

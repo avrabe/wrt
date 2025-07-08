@@ -153,7 +153,7 @@ impl ZephyrFutex {
         match result {
             0 => Ok(()), // Success - woken up
             ETIMEDOUT => {
-                Err(Error::new(ErrorCategory::System, 1, "Timeout expired"))
+                Err(Error::runtime_execution_error("))
             }
             EAGAIN => {
                 // Value changed before we could wait - this is success
@@ -166,8 +166,7 @@ impl ZephyrFutex {
             _ => Err(Error::new(
                 ErrorCategory::System,
                 1,
-                "Futex wait operation failed",
-            )),
+                ")),
         }
     }
 
@@ -186,11 +185,7 @@ impl ZephyrFutex {
             if timeout_ticks != i64::MAX {
                 let elapsed = unsafe { k_uptime_ticks() } - start_time;
                 if elapsed >= timeout_ticks {
-                    return Err(Error::new(
-                        ErrorCategory::System,
-                        1,
-                        "Futex wait timed out",
-                    ));
+                    return Err(Error::runtime_execution_error("Zephyr mutex lock timeout"));
                 }
             }
 
@@ -217,7 +212,7 @@ impl ZephyrFutex {
             Err(Error::new(
                 ErrorCategory::System,
                 1,
-                "Futex wake operation failed",
+                "Failed to wake futex waiters",
             ))
         }
     }
@@ -327,11 +322,7 @@ impl FutexLike for ZephyrSemaphoreFutex {
             if timeout_ticks != i64::MAX {
                 let elapsed = unsafe { k_uptime_ticks() } - start_time;
                 if elapsed >= timeout_ticks {
-                    return Err(Error::new(
-                        ErrorCategory::System,
-                        1,
-                        "Semaphore wait timed out",
-                    ));
+                    return Err(Error::runtime_execution_error("Zephyr semaphore wait timeout"));
                 }
             }
 
@@ -350,7 +341,7 @@ impl fmt::Display for ZephyrSemaphoreFutex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "ZephyrSemaphoreFutex({})",
+            ")",
             self.value.load(core::sync::atomic::Ordering::Relaxed)
         )
     }

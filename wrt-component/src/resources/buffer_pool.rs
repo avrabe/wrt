@@ -159,8 +159,8 @@ mod tests {
         let mut pool = BufferPool::new();
 
         // Allocate and return some buffers
-        pool.return_buffer(pool.allocate(100));
-        pool.return_buffer(pool.allocate(200));
+        pool.return_buffer(pool.allocate(100);
+        pool.return_buffer(pool.allocate(200);
 
         // Check stats
         let stats_before = pool.stats();

@@ -28,17 +28,13 @@ impl MemoryManager {
     ) -> Result<()> {
         // Verify the resource exists
         if !resource_manager.has_resource(id) {
-            return Err(Error::new(
-                wrt_error::ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found"
-            ));
+            return Err(Error::component_not_found("Error occurred"Component not foundMissing messageMissing messageMissing message");
         }
 
         // Register with the default strategy
         self.resource_strategies.insert(id, self.default_strategy);
 
-        Ok(())
+        Ok(()
     }
 
     /// Register a resource with a custom memory strategy
@@ -50,17 +46,13 @@ impl MemoryManager {
     ) -> Result<()> {
         // Verify the resource exists
         if !resource_manager.has_resource(id) {
-            return Err(Error::new(
-                wrt_error::ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found"
-            ));
+            return Err(Error::component_not_found("Error occurred"Component not foundMissing messageMissing messageMissing message");
         }
 
         // Register with the specified strategy
         self.resource_strategies.insert(id, strategy);
 
-        Ok(())
+        Ok(()
     }
 
     /// Get access to memory for a resource
@@ -108,11 +100,11 @@ mod tests {
         memory_manager.register_resource(id, &resource_manager).unwrap();
 
         // Check strategy
-        assert_eq!(memory_manager.get_strategy(id), Some(MemoryStrategy::Copy));
+        assert_eq!(memory_manager.get_strategy(id), Some(MemoryStrategy::Copy);
 
         // Change strategy
         memory_manager.set_strategy(id, MemoryStrategy::Reference);
-        assert_eq!(memory_manager.get_strategy(id), Some(MemoryStrategy::Reference));
+        assert_eq!(memory_manager.get_strategy(id), Some(MemoryStrategy::Reference);
     }
 
     #[test]
@@ -122,6 +114,6 @@ mod tests {
 
         // Try to register a non-existent resource
         let result = memory_manager.register_resource(ResourceId(999), &resource_manager);
-        assert!(result.is_err());
+        assert!(result.is_err();
     }
 }

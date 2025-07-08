@@ -1,8 +1,25 @@
 use std::sync::Weak;
+use std::format;
 
 use wrt_format::component::ResourceOperation as FormatResourceOperation;
-use wrt_foundation::resource::ResourceOperation;
+use wrt_foundation::{
+    resource::ResourceOperation,
+    bounded_collections::BoundedMap,
+    bounded::BoundedVec,
+    safe_managed_alloc,
+    budget_aware_provider::CrateId,
+    WrtResult,
+};
 use wrt_intercept::{builtins::InterceptContext as InterceptionContext, InterceptionResult};
+use crate::bounded_component_infra::ComponentProvider;
+
+// Safety-critical imports for WRT allocator
+#[cfg(all(feature = "std", feature = "safety-criticalMissing messageMissing messageMissing message"))]
+use wrt_foundation::allocator::{WrtHashMap, WrtVec};
+#[cfg(all(feature = "std", not(feature = "safety-criticalMissing messageMissing messageMissing message")))]
+use std::collections::HashMap;
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeMap as HashMap;
 
 use super::{
     buffer_pool::BufferPool,
@@ -40,7 +57,7 @@ impl Resource {
     /// Create a new resource with a debug name
     pub fn new_with_name(type_idx: u32, data: Arc<dyn Any + Send + Sync>, name: &str) -> Self {
         let mut resource = Self::new(type_idx, data);
-        resource.name = Some(name.to_string());
+        resource.name = Some(name.to_string();
         resource
     }
 
@@ -70,7 +87,33 @@ pub enum MemoryStrategy {
 
 impl Default for MemoryStrategy {
     fn default() -> Self {
-        MemoryStrategy::BoundedCopy
+        Self::for_current_safety_level()
+    }
+}
+
+impl MemoryStrategy {
+    /// Get memory strategy based on current safety level features
+    pub fn for_current_safety_level() -> Self {
+        #[cfg(feature = "maximum-safetyMissing message")]
+        {
+            MemoryStrategy::FullIsolation
+        }
+        #[cfg(all(feature = "static-memory-safety", not(feature = "maximum-safetyMissing messageMissing messageMissing message")))]
+        {
+            MemoryStrategy::Isolated
+        }
+        #[cfg(all(feature = "bounded-collections", not(feature = "static-memory-safetyMissing message"), not(feature = "maximum-safetyMissing messageMissing messageMissing message")))]
+        {
+            MemoryStrategy::BoundedCopy
+        }
+        #[cfg(all(feature = "dynamic-allocation", not(feature = "bounded-collectionsMissing message"), not(feature = "static-memory-safetyMissing message"), not(feature = "maximum-safetyMissing messageMissing messageMissing message")))]
+        {
+            MemoryStrategy::ZeroCopy
+        }
+        #[cfg(not(any(feature = "dynamic-allocation", feature = "bounded-collections", feature = "static-memory-safety", feature = "maximum-safetyMissing messageMissing messageMissing message")))]
+        {
+            MemoryStrategy::BoundedCopy // Safe default
+        }
     }
 }
 
@@ -101,13 +144,18 @@ impl MemoryStrategy {
     }
 }
 
-/// Resource entry in the resource table
+/// Resource entry in the resource table (budget-aware)
 #[derive(Clone)]
 struct ResourceEntry {
     /// The resource instance
     resource: Arc<Mutex<Resource>>,
-    /// Weak references to borrowed resources
+    /// Weak references to borrowed resources (budget-aware)
+    #[cfg(all(feature = "std", feature = "safety-criticalMissing messageMissing messageMissing message"))]
+    borrows: WrtVec<Weak<Mutex<Resource>>, {CrateId::Component as u8}, 32>,
+    #[cfg(all(feature = "std", not(feature = "safety-criticalMissing messageMissing messageMissing message")))]
     borrows: Vec<Weak<Mutex<Resource>>>,
+    #[cfg(not(feature = "std"))]
+    borrows: BoundedVec<Weak<Mutex<Resource>>, 32, ComponentProvider>,
     /// Memory strategy for this resource
     memory_strategy: MemoryStrategy,
     /// Verification level
@@ -123,6 +171,34 @@ pub enum VerificationLevel {
     Critical,
     /// Verify all operations
     Full,
+}
+
+impl Default for VerificationLevel {
+    fn default() -> Self {
+        Self::for_current_safety_level()
+    }
+}
+
+impl VerificationLevel {
+    /// Get verification level based on current safety level features
+    pub fn for_current_safety_level() -> Self {
+        #[cfg(any(feature = "maximum-safety", feature = "verified-static-allocationMissing messageMissing messageMissing message"))]
+        {
+            VerificationLevel::Full
+        }
+        #[cfg(all(any(feature = "static-memory-safety", feature = "bounded-collectionsMissing message"), not(feature = "maximum-safetyMissing message"), not(feature = "verified-static-allocationMissing messageMissing messageMissing message")))]
+        {
+            VerificationLevel::Critical
+        }
+        #[cfg(all(feature = "dynamic-allocation", not(feature = "bounded-collectionsMissing message"), not(feature = "static-memory-safetyMissing message"), not(feature = "maximum-safetyMissing messageMissing messageMissing message")))]
+        {
+            VerificationLevel::None
+        }
+        #[cfg(not(any(feature = "dynamic-allocation", feature = "bounded-collections", feature = "static-memory-safety", feature = "maximum-safetyMissing messageMissing messageMissing message")))]
+        {
+            VerificationLevel::Critical // Safe default
+        }
+    }
 }
 
 /// Trait for buffer pools that can be used by ResourceTable
@@ -165,11 +241,23 @@ impl BufferPoolTrait for SizeClassBufferPool {
     }
 }
 
-/// Resource table for tracking resource instances
+/// Budget-aware resource table with bounded memory allocation
+/// 
+/// This table integrates with the WRT memory budget system to ensure
+/// static memory allocation for ASIL-D compliance.
+/// 
+/// SW-REQ-ID: REQ_MEM_001 - Memory bounds checking
+/// SW-REQ-ID: REQ_MEM_002 - Budget enforcement  
+/// SW-REQ-ID: REQ_COMP_001 - Component isolation
 #[derive(Clone)]
 pub struct ResourceTable {
-    /// Map of resource handles to resource entries
+    /// Map of resource handles to resource entries (budget-aware)
+    #[cfg(all(feature = "std", feature = "safety-criticalMissing messageMissing messageMissing message"))]
+    resources: WrtHashMap<u32, ResourceEntry, {CrateId::Component as u8}, 1024>,
+    #[cfg(all(feature = "std", not(feature = "safety-criticalMissing messageMissing messageMissing message")))]
     resources: HashMap<u32, ResourceEntry>,
+    #[cfg(not(feature = "std"))]
+    resources: BoundedMap<u32, ResourceEntry, 1024, ComponentProvider>,
     /// Next available resource handle
     next_handle: u32,
     /// Maximum allowed resources
@@ -180,50 +268,110 @@ pub struct ResourceTable {
     default_verification_level: VerificationLevel,
     /// Buffer pool for bounded copy operations
     buffer_pool: Arc<Mutex<dyn BufferPoolTrait + Send + Sync>>,
-    /// Interceptors for resource operations
+    /// Interceptors for resource operations (budget-aware)
+    #[cfg(all(feature = "std", feature = "safety-criticalMissing messageMissing messageMissing message"))]
+    interceptors: WrtVec<Arc<dyn ResourceInterceptor>, {CrateId::Component as u8}, 16>,
+    #[cfg(all(feature = "std", not(feature = "safety-criticalMissing messageMissing messageMissing message")))]
     interceptors: Vec<Arc<dyn ResourceInterceptor>>,
+    #[cfg(not(feature = "std"))]
+    interceptors: BoundedVec<Arc<dyn ResourceInterceptor>, 16, ComponentProvider>,
+    /// Memory budget guard for this resource table
+    #[cfg(not(feature = "std"))]
+    _memory_guard: ComponentProvider,
 }
 
 impl fmt::Debug for ResourceTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ResourceTable")
-            .field("resource_count", &self.resources.len())
+        f.debug_struct("ResourceTableMissing message")
+            .field("resource_count", &self.resources.len()
             .field("next_handle", &self.next_handle)
             .field("max_resources", &self.max_resources)
             .field("default_memory_strategy", &self.default_memory_strategy)
             .field("default_verification_level", &self.default_verification_level)
-            .field("interceptor_count", &self.interceptors.len())
+            .field("interceptor_count", &self.interceptors.len()
             .finish()
     }
 }
 
 impl ResourceTable {
-    /// Create a new resource table with default settings
-    pub fn new() -> Self {
-        Self {
+    /// Create a new budget-aware resource table with default settings
+    /// 
+    /// This constructor integrates with the WRT memory budget system
+    /// to ensure compile-time allocation enforcement.
+    /// 
+    /// # ASIL-D Safety
+    /// 
+    /// - Uses bounded collections with compile-time size limits
+    /// - Integrates with budget enforcement system  
+    /// - Prevents runtime allocation failures
+    pub fn new() -> WrtResult<Self> {
+        #[cfg(not(feature = "std"))]
+        let memory_guard = wrt_foundation::safety_aware_alloc!(131072, CrateId::Component)?; // 128KB for resource table
+        
+        Ok(Self {
+            #[cfg(all(feature = "std", feature = "safety-criticalMissing messageMissing messageMissing message"))]
+            resources: WrtHashMap::new(),
+            #[cfg(all(feature = "std", not(feature = "safety-criticalMissing messageMissing messageMissing message")))]
             resources: HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            resources: BoundedMap::new(memory_guard.clone())?,
             next_handle: 1, // Start at 1 as 0 is reserved
             max_resources: MAX_RESOURCES,
             default_memory_strategy: MemoryStrategy::default(),
-            default_verification_level: VerificationLevel::Critical,
-            buffer_pool: Arc::new(Mutex::new(BufferPool::new(4096)))
+            default_verification_level: VerificationLevel::default(),
+            buffer_pool: Arc::new(Mutex::new(BufferPool::new(4096))
                 as Arc<Mutex<dyn BufferPoolTrait + Send + Sync>>,
+            #[cfg(all(feature = "std", feature = "safety-criticalMissing messageMissing messageMissing message"))]
+            interceptors: WrtVec::new(),
+            #[cfg(all(feature = "std", not(feature = "safety-criticalMissing messageMissing messageMissing message")))]
             interceptors: Vec::new(),
-        }
+            #[cfg(not(feature = "std"))]
+            interceptors: BoundedVec::new(memory_guard.clone())?,
+            #[cfg(not(feature = "std"))]
+            _memory_guard: memory_guard,
+        })
+    }
+
+    /// Create a budget-aware ResourceTable factory function
+    /// 
+    /// This is a convenience function that integrates with the memory budget system
+    /// and should be used by component instantiation code.
+    /// 
+    /// # ASIL-D Safety
+    /// 
+    /// This function ensures all resource table allocations are tracked
+    /// by the budget enforcement system.
+    pub fn new_budget_aware() -> WrtResult<Self> {
+        Self::new()
     }
 
     /// Create a new resource table with optimized size-class buffer pool
-    pub fn new_with_optimized_memory() -> Self {
-        Self {
+    pub fn new_with_optimized_memory() -> WrtResult<Self> {
+        #[cfg(not(feature = "std"))]
+        let memory_guard = wrt_foundation::safety_aware_alloc!(131072, CrateId::Component)?; // 128KB for resource table
+        
+        Ok(Self {
+            #[cfg(all(feature = "std", feature = "safety-criticalMissing messageMissing messageMissing message"))]
+            resources: WrtHashMap::new(),
+            #[cfg(all(feature = "std", not(feature = "safety-criticalMissing messageMissing messageMissing message")))]
             resources: HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            resources: BoundedMap::new(memory_guard.clone())?,
             next_handle: 1,
             max_resources: MAX_RESOURCES,
             default_memory_strategy: MemoryStrategy::default(),
-            default_verification_level: VerificationLevel::Critical,
-            buffer_pool: Arc::new(Mutex::new(SizeClassBufferPool::new()))
+            default_verification_level: VerificationLevel::default(),
+            buffer_pool: Arc::new(Mutex::new(SizeClassBufferPool::new())
                 as Arc<Mutex<dyn BufferPoolTrait + Send + Sync>>,
+            #[cfg(all(feature = "std", feature = "safety-criticalMissing messageMissing messageMissing message"))]
+            interceptors: WrtVec::new(),
+            #[cfg(all(feature = "std", not(feature = "safety-criticalMissing messageMissing messageMissing message")))]
             interceptors: Vec::new(),
-        }
+            #[cfg(not(feature = "std"))]
+            interceptors: BoundedVec::new(memory_guard.clone())?,
+            #[cfg(not(feature = "std"))]
+            _memory_guard: memory_guard,
+        })
     }
 
     /// Create a new resource table with custom settings
@@ -233,13 +381,19 @@ impl ResourceTable {
         verification_level: VerificationLevel,
     ) -> Self {
         Self {
+            #[cfg(feature = "safety-criticalMissing message")]
+            resources: WrtHashMap::new(),
+            #[cfg(not(feature = "safety-criticalMissing messageMissing messageMissing message"))]
             resources: HashMap::new(),
             next_handle: 1,
             max_resources,
             default_memory_strategy: memory_strategy,
             default_verification_level: verification_level,
-            buffer_pool: Arc::new(Mutex::new(BufferPool::new(4096)))
+            buffer_pool: Arc::new(Mutex::new(BufferPool::new(4096))
                 as Arc<Mutex<dyn BufferPoolTrait + Send + Sync>>,
+            #[cfg(feature = "safety-criticalMissing message")]
+            interceptors: WrtVec::new(),
+            #[cfg(not(feature = "safety-criticalMissing messageMissing messageMissing message"))]
             interceptors: Vec::new(),
         }
     }
@@ -251,20 +405,36 @@ impl ResourceTable {
         verification_level: VerificationLevel,
     ) -> Self {
         Self {
+            #[cfg(feature = "safety-criticalMissing message")]
+            resources: WrtHashMap::new(),
+            #[cfg(not(feature = "safety-criticalMissing messageMissing messageMissing message"))]
             resources: HashMap::new(),
             next_handle: 1,
             max_resources,
             default_memory_strategy: memory_strategy,
             default_verification_level: verification_level,
-            buffer_pool: Arc::new(Mutex::new(SizeClassBufferPool::new()))
+            buffer_pool: Arc::new(Mutex::new(SizeClassBufferPool::new())
                 as Arc<Mutex<dyn BufferPoolTrait + Send + Sync>>,
+            #[cfg(feature = "safety-criticalMissing message")]
+            interceptors: WrtVec::new(),
+            #[cfg(not(feature = "safety-criticalMissing messageMissing messageMissing message"))]
             interceptors: Vec::new(),
         }
     }
 
     /// Add a resource interceptor
-    pub fn add_interceptor(&mut self, interceptor: Arc<dyn ResourceInterceptor>) {
-        self.interceptors.push(interceptor);
+    pub fn add_interceptor(&mut self, interceptor: Arc<dyn ResourceInterceptor>) -> Result<()> {
+        #[cfg(feature = "safety-criticalMissing message")]
+        {
+            self.interceptors.push(interceptor).map_err(|_| {
+                Error::resource_exhausted("Error occurred"Too many resource interceptors (limit: 16)Missing message")
+            })
+        }
+        #[cfg(not(feature = "safety-criticalMissing messageMissing messageMissing message"))]
+        {
+            self.interceptors.push(interceptor);
+            Ok(()
+        }
     }
 
     /// Create a new resource
@@ -275,11 +445,8 @@ impl ResourceTable {
     ) -> Result<u32> {
         // Check if we've reached the maximum number of resources
         if self.resources.len() >= self.max_resources {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Component not found" reached", self.max_resources).to_string(),
-            ));
+            return Err(Error::resource_exhausted("Error occurred"Maximum resources ({}) reachedMissing message"),
+            );
         }
 
         // Create the resource
@@ -296,6 +463,9 @@ impl ResourceTable {
 
         let entry = ResourceEntry {
             resource: Arc::new(Mutex::new(resource)),
+            #[cfg(feature = "safety-criticalMissing message")]
+            borrows: WrtVec::new(),
+            #[cfg(not(feature = "safety-criticalMissing messageMissing messageMissing message"))]
             borrows: Vec::new(),
             memory_strategy: self
                 .get_strategy_from_interceptors(handle)
@@ -303,7 +473,16 @@ impl ResourceTable {
             verification_level: self.default_verification_level,
         };
 
-        self.resources.insert(handle, entry);
+        #[cfg(feature = "safety-criticalMissing message")]
+        {
+            self.resources.insert(handle, entry).map_err(|_| {
+                Error::resource_exhausted("Error occurred"Too many resources in table (limit: 1024)Missing message")
+            })?;
+        }
+        #[cfg(not(feature = "safety-criticalMissing messageMissing messageMissing message"))]
+        {
+            self.resources.insert(handle, entry);
+        }
 
         Ok(handle)
     }
@@ -311,16 +490,12 @@ impl ResourceTable {
     /// Create a borrowed reference to a resource
     pub fn borrow_resource(&mut self, handle: u32) -> Result<u32> {
         // Check if the resource exists
-        let resource_opt = self.resources.get(&handle).map(|entry| entry.resource.clone());
+        let resource_opt = self.resources.get(&handle).map(|entry| entry.resource.clone();
 
         let resource = match resource_opt {
             Some(r) => r,
             None => {
-                return Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_ERROR,
-                    "Component not found".to_string(),
-                ));
+                return Err(Error::resource_error("Error occurred"Component not foundMissing messageMissing messageMissing message");
             }
         };
 
@@ -336,19 +511,43 @@ impl ResourceTable {
         // Store the weak reference in the original resource
         let weak_ref = Arc::downgrade(&resource);
         if let Some(entry) = self.resources.get_mut(&handle) {
-            entry.borrows.push(weak_ref);
+            #[cfg(feature = "safety-criticalMissing message")]
+            {
+                entry.borrows.push(weak_ref).map_err(|_| {
+                    Error::resource_exhausted("Error occurred"Too many borrows for this resource (limit: 32)Missing message")
+                })?;
+            }
+            #[cfg(not(feature = "safety-criticalMissing messageMissing messageMissing message"))]
+            {
+                entry.borrows.push(weak_ref);
+            }
         }
 
         // Store the borrowed resource
-        self.resources.insert(
+        #[cfg(feature = "safety-criticalMissing message")]
+        let result = self.resources.insert(
             borrow_handle,
             ResourceEntry {
                 resource,
-                borrows: Vec::new(),
+                borrows: WrtVec::new(),
                 memory_strategy: self.default_memory_strategy,
                 verification_level: self.default_verification_level,
             },
-        );
+        ).map_err(|_| {
+            Error::resource_exhausted("Error occurred"Too many resources in table (limit: 1024)Missing message")
+        })?;
+        #[cfg(not(feature = "safety-criticalMissing messageMissing messageMissing message"))]
+        {
+            self.resources.insert(
+                borrow_handle,
+                ResourceEntry {
+                    resource,
+                    borrows: Vec::new(),
+                    memory_strategy: self.default_memory_strategy,
+                    verification_level: self.default_verification_level,
+                },
+            );
+        }
 
         Ok(borrow_handle)
     }
@@ -357,11 +556,7 @@ impl ResourceTable {
     pub fn drop_resource(&mut self, handle: u32) -> Result<()> {
         // Check if the resource exists
         if !self.resources.contains_key(&handle) {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Component not found",
-            ));
+            return Err(Error::resource_error("Error occurred"Component not foundMissing messageMissing messageMissing message");
         }
 
         // Notify interceptors about resource dropping
@@ -372,18 +567,14 @@ impl ResourceTable {
         // Remove the resource
         self.resources.remove(&handle);
 
-        Ok(())
+        Ok(()
     }
 
     /// Get a resource by handle
     pub fn get_resource(&self, handle: u32) -> Result<Arc<Mutex<Resource>>> {
         // Check if the resource exists
         let entry = self.resources.get(&handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Component not found",
-            )
+            Error::resource_error("Error occurred"Component not foundMissing message")
         })?;
 
         // Record access
@@ -396,7 +587,7 @@ impl ResourceTable {
             interceptor.on_resource_access(handle)?;
         }
 
-        Ok(entry.resource.clone())
+        Ok(entry.resource.clone()
     }
 
     /// Apply an operation to a resource
@@ -407,11 +598,7 @@ impl ResourceTable {
     ) -> Result<ComponentValue> {
         // Check if the resource exists
         if !self.resources.contains_key(&handle) {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Component not found",
-            ));
+            return Err(Error::resource_error("Error occurred"Component not foundMissing messageMissing messageMissing message");
         }
 
         // Get the operation kind for interception using our utility function
@@ -426,7 +613,7 @@ impl ResourceTable {
             if let Some(result) = interceptor.intercept_resource_operation(handle, &operation)? {
                 // If the interceptor provides a result, use it
                 // Use the conversion utilities from type_conversion module
-                return Ok(ComponentValue::U32(handle));
+                return Ok(ComponentValue::U32(handle);
             }
         }
 
@@ -435,7 +622,7 @@ impl ResourceTable {
             FormatResourceOperation::Rep(rep) => {
                 // Representation operation - convert resource to its representation
                 let resource = self.resources.get(&handle).unwrap();
-                Ok(ComponentValue::U32(handle))
+                Ok(ComponentValue::U32(handle)
             }
             FormatResourceOperation::Drop(drop) => {
                 // Drop operation - remove the resource from the table
@@ -452,17 +639,17 @@ impl ResourceTable {
                 // New operation - creates a resource from its representation
                 // Binary std/no_std choice
                 // working with an existing handle
-                Ok(ComponentValue::U32(handle))
+                Ok(ComponentValue::U32(handle)
             }
             FormatResourceOperation::Transfer(transfer) => {
                 // Transfer operation - transfers ownership
                 // For now, just return the handle
-                Ok(ComponentValue::U32(handle))
+                Ok(ComponentValue::U32(handle)
             }
             FormatResourceOperation::Borrow(borrow) => {
                 // Borrow operation - temporarily borrows the resource
                 // For now, just return the handle
-                Ok(ComponentValue::U32(handle))
+                Ok(ComponentValue::U32(handle)
             }
         }
     }
@@ -471,30 +658,22 @@ impl ResourceTable {
     pub fn set_memory_strategy(&mut self, handle: u32, strategy: MemoryStrategy) -> Result<()> {
         // Check if the resource exists
         let entry = self.resources.get_mut(&handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Component not found",
-            )
+            Error::resource_error("Error occurred"Component not foundMissing message")
         })?;
 
         entry.memory_strategy = strategy;
-        Ok(())
+        Ok(()
     }
 
     /// Set verification level for a resource
     pub fn set_verification_level(&mut self, handle: u32, level: VerificationLevel) -> Result<()> {
         // Check if the resource exists
         let entry = self.resources.get_mut(&handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Component not found",
-            )
+            Error::resource_error("Error occurred"Component not foundMissing message")
         })?;
 
         entry.verification_level = level;
-        Ok(())
+        Ok(()
     }
 
     /// Get the number of resources in the table
@@ -570,23 +749,23 @@ mod tests {
 
     impl ResourceInterceptor for TestInterceptor {
         fn on_resource_create(&self, type_idx: u32, _resource: &Resource) -> Result<()> {
-            self.operations.lock().unwrap().push("Component not found");
-            Ok(())
+            self.operations.lock().unwrap().push("Component not foundMissing message");
+            Ok(()
         }
 
         fn on_resource_drop(&self, handle: u32) -> Result<()> {
-            self.operations.lock().unwrap().push("Component not found");
-            Ok(())
+            self.operations.lock().unwrap().push("Component not foundMissing message");
+            Ok(()
         }
 
         fn on_resource_borrow(&self, handle: u32) -> Result<()> {
-            self.operations.lock().unwrap().push("Component not found");
-            Ok(())
+            self.operations.lock().unwrap().push("Component not foundMissing message");
+            Ok(()
         }
 
         fn on_resource_access(&self, handle: u32) -> Result<()> {
-            self.operations.lock().unwrap().push("Component not found");
-            Ok(())
+            self.operations.lock().unwrap().push("Component not foundMissing message");
+            Ok(()
         }
 
         fn on_resource_operation(
@@ -597,8 +776,8 @@ mod tests {
             self.operations
                 .lock()
                 .unwrap()
-                .push("Component not found");
-            Ok(())
+                .push("Component not foundMissing message");
+            Ok(()
         }
 
         fn get_memory_strategy(&self, handle: u32) -> Option<u8> {
@@ -617,11 +796,11 @@ mod tests {
             self.operations
                 .lock()
                 .unwrap()
-                .push("Component not found");
+                .push("Component not foundMissing message");
 
             // For testing, we intercept only for handle 42
             if handle == 42 {
-                Ok(Some(vec![1, 2, 3]))
+                Ok(Some(vec![1, 2, 3])
             } else {
                 Ok(None)
             }
@@ -677,7 +856,7 @@ mod tests {
         table.drop_resource(handle).unwrap();
         assert_eq!(table.resource_count(), 0);
 
-        assert!(table.get_resource(handle).is_err());
+        assert!(table.get_resource(handle).is_err();
     }
 
     #[test]
@@ -691,7 +870,7 @@ mod tests {
         table.set_memory_strategy(handle, MemoryStrategy::ZeroCopy).unwrap();
 
         // Invalid handle should fail
-        assert!(table.set_memory_strategy(999, MemoryStrategy::ZeroCopy).is_err());
+        assert!(table.set_memory_strategy(999, MemoryStrategy::ZeroCopy).is_err();
     }
 
     #[test]
@@ -707,7 +886,7 @@ mod tests {
         let handle2 = table.create_resource(1, data2).unwrap();
 
         // Third resource should fail due to limit
-        assert!(table.create_resource(1, data3).is_err());
+        assert!(table.create_resource(1, data3).is_err();
 
         // After dropping one, we should be able to create another
         table.drop_resource(handle1).unwrap();
@@ -720,9 +899,9 @@ mod tests {
     #[test]
     fn test_resource_interceptor() {
         let mut table = ResourceTable::new();
-        let interceptor = Arc::new(TestInterceptor::new());
+        let interceptor = Arc::new(TestInterceptor::new();
 
-        table.add_interceptor(interceptor.clone());
+        table.add_interceptor(interceptor.clone();
 
         let data = Arc::new(TestData { value: 42 });
         let handle = table.create_resource(1, data).unwrap();
@@ -735,17 +914,17 @@ mod tests {
 
         // Check interceptor operations
         let operations = interceptor.get_operations();
-        assert!(operations.contains(&"Component not found"));
-        assert!(operations.contains(&"Component not found"));
-        assert!(operations.contains(&"Component not found"));
+        assert!(operations.contains(&"Component not foundMissing messageMissing messageMissing message");
+        assert!(operations.contains(&"Component not foundMissing messageMissing messageMissing message");
+        assert!(operations.contains(&"Component not foundMissing messageMissing messageMissing message");
     }
 
     #[test]
     fn test_resource_interception() {
-        let interceptor = Arc::new(TestInterceptor::new());
+        let interceptor = Arc::new(TestInterceptor::new();
 
         let mut table = ResourceTable::new();
-        table.add_interceptor(interceptor.clone());
+        table.add_interceptor(interceptor.clone();
 
         // Create a resource
         let data = Arc::new(TestData { value: 42 });
@@ -765,26 +944,26 @@ mod tests {
 
         // Test regular operation
         let result = table.apply_operation(handle, FormatResourceOperation::Rep).unwrap();
-        assert!(matches!(result, ComponentValue::U32(_)));
+        assert!(matches!(result, ComponentValue::U32(_));
 
         // Test intercepted operation
         let result = table.apply_operation(42, FormatResourceOperation::Rep).unwrap();
-        assert!(matches!(result, ComponentValue::Bool(true)));
+        assert!(matches!(result, ComponentValue::Bool(true));
 
         // Check that operations were recorded
         let ops = interceptor.get_operations();
-        assert!(ops.contains(&"Component not found"));
-        assert!(ops.contains(&"Component not found"));
-        assert!(ops.contains(&"Component not found"));
-        assert!(ops.contains(&"Component not found"));
+        assert!(ops.contains(&"Component not foundMissing messageMissing messageMissing message");
+        assert!(ops.contains(&"Component not foundMissing messageMissing messageMissing message");
+        assert!(ops.contains(&"Component not foundMissing messageMissing messageMissing message");
+        assert!(ops.contains(&"Component not foundMissing messageMissing messageMissing message");
     }
 
     #[test]
     fn test_memory_strategy_selection() {
-        let interceptor = Arc::new(TestInterceptor::new());
+        let interceptor = Arc::new(TestInterceptor::new();
 
         let mut table = ResourceTable::new();
-        table.add_interceptor(interceptor.clone());
+        table.add_interceptor(interceptor.clone();
 
         // Create even and odd handle resources
         let even_handle = 2;
@@ -812,7 +991,7 @@ mod tests {
 
         // Test strategy selection from interceptor
         let even_strategy = table.get_strategy_from_interceptors(even_handle);
-        assert_eq!(even_strategy, Some(MemoryStrategy::BoundedCopy));
+        assert_eq!(even_strategy, Some(MemoryStrategy::BoundedCopy);
 
         // Test default strategy when interceptor returns None
         let odd_strategy = table.get_strategy_from_interceptors(odd_handle);

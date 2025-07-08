@@ -13,9 +13,24 @@ use core::{
 };
 use wrt_foundation::{
     bounded_collections::{BoundedHashMap, BoundedVec},
-    component_value::ComponentValue,
+    component_value::WrtComponentValue,
     safe_memory::SafeMemory,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
+
+// Type aliases for capability-based memory allocation
+type ComponentProvider = wrt_foundation::safe_memory::NoStdProvider<65536>;
+type TypeIdVec<const N: usize> = BoundedVec<TypeId, N, ComponentProvider>;
+type StringVec<const N: usize> = BoundedVec<String, N, ComponentProvider>;
+type ComponentIdVec<const N: usize> = BoundedVec<ComponentInstanceId, N, ComponentProvider>;
+type U32Vec<const N: usize> = BoundedVec<u32, N, ComponentProvider>;
+type PolicyRuleVec = BoundedVec<PolicyRule, 32, ComponentProvider>;
+type SharingRestrictionVec = BoundedVec<SharingRestriction, 16, ComponentProvider>;
+type AuditEntryVec = BoundedVec<AuditEntry, 32, ComponentProvider>;
+type CapabilityVec = BoundedVec<Capability, 8, ComponentProvider>;
+type SharingPolicyVec = BoundedVec<SharingPolicy, MAX_SHARING_POLICIES, ComponentProvider>;
+type TransferRequestVec = BoundedVec<ResourceTransferRequest, MAX_TRANSFER_QUEUE, ComponentProvider>;
 
 // Enable vec! and format! macros for no_std
 #[cfg(not(feature = "std"))]
@@ -74,7 +89,7 @@ pub struct SharingAgreement {
     pub id: u32,
     pub source_component: ComponentInstanceId,
     pub target_component: ComponentInstanceId,
-    pub resource_types: BoundedVec<TypeId, 32, NoStdProvider<65536>>,
+    pub resource_types: TypeIdVec<32>,
     pub access_rights: AccessRights,
     pub transfer_policy: TransferPolicy,
     pub lifetime: SharingLifetime,
@@ -103,9 +118,9 @@ pub enum SharingLifetime {
 #[derive(Debug, Clone)]
 pub struct SharingMetadata {
     pub description: String,
-    pub tags: BoundedVec<String, 16, NoStdProvider<65536>>,
-    pub restrictions: BoundedVec<SharingRestriction, 16, NoStdProvider<65536>>,
-    pub audit_log: BoundedVec<AuditEntry, 32, NoStdProvider<65536>>,
+    pub tags: StringVec<16>,
+    pub restrictions: SharingRestrictionVec,
+    pub audit_log: AuditEntryVec,
 }
 
 #[derive(Debug, Clone)]
@@ -115,7 +130,7 @@ pub enum SharingRestriction {
     MustReturnBy { deadline: u64 },
     MaxConcurrentAccess { limit: u32 },
     RequiredCapability { capability: Capability },
-    GeographicRestriction { allowed_regions: BoundedVec<String, 8, NoStdProvider<65536>> },
+    GeographicRestriction { allowed_regions: StringVec<8> },
 }
 
 #[derive(Debug, Clone)]
@@ -142,8 +157,8 @@ pub struct SharedResource {
     pub handle: ResourceHandle,
     pub resource_type: GenerativeResourceType,
     pub owner_component: ComponentInstanceId,
-    pub shared_with: BoundedVec<ComponentInstanceId, 16, NoStdProvider<65536>>,
-    pub sharing_agreements: BoundedVec<u32, 16, NoStdProvider<65536>>,
+    pub shared_with: ComponentIdVec<16>,
+    pub sharing_agreements: U32Vec<16>,
     pub access_count: AtomicU32,
     pub is_locked: AtomicBool,
 }
@@ -155,7 +170,7 @@ pub struct ResourceTransferRequest {
     pub target_component: ComponentInstanceId,
     pub transfer_type: TransferType,
     pub access_rights: AccessRights,
-    pub metadata: Option<ComponentValue>,
+    pub metadata: Option<WrtComponentValue>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -171,7 +186,7 @@ pub struct SharingPolicy {
     pub id: u32,
     pub name: String,
     pub applies_to: PolicyScope,
-    pub rules: BoundedVec<PolicyRule, 32, NoStdProvider<65536>>,
+    pub rules: PolicyRuleVec,
     pub priority: u32,
     pub enabled: bool,
 }
@@ -187,10 +202,10 @@ pub enum PolicyScope {
 #[derive(Debug, Clone)]
 pub enum PolicyRule {
     RequireExplicitConsent,
-    AllowedResourceTypes { types: BoundedVec<TypeId, 16, NoStdProvider<65536>> },
-    DeniedResourceTypes { types: BoundedVec<TypeId, 16, NoStdProvider<65536>> },
+    AllowedResourceTypes { types: TypeIdVec<16> },
+    DeniedResourceTypes { types: TypeIdVec<16> },
     MaxShareCount { limit: u32 },
-    RequiredCapabilities { capabilities: BoundedVec<Capability, 8, NoStdProvider<65536>> },
+    RequiredCapabilities { capabilities: CapabilityVec },
     TimeRestriction { allowed_hours: (u8, u8) },
 }
 
@@ -206,8 +221,8 @@ pub struct CrossComponentResourceSharingManager {
 
     sharing_agreements: BoundedHashMap<u32, SharingAgreement, MAX_SHARING_AGREEMENTS>,
     shared_resources: BoundedHashMap<ResourceHandle, SharedResource, MAX_SHARED_RESOURCES>,
-    sharing_policies: BoundedVec<SharingPolicy, MAX_SHARING_POLICIES, NoStdProvider<65536>>,
-    transfer_queue: BoundedVec<ResourceTransferRequest, MAX_TRANSFER_QUEUE, NoStdProvider<65536>>,
+    sharing_policies: SharingPolicyVec,
+    transfer_queue: TransferRequestVec,
 
     callbacks: BoundedHashMap<String, SharingCallback, MAX_SHARING_CALLBACKS>,
 
@@ -217,8 +232,24 @@ pub struct CrossComponentResourceSharingManager {
 }
 
 impl CrossComponentResourceSharingManager {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> ResourceSharingResult<Self> {
+        let sharing_policies_provider = safe_managed_alloc!(65536, CrateId::Component).map_err(|e| ResourceSharingError {
+            kind: ResourceSharingErrorKind::ResourceLimitExceeded,
+            message: "Failed to allocate sharing policies provider".to_string(),
+            source_component: None,
+            target_component: None,
+            resource: None,
+        })?;
+        
+        let transfer_queue_provider = safe_managed_alloc!(65536, CrateId::Component).map_err(|e| ResourceSharingError {
+            kind: ResourceSharingErrorKind::ResourceLimitExceeded,
+            message: "Failed to allocate transfer queue provider".to_string(),
+            source_component: None,
+            target_component: None,
+            resource: None,
+        })?;
+        
+        Ok(Self {
             handle_manager: HandleRepresentationManager::new(),
             type_registry: GenerativeTypeRegistry::new(),
             bounds_checker: TypeBoundsChecker::new(),
@@ -227,15 +258,15 @@ impl CrossComponentResourceSharingManager {
 
             sharing_agreements: BoundedHashMap::new(),
             shared_resources: BoundedHashMap::new(),
-            sharing_policies: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-            transfer_queue: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            sharing_policies: BoundedVec::new(sharing_policies_provider).unwrap(),
+            transfer_queue: BoundedVec::new(transfer_queue_provider).unwrap(),
 
             callbacks: BoundedHashMap::new(),
 
             next_agreement_id: AtomicU32::new(1),
             next_policy_id: AtomicU32::new(1),
             enforce_policies: AtomicBool::new(true),
-        }
+        })
     }
 
     pub fn with_virtualization(mut self, virt_manager: VirtualizationManager) -> Self {
@@ -252,7 +283,7 @@ impl CrossComponentResourceSharingManager {
         &mut self,
         source_component: ComponentInstanceId,
         target_component: ComponentInstanceId,
-        resource_types: BoundedVec<TypeId, 32, NoStdProvider<65536>>,
+        resource_types: TypeIdVec<32>,
         access_rights: AccessRights,
         transfer_policy: TransferPolicy,
         lifetime: SharingLifetime,
@@ -282,9 +313,9 @@ impl CrossComponentResourceSharingManager {
                     source_component.id(),
                     target_component.id()
                 ),
-                tags: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-                restrictions: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-                audit_log: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+                tags: BoundedVec::new(safe_managed_alloc!(65536, CrateId::Component)?).unwrap(),
+                restrictions: BoundedVec::new(safe_managed_alloc!(65536, CrateId::Component)?).unwrap(),
+                audit_log: BoundedVec::new(safe_managed_alloc!(65536, CrateId::Component)?).unwrap(),
             },
         };
 
@@ -416,7 +447,7 @@ impl CrossComponentResourceSharingManager {
             },
         )?;
 
-        Ok(())
+        Ok(()
     }
 
     pub fn access_shared_resource(
@@ -424,7 +455,7 @@ impl CrossComponentResourceSharingManager {
         component_id: ComponentInstanceId,
         resource_handle: ResourceHandle,
         operation: HandleOperation,
-    ) -> ResourceSharingResult<Option<ComponentValue>> {
+    ) -> ResourceSharingResult<Option<WrtComponentValue>> {
         // Check if resource is shared
         let shared_resource =
             self.shared_resources.get(&resource_handle).ok_or_else(|| ResourceSharingError {
@@ -530,7 +561,7 @@ impl CrossComponentResourceSharingManager {
             )?;
         }
 
-        Ok(())
+        Ok(()
     }
 
     pub fn add_sharing_policy(&mut self, policy: SharingPolicy) -> ResourceSharingResult<u32> {
@@ -560,7 +591,7 @@ impl CrossComponentResourceSharingManager {
             resource: None,
         })?;
 
-        Ok(())
+        Ok(()
     }
 
     pub fn get_shared_resources_for_component(
@@ -612,7 +643,7 @@ impl CrossComponentResourceSharingManager {
             });
         }
 
-        Ok(())
+        Ok(()
     }
 
     fn check_sharing_policies(
@@ -631,7 +662,7 @@ impl CrossComponentResourceSharingManager {
             }
         }
 
-        Ok(())
+        Ok(()
     }
 
     fn policy_applies_to(
@@ -706,7 +737,7 @@ impl CrossComponentResourceSharingManager {
             _ => {} // Other rules would be checked elsewhere
         }
 
-        Ok(())
+        Ok(()
     }
 
     fn would_create_circular_dependency(
@@ -763,7 +794,7 @@ impl CrossComponentResourceSharingManager {
                     resource: Some(handle),
                 })?;
 
-            let mut shared_with_vec = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            let mut shared_with_vec = BoundedVec::new(safe_managed_alloc!(65536, CrateId::Component)?).unwrap();
             shared_with_vec.push(shared_with).map_err(|_| ResourceSharingError {
                 kind: ResourceSharingErrorKind::ResourceLimitExceeded,
                 message: "Failed to create shared_with list".to_string(),
@@ -772,7 +803,7 @@ impl CrossComponentResourceSharingManager {
                 resource: Some(handle),
             })?;
 
-            let mut agreements_vec = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+            let mut agreements_vec = BoundedVec::new(safe_managed_alloc!(65536, CrateId::Component)?).unwrap();
             agreements_vec.push(agreement_id).map_err(|_| ResourceSharingError {
                 kind: ResourceSharingErrorKind::ResourceLimitExceeded,
                 message: "Failed to create agreements list".to_string(),
@@ -802,7 +833,7 @@ impl CrossComponentResourceSharingManager {
             })?;
         }
 
-        Ok(())
+        Ok(()
     }
 
     fn process_resource_transfer(
@@ -819,7 +850,7 @@ impl CrossComponentResourceSharingManager {
             resource: None,
         })?;
 
-        Ok(())
+        Ok(()
     }
 
     fn execute_sharing_callbacks(
@@ -832,7 +863,7 @@ impl CrossComponentResourceSharingManager {
                 callback(shared_resource, agreement)?;
             }
         }
-        Ok(())
+        Ok(()
     }
 
     fn get_agreement(&self, agreement_id: u32) -> ResourceSharingResult<&SharingAgreement> {
@@ -871,7 +902,7 @@ impl CrossComponentResourceSharingManager {
             })?;
         }
 
-        Ok(())
+        Ok(()
     }
 
     fn count_active_agreements(&self) -> usize {
@@ -904,7 +935,7 @@ impl CrossComponentResourceSharingManager {
 
 impl Default for CrossComponentResourceSharingManager {
     fn default() -> Self {
-        Self::new()
+        Self::new().unwrap()
     }
 }
 
@@ -917,30 +948,46 @@ pub struct SharingStatistics {
     pub pending_transfers: usize,
 }
 
-pub fn create_basic_sharing_policy(name: &str) -> SharingPolicy {
-    SharingPolicy {
+pub fn create_basic_sharing_policy(name: &str) -> ResourceSharingResult<SharingPolicy> {
+    let rules_provider = safe_managed_alloc!(65536, CrateId::Component).map_err(|e| ResourceSharingError {
+        kind: ResourceSharingErrorKind::ResourceLimitExceeded,
+        message: "Failed to allocate policy rules provider".to_string(),
+        source_component: None,
+        target_component: None,
+        resource: None,
+    })?;
+    
+    Ok(SharingPolicy {
         id: 0, // Will be assigned by manager
         name: name.to_string(),
         applies_to: PolicyScope::Global,
-        rules: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+        rules: BoundedVec::new(rules_provider).unwrap(),
         priority: 0,
         enabled: true,
-    }
+    })
 }
 
 pub fn create_component_pair_policy(
     name: &str,
     source: ComponentInstanceId,
     target: ComponentInstanceId,
-) -> SharingPolicy {
-    SharingPolicy {
+) -> ResourceSharingResult<SharingPolicy> {
+    let rules_provider = safe_managed_alloc!(65536, CrateId::Component).map_err(|e| ResourceSharingError {
+        kind: ResourceSharingErrorKind::ResourceLimitExceeded,
+        message: "Failed to allocate policy rules provider".to_string(),
+        source_component: None,
+        target_component: None,
+        resource: None,
+    })?;
+    
+    Ok(SharingPolicy {
         id: 0,
         name: name.to_string(),
         applies_to: PolicyScope::ComponentPair { source, target },
-        rules: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+        rules: BoundedVec::new(rules_provider).unwrap(),
         priority: 0,
         enabled: true,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -949,8 +996,8 @@ mod tests {
 
     #[test]
     fn test_sharing_manager_creation() {
-        let manager = CrossComponentResourceSharingManager::new();
-        assert!(manager.enforce_policies.load(Ordering::Acquire));
+        let manager = CrossComponentResourceSharingManager::new().unwrap();
+        assert!(manager.enforce_policies.load(Ordering::Acquire);
     }
 
     #[test]
@@ -969,9 +1016,9 @@ mod tests {
 
     #[test]
     fn test_basic_policy_creation() {
-        let policy = create_basic_sharing_policy("test-policy");
-        assert_eq!(policy.name, "test-policy");
-        assert!(matches!(policy.applies_to, PolicyScope::Global));
+        let policy = create_basic_sharing_policy("test-policyMissing message").unwrap();
+        assert_eq!(policy.name, "test-policyMissing message");
+        assert!(matches!(policy.applies_to, PolicyScope::Global);
         assert!(policy.enabled);
     }
 }

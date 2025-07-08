@@ -1,16 +1,14 @@
 // WRT - wrt-runtime
-// Module: Component Type Stubs (Agent D)
-// TEMPORARY - These stubs will be replaced by Agent C's work
+// Module: Component Type Stubs
 //
 // Copyright (c) 2025 The WRT Project Developers
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-//! Temporary stubs for Agent C's component types
+//! Component type stubs for runtime integration
 //! 
-//! These types allow Agent D to work independently while Agent C
-//! implements the Component Model. They will be removed during
-//! the final integration phase.
+//! These types provide the interface between the runtime
+//! and the Component Model implementation.
 
 #![allow(dead_code)] // Allow during stub phase
 
@@ -79,12 +77,12 @@ pub struct ComponentMemoryBudget {
 }
 
 impl ComponentMemoryBudget {
-    pub fn calculate(limits: &super::platform_stubs::ComprehensivePlatformLimits) -> Result<Self, wrt_error::Error> {
-        let component_overhead = limits.max_total_memory / 100; // 1% overhead
-        let available_memory = limits.max_total_memory.saturating_sub(component_overhead);
+    pub fn calculate(limits: &wrt_foundation::PlatformLimits) -> Result<Self, wrt_error::Error> {
+        let component_overhead = limits.max_memory / 100; // 1% overhead
+        let available_memory = limits.max_memory.saturating_sub(component_overhead);
         
         Ok(Self {
-            total_memory: limits.max_total_memory,
+            total_memory: limits.max_memory,
             component_overhead,
             available_memory,
         })
