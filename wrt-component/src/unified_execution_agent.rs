@@ -1,7 +1,7 @@
-//! Unified Execution Agent for WebAssembly Runtime
+//! Unified Execution Engine for WebAssembly Runtime
 //!
-//! This module provides a unified execution agent that consolidates functionality
-//! from ComponentExecutionEngine, AsyncExecutionEngine, StacklessEngine, and CfiExecutionEngine.
+//! This module provides a unified execution engine that consolidates functionality
+//! from various execution modes (synchronous, asynchronous, stackless, and CFI-protected).
 //! It provides a single, cohesive interface for WebAssembly execution with support for:
 //! - Synchronous and asynchronous execution
 //! - Stackless execution for memory-constrained environments  
@@ -16,7 +16,9 @@ use core::{mem, fmt};
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
     prelude::*,
-    traits::DefaultMemoryProvider,
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 #[cfg(feature = "std")]
@@ -49,6 +51,10 @@ const MAX_CALL_STACK_DEPTH: usize = 256;
 /// Maximum operand stack size
 const MAX_OPERAND_STACK_SIZE: usize = 2048;
 
+// Type aliases for commonly used providers
+type AgentProvider = NoStdProvider<65536>;
+type AgentBoundedString = BoundedString<128, AgentProvider>;
+
 /// Unified execution agent that combines all execution capabilities
 #[derive(Debug, Clone)]
 pub struct UnifiedExecutionAgent {
@@ -75,13 +81,13 @@ pub struct CoreExecutionState {
     #[cfg(feature = "std")]
     call_stack: Vec<UnifiedCallFrame>,
     #[cfg(not(feature = "std"))]
-    call_stack: BoundedVec<UnifiedCallFrame, MAX_CALL_STACK_DEPTH, DefaultMemoryProvider>,
+    call_stack: BoundedVec<UnifiedCallFrame, MAX_CALL_STACK_DEPTH, AgentProvider>,
     
     /// Operand stack for value operations
     #[cfg(feature = "std")]
     operand_stack: Vec<Value>,
     #[cfg(not(feature = "std"))]
-    operand_stack: BoundedVec<Value, MAX_OPERAND_STACK_SIZE, DefaultMemoryProvider>,
+    operand_stack: BoundedVec<Value, MAX_OPERAND_STACK_SIZE, AgentProvider>,
     
     /// Current execution mode
     execution_mode: ExecutionMode,
@@ -110,7 +116,7 @@ pub struct AsyncExecutionState {
     #[cfg(feature = "std")]
     executions: Vec<AsyncExecution>,
     #[cfg(not(feature = "std"))]
-    executions: BoundedVec<AsyncExecution, MAX_CONCURRENT_EXECUTIONS, DefaultMemoryProvider>,
+    executions: BoundedVec<AsyncExecution, MAX_CONCURRENT_EXECUTIONS, AgentProvider>,
     
     /// Next execution ID
     next_execution_id: u64,
@@ -119,7 +125,7 @@ pub struct AsyncExecutionState {
     #[cfg(feature = "std")]
     context_pool: Vec<AsyncExecutionContext>,
     #[cfg(not(feature = "std"))]
-    context_pool: BoundedVec<AsyncExecutionContext, 16, DefaultMemoryProvider>,
+    context_pool: BoundedVec<AsyncExecutionContext, 16, AgentProvider>,
 }
 
 /// CFI execution state for security protection
@@ -147,7 +153,7 @@ pub struct StacklessExecutionState {
     #[cfg(feature = "std")]
     labels: Vec<Label>,
     #[cfg(not(feature = "std"))]
-    labels: BoundedVec<Label, 128, DefaultMemoryProvider>,
+    labels: BoundedVec<Label, 128, AgentProvider>,
     /// Stackless execution mode
     stackless_mode: bool,
 }
@@ -160,12 +166,12 @@ pub struct UnifiedCallFrame {
     /// Function index
     pub function_index: u32,
     /// Function name (for async and debugging)
-    pub function_name: BoundedString<128, DefaultMemoryProvider>,
+    pub function_name: AgentBoundedString,
     /// Local variables
     #[cfg(feature = "std")]
     pub locals: Vec<Value>,
     #[cfg(not(feature = "std"))]
-    pub locals: BoundedVec<Value, 64, DefaultMemoryProvider>,
+    pub locals: BoundedVec<Value, 64, AgentProvider>,
     /// Return address
     pub return_address: Option<usize>,
     /// Async state for this frame
@@ -315,13 +321,13 @@ pub struct WaitSet {
     #[cfg(feature = "std")]
     pub futures: Vec<FutureHandle>,
     #[cfg(not(feature = "std"))]
-    pub futures: BoundedVec<FutureHandle, 16, DefaultMemoryProvider>,
+    pub futures: BoundedVec<FutureHandle, 16, AgentProvider>,
     
     /// Streams to wait for
     #[cfg(feature = "std")]
     pub streams: Vec<StreamHandle>,
     #[cfg(not(feature = "std"))]
-    pub streams: BoundedVec<StreamHandle, 16, DefaultMemoryProvider>,
+    pub streams: BoundedVec<StreamHandle, 16, AgentProvider>,
 }
 
 /// Shadow stack entry for CFI protection
@@ -381,7 +387,7 @@ pub struct AsyncExecution {
 #[derive(Debug, Clone)]
 pub struct AsyncExecutionContext {
     pub component_instance: u32,
-    pub function_name: BoundedString<128, DefaultMemoryProvider>,
+    pub function_name: AgentBoundedString,
     pub memory_views: MemoryViews,
 }
 
@@ -418,7 +424,7 @@ pub struct MemoryPermissions {
 #[derive(Debug, Clone)]
 pub enum AsyncOperation {
     FunctionCall {
-        name: BoundedString<128, DefaultMemoryProvider>,
+        name: AgentBoundedString,
         args: Vec<Value>,
     },
     StreamRead {
@@ -440,7 +446,7 @@ pub enum AsyncOperation {
         wait_set: WaitSet,
     },
     SpawnSubtask {
-        function: BoundedString<128, DefaultMemoryProvider>,
+        function: AgentBoundedString,
         args: Vec<Value>,
     },
 }
@@ -457,20 +463,24 @@ pub struct AsyncExecutionResult {
 
 impl UnifiedExecutionAgent {
     /// Create a new unified execution agent
-    pub fn new(config: AgentConfiguration) -> Self {
-        let provider = DefaultMemoryProvider::default();
-        
-        Self {
+    pub fn new(config: AgentConfiguration) -> WrtResult<Self> {
+        Ok(Self {
             core_state: CoreExecutionState {
                 #[cfg(feature = "std")]
                 call_stack: Vec::new(),
                 #[cfg(not(feature = "std"))]
-                call_stack: BoundedVec::new(provider.clone()).unwrap(),
+                call_stack: {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider)?
+                },
                 
                 #[cfg(feature = "std")]
                 operand_stack: Vec::new(),
                 #[cfg(not(feature = "std"))]
-                operand_stack: BoundedVec::new(provider.clone()).unwrap(),
+                operand_stack: {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider)?
+                },
                 
                 execution_mode: config.execution_mode,
                 state: UnifiedExecutionState::Ready,
@@ -485,12 +495,18 @@ impl UnifiedExecutionAgent {
                 #[cfg(feature = "std")]
                 executions: Vec::new(),
                 #[cfg(not(feature = "std"))]
-                executions: BoundedVec::new(provider.clone()).unwrap(),
+                executions: {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider)?
+                },
                 next_execution_id: 1,
                 #[cfg(feature = "std")]
                 context_pool: Vec::new(),
                 #[cfg(not(feature = "std"))]
-                context_pool: BoundedVec::new(provider.clone()).unwrap(),
+                context_pool: {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider)?
+                },
             },
             
             #[cfg(feature = "cfi")]
@@ -507,23 +523,26 @@ impl UnifiedExecutionAgent {
                 #[cfg(feature = "std")]
                 labels: Vec::new(),
                 #[cfg(not(feature = "std"))]
-                labels: BoundedVec::new(provider).unwrap(),
+                labels: {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider)?
+                },
                 stackless_mode: matches!(config.execution_mode, ExecutionMode::Stackless),
             },
             
             config,
             statistics: UnifiedExecutionStatistics::default(),
-        }
+        })
     }
 
     /// Create agent with default configuration
-    pub fn new_default() -> Self {
+    pub fn new_default() -> WrtResult<Self> {
         Self::new(AgentConfiguration::default())
     }
 
     /// Create agent for async execution
     #[cfg(feature = "async")]
-    pub fn new_async() -> Self {
+    pub fn new_async() -> WrtResult<Self> {
         Self::new(AgentConfiguration {
             execution_mode: ExecutionMode::Asynchronous,
             ..AgentConfiguration::default()
@@ -532,7 +551,7 @@ impl UnifiedExecutionAgent {
 
     /// Create agent for CFI-protected execution
     #[cfg(feature = "cfi")]
-    pub fn new_cfi_protected() -> Self {
+    pub fn new_cfi_protected() -> WrtResult<Self> {
         Self::new(AgentConfiguration {
             execution_mode: ExecutionMode::CfiProtected,
             ..AgentConfiguration::default()
@@ -540,7 +559,7 @@ impl UnifiedExecutionAgent {
     }
 
     /// Create agent for stackless execution
-    pub fn new_stackless() -> Self {
+    pub fn new_stackless() -> WrtResult<Self> {
         Self::new(AgentConfiguration {
             execution_mode: ExecutionMode::Stackless,
             ..AgentConfiguration::default()
@@ -548,7 +567,7 @@ impl UnifiedExecutionAgent {
     }
 
     /// Create agent with hybrid capabilities
-    pub fn new_hybrid(flags: HybridModeFlags) -> Self {
+    pub fn new_hybrid(flags: HybridModeFlags) -> WrtResult<Self> {
         Self::new(AgentConfiguration {
             execution_mode: ExecutionMode::Hybrid(flags),
             ..AgentConfiguration::default()
@@ -572,7 +591,7 @@ impl UnifiedExecutionAgent {
             memory_base: 0,
             memory_size: self.config.max_memory,
         };
-        self.core_state.current_context = Some(context);
+        self.core_state.current_context = Some(context;
 
         // Create unified call frame
         let frame = UnifiedCallFrame {
@@ -583,9 +602,10 @@ impl UnifiedExecutionAgent {
             locals: args.to_vec(),
             #[cfg(not(feature = "std"))]
             locals: {
-                let mut locals = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                let mut locals = BoundedVec::new(provider)?;
                 for arg in args.iter().take(64) {
-                    let _ = locals.push(arg.clone());
+                    let _ = locals.push(arg.clone();
                 }
                 locals
             },
@@ -632,7 +652,7 @@ impl UnifiedExecutionAgent {
         #[cfg(not(feature = "std"))]
         {
             self.core_state.call_stack.push(frame).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Call stack overflow".into())
+                wrt_error::Error::resource_exhausted("Error occurred")
             })?;
         }
 
@@ -640,22 +660,22 @@ impl UnifiedExecutionAgent {
         #[cfg(feature = "std")]
         let function_name = "Component not found";
         #[cfg(not(feature = "std"))]
-        let function_name = BoundedString::from_str("Component operation result").unwrap_or_default();
+        let function_name = BoundedString::from_str("Component operation result").unwrap_or_default);
         
         let component_values = self.convert_values_to_component(args)?;
         
         let result = self.core_state.runtime_bridge
             .execute_component_function(frame.instance_id, &function_name, &component_values)
-            .map_err(|e| wrt_foundation::WrtError::Runtime(BoundedString::from_str("Component operation result").unwrap_or_default().into()))?;
+            .map_err(|_| wrt_error::Error::runtime_error("Error occurred"))?;
 
         // Pop frame
         #[cfg(feature = "std")]
         {
-            self.core_state.call_stack.pop();
+            self.core_state.call_stack.pop);
         }
         #[cfg(not(feature = "std"))]
         {
-            let _ = self.core_state.call_stack.pop();
+            let _ = self.core_state.call_stack.pop);
         }
 
         self.core_state.state = UnifiedExecutionState::Completed;
@@ -727,7 +747,7 @@ impl UnifiedExecutionAgent {
         #[cfg(not(feature = "std"))]
         {
             self.async_state.executions.push(async_execution).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many async executions".into())
+                wrt_error::Error::resource_exhausted("Error occurred")
             })?;
         }
 
@@ -800,15 +820,15 @@ impl UnifiedExecutionAgent {
 
     /// Reset the agent state
     pub fn reset(&mut self) {
-        self.core_state.call_stack.clear();
-        self.core_state.operand_stack.clear();
+        self.core_state.call_stack.clear);
+        self.core_state.operand_stack.clear);
         self.core_state.state = UnifiedExecutionState::Ready;
         self.core_state.current_context = None;
-        self.statistics = UnifiedExecutionStatistics::default();
+        self.statistics = UnifiedExecutionStatistics::default);
         
         #[cfg(feature = "async")]
         {
-            self.async_state.executions.clear();
+            self.async_state.executions.clear);
             self.async_state.next_execution_id = 1;
         }
     }
@@ -816,19 +836,20 @@ impl UnifiedExecutionAgent {
     /// Convert values to component values
     #[cfg(feature = "std")]
     fn convert_values_to_component(&self, values: &[Value]) -> WrtResult<Vec<ComponentValue>> {
-        let mut component_values = Vec::new();
+        let mut component_values = Vec::new);
         for value in values {
-            component_values.push(value.clone().into());
+            component_values.push(value.clone().into();
         }
         Ok(component_values)
     }
 
     #[cfg(not(feature = "std"))]
-    fn convert_values_to_component(&self, values: &[Value]) -> WrtResult<BoundedVec<Value, 16, DefaultMemoryProvider>> {
-        let mut component_values = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+    fn convert_values_to_component(&self, values: &[Value]) -> WrtResult<BoundedVec<Value, 16, AgentProvider>> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let mut component_values = BoundedVec::new(provider)?;
         for value in values.iter().take(16) {
             component_values.push(value.clone()).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many component values".into())
+                wrt_error::Error::resource_exhausted("Error occurred")
             })?;
         }
         Ok(component_values)
@@ -879,7 +900,11 @@ use wrt_foundation::traits::{Checksummable, ToBytes, FromBytes, WriteStream, Rea
 
 impl Default for UnifiedExecutionAgent {
     fn default() -> Self {
-        Self::new_default()
+        Self::new_default().unwrap_or_else(|_| {
+            // This should never happen in practice, but we need a fallback for the Default trait
+            // In production code, prefer using new_default() directly which returns Result
+            panic!("Failed to create default UnifiedExecutionAgent: memory allocation error")
+        })
     }
 }
 
@@ -897,7 +922,7 @@ macro_rules! impl_basic_traits {
     ($type:ty, $default_val:expr) => {
         impl Checksummable for $type {
             fn update_checksum(&self, checksum: &mut wrt_foundation::traits::Checksum) {
-                0u32.update_checksum(checksum);
+                0u32.update_checksum(checksum;
             }
         }
 
@@ -923,7 +948,7 @@ macro_rules! impl_basic_traits {
 }
 
 // Apply macro to UnifiedExecutionAgent
-impl_basic_traits!(UnifiedExecutionAgent, UnifiedExecutionAgent::default());
+impl_basic_traits!(UnifiedExecutionAgent, UnifiedExecutionAgent::default);
 
 #[cfg(test)]
 mod tests {
@@ -931,42 +956,42 @@ mod tests {
 
     #[test]
     fn test_unified_agent_creation() {
-        let agent = UnifiedExecutionAgent::new_default();
-        assert_eq!(agent.state(), UnifiedExecutionState::Ready);
-        assert_eq!(agent.call_stack_depth(), 0);
+        let agent = UnifiedExecutionAgent::new_default().unwrap();
+        assert_eq!(agent.state(), UnifiedExecutionState::Ready;
+        assert_eq!(agent.call_stack_depth(), 0;
     }
 
     #[test]
     fn test_synchronous_execution() {
-        let mut agent = UnifiedExecutionAgent::new_default();
+        let mut agent = UnifiedExecutionAgent::new_default().unwrap();
         let args = [Value::U32(42), Value::Bool(true)];
         
-        let result = agent.call_function(1, 2, &args);
-        assert!(result.is_ok());
-        assert_eq!(agent.state(), UnifiedExecutionState::Completed);
-        assert_eq!(agent.statistics().function_calls, 1);
+        let result = agent.call_function(1, 2, &args;
+        assert!(result.is_ok();
+        assert_eq!(agent.state(), UnifiedExecutionState::Completed;
+        assert_eq!(agent.statistics().function_calls, 1;
     }
 
     #[test]
     fn test_stackless_execution() {
-        let mut agent = UnifiedExecutionAgent::new_stackless();
+        let mut agent = UnifiedExecutionAgent::new_stackless().unwrap();
         let args = [Value::U32(100)];
         
-        let result = agent.call_function(1, 5, &args);
-        assert!(result.is_ok());
-        assert_eq!(agent.statistics().stackless_frames, 1);
+        let result = agent.call_function(1, 5, &args;
+        assert!(result.is_ok();
+        assert_eq!(agent.statistics().stackless_frames, 1;
     }
 
     #[cfg(feature = "async")]
     #[test]
     fn test_async_execution() {
-        let mut agent = UnifiedExecutionAgent::new_async();
+        let mut agent = UnifiedExecutionAgent::new_async().unwrap();
         let args = [Value::F32(3.14)];
         
-        let result = agent.call_function(2, 3, &args);
-        assert!(result.is_ok());
-        assert_eq!(agent.statistics().async_executions_started, 1);
-        assert_eq!(agent.statistics().async_executions_completed, 1);
+        let result = agent.call_function(2, 3, &args;
+        assert!(result.is_ok();
+        assert_eq!(agent.statistics().async_executions_started, 1;
+        assert_eq!(agent.statistics().async_executions_completed, 1;
     }
 
     #[test]
@@ -976,29 +1001,29 @@ mod tests {
             stackless_enabled: true,
             cfi_enabled: false,
         };
-        let mut agent = UnifiedExecutionAgent::new_hybrid(flags);
+        let mut agent = UnifiedExecutionAgent::new_hybrid(flags).unwrap();
         let args = [Value::S64(-100)];
         
-        let result = agent.call_function(1, 1, &args);
-        assert!(result.is_ok());
-        assert_eq!(agent.statistics().stackless_frames, 1);
+        let result = agent.call_function(1, 1, &args;
+        assert!(result.is_ok();
+        assert_eq!(agent.statistics().stackless_frames, 1;
     }
 
     #[test]
     fn test_agent_reset() {
-        let mut agent = UnifiedExecutionAgent::new_default();
+        let mut agent = UnifiedExecutionAgent::new_default().unwrap();
         
         // Execute something first
         let args = [Value::U32(42)];
-        let _ = agent.call_function(1, 2, &args);
+        let _ = agent.call_function(1, 2, &args;
         
         // Verify state changed
-        assert_eq!(agent.statistics().function_calls, 1);
+        assert_eq!(agent.statistics().function_calls, 1;
         
         // Reset and verify clean state
-        agent.reset();
-        assert_eq!(agent.state(), UnifiedExecutionState::Ready);
-        assert_eq!(agent.call_stack_depth(), 0);
-        assert_eq!(agent.statistics().function_calls, 0);
+        agent.reset);
+        assert_eq!(agent.state(), UnifiedExecutionState::Ready;
+        assert_eq!(agent.call_stack_depth(), 0;
+        assert_eq!(agent.statistics().function_calls, 0;
     }
 }

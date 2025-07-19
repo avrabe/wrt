@@ -7,7 +7,7 @@
 //! This module provides pure implementations for WebAssembly variable access
 //! instructions, including local and global variable operations.
 
-use crate::prelude::{ConstExprContext, Debug, Error, PureInstruction, Result, Value};
+use crate::prelude::{Debug, Error, PureInstruction, Result, Value};
 
 // ToString is brought in through the prelude for both std and no_std
 // configurations so we don't need explicit imports
@@ -96,12 +96,12 @@ mod tests {
         fn new() -> Self {
             Self {
                 locals: {
-                    let mut v = Vec::with_capacity(10);
+                    let mut v = Vec::with_capacity(10;
                     for _ in 0..10 { v.push(Value::I32(0)); }
                     v
                 },
                 globals: {
-                    let mut v = Vec::with_capacity(5);
+                    let mut v = Vec::with_capacity(5;
                     for _ in 0..5 { v.push(Value::I32(0)); }
                     v
                 },
@@ -113,11 +113,7 @@ mod tests {
     impl VariableContext for MockVariableContext {
         fn get_local(&self, index: u32) -> Result<Value> {
             self.locals.get(index as usize).cloned().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid local index",
-                )
+                Error::invalid_function_index("Invalid local index")
             })
         }
 
@@ -126,21 +122,13 @@ mod tests {
                 *local = value;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid local index",
-                ))
+                Err(Error::invalid_function_index("Invalid local index"))
             }
         }
 
         fn get_global(&self, index: u32) -> Result<Value> {
             self.globals.get(index as usize).cloned().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid global index",
-                )
+                Error::invalid_function_index("Invalid global index")
             })
         }
 
@@ -149,11 +137,7 @@ mod tests {
                 *global = value;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid global index",
-                ))
+                Err(Error::invalid_function_index("Invalid global index"))
             }
         }
 
@@ -164,14 +148,14 @@ mod tests {
 
         fn pop_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::runtime_stack_underflow("Stack underflow")
             })
         }
     }
 
     #[test]
     fn test_local_operations() {
-        let mut context = MockVariableContext::new();
+        let mut context = MockVariableContext::new);
 
         // Set up initial values
         context.set_local(0, Value::I32(42)).unwrap();
@@ -179,23 +163,23 @@ mod tests {
 
         // Test local.get
         VariableOp::LocalGet(0).execute(&mut context).unwrap();
-        assert_eq!(context.pop_value().unwrap(), Value::I32(42));
+        assert_eq!(context.pop_value().unwrap(), Value::I32(42;
 
         // Test local.set
         context.push_value(Value::I32(123)).unwrap();
         VariableOp::LocalSet(0).execute(&mut context).unwrap();
-        assert_eq!(context.get_local(0).unwrap(), Value::I32(123));
+        assert_eq!(context.get_local(0).unwrap(), Value::I32(123;
 
         // Test local.tee
         context.push_value(Value::I32(999)).unwrap();
         VariableOp::LocalTee(0).execute(&mut context).unwrap();
-        assert_eq!(context.get_local(0).unwrap(), Value::I32(999));
-        assert_eq!(context.pop_value().unwrap(), Value::I32(999));
+        assert_eq!(context.get_local(0).unwrap(), Value::I32(999;
+        assert_eq!(context.pop_value().unwrap(), Value::I32(999;
     }
 
     #[test]
     fn test_global_operations() {
-        let mut context = MockVariableContext::new();
+        let mut context = MockVariableContext::new);
 
         // Set up initial values
         context.set_global(0, Value::I32(42)).unwrap();
@@ -203,28 +187,28 @@ mod tests {
 
         // Test global.get
         VariableOp::GlobalGet(0).execute(&mut context).unwrap();
-        assert_eq!(context.pop_value().unwrap(), Value::I32(42));
+        assert_eq!(context.pop_value().unwrap(), Value::I32(42;
 
         // Test global.set
         context.push_value(Value::I32(123)).unwrap();
         VariableOp::GlobalSet(0).execute(&mut context).unwrap();
-        assert_eq!(context.get_global(0).unwrap(), Value::I32(123));
+        assert_eq!(context.get_global(0).unwrap(), Value::I32(123;
     }
 
     #[test]
     fn test_variable_errors() {
-        let mut context = MockVariableContext::new();
+        let mut context = MockVariableContext::new);
 
         // Test invalid local index
-        let result = VariableOp::LocalGet(100).execute(&mut context);
-        assert!(result.is_err());
+        let result = VariableOp::LocalGet(100).execute(&mut context;
+        assert!(result.is_err();
 
         // Test invalid global index
-        let result = VariableOp::GlobalGet(100).execute(&mut context);
-        assert!(result.is_err());
+        let result = VariableOp::GlobalGet(100).execute(&mut context;
+        assert!(result.is_err();
 
         // Test stack underflow
-        let result = VariableOp::LocalSet(0).execute(&mut context);
-        assert!(result.is_err());
+        let result = VariableOp::LocalSet(0).execute(&mut context;
+        assert!(result.is_err();
     }
 }

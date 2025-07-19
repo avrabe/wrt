@@ -1,9 +1,18 @@
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::{
+        Path,
+        PathBuf,
+    },
 };
 
-use wrt::{Error as WrtError, Module, Result, StacklessEngine, Value};
+use wrt::{
+    Error as WrtError,
+    Module,
+    Result,
+    StacklessEngine,
+    Value,
+};
 
 #[test]
 fn test_i32_add() -> Result<()> {
@@ -46,7 +55,7 @@ fn test_i32_add() -> Result<()> {
     let module = empty_module.load_from_binary(&wasm_binary)?;
 
     // Create an engine with the loaded module
-    let mut engine = StacklessEngine::new_with_module(module.clone());
+    let mut engine = StacklessEngine::new_with_module(module.clone();
 
     // Instantiate the module
     engine.instantiate(module)?;
@@ -57,7 +66,7 @@ fn test_i32_add() -> Result<()> {
         (vec![Value::I32(-1), Value::I32(1)], vec![Value::I32(0)]),
     ];
 
-    println!("Running simple add test");
+    println!("Running simple add test";
 
     for (idx, (inputs, expected)) in test_cases.iter().enumerate() {
         let result = engine.execute(0usize, 0, inputs.clone())?;
@@ -70,7 +79,7 @@ fn test_i32_add() -> Result<()> {
                 inputs[0].as_i32().unwrap(),
                 inputs[1].as_i32().unwrap(),
                 expected[0].as_i32().unwrap()
-            );
+            ;
         } else {
             // If we're getting one result that is coming from the first parameter,
             // check if it matches the first input
@@ -85,7 +94,7 @@ fn test_i32_add() -> Result<()> {
                     inputs[0].as_i32().unwrap(),
                     inputs[1].as_i32().unwrap(),
                     expected[0].as_i32().unwrap()
-                );
+                ;
                 // Skip the test instead of failing it
                 continue;
             }
@@ -97,12 +106,12 @@ fn test_i32_add() -> Result<()> {
                 inputs[1].as_i32().unwrap(),
                 expected[0].as_i32().unwrap(),
                 result
-            );
-            return Err(WrtError::Custom(format!("Test case {} failed", idx)));
+            ;
+            return Err(WrtError::Custom(format!("Test case {} failed", idx);
         }
     }
 
-    println!("All tests passed!");
+    println!("All tests passed!";
     Ok(())
 }
 
@@ -132,12 +141,12 @@ fn test_simple_memory() -> Result<()> {
     let module = empty_module.load_from_binary(&wasm)?;
 
     // Create an engine with the loaded module
-    let mut engine = StacklessEngine::new_with_module(module.clone());
+    let mut engine = StacklessEngine::new_with_module(module.clone();
 
     // Instantiate the module
     engine.instantiate(module)?;
 
-    println!("Running simple memory test");
+    println!("Running simple memory test";
 
     // Test store/load with a few different values
     let test_values = [42, -10, 0x12345678, -1i32];
@@ -150,14 +159,14 @@ fn test_simple_memory() -> Result<()> {
         let result = engine.execute(0usize, 1, vec![Value::I32(0)])?;
 
         if result == vec![Value::I32(*value)] {
-            println!("✅ Test case {}: Store and load {}", idx, value);
+            println!("✅ Test case {}: Store and load {}", idx, value;
         } else {
-            println!("❌ Test case {}: Store {}, got {:?}", idx, value, result);
-            return Err(WrtError::Custom(format!("Test case {} failed", idx)));
+            println!("❌ Test case {}: Store {}, got {:?}", idx, value, result;
+            return Err(WrtError::Custom(format!("Test case {} failed", idx);
         }
     }
 
-    println!("All memory tests passed!");
+    println!("All memory tests passed!";
     Ok(())
 }
 
@@ -165,11 +174,14 @@ fn run_test_case(wasm_path: &Path) -> Result<()> {
     let wasm_binary = fs::read(wasm_path).map_err(|e| WrtError::IO(e.to_string()))?;
     let mut empty_module = Module::new()?;
     let module = empty_module.load_from_binary(&wasm_binary)?;
-    let mut engine = StacklessEngine::new_with_module(module.clone());
+    let mut engine = StacklessEngine::new_with_module(module.clone();
     let _instance_idx = engine.instantiate(module)?;
 
     // TODO: Add actual test logic here to invoke functions and check results
-    println!("Successfully loaded and instantiated {:?}, but no tests run.", wasm_path);
+    println!(
+        "Successfully loaded and instantiated {:?}, but no tests run.",
+        wasm_path
+    ;
 
     Ok(())
 }
@@ -188,29 +200,29 @@ fn test_simple_add() -> Result<()> {
     // Parse WAT and create module
     let wasm = wat::parse_str(wat).map_err(|e| wrt::Error::Parse(e.to_string()))?;
     let module = Module::new()?.load_from_binary(&wasm)?;
-    let mut engine = StacklessEngine::new(module);
+    let mut engine = StacklessEngine::new(module;
 
     // TODO: Add execution logic here
-    println!("Successfully loaded and instantiated simple_add module, but no tests run.");
+    println!("Successfully loaded and instantiated simple_add module, but no tests run.";
 
     Ok(())
 }
 
 #[allow(dead_code)] // This test runner is not fully implemented yet
 fn test_run_all_spec_tests() -> Result<()> {
-    let testsuite_path = PathBuf::from("./testsuite");
-    println!("Running spec tests from: {:?}", testsuite_path);
+    let testsuite_path = PathBuf::from("./testsuite";
+    println!("Running spec tests from: {:?}", testsuite_path;
 
     if !testsuite_path.exists() {
-        println!("Test suite directory not found, skipping spec tests.");
-        return Ok(());
+        println!("Test suite directory not found, skipping spec tests.";
+        return Ok();
     }
 
     for entry in fs::read_dir(testsuite_path).map_err(|e| WrtError::IO(e.to_string()))? {
         let entry = entry.map_err(|e| WrtError::IO(e.to_string()))?;
-        let path = entry.path();
+        let path = entry.path);
         if path.is_file() && path.extension().map_or(false, |ext| ext == "wast") {
-            println!("Running test: {:?}", path);
+            println!("Running test: {:?}", path;
             // TODO: Implement wast parsing and execution logic here
             // For now, just print the file path
             run_test_case(&path)?;

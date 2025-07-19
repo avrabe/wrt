@@ -13,7 +13,7 @@ use crate::prelude::*;
 
 /// Unique identifier for a resource
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ResourceId(pub u32);
+pub struct ResourceId(pub u32;
 
 /// Trait representing a host resource
 pub trait HostResource {}
@@ -121,26 +121,14 @@ impl ResourceManager {
 
     /// Add a resource interceptor
     pub fn add_interceptor(&self, interceptor: Arc<dyn ResourceInterceptor>) -> Result<()> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
-        table.add_interceptor(interceptor);
+        let mut table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
+        table.add_interceptor(interceptor;
         Ok(())
     }
 
     /// Create a new resource
     pub fn create_resource(&self, type_idx: u32, data: Arc<dyn Any + Send + Sync>) -> Result<u32> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
         table.create_resource(type_idx, data)
     }
 
@@ -157,13 +145,7 @@ impl ResourceManager {
         data: Arc<dyn Any + Send + Sync>,
         name: &str,
     ) -> Result<u32> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
 
         // Create the resource
         let handle = table.create_resource(type_idx, data)?;
@@ -171,7 +153,7 @@ impl ResourceManager {
         // Set the name if we have access to the resource
         if let Ok(res) = table.get_resource(handle) {
             if let Ok(mut res_guard) = res.lock() {
-                res_guard.name = Some(name.to_string());
+                res_guard.name = Some(name.to_string();
             }
         }
 
@@ -180,13 +162,7 @@ impl ResourceManager {
 
     /// Borrow a resource
     pub fn borrow_resource(&self, handle: u32) -> Result<u32> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
         table.borrow_resource(handle)
     }
 
@@ -199,37 +175,21 @@ impl ResourceManager {
         let resource = self.get_resource(id.0)?;
 
         // Attempt to downcast to the requested type
-        let resource_guard = resource.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let resource_guard = resource.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource lock"))?;
 
         // Check if we can access the data as the requested type
         if let Some(typed_data) = resource_guard.data.downcast_ref::<T>() {
             // Create a cloned Arc<Mutex<T>> to return
-            let cloned_data = Arc::new(Mutex::new(typed_data.clone()));
+            let cloned_data = Arc::new(Mutex::new(typed_data.clone();
             Ok(cloned_data)
         } else {
-            Err(Error::new(
-                ErrorCategory::Type,
-                codes::TYPE_MISMATCH_ERROR,
-                "Component not found".to_string(),
-            ))
+            Err(Error::component_not_found("Resource type mismatch"))
         }
     }
 
     /// Drop a resource
     pub fn drop_resource(&self, handle: u32) -> Result<()> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
         table.drop_resource(handle)
     }
 
@@ -240,13 +200,7 @@ impl ResourceManager {
 
     /// Get a resource by handle
     pub fn get_resource(&self, handle: u32) -> Result<Arc<Mutex<Resource>>> {
-        let table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
         table.get_resource(handle)
     }
 
@@ -264,37 +218,19 @@ impl ResourceManager {
         handle: u32,
         operation: FormatResourceOperation,
     ) -> Result<ComponentValue> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
         table.apply_operation(handle, operation)
     }
 
     /// Set memory strategy for a resource
     pub fn set_memory_strategy(&self, handle: u32, strategy: MemoryStrategy) -> Result<()> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
         table.set_memory_strategy(handle, strategy)
     }
 
     /// Set verification level for a resource
     pub fn set_verification_level(&self, handle: u32, level: VerificationLevel) -> Result<()> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
         table.set_verification_level(handle, level)
     }
 
@@ -320,38 +256,20 @@ impl ResourceManager {
 
     /// Get the number of resources
     pub fn resource_count(&self) -> Result<usize> {
-        let table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
         Ok(table.resource_count())
     }
 
     /// Clean up unused resources
     pub fn cleanup_unused_resources(&self) -> Result<usize> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
         Ok(table.cleanup_unused_resources())
     }
 
     /// Clear all resources (legacy API)
     pub fn clear(&self) -> Result<()> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
-        let _ = table.cleanup_unused_resources();
+        let mut table = self.table.lock().map_err(|_| Error::runtime_poisoned_lock("Failed to acquire resource table lock"))?;
+        let _ = table.cleanup_unused_resources);
         Ok(())
     }
 
@@ -384,7 +302,7 @@ impl ResourceManager {
 impl fmt::Debug for ResourceManager {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Get the resource count, or show an error if we can't access it
-        let count = self.resource_count().unwrap_or(0);
+        let count = self.resource_count().unwrap_or(0;
 
         f.debug_struct("ResourceManager")
             .field("instance_id", &self.instance_id)
@@ -403,10 +321,10 @@ mod tests {
 
     #[test]
     fn test_resource_creation() {
-        let manager = ResourceManager::new();
+        let manager = ResourceManager::new);
 
         // Create a string resource
-        let data = Arc::new(String::from("test"));
+        let data = Arc::new(String::from("test";
         let handle = manager.create_resource(1, data).unwrap();
 
         // Verify it exists
@@ -418,46 +336,46 @@ mod tests {
         let guard = resource.lock().unwrap();
 
         // Verify type index
-        assert_eq!(guard.type_idx, 1);
+        assert_eq!(guard.type_idx, 1;
     }
 
     #[test]
     fn test_add_and_get_host_resource() {
-        let manager = ResourceManager::new();
+        let manager = ResourceManager::new);
 
         // Add a string resource using the legacy API
         let id = manager.add_host_resource(String::from("test")).unwrap();
 
         // Check we can retrieve it
         let resource = manager.get_host_resource::<String>(id).unwrap();
-        assert_eq!(*resource.lock().unwrap(), "test");
+        assert_eq!(*resource.lock().unwrap(), "test";
 
         // Check type mismatch
-        let result = manager.get_host_resource::<i32>(id);
-        assert!(result.is_err());
+        let result = manager.get_host_resource::<i32>(id;
+        assert!(result.is_err();
     }
 
     #[test]
     fn test_named_resource() {
-        let manager = ResourceManager::new();
+        let manager = ResourceManager::new);
 
         // Create a named resource
-        let data = Arc::new(42i32);
+        let data = Arc::new(42i32;
         let handle = manager.create_named_resource(1, data, "answer").unwrap();
 
         // Get the resource and check the name
         let resource = manager.get_resource(handle).unwrap();
         let guard = resource.lock().unwrap();
 
-        assert_eq!(guard.name, Some("answer".to_string()));
+        assert_eq!(guard.name, Some("answer".to_string();
     }
 
     #[test]
     fn test_resource_lifecycle() {
-        let manager = ResourceManager::new();
+        let manager = ResourceManager::new);
 
         // Add a resource
-        let data = Arc::new(42i32);
+        let data = Arc::new(42i32;
         let handle = manager.create_resource(1, data).unwrap();
 
         // Verify it exists
@@ -474,21 +392,21 @@ mod tests {
 
     #[test]
     fn test_borrow_resource() {
-        let manager = ResourceManager::new();
+        let manager = ResourceManager::new);
 
         // Create a resource
-        let data = Arc::new(42i32);
+        let data = Arc::new(42i32;
         let handle = manager.create_resource(1, data).unwrap();
 
         // Borrow it
         let borrow_handle = manager.borrow_resource(handle).unwrap();
 
         // Verify both exist
-        assert!(manager.has_resource(ResourceId(handle)).unwrap());
-        assert!(manager.has_resource(ResourceId(borrow_handle)).unwrap());
+        assert!(manager.has_resource(ResourceId(handle)).unwrap();
+        assert!(manager.has_resource(ResourceId(borrow_handle)).unwrap();
 
         // Verify they're different handles
-        assert_ne!(handle, borrow_handle);
+        assert_ne!(handle, borrow_handle;
 
         // But point to the same data
         let resource1 = manager.get_resource(handle).unwrap();
@@ -497,6 +415,6 @@ mod tests {
         let data1 = resource1.lock().unwrap().data.downcast_ref::<i32>().unwrap();
         let data2 = resource2.lock().unwrap().data.downcast_ref::<i32>().unwrap();
 
-        assert_eq!(*data1, *data2);
+        assert_eq!(*data1, *data2;
     }
 }

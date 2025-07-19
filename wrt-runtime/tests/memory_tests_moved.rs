@@ -16,6 +16,6 @@
 
 #[test]
 fn runtime_memory_tests_moved_notice() {
-    println!("Runtime memory safety tests have been moved to wrt-tests/integration/memory/");
-    println!("Run: cargo test -p wrt-tests memory");
+    println!("Runtime memory safety tests have been moved to wrt-tests/integration/memory/";
+    println!("Run: cargo test -p wrt-tests memory";
 }

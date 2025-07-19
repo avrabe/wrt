@@ -55,15 +55,38 @@ extern crate alloc;
 
 // Module exports
 // Core memory optimization modules (always available)
+pub mod decoder;
+pub mod format_detection_tests;
+pub mod lazy_detection;
 pub mod memory_optimized;
 pub mod optimized_string;
 pub mod prelude;
+pub mod shared_cache;
+pub mod streaming_decoder;
+pub mod streaming_validation;
 pub mod streaming_validator;
+pub mod unified_loader;
+
+// Bounded infrastructure for static memory allocation
+#[cfg(not(feature = "std"))]
+pub mod bounded_decoder_infra;
+
+// Section parsing - use bounded version in no_std
+#[cfg(feature = "std")]
+pub mod sections;
+#[cfg(not(feature = "std"))]
+pub mod sections_no_std;
+#[cfg(not(feature = "std"))]
+pub use sections_no_std as sections;
 
 // Conditionally include other modules
 pub mod component;
 #[cfg(feature = "std")]
 pub mod utils;
+
+// Safety-critical memory limits
+#[cfg(feature = "safety-critical")]
+pub mod memory_limits;
 
 // Binary std/no_std choice
 pub mod decoder_no_alloc;
@@ -74,25 +97,83 @@ pub mod branch_hint_section;
 #[cfg(feature = "std")]
 pub mod custom_section_handler;
 
-// Most re-exports temporarily disabled for demo - keep only essential ones
-pub use decoder_no_alloc::{
-    create_memory_provider, decode_module_header, extract_section_info, validate_module_no_alloc,
-    verify_wasm_header, SectionId, SectionInfo, ValidatorType, WasmModuleHeader, MAX_MODULE_SIZE,
-};
-// Streaming validator exports
-pub use streaming_validator::{
-    StreamingWasmValidator, PlatformWasmValidatorFactory, WasmRequirements, WasmConfiguration,
-    Section, MemorySection, CodeSection, ComprehensivePlatformLimits, PlatformId,
-};
-pub use wrt_error::{codes, kinds, Error, Result};
-// Essential re-exports only
-#[cfg(feature = "std")]
-pub use wrt_foundation::safe_memory::StdProvider as StdMemoryProvider;
-pub use wrt_foundation::safe_memory::{MemoryProvider, SafeSlice};
+// Resource limits section - now ASIL-D compatible (no external dependencies)
+pub mod resource_limits_section;
 
+// TOML configuration parser for resource limits (std only for tooling)
+#[cfg(feature = "std")]
+pub mod toml_config;
+
+// Most re-exports temporarily disabled for demo - keep only essential ones
 // Component functionality (std only)
 #[cfg(feature = "std")]
 pub use component::decode_no_alloc;
+pub use decoder_no_alloc::{
+    create_memory_provider,
+    decode_module_header,
+    extract_section_info,
+    validate_module_no_alloc,
+    verify_wasm_header,
+    SectionId,
+    SectionInfo,
+    ValidatorType,
+    WasmModuleHeader,
+    MAX_MODULE_SIZE,
+};
+// Lazy detection exports
+pub use lazy_detection::{
+    create_fast_detector,
+    create_thorough_detector,
+    ComponentDetection,
+    DetectionConfig,
+    LazyDetector,
+};
+// Shared cache exports
+pub use shared_cache::{
+    create_cache_with_size,
+    create_default_cache,
+    CacheManager,
+    CacheStats,
+    DecodedCache,
+    SectionData,
+};
+// Streaming validator exports
+pub use streaming_validator::{
+    CodeSection,
+    ComprehensivePlatformLimits,
+    MemorySection,
+    PlatformId,
+    PlatformWasmValidatorFactory,
+    Section,
+    StreamingWasmValidator,
+    WasmConfiguration,
+    WasmRequirements,
+};
+// Unified loader exports
+pub use unified_loader::{
+    load_wasm_unified,
+    ComponentInfo,
+    ExportInfo,
+    ExportType,
+    ImportInfo,
+    ImportType,
+    ModuleInfo,
+    WasmFormat,
+    WasmInfo,
+};
+pub use wrt_error::{
+    codes,
+    kinds,
+    Error,
+    Result,
+};
+// Essential re-exports only
+#[cfg(feature = "std")]
+pub use wrt_foundation::safe_memory::StdProvider as StdMemoryProvider;
+pub use wrt_foundation::safe_memory::{
+    MemoryProvider,
+    SafeSlice,
+};
 
 /// Validate WebAssembly header
 ///
@@ -109,8 +190,8 @@ pub fn validate_header(bytes: &[u8]) -> Result<()> {
 
 // Panic handler disabled to avoid conflicts with other crates
 // // Provide a panic handler only when wrt-decoder is being tested in isolation
-// #[cfg(all(not(feature = "std"), not(test), not(feature = "disable-panic-handler")))]
-// #[panic_handler]
+// #[cfg(all(not(feature = "std"), not(test), not(feature =
+// "disable-panic-handler")))] #[panic_handler]
 // fn panic(_info: &core::panic::PanicInfo) -> ! {
 //     loop {}
 // }

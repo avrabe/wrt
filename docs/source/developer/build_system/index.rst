@@ -2,7 +2,7 @@
 Build System
 ============
 
-This section documents the WRT build system and xtask automation.
+This section documents the WRT unified build system powered by cargo-wrt.
 
 .. contents:: Table of Contents
    :local:
@@ -11,292 +11,231 @@ This section documents the WRT build system and xtask automation.
 Overview
 --------
 
-WRT uses a hybrid build system combining:
+WRT uses a modern, unified build system that consolidates all build operations:
 
-1. **Cargo**: Primary Rust build tool for compilation and testing
-2. **xtasks**: Rust-based task runner for complex build operations
-3. **Justfile** (legacy): Being phased out in favor of xtasks
+1. **cargo-wrt**: Unified build tool providing all development commands
+2. **wrt-build-core**: Core library implementing build system functionality
+3. **Cargo**: Standard Rust build tool for basic compilation
 
-Current Build System (xtasks)
------------------------------
+The new architecture replaces the previous fragmented approach (justfile, xtask, shell scripts) with a single, AI-friendly tool.
 
-The xtasks system provides a Rust-based alternative to shell scripts and Makefiles.
+Installation
+------------
+
+Install the unified build tool::
+
+    cargo install --path cargo-wrt
+
+Verify installation::
+
+    cargo-wrt --help
+
+Core Commands
+-------------
+
+All development tasks are available through cargo-wrt:
 
 Available Commands
 ~~~~~~~~~~~~~~~~~~
 
-Run ``cargo xtask`` to see available commands::
+Run ``cargo-wrt --help`` to see available commands::
 
-    cargo xtask --help
+    cargo-wrt --help
 
-Common tasks include:
+Essential commands include:
 
-- ``cargo xtask check-imports``: Verify import organization
-- ``cargo xtask check-panics``: Audit panic usage in safety-critical code
-- ``cargo xtask coverage``: Generate comprehensive test coverage
-- ``cargo xtask docs``: Build and publish documentation
-- ``cargo xtask qualification``: Run qualification checks
+**Build Operations**:
 
-Task Categories
-~~~~~~~~~~~~~~~
+- ``cargo-wrt build``: Build all WRT components
+- ``cargo-wrt clean``: Clean build artifacts
+- ``cargo-wrt wrtd``: Build WRTD daemon binaries
 
-**CI Tasks**:
+**Testing**:
 
-- ``ci-static-analysis``: Run static analysis tools
-- ``ci-integrity-checks``: Verify codebase integrity
-- ``ci-advanced-tests``: Run extended test suite
+- ``cargo-wrt test``: Run comprehensive test suite
+- ``cargo-wrt test --filter pattern``: Run filtered tests
+- ``cargo-wrt coverage --html``: Generate test coverage reports
 
-**Development Tasks**:
+**Quality Assurance**:
 
-- ``fmt-check``: Check code formatting
-- ``test-runner``: Run tests with custom configuration
-- ``wasm-ops``: WebAssembly-specific operations
+- ``cargo-wrt check``: Run static analysis and formatting
+- ``cargo-wrt check --strict``: Run strict linting and checks
+- ``cargo-wrt ci``: Run full CI pipeline locally
 
-**Documentation Tasks**:
+**Safety Verification**:
 
-- ``docs``: Build documentation locally
-- ``publish-docs-dagger``: Publish documentation via Dagger
-- ``generate-coverage-summary``: Create coverage reports
+- ``cargo-wrt verify --asil d``: Run ASIL-D safety verification
+- ``cargo-wrt kani-verify --asil-profile d``: Formal verification with KANI
+- ``cargo-wrt verify-matrix --report``: Comprehensive build matrix verification
 
-Legacy Build System (Justfile)
--------------------------------
+**Documentation**:
 
-The Justfile is being phased out but still contains some useful commands:
+- ``cargo-wrt docs``: Generate documentation
+- ``cargo-wrt docs --open``: Generate and open documentation
+- ``cargo-wrt docs --private``: Include private items
 
-Common Commands
-~~~~~~~~~~~~~~~
+**Development Utilities**:
 
-::
+- ``cargo-wrt no-std``: Verify no_std compatibility
+- ``cargo-wrt simulate-ci``: Simulate CI workflow locally
 
-    # Build all crates
-    just build
+**Tool Management**:
 
-    # Run tests
-    just test
+- ``cargo-wrt setup --check``: Check all tool dependencies
+- ``cargo-wrt setup --install``: Install optional development tools
+- ``cargo-wrt setup --all``: Complete environment setup
+- ``cargo-wrt tool-versions check``: Verify tool versions against requirements
+- ``cargo-wrt tool-versions generate``: Generate tool version configuration
 
-    # Format code
-    just fmt
+Architecture
+------------
 
-    # Run CI checks
-    just ci-main
+The build system is built on three key components:
 
-Migration Status
-~~~~~~~~~~~~~~~~
-
-Most Justfile commands have been migrated to xtasks:
-
-- ✅ ``just build`` → ``cargo build``
-- ✅ ``just test`` → ``cargo test`` or ``cargo xtask test-runner``
-- ✅ ``just fmt`` → ``cargo fmt`` or ``cargo xtask fmt-check``
-- ✅ ``just ci-*`` → ``cargo xtask ci-*``
-
-Build Configuration
--------------------
-
-Workspace Structure
-~~~~~~~~~~~~~~~~~~~
-
-::
-
-    wrt2/
-    ├── Cargo.toml          # Workspace configuration
-    ├── rust-toolchain.toml # Rust version specification
-    ├── .cargo/
-    │   └── config.toml     # Cargo configuration
-    ├── xtask/
-    │   └── src/            # Build tasks implementation
-    └── crates/
-        ├── wrt/            # Main runtime
-        ├── wrt-*/          # Component crates
-        └── ...
-
-Feature Flags
+cargo-wrt CLI
 ~~~~~~~~~~~~~
 
-Standard feature configuration across crates::
+The main command-line interface that provides:
 
-    [features]
-    default = ["std"]
-    std = ["alloc"]
-    alloc = []
-    safety = []
-    
-    # Platform features
-    platform-linux = ["wrt-platform/linux"]
-    platform-macos = ["wrt-platform/macos"]
-    platform-qnx = ["wrt-platform/qnx"]
-    platform-bare = ["wrt-platform/bare"]
-    
-    # Hardening features
-    arm-hardening = ["wrt-platform/arm-hardening"]
-    cfi = ["wrt-platform/cfi"]
+- Unified command structure
+- Consistent argument handling
+- Progress reporting and logging
+- Error handling and diagnostics
 
-Dependencies Management
-~~~~~~~~~~~~~~~~~~~~~~~
+wrt-build-core Library
+~~~~~~~~~~~~~~~~~~~~~~
 
-Workspace dependencies are centralized in the root ``Cargo.toml``::
+The core build system library that implements:
 
-    [workspace.dependencies]
-    thiserror = { version = "2.0", default-features = false }
-    cfg-if = "1.0"
-    bitflags = "2.4"
+- Workspace management
+- Build orchestration
+- Test execution
+- Safety verification
+- Documentation generation
+- Coverage analysis
 
-Crates reference workspace dependencies::
-
-    [dependencies]
-    thiserror = { workspace = true }
-    cfg-if = { workspace = true }
-
-Build Optimization
-------------------
-
-Release Profiles
+Build Operations
 ~~~~~~~~~~~~~~~~
 
-Optimized profiles for different use cases::
+All build operations follow a consistent pattern:
 
-    [profile.release]
-    opt-level = 3
-    lto = true
-    codegen-units = 1
-    strip = true
+1. **Initialization**: Detect workspace and load configuration
+2. **Validation**: Check prerequisites and dependencies
+3. **Execution**: Run the requested operation with progress reporting
+4. **Verification**: Validate results and generate reports
+5. **Cleanup**: Clean up temporary files and resources
 
-    [profile.release-debug]
-    inherits = "release"
-    debug = true
-    strip = false
+Configuration
+-------------
 
-    [profile.bench]
-    inherits = "release"
-    debug = true
+The build system uses multiple configuration sources:
 
-Platform-Specific Builds
-~~~~~~~~~~~~~~~~~~~~~~~~
+**Cargo.toml**:
+  Workspace configuration, dependencies, and build profiles
 
-Target-specific configuration::
+**ASIL Levels**:
+  Safety verification profiles (QM, A, B, C, D)
 
-    # ARM embedded
-    cargo build --target thumbv7em-none-eabi --no-default-features
+**Environment Variables**:
+  CI detection, custom paths, and feature flags
 
-    # WebAssembly
-    cargo build --target wasm32-unknown-unknown --no-default-features
+**tool-versions.toml**:
+  Tool version requirements and installation commands for reproducible development environments
 
-    # QNX
-    cargo build --target aarch64-unknown-nto-qnx7.1.0 --features platform-qnx
+Common Workflows
+----------------
 
-Continuous Integration
-----------------------
+**Development Workflow**::
 
-GitHub Actions
-~~~~~~~~~~~~~~
-
-The CI pipeline includes:
-
-1. **Format Check**: Ensure code follows style guidelines
-2. **Clippy**: Static analysis for common mistakes
-3. **Test Matrix**: Test across feature combinations
-4. **Coverage**: Generate and upload coverage reports
-5. **Documentation**: Build and validate docs
-
-CI Configuration
-~~~~~~~~~~~~~~~~
-
-Key CI jobs::
-
-    - name: Check
-      run: cargo xtask ci-static-analysis
+    # Start development
+    cargo-wrt build
+    cargo-wrt test
     
-    - name: Test
-      run: cargo xtask ci-advanced-tests
+    # Make changes...
     
-    - name: Coverage
-      run: cargo xtask coverage
+    # Verify changes
+    cargo-wrt check
+    cargo-wrt test --filter new_feature
+    
+    # Before commit
+    cargo-wrt ci
 
-Development Workflow
---------------------
+**Safety-Critical Development**::
 
-Local Development
-~~~~~~~~~~~~~~~~~
+    # ASIL-D verification
+    cargo-wrt verify --asil d
+    cargo-wrt kani-verify --asil-profile d
+    cargo-wrt verify-matrix --report
+    
+    # Generate compliance reports
+    cargo-wrt simulate-ci --verbose
 
-1. **Setup**::
+**Documentation Workflow**::
 
-       # Clone repository
-       git clone https://github.com/pulseengine/wrt.git
-       cd wrt2
-       
-       # Install Rust toolchain
-       rustup update
+    # Generate and preview docs
+    cargo-wrt docs --open
+    
+    # Verify documentation
+    cargo-wrt docs --private
+    cargo-wrt verify --detailed
 
-2. **Build**::
+Migration from Legacy System
+-----------------------------
 
-       # Build all crates
-       cargo build
-       
-       # Build specific crate
-       cargo build -p wrt-runtime
+If you're migrating from the legacy build system:
 
-3. **Test**::
+**Command Mapping**:
 
-       # Run all tests
-       cargo test
-       
-       # Run specific test
-       cargo test -p wrt-runtime test_name
+.. list-table:: Legacy to cargo-wrt Command Mapping
+   :widths: 40 40 20
+   :header-rows: 1
 
-4. **Documentation**::
+   * - Legacy Command
+     - New Command
+     - Notes
+   * - ``just build``
+     - ``cargo-wrt build``
+     - Direct replacement
+   * - ``just ci-test``
+     - ``cargo-wrt test``
+     - Enhanced test reporting
+   * - ``just ci-main``
+     - ``cargo-wrt ci``
+     - Comprehensive CI checks
+   * - ``cargo xtask coverage``
+     - ``cargo-wrt coverage --html``
+     - Improved coverage reporting
+   * - ``./scripts/kani-verify.sh``
+     - ``cargo-wrt kani-verify``
+     - Rust-based implementation
+   * - ``just verify-build-matrix``
+     - ``cargo-wrt verify-matrix --report``
+     - Enhanced reporting
 
-       # Build docs locally
-       cargo xtask docs
-       
-       # Open in browser
-       open target/doc/wrt/index.html
+**Benefits of Migration**:
 
-Pre-commit Checks
-~~~~~~~~~~~~~~~~~
-
-Run before committing::
-
-    # Format code
-    cargo fmt
-
-    # Run clippy
-    cargo clippy --all-targets --all-features
-
-    # Check imports
-    cargo xtask check-imports
-
-    # Run tests
-    cargo test
+- Unified command interface
+- Better error messages and diagnostics
+- Consistent progress reporting
+- AI-friendly architecture
+- Cross-platform compatibility
+- Integrated safety verification
 
 Troubleshooting
 ---------------
 
-Common Issues
-~~~~~~~~~~~~~
+**Common Issues**:
 
 **Build Failures**:
+  Run ``cargo-wrt build --verbose`` for detailed output
 
-- Check ``rust-toolchain.toml`` for required Rust version
-- Ensure all dependencies are available
-- Try ``cargo clean`` and rebuild
+**Test Failures**:
+  Use ``cargo-wrt test --nocapture`` to see test output
 
-**Feature Conflicts**:
+**Verification Issues**:
+  Run ``cargo-wrt simulate-ci`` to reproduce CI environment locally
 
-- Some features are mutually exclusive
-- Check feature documentation in Cargo.toml
-- Use ``--no-default-features`` when testing specific configurations
+**Getting Help**:
+  Use ``cargo-wrt <command> --help`` for command-specific help
 
-**Platform-Specific Issues**:
-
-- Ensure target is installed: ``rustup target add <target>``
-- Check platform-specific dependencies
-- Verify cross-compilation tools are available
-
-Future Improvements
--------------------
-
-1. **Enhanced xtask capabilities** for improved build performance
-2. **Build metrics** and performance tracking
-3. **Automated dependency updates** with security scanning
-4. **Custom lint rules** for WRT-specific patterns
-5. **Distributed testing** across multiple platforms
+For more detailed troubleshooting, see the :doc:`../troubleshooting/index` section.

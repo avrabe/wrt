@@ -88,7 +88,7 @@ impl LinuxArm64MteAllocator {
 
     /// Creates a new `LinuxArm64MteAllocator`.
     pub fn new(maximum_pages: Option<u32>, use_guard_pages: bool, mte_mode: MteMode) -> Self {
-        let max_pages_val = maximum_pages.unwrap_or(Self::DEFAULT_MAX_PAGES);
+        let max_pages_val = maximum_pages.unwrap_or(Self::DEFAULT_MAX_PAGES;
         let max_capacity_bytes = max_pages_val as usize * WASM_PAGE_SIZE;
 
         let mut allocator = Self {
@@ -104,7 +104,7 @@ impl LinuxArm64MteAllocator {
 
         // Check if MTE is available and configure it if requested
         if mte_mode != MteMode::Disabled {
-            allocator.mte_available = allocator.configure_mte().is_ok();
+            allocator.mte_available = allocator.configure_mte().is_ok);
         }
 
         allocator
@@ -112,11 +112,7 @@ impl LinuxArm64MteAllocator {
 
     fn pages_to_bytes(pages: u32) -> Result<usize> {
         pages.checked_mul(WASM_PAGE_SIZE as u32).map(|b| b as usize).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Page count results in byte overflow",
-            )
+            Error::memory_error("Page count results in byte overflow")
         })
     }
 
@@ -132,11 +128,7 @@ impl LinuxArm64MteAllocator {
         let result = unsafe { Self::prctl(PR_SET_TAGGED_ADDR_CTRL, mte_flags, 0, 0, 0) };
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "Failed to configure MTE",
-            ));
+            return Err(Error::runtime_execution_error("MTE tagging not supported on this system";
         }
 
         Ok(())
@@ -147,14 +139,13 @@ impl LinuxArm64MteAllocator {
         let result: isize;
 
         core::arch::asm!(
-            "svc #0",
-            inout("x8") syscalls::PRCTL => _,
+            ") syscalls::PRCTL => _,
             inout("x0") option => result,
             in("x1") arg2,
             in("x2") arg3,
             in("x3") arg4,
             in("x4") arg5,
-        );
+        ;
 
         result as i32
     }
@@ -179,7 +170,7 @@ impl LinuxArm64MteAllocator {
             in("x3") flags,
             in("x4") fd,
             in("x5") offset,
-        );
+        ;
 
         // Linux syscalls return negative errno on error
         if result < 0 && result >= -4095 {
@@ -198,7 +189,7 @@ impl LinuxArm64MteAllocator {
             inout("x8") syscalls::MUNMAP => _,
             inout("x0") addr => result,
             in("x1") len,
-        );
+        ;
 
         result as i32
     }
@@ -213,7 +204,7 @@ impl LinuxArm64MteAllocator {
             inout("x0") addr => result,
             in("x1") len,
             in("x2") prot,
-        );
+        ;
 
         result as i32
     }
@@ -225,7 +216,7 @@ impl LinuxArm64MteAllocator {
         }
 
         // ARM64 MTE uses the top 4 bits of the pointer for tagging
-        let tagged_ptr = ((self.current_tag as usize) << 56) | (ptr as usize);
+        let tagged_ptr = ((self.current_tag as usize) << 56) | (ptr as usize;
 
         // Binary std/no_std choice
         self.current_tag = (self.current_tag + 1) & 0xF;
@@ -239,7 +230,7 @@ impl LinuxArm64MteAllocator {
     /// Set memory tags using MTE instructions
     unsafe fn set_memory_tags(&self, ptr: *mut u8, size: usize, tag: u8) -> Result<()> {
         if !self.mte_available {
-            return Ok(());
+            return Ok();
         }
 
         // Set memory tags in 16-byte chunks (MTE granule size)
@@ -247,14 +238,14 @@ impl LinuxArm64MteAllocator {
         let num_granules = (size + tag_granule_size - 1) / tag_granule_size;
 
         for i in 0..num_granules {
-            let granule_ptr = ptr.add(i * tag_granule_size);
+            let granule_ptr = ptr.add(i * tag_granule_size;
 
             // Binary std/no_std choice
             core::arch::asm!(
                 "st2g {ptr}, [{ptr}]",
                 ptr = in(reg) granule_ptr,
                 options(nostack),
-            );
+            ;
         }
 
         Ok(())
@@ -263,19 +254,15 @@ impl LinuxArm64MteAllocator {
     /// Binary std/no_std choice
     unsafe fn setup_guard_pages(&self, base_ptr: *mut u8, total_size: usize) -> Result<()> {
         if !self.use_guard_pages {
-            return Ok(());
+            return Ok();
         }
 
         // Binary std/no_std choice
-        let guard_page_addr = base_ptr.add(total_size - WASM_PAGE_SIZE);
-        let result = Self::mprotect(guard_page_addr, WASM_PAGE_SIZE, PROT_NONE);
+        let guard_page_addr = base_ptr.add(total_size - WASM_PAGE_SIZE;
+        let result = Self::mprotect(guard_page_addr, WASM_PAGE_SIZE, PROT_NONE;
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "Failed to set up guard page protection",
-            ));
+            return Err(Error::runtime_execution_error("Failed to apply MTE tag to memory region";
         }
 
         Ok(())
@@ -305,7 +292,7 @@ impl LinuxArm64MteAllocatorBuilder {
     /// Sets the maximum number of WebAssembly pages (64 KiB) that can be
     /// Binary std/no_std choice
     pub fn with_maximum_pages(mut self, pages: u32) -> Self {
-        self.maximum_pages = Some(pages);
+        self.maximum_pages = Some(pages;
         self
     }
 
@@ -337,21 +324,16 @@ impl PageAllocator for LinuxArm64MteAllocator {
             return Err(Error::new(
                 ErrorCategory::System, 1,
                 
-                "Allocator has already allocated memory",
-            ));
+                ";
         }
 
         if initial_pages == 0 {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Initial pages cannot be zero",
-            ));
+            return Err(Error::memory_error("Initial pages cannot be zero";
         }
 
         let initial_bytes = Self::pages_to_bytes(initial_pages)?;
-        let max_pages_hint = maximum_pages.unwrap_or(initial_pages).max(initial_pages);
-        let mut reserve_bytes = Self::pages_to_bytes(max_pages_hint)?.max(initial_bytes);
+        let max_pages_hint = maximum_pages.unwrap_or(initial_pages).max(initial_pages;
+        let mut reserve_bytes = Self::pages_to_bytes(max_pages_hint)?.max(initial_bytes;
 
         // Add space for guard pages if enabled
         if self.use_guard_pages {
@@ -361,11 +343,7 @@ impl PageAllocator for LinuxArm64MteAllocator {
         }
 
         if reserve_bytes > self.max_capacity_bytes {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Requested reservation size exceeds allocator's maximum capacity",
-            ));
+            return Err(Error::memory_error("Requested reservation size exceeds allocator's maximum capacity";
         }
 
         // Determine protection flags
@@ -391,11 +369,7 @@ impl PageAllocator for LinuxArm64MteAllocator {
 
         // Check for mapping failure
         if ptr == MAP_FAILED {
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "Memory mapping failed due to OS error",
-            ));
+            return Err(Error::runtime_execution_error("Failed to validate MTE tagged memory";
         }
 
         // Create tagged pointer if MTE is available
@@ -406,8 +380,7 @@ impl PageAllocator for LinuxArm64MteAllocator {
             Error::new(
                 ErrorCategory::System, 1,
                 
-                "Memory mapping returned null pointer",
-            )
+                ")
         })?;
 
         // Set memory tags if MTE is available
@@ -423,35 +396,27 @@ impl PageAllocator for LinuxArm64MteAllocator {
             self.setup_guard_pages(ptr, reserve_bytes)?;
         }
 
-        self.base_ptr = Some(base_ptr);
+        self.base_ptr = Some(base_ptr;
         self.total_reserved_bytes = reserve_bytes;
         self.current_committed_bytes = initial_bytes;
 
         // Return tagged pointer for use, but store untagged pointer internally
-        let result_ptr = NonNull::new(tagged_ptr).unwrap_or(base_ptr);
+        let result_ptr = NonNull::new(tagged_ptr).unwrap_or(base_ptr;
         Ok((result_ptr, initial_bytes))
     }
 
     fn grow(&mut self, current_pages: u32, additional_pages: u32) -> Result<()> {
         let Some(base_ptr) = self.base_ptr else {
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "No memory allocated to grow",
-            ));
+            return Err(Error::runtime_execution_error("Grow called before allocate";
         };
 
         if additional_pages == 0 {
-            return Ok(());
+            return Ok();
         }
 
         let current_bytes_from_arg = Self::pages_to_bytes(current_pages)?;
         if current_bytes_from_arg != self.current_committed_bytes {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Inconsistent current_pages argument for grow operation",
-            ));
+            return Err(Error::memory_error("Current page count mismatch";
         }
 
         let new_total_pages = current_pages
@@ -468,17 +433,13 @@ impl PageAllocator for LinuxArm64MteAllocator {
         };
 
         if new_committed_bytes > available_space {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Grow request exceeds total reserved memory space",
-            ));
+            return Err(Error::memory_error("Grow request exceeds total reserved memory space";
         }
 
         // Set memory tags for the newly accessible region if MTE is available
         unsafe {
             if self.mte_available {
-                let grow_start = base_ptr.as_ptr().add(self.current_committed_bytes);
+                let grow_start = base_ptr.as_ptr().add(self.current_committed_bytes;
                 let grow_size = new_committed_bytes - self.current_committed_bytes;
                 self.set_memory_tags(grow_start, grow_size, self.current_tag)?;
             }
@@ -497,33 +458,21 @@ impl PageAllocator for LinuxArm64MteAllocator {
 
         // Validate that untagged ptr matches our base_ptr
         let Some(base_ptr) = self.base_ptr.take() else {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "No memory allocated to deallocate",
-            ));
+            return Err(Error::memory_error("No memory allocated to deallocate";
         };
 
         if untagged_ptr.as_ptr() != base_ptr.as_ptr() {
             self.base_ptr = Some(base_ptr); // Restore base_ptr
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Attempted to deallocate with mismatched pointer",
-            ));
+            return Err(Error::memory_error("Attempted to deallocate with mismatched pointer";
         }
 
         // SAFETY: ptr was obtained from our mmap call and is valid.
         // size is the total size we had reserved.
-        let result = Self::munmap(base_ptr.as_ptr(), size);
+        let result = Self::munmap(base_ptr.as_ptr(), size;
         if result != 0 {
             // munmap failed, need to restore base_ptr
-            self.base_ptr = Some(base_ptr);
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "Memory unmapping failed due to OS error",
-            ));
+            self.base_ptr = Some(base_ptr;
+            return Err(Error::runtime_execution_error("Memory unmapping failed due to OS error";
         }
 
         // Reset internal state

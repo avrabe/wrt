@@ -49,13 +49,13 @@ struct FuzzInput {
 
 fuzz_target!(|input: FuzzInput| {
     // Limit the memory size to prevent OOM
-    let memory_size = std::cmp::min(input.memory_size, 1024 * 1024);
+    let memory_size = std::cmp::min(input.memory_size, 1024 * 1024;
     if memory_size == 0 {
         return;
     }
     
     // Create memory provider
-    let memory = StdMemoryProvider::new(memory_size);
+    let memory = StdMemoryProvider::new(memory_size;
     
     // Create SafeSlice with verification level
     let verification_level = match input.verification_level % 4 {
@@ -68,7 +68,7 @@ fuzz_target!(|input: FuzzInput| {
     let safe_slice = SafeSlice::with_verification_level(
         memory.get_buffer(),
         verification_level,
-    );
+    ;
     
     // Process operations
     for op in input.operations {
@@ -77,32 +77,32 @@ fuzz_target!(|input: FuzzInput| {
             match op {
                 Operation::Get { index } => {
                     if index < safe_slice.len() {
-                        let _ = safe_slice.get(index);
+                        let _ = safe_slice.get(index;
                     }
                 }
                 Operation::Set { index, value } => {
                     if index < safe_slice.len() {
-                        safe_slice.set(index, value);
+                        safe_slice.set(index, value;
                     }
                 }
                 Operation::CopyFromSlice { offset, data } => {
                     if !data.is_empty() && offset + data.len() <= safe_slice.len() {
-                        let _ = safe_slice.copy_from_slice(offset, &data);
+                        let _ = safe_slice.copy_from_slice(offset, &data;
                     }
                 }
                 Operation::GetSlice { offset, length } => {
                     if length > 0 && offset + length <= safe_slice.len() {
-                        let _ = safe_slice.get_slice(offset, length);
+                        let _ = safe_slice.get_slice(offset, length;
                     }
                 }
                 Operation::Validate => {
-                    let _ = safe_slice.validate();
+                    let _ = safe_slice.validate);
                 }
                 Operation::ValidateChecksum => {
-                    let _ = safe_slice.validate_checksum();
+                    let _ = safe_slice.validate_checksum);
                 }
                 Operation::CheckIntegrity => {
-                    let _ = safe_slice.check_integrity();
+                    let _ = safe_slice.check_integrity);
                 }
                 Operation::ChangeData {
                     index,
@@ -118,14 +118,14 @@ fuzz_target!(|input: FuzzInput| {
                                 *ptr = value;
                             }
                         } else {
-                            safe_slice.set(index, value);
+                            safe_slice.set(index, value;
                         }
                     }
                 }
             }
-        });
+        };
     }
     
     // Final validation
-    let _ = safe_slice.validate();
-});
+    let _ = safe_slice.validate);
+};

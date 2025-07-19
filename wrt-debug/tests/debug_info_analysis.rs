@@ -93,33 +93,40 @@ mod debug_info_analysis {
 
     #[test]
     fn analyze_complete_debug_capabilities() {
-        println!("\n=== WRT Debug Information Analysis ===");
+        println!("\n=== WRT Debug Information Analysis ===";
 
         // Test our cursor implementation
         let cursor_data = &MOCK_DEBUG_LINE[0..8];
-        let unit_length =
-            u32::from_le_bytes([cursor_data[0], cursor_data[1], cursor_data[2], cursor_data[3]]);
-        let version = u16::from_le_bytes([cursor_data[4], cursor_data[5]]);
+        let unit_length = u32::from_le_bytes([
+            cursor_data[0],
+            cursor_data[1],
+            cursor_data[2],
+            cursor_data[3],
+        ];
+        let version = u16::from_le_bytes([cursor_data[4], cursor_data[5]];
 
-        println!("✓ Raw DWARF parsing: unit_length={}, version={}", unit_length, version);
+        println!(
+            "✓ Raw DWARF parsing: unit_length={}, version={}",
+            unit_length, version
+        ;
 
         // Analyze what information we can extract
-        analyze_line_numbers();
-        analyze_function_info();
-        analyze_string_data();
-        analyze_type_information();
-        analyze_variable_information();
+        analyze_line_numbers);
+        analyze_function_info);
+        analyze_string_data);
+        analyze_type_information);
+        analyze_variable_information);
 
-        println!("\n=== Summary ===");
-        print_capabilities_summary();
+        println!("\n=== Summary ===";
+        print_capabilities_summary);
     }
 
     fn analyze_line_numbers() {
-        println!("\n--- Line Number Information (.debug_line) ---");
-        println!("✓ Can map instruction addresses to source locations");
-        println!("✓ Can extract file names and line numbers");
-        println!("✓ Can track statement boundaries");
-        println!("✓ Zero-allocation parsing with bounded buffers");
+        println!("\n--- Line Number Information (.debug_line) ---";
+        println!("✓ Can map instruction addresses to source locations";
+        println!("✓ Can extract file names and line numbers";
+        println!("✓ Can track statement boundaries";
+        println!("✓ Zero-allocation parsing with bounded buffers";
 
         // Simulate line program execution
         let header_length = u32::from_le_bytes([
@@ -127,23 +134,23 @@ mod debug_info_analysis {
             MOCK_DEBUG_LINE[7],
             MOCK_DEBUG_LINE[8],
             MOCK_DEBUG_LINE[9],
-        ]);
-        println!("  Header length: {} bytes", header_length);
+        ];
+        println!("  Header length: {} bytes", header_length;
 
         let min_instr_length = MOCK_DEBUG_LINE[10];
         let line_base = MOCK_DEBUG_LINE[13] as i8;
         let line_range = MOCK_DEBUG_LINE[14];
 
-        println!("  Min instruction length: {}", min_instr_length);
-        println!("  Line base: {}, Line range: {}", line_base, line_range);
+        println!("  Min instruction length: {}", min_instr_length;
+        println!("  Line base: {}, Line range: {}", line_base, line_range;
     }
 
     fn analyze_function_info() {
-        println!("\n--- Function Information (.debug_info) ---");
-        println!("✓ Can discover function boundaries (low_pc/high_pc)");
-        println!("✓ Can extract function addresses and sizes");
-        println!("✓ Can parse compilation unit information");
-        println!("⚠ Function names require string table lookup (.debug_str)");
+        println!("\n--- Function Information (.debug_info) ---";
+        println!("✓ Can discover function boundaries (low_pc/high_pc)";
+        println!("✓ Can extract function addresses and sizes";
+        println!("✓ Can parse compilation unit information";
+        println!("⚠ Function names require string table lookup (.debug_str)";
 
         // Parse basic function info from mock data
         let unit_length = u32::from_le_bytes([
@@ -151,125 +158,125 @@ mod debug_info_analysis {
             MOCK_DEBUG_INFO[1],
             MOCK_DEBUG_INFO[2],
             MOCK_DEBUG_INFO[3],
-        ]);
-        let version = u16::from_le_bytes([MOCK_DEBUG_INFO[4], MOCK_DEBUG_INFO[5]]);
+        ];
+        let version = u16::from_le_bytes([MOCK_DEBUG_INFO[4], MOCK_DEBUG_INFO[5]];
         let addr_size = MOCK_DEBUG_INFO[11];
 
         println!(
             "  Compilation unit: {} bytes, version {}, {}-byte addresses",
             unit_length, version, addr_size
-        );
+        ;
     }
 
     fn analyze_string_data() {
-        println!("\n--- String Information (.debug_str) ---");
-        println!("✓ Can locate strings by offset");
-        println!("⚠ Limited by no_alloc constraint - can't store string copies");
-        println!("✓ Can provide string references with lifetime bounds");
+        println!("\n--- String Information (.debug_str) ---";
+        println!("✓ Can locate strings by offset";
+        println!("⚠ Limited by no_alloc constraint - can't store string copies";
+        println!("✓ Can provide string references with lifetime bounds";
 
         // Demonstrate string extraction
-        let str_at_7 = extract_null_terminated_str(&MOCK_DEBUG_STR[7..]);
-        let str_at_15 = extract_null_terminated_str(&MOCK_DEBUG_STR[15..]);
+        let str_at_7 = extract_null_terminated_str(&MOCK_DEBUG_STR[7..];
+        let str_at_15 = extract_null_terminated_str(&MOCK_DEBUG_STR[15..];
 
-        println!("  String at offset 7: {:?}", str_at_7);
-        println!("  String at offset 15: {:?}", str_at_15);
+        println!("  String at offset 7: {:?}", str_at_7;
+        println!("  String at offset 15: {:?}", str_at_15;
     }
 
     fn analyze_type_information() {
-        println!("\n--- Type Information ---");
-        println!("⚠ Advanced type info parsing not yet implemented");
-        println!("✓ Can parse basic type DIEs from .debug_info");
-        println!("⚠ Complex type relationships require graph traversal");
-        println!("⚠ Limited by no_alloc constraint for type caching");
+        println!("\n--- Type Information ---";
+        println!("⚠ Advanced type info parsing not yet implemented";
+        println!("✓ Can parse basic type DIEs from .debug_info";
+        println!("⚠ Complex type relationships require graph traversal";
+        println!("⚠ Limited by no_alloc constraint for type caching";
 
-        println!("  Potential improvements:");
-        println!("  - Basic type parsing (int, float, pointer)");
-        println!("  - Struct field enumeration");
-        println!("  - Array dimension information");
+        println!("  Potential improvements:";
+        println!("  - Basic type parsing (int, float, pointer)";
+        println!("  - Struct field enumeration";
+        println!("  - Array dimension information";
     }
 
     fn analyze_variable_information() {
-        println!("\n--- Variable Information ---");
-        println!("⚠ Variable location parsing not yet implemented");
-        println!("⚠ DWARF expression evaluation complex in no_std");
-        println!("⚠ Stack frame analysis requires call frame info");
+        println!("\n--- Variable Information ---";
+        println!("⚠ Variable location parsing not yet implemented";
+        println!("⚠ DWARF expression evaluation complex in no_std";
+        println!("⚠ Stack frame analysis requires call frame info";
 
-        println!("  Potential improvements:");
-        println!("  - Parameter location parsing");
-        println!("  - Local variable discovery");
-        println!("  - Register usage information");
+        println!("  Potential improvements:";
+        println!("  - Parameter location parsing";
+        println!("  - Local variable discovery";
+        println!("  - Register usage information";
     }
 
     fn print_capabilities_summary() {
-        println!("Current capabilities:");
-        println!("  ✓ Line number mapping (address ↔ source location)");
-        println!("  ✓ Function boundary detection");
-        println!("  ✓ Basic compilation unit parsing");
-        println!("  ✓ Zero-allocation DWARF parsing");
-        println!("  ✓ Feature-gated compilation");
+        println!("Current capabilities:";
+        println!("  ✓ Line number mapping (address ↔ source location)";
+        println!("  ✓ Function boundary detection";
+        println!("  ✓ Basic compilation unit parsing";
+        println!("  ✓ Zero-allocation DWARF parsing";
+        println!("  ✓ Feature-gated compilation";
 
-        println!("\nMissing capabilities (improvement opportunities):");
-        println!("  ⚠ Function name resolution (needs .debug_str)");
-        println!("  ⚠ Variable location information");
-        println!("  ⚠ Type information extraction");
-        println!("  ⚠ Inlined function handling");
-        println!("  ⚠ Call frame information (.debug_frame)");
+        println!("\nMissing capabilities (improvement opportunities):";
+        println!("  ⚠ Function name resolution (needs .debug_str)";
+        println!("  ⚠ Variable location information";
+        println!("  ⚠ Type information extraction";
+        println!("  ⚠ Inlined function handling";
+        println!("  ⚠ Call frame information (.debug_frame)";
 
-        println!("\nMemory constraints respected:");
-        println!("  ✓ No heap allocation");
-        println!("  ✓ Bounded buffer usage");
-        println!("  ✓ Zero-copy string references");
-        println!("  ✓ Stack-based parsing state");
+        println!("\nMemory constraints respected:";
+        println!("  ✓ No heap allocation";
+        println!("  ✓ Bounded buffer usage";
+        println!("  ✓ Zero-copy string references";
+        println!("  ✓ Stack-based parsing state";
     }
 
     // Helper function to extract null-terminated strings
     fn extract_null_terminated_str(data: &[u8]) -> &str {
-        let end = data.iter().position(|&b| b == 0).unwrap_or(data.len());
+        let end = data.iter().position(|&b| b == 0).unwrap_or(data.len);
         core::str::from_utf8(&data[..end]).unwrap_or("<invalid utf8>")
     }
 
     #[test]
     fn test_feature_combinations() {
-        println!("\n=== Feature Combination Testing ===");
+        println!("\n=== Feature Combination Testing ===";
 
         #[cfg(feature = "line-info")]
-        println!("✓ line-info feature enabled");
+        println!("✓ line-info feature enabled";
 
         #[cfg(feature = "debug-info")]
-        println!("✓ debug-info feature enabled");
+        println!("✓ debug-info feature enabled";
 
         #[cfg(feature = "abbrev")]
-        println!("✓ abbrev feature enabled");
+        println!("✓ abbrev feature enabled";
 
         #[cfg(feature = "function-info")]
-        println!("✓ function-info feature enabled");
+        println!("✓ function-info feature enabled";
 
         #[cfg(feature = "full-debug")]
-        println!("✓ full-debug feature enabled");
+        println!("✓ full-debug feature enabled";
 
         #[cfg(not(any(feature = "line-info", feature = "debug-info")))]
-        println!("⚠ No debug features enabled - minimal build");
+        println!("⚠ No debug features enabled - minimal build";
     }
 
     #[test]
     fn test_memory_usage_analysis() {
-        println!("\n=== Memory Usage Analysis ===");
+        println!("\n=== Memory Usage Analysis ===";
 
         // Calculate stack usage for our parsing structures
-        println!("Stack-based structure sizes:");
+        println!("Stack-based structure sizes:";
 
         // Simulated structure sizes (would be actual in real implementation)
         let cursor_size = 16; // offset + remaining length
         let line_state_size = 64; // state machine registers
         let abbrev_cache_size = 1024; // bounded abbreviation cache
 
-        println!("  Cursor: {} bytes", cursor_size);
-        println!("  Line state: {} bytes", line_state_size);
-        println!("  Abbreviation cache: {} bytes", abbrev_cache_size);
+        println!("  Cursor: {} bytes", cursor_size;
+        println!("  Line state: {} bytes", line_state_size;
+        println!("  Abbreviation cache: {} bytes", abbrev_cache_size;
 
         let total_stack = cursor_size + line_state_size + abbrev_cache_size;
-        println!("  Total stack usage: {} bytes", total_stack);
+        println!("  Total stack usage: {} bytes", total_stack;
 
-        println!("\nHeap usage: 0 bytes (no_alloc compliant)");
+        println!("\nHeap usage: 0 bytes (no_alloc compliant)";
     }
 }

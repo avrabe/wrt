@@ -13,7 +13,7 @@
 //!
 //! The implementation works across std, `no_std+alloc`, and pure `no_std` environments.
 
-use crate::prelude::{DataSegmentOperations, Debug, MemoryOperations, PureInstruction, Validate, ValidationContext};
+use crate::prelude::{DataSegmentOperations, Debug, MemoryOperations, Validate, ValidationContext};
 use wrt_error::{Error, Result};
 use wrt_foundation::{
     types::ValueType,
@@ -274,7 +274,7 @@ impl MultiMemoryBulk {
         size: &Value,
     ) -> Result<()> {
         // Create and execute MemoryFill
-        let fill_op = crate::memory_ops::MemoryFill::new(self.memory_index);
+        let fill_op = crate::memory_ops::MemoryFill::new(self.memory_index;
         fill_op.execute(memory, dest, value, size)
     }
 
@@ -287,7 +287,7 @@ impl MultiMemoryBulk {
         size: &Value,
     ) -> Result<()> {
         // Create and execute MemoryCopy (same memory)
-        let copy_op = crate::memory_ops::MemoryCopy::new(self.memory_index, self.memory_index);
+        let copy_op = crate::memory_ops::MemoryCopy::new(self.memory_index, self.memory_index;
         copy_op.execute(memory, dest, src, size)
     }
 
@@ -302,7 +302,7 @@ impl MultiMemoryBulk {
         size: &Value,
     ) -> Result<()> {
         // Create and execute MemoryInit
-        let init_op = crate::memory_ops::MemoryInit::new(self.memory_index, data_index);
+        let init_op = crate::memory_ops::MemoryInit::new(self.memory_index, data_index;
         init_op.execute(memory, data_segments, dest, src, size)
     }
 }
@@ -338,7 +338,7 @@ impl MultiMemoryCrossCopy {
     ) -> Result<()> {
         // For now, just validate the operation structure
         if self.dest_memory_index == self.src_memory_index {
-            return Err(Error::memory_error("Use regular copy for same-memory operations"));
+            return Err(Error::memory_error("Use regular copy for same-memory operations";
         }
         
         // Actual implementation would:
@@ -426,7 +426,7 @@ impl Validate for MultiMemoryLoad {
     fn validate(&self, ctx: &mut ValidationContext) -> Result<()> {
         // Check memory index
         if self.memory_index >= ctx.memories {
-            return Err(Error::validation_error("Invalid memory index"));
+            return Err(Error::validation_error("Invalid memory index";
         }
         
         // Validate like regular memory load
@@ -445,7 +445,7 @@ impl Validate for MultiMemoryStore {
     fn validate(&self, ctx: &mut ValidationContext) -> Result<()> {
         // Check memory index
         if self.memory_index >= ctx.memories {
-            return Err(Error::validation_error("Invalid memory index"));
+            return Err(Error::validation_error("Invalid memory index";
         }
         
         // Validate like regular memory store
@@ -464,7 +464,7 @@ impl Validate for MultiMemoryBulk {
     fn validate(&self, ctx: &mut ValidationContext) -> Result<()> {
         // Check memory index
         if self.memory_index >= ctx.memories {
-            return Err(Error::validation_error("Invalid memory index"));
+            return Err(Error::validation_error("Invalid memory index";
         }
         Ok(())
     }
@@ -474,7 +474,7 @@ impl Validate for MultiMemoryCrossCopy {
     fn validate(&self, ctx: &mut ValidationContext) -> Result<()> {
         // Check both memory indices
         if self.dest_memory_index >= ctx.memories || self.src_memory_index >= ctx.memories {
-            return Err(Error::validation_error("Invalid memory index"));
+            return Err(Error::validation_error("Invalid memory index";
         }
         
         // memory.copy: [i32, i32, i32] -> []
@@ -491,7 +491,7 @@ impl Validate for MultiMemorySize {
     fn validate(&self, ctx: &mut ValidationContext) -> Result<()> {
         // Check memory index
         if self.memory_index >= ctx.memories {
-            return Err(Error::validation_error("Invalid memory index"));
+            return Err(Error::validation_error("Invalid memory index";
         }
         
         // memory.size: [] -> [i32]
@@ -504,7 +504,7 @@ impl Validate for MultiMemoryGrow {
     fn validate(&self, ctx: &mut ValidationContext) -> Result<()> {
         // Check memory index
         if self.memory_index >= ctx.memories {
-            return Err(Error::validation_error("Invalid memory index"));
+            return Err(Error::validation_error("Invalid memory index";
         }
         
         // memory.grow: [i32] -> [i32]
@@ -539,7 +539,7 @@ mod tests {
             let start = offset as usize;
             let end = start + len as usize;
             if end > self.data.len() {
-                return Err(Error::memory_error("Read out of bounds"));
+                return Err(Error::memory_error("Read out of bounds";
             }
             Ok(self.data[start..end].to_vec())
         }
@@ -549,10 +549,11 @@ mod tests {
             let start = offset as usize;
             let end = start + len as usize;
             if end > self.data.len() {
-                return Err(Error::memory_error("Read out of bounds"));
+                return Err(Error::memory_error("Read out of bounds";
             }
             
-            let mut result = wrt_foundation::BoundedVec::new(wrt_foundation::NoStdProvider::new())?;
+            let provider = wrt_foundation::wrt_provider!(len, wrt_foundation::budget_aware_provider::CrateId::Instructions).unwrap_or_default);
+            let mut result = wrt_foundation::BoundedVec::new(provider)?;
             for i in start..end {
                 result.push(self.data[i]).map_err(|_| Error::memory_error("Result vector full"))?;
             }
@@ -561,15 +562,15 @@ mod tests {
 
         fn write_bytes(&mut self, offset: u32, bytes: &[u8]) -> Result<()> {
             let start = offset as usize;
-            let end = start + bytes.len();
+            let end = start + bytes.len);
             
             // Extend data if necessary
             if end > self.data.len() {
-                self.data.resize(end, 0);
+                self.data.resize(end, 0;
             }
             
             // Copy bytes
-            self.data[start..end].copy_from_slice(bytes);
+            self.data[start..end].copy_from_slice(bytes;
             Ok(())
         }
 
@@ -583,7 +584,7 @@ mod tests {
             
             // Extend data if necessary
             if end > self.data.len() {
-                self.data.resize(end, 0);
+                self.data.resize(end, 0;
             }
             
             // Fill with value
@@ -595,7 +596,7 @@ mod tests {
 
         fn copy(&mut self, dest: u32, src: u32, size: u32) -> Result<()> {
             if dest == src || size == 0 {
-                return Ok(());
+                return Ok();
             }
             
             let dest_start = dest as usize;
@@ -603,9 +604,9 @@ mod tests {
             let copy_size = size as usize;
             
             // Extend data if necessary
-            let max_end = core::cmp::max(dest_start + copy_size, src_start + copy_size);
+            let max_end = core::cmp::max(dest_start + copy_size, src_start + copy_size;
             if max_end > self.data.len() {
-                self.data.resize(max_end, 0);
+                self.data.resize(max_end, 0;
             }
             
             // Use Vec's copy_within for safe overlapping copy
@@ -625,33 +626,33 @@ mod tests {
 
         fn grow(&mut self, pages: u32) -> Result<u32> {
             let additional_bytes = pages as usize * 65536;
-            let old_size = self.data.len();
-            self.data.resize(old_size + additional_bytes, 0);
+            let old_size = self.data.len);
+            self.data.resize(old_size + additional_bytes, 0;
             Ok((old_size / 65536) as u32)
         }
     }
 
     #[test]
     fn test_multi_memory_load() {
-        let mut memory = MockMemory::new();
+        let mut memory = MockMemory::new);
         
         // Write test data
         memory.write_bytes(0, &[0x42, 0x43, 0x44, 0x45]).unwrap();
         
         // Test i32 load from memory 0
-        let load_op = MultiMemoryLoad::i32_load(0, 0, 4);
+        let load_op = MultiMemoryLoad::i32_load(0, 0, 4;
         let result = load_op.execute_with_memory(&memory, &Value::I32(0)).unwrap();
         
         // Verify result (little-endian)
-        assert_eq!(result, Value::I32(0x45444342u32 as i32));
+        assert_eq!(result, Value::I32(0x45444342u32 as i32;
     }
 
     #[test]
     fn test_multi_memory_store() {
-        let mut memory = MockMemory::new();
+        let mut memory = MockMemory::new);
         
         // Test i32 store to memory 1
-        let store_op = MultiMemoryStore::i32_store(1, 0, 4);
+        let store_op = MultiMemoryStore::i32_store(1, 0, 4;
         store_op.execute_with_memory(&mut memory, &Value::I32(0), &Value::I32(0x12345678)).unwrap();
         
         // Verify stored data
@@ -662,29 +663,29 @@ mod tests {
 
     #[test]
     fn test_multi_memory_size_and_grow() {
-        let mut memory = MockMemory::new();
+        let mut memory = MockMemory::new);
         
         // Test size (should be 0 pages initially)
-        let size_op = MultiMemorySize::new(0);
+        let size_op = MultiMemorySize::new(0;
         let size = size_op.execute(&memory).unwrap();
-        assert_eq!(size, Value::I32(0));
+        assert_eq!(size, Value::I32(0;
         
         // Test grow
-        let grow_op = MultiMemoryGrow::new(0);
+        let grow_op = MultiMemoryGrow::new(0;
         let old_size = grow_op.execute(&mut memory, &Value::I32(1)).unwrap();
-        assert_eq!(old_size, Value::I32(0));
+        assert_eq!(old_size, Value::I32(0;
         
         // Test size after grow
         let new_size = size_op.execute(&memory).unwrap();
-        assert_eq!(new_size, Value::I32(1));
+        assert_eq!(new_size, Value::I32(1;
     }
 
     #[test]
     fn test_multi_memory_bulk_operations() {
-        let mut memory = MockMemory::new();
+        let mut memory = MockMemory::new);
         memory.data.resize(100, 0); // Binary std/no_std choice
         
-        let bulk_ops = MultiMemoryBulk::new(0);
+        let bulk_ops = MultiMemoryBulk::new(0;
         
         // Test fill
         bulk_ops.fill(&mut memory, &Value::I32(10), &Value::I32(0xAB), &Value::I32(5)).unwrap();
@@ -692,7 +693,7 @@ mod tests {
         // Verify fill
         let data = memory.read_bytes(10, 5).unwrap();
         #[cfg(feature = "std")]
-        assert_eq!(data, vec![0xAB; 5]);
+        assert_eq!(data, vec![0xAB; 5];
         
         // Test copy
         bulk_ops.copy(&mut memory, &Value::I32(20), &Value::I32(10), &Value::I32(5)).unwrap();
@@ -700,15 +701,15 @@ mod tests {
         // Verify copy
         let copied_data = memory.read_bytes(20, 5).unwrap();
         #[cfg(feature = "std")]
-        assert_eq!(copied_data, vec![0xAB; 5]);
+        assert_eq!(copied_data, vec![0xAB; 5];
     }
 
     #[test]
     fn test_cross_memory_copy() {
-        let mut dest_memory = MockMemory::new();
-        let src_memory = MockMemory::new();
+        let mut dest_memory = MockMemory::new);
+        let src_memory = MockMemory::new);
         
-        let cross_copy = MultiMemoryCrossCopy::new(0, 1);
+        let cross_copy = MultiMemoryCrossCopy::new(0, 1;
         
         // This is a placeholder test since actual implementation requires
         // more complex memory management
@@ -718,8 +719,8 @@ mod tests {
             &Value::I32(0),
             &Value::I32(0),
             &Value::I32(4)
-        );
+        ;
         
-        assert!(result.is_ok());
+        assert!(result.is_ok();
     }
 }

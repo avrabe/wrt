@@ -1,19 +1,19 @@
 # wrt-runtime
 
-Core runtime implementation for the WebAssembly Runtime (WRT).
+Core runtime implementation for PulseEngine (WRT Edition).
 
-This crate provides the execution engine and runtime environment for WebAssembly modules, supporting both standard and stackless execution models.
+This crate provides WebAssembly runtime infrastructure including memory management, type systems, and foundational components for WebAssembly execution. The instruction execution engine is currently under development.
 
 ## Features
 
-- WebAssembly module instantiation and execution
-- Memory management with safety features
-- Table management
-- Global variable support
-- Function imports and exports
-- Stackless execution engine for constrained environments
-- Control Flow Integrity (CFI) protection
-- Support for both `std` and `no_std` environments
+- **Implemented**: Memory management with safety features and bounds checking
+- **Implemented**: WebAssembly value types and type system
+- **Implemented**: Table operations and global variable infrastructure
+- **In Development**: WebAssembly instruction execution engine
+- **In Development**: Module instantiation and function calling
+- **In Development**: Stackless execution engine for constrained environments
+- **Planned**: Control Flow Integrity (CFI) protection
+- **Implemented**: Support for both `std` and `no_std` environments
 
 ## Architecture
 
@@ -57,12 +57,12 @@ This crate supports `no_std` environments with the `alloc` feature. Without `all
 ```rust
 use wrt_runtime::prelude::*;
 
-// Load and instantiate a module
-let module = Module::new(wasm_bytes)?;
-let instance = ModuleInstance::new(module, imports)?;
+// Current capabilities - memory and arithmetic operations
+let memory = WrtMemory::new(1024)?;
+let stats = ExecutionStats::new();
 
-// Execute an exported function
-let result = instance.invoke("function_name", &args)?;
+// Note: Module instantiation and function execution under development
+// See documentation for current implementation status
 ```
 
 ## License

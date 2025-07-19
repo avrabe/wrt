@@ -24,28 +24,31 @@ const MODULE_BYTES: &[u8] = &[
 
 /// Example structure to hold debug results
 struct DebugResult {
-    has_line_info: bool,
+    has_line_info:     bool,
     has_function_info: bool,
-    function_count: usize,
+    function_count:    usize,
 }
 
 #[no_mangle]
 pub extern "C" fn demonstrate_debug_features() -> DebugResult {
     // Create debug info parser
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
 
     // Register debug sections (in practice, these would come from parsing the
     // module)
-    debug_info.add_section(".debug_line", 0x1000, 0x500);
-    debug_info.add_section(".debug_info", 0x1500, 0x800);
-    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200);
-    debug_info.add_section(".debug_str", 0x1F00, 0x300);
+    debug_info.add_section(".debug_line", 0x1000, 0x500;
+    debug_info.add_section(".debug_info", 0x1500, 0x800;
+    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200;
+    debug_info.add_section(".debug_str", 0x1F00, 0x300;
 
     // Initialize the debug info parser
-    let info_init_result = debug_info.init_info_parser();
+    let info_init_result = debug_info.init_info_parser);
 
-    let mut result =
-        DebugResult { has_line_info: false, has_function_info: false, function_count: 0 };
+    let mut result = DebugResult {
+        has_line_info:     false,
+        has_function_info: false,
+        function_count:    0,
+    };
 
     // Check for line information
     if let Ok(Some(line_info)) = debug_info.find_line_info(0x42) {
@@ -71,7 +74,7 @@ pub extern "C" fn demonstrate_debug_features() -> DebugResult {
 
         // Count total functions
         if let Some(functions) = debug_info.get_functions() {
-            result.function_count = functions.len();
+            result.function_count = functions.len);
         }
     }
 
@@ -81,15 +84,15 @@ pub extern "C" fn demonstrate_debug_features() -> DebugResult {
 /// Example of querying debug info for multiple addresses
 #[no_mangle]
 pub extern "C" fn query_multiple_addresses() {
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
 
     // Register sections
-    debug_info.add_section(".debug_line", 0x1000, 0x500);
-    debug_info.add_section(".debug_info", 0x1500, 0x800);
-    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200);
+    debug_info.add_section(".debug_line", 0x1000, 0x500;
+    debug_info.add_section(".debug_info", 0x1500, 0x800;
+    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200;
 
     // Initialize parser
-    let _ = debug_info.init_info_parser();
+    let _ = debug_info.init_info_parser);
 
     // Query multiple addresses
     let test_addresses = [0x10, 0x20, 0x30, 0x40, 0x50];
@@ -113,11 +116,11 @@ pub extern "C" fn query_multiple_addresses() {
 /// Example of iterating through all functions
 #[no_mangle]
 pub extern "C" fn list_all_functions() -> usize {
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
 
     // Setup sections
-    debug_info.add_section(".debug_info", 0x1500, 0x800);
-    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200);
+    debug_info.add_section(".debug_info", 0x1500, 0x800;
+    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200;
 
     // Initialize and parse
     if debug_info.init_info_parser().is_ok() {
@@ -130,7 +133,7 @@ pub extern "C" fn list_all_functions() -> usize {
                 let _file = func.file_index;
                 let _line = func.line;
             }
-            return functions.len();
+            return functions.len);
         }
     }
 

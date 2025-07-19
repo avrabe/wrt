@@ -42,15 +42,15 @@ impl Future for ReadyFuture {
 impl Unpin for ReadyFuture {}
 
 fn main() {
-    println!("=== Simple Async Executor Example ===\n");
+    println!("=== Simple Async Executor Example ===\n";
     
     // 1. Check initial state - should be using fallback
-    println!("1. Initial state:");
-    println!("   Using fallback executor: {}", is_using_fallback());
+    println!("1. Initial state:";
+    println!("   Using fallback executor: {}", is_using_fallback);
     
     // 2. Use the simple async runtime
-    println!("\n2. Using AsyncRuntime:");
-    let runtime = AsyncRuntime::new();
+    println!("\n2. Using AsyncRuntime:";
+    let runtime = AsyncRuntime::new);
     
     // Test with a simple ready future
     let ready_future = ReadyFuture { value: "Ready immediately!" };
@@ -60,7 +60,7 @@ fn main() {
     }
     
     // 3. Using the with_async helper with ready futures
-    println!("\n3. Using with_async helper:");
+    println!("\n3. Using with_async helper:";
     
     #[cfg(feature = "std")]
     {
@@ -70,16 +70,16 @@ fn main() {
         };
         
         // Note: This requires the future to be Unpin, so we'll pin it
-        let pinned_future = Box::pin(async_block);
+        let pinned_future = Box::pin(async_block;
         match with_async(pinned_future) {
             Ok(result) => println!("   Result: {}", result),
             Err(e) => println!("   Error: {:?}", e),
         }
         
         // 4. Example of what happens with pending futures
-        println!("\n4. Pending futures (expected to fail):");
-        let pending_future = core::future::pending::<()>();
-        let pinned_pending = Box::pin(pending_future);
+        println!("\n4. Pending futures (expected to fail):";
+        let pending_future = core::future::pending::<()>);
+        let pinned_pending = Box::pin(pending_future;
         match with_async(pinned_pending) {
             Ok(_) => println!("   Unexpected success"),
             Err(e) => println!("   Expected error: {:?}", e),
@@ -88,7 +88,7 @@ fn main() {
     
     #[cfg(not(any(feature = "std", )))]
     {
-        println!("   Skipping Box::pin examples (requires alloc feature)");
+        println!("   Skipping Box::pin examples (requires alloc feature)";
         
         // Binary std/no_std choice
         let ready_future2 = ReadyFuture { value: "Stack allocated result" };
@@ -98,13 +98,13 @@ fn main() {
         }
     }
     
-    println!("\n=== Example Complete ===");
-    println!("Note: This simple executor only handles immediately ready futures.");
-    println!("For real async execution, integrate with Embassy, tokio, or other runtimes.");
+    println!("\n=== Example Complete ===";
+    println!("Note: This simple executor only handles immediately ready futures.";
+    println!("For real async execution, integrate with Embassy, tokio, or other runtimes.";
 }
 
 #[cfg(not(feature = "async-api"))]
 fn main() {
-    println!("This example requires the 'async-api' feature to be enabled.");
-    println!("Try running with: cargo run --example pluggable_async_example --features async-api");
+    println!("This example requires the 'async-api' feature to be enabled.";
+    println!("Try running with: cargo run --example pluggable_async_example --features async-api";
 }

@@ -3,6 +3,7 @@
 //! This strategy logs function calls between components and hosts.
 //! It can be configured to log arguments, results, timing, etc.
 
+
 #[cfg(feature = "std")]
 use std::{time::Instant, sync::{Arc, Mutex}};
 
@@ -41,7 +42,7 @@ impl ValueFormatter for DefaultValueFormatter {
 #[cfg(feature = "std")]
 pub trait LogSink: Send + Sync {
     /// Write a log entry
-    fn write_log(&self, entry: &str);
+    fn write_log(&self, entry: &str;
 }
 
 /// Configuration for the logging strategy
@@ -130,11 +131,11 @@ impl<S: LogSink + 'static, F: ValueFormatter + 'static> LinkInterceptorStrategy
         args: &[Value],
     ) -> Result<Vec<Value>> {
         // Format the function call
-        let mut log_entry = format!("CALL: {}->{}::{}", source, target, function);
+        let mut log_entry = format!("CALL: {}->{}::{}", source, target, function;
 
         // Add arguments if configured
         if self.config.log_args && !args.is_empty() {
-            let mut args_str = String::new();
+            let mut args_str = String::new);
             let limit = if self.config.max_args > 0 {
                 self.config.max_args.min(args.len())
             } else {
@@ -143,25 +144,25 @@ impl<S: LogSink + 'static, F: ValueFormatter + 'static> LinkInterceptorStrategy
 
             for (i, arg) in args.iter().take(limit).enumerate() {
                 if i > 0 {
-                    args_str.push_str(", ");
+                    args_str.push_str(", ";
                 }
-                args_str.push_str(&self.formatter.format_value(arg));
+                args_str.push_str(&self.formatter.format_value(arg;
             }
 
             if limit < args.len() {
-                args_str.push_str(&format!(", ... ({} more)", args.len() - limit));
+                args_str.push_str(&format!(", ... ({} more)", args.len() - limit;
             }
 
-            log_entry.push_str(&format!(" args: [{}]", args_str));
+            log_entry.push_str(&format!(" args: [{}]", args_str;
         }
 
         // Write the log entry
-        self.sink.write_log(&log_entry);
+        self.sink.write_log(&log_entry;
 
         // Store start time if timing is enabled
         if self.config.log_timing {
             if let Ok(mut timing) = self.timing.lock() {
-                *timing = Some(Instant::now());
+                *timing = Some(Instant::now);
             }
         }
 
@@ -178,14 +179,14 @@ impl<S: LogSink + 'static, F: ValueFormatter + 'static> LinkInterceptorStrategy
         result: Result<Vec<Value>>,
     ) -> Result<Vec<Value>> {
         // Format the return
-        let mut log_entry = format!("RETURN: {}->{}::{}", source, target, function);
+        let mut log_entry = format!("RETURN: {}->{}::{}", source, target, function;
 
         // Add timing information if configured
         if self.config.log_timing {
             if let Ok(mut timing) = self.timing.lock() {
                 if let Some(start_time) = timing.take() {
-                    let elapsed = start_time.elapsed();
-                    log_entry.push_str(&format!(" elapsed: {:?}", elapsed));
+                    let elapsed = start_time.elapsed);
+                    log_entry.push_str(&format!(" elapsed: {:?}", elapsed;
                 }
             }
         }
@@ -195,7 +196,7 @@ impl<S: LogSink + 'static, F: ValueFormatter + 'static> LinkInterceptorStrategy
             match &result {
                 Ok(values) => {
                     if !values.is_empty() {
-                        let mut result_str = String::new();
+                        let mut result_str = String::new);
                         let limit = if self.config.max_results > 0 {
                             self.config.max_results.min(values.len())
                         } else {
@@ -204,28 +205,28 @@ impl<S: LogSink + 'static, F: ValueFormatter + 'static> LinkInterceptorStrategy
 
                         for (i, value) in values.iter().take(limit).enumerate() {
                             if i > 0 {
-                                result_str.push_str(", ");
+                                result_str.push_str(", ";
                             }
-                            result_str.push_str(&self.formatter.format_value(value));
+                            result_str.push_str(&self.formatter.format_value(value;
                         }
 
                         if limit < values.len() {
-                            result_str.push_str(&format!(", ... ({} more)", values.len() - limit));
+                            result_str.push_str(&format!(", ... ({} more)", values.len() - limit;
                         }
 
-                        log_entry.push_str(&format!(" result: [{}]", result_str));
+                        log_entry.push_str(&format!(" result: [{}]", result_str;
                     } else {
-                        log_entry.push_str(" result: []");
+                        log_entry.push_str(" result: []";
                     }
                 }
                 Err(e) => {
-                    log_entry.push_str(&format!(" error: {}", e));
+                    log_entry.push_str(&format!(" error: {}", e;
                 }
             }
         }
 
         // Write the log entry
-        self.sink.write_log(&log_entry);
+        self.sink.write_log(&log_entry;
 
         // Return unmodified result
         result
@@ -260,6 +261,7 @@ impl Default for LoggingStrategy {
     }
 }
 
+#[cfg(not(feature = "std"))]
 impl LoggingStrategy {
     /// Create a new logging strategy for `no_std` environments
     #[must_use] pub fn new() -> Self {
@@ -324,7 +326,7 @@ impl LogSink for FileLogSink {
         use std::io::Write;
 
         if let Ok(mut file) = self.file.lock() {
-            let _ = writeln!(file, "{}", entry);
+            let _ = writeln!(file, "{}", entry;
         }
     }
 }
@@ -347,7 +349,7 @@ impl LogCrateSink {
 #[cfg(feature = "log")]
 impl LogSink for LogCrateSink {
     fn write_log(&self, entry: &str) {
-        log::debug!(target: self.module, "{}", entry);
+        log::debug!(target: self.module, "{}", entry;
     }
 }
 
@@ -364,52 +366,52 @@ mod tests {
     impl LogSink for TestSink {
         fn write_log(&self, entry: &str) {
             if let Ok(mut logs) = self.logs.lock() {
-                logs.push(entry.to_string());
+                logs.push(entry.to_string();
             }
         }
     }
 
     #[test]
     fn test_logging_strategy() {
-        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) });
-        let strategy = LoggingStrategy::new(sink.clone());
+        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) };
+        let strategy = LoggingStrategy::new(sink.clone();
 
         // Test before_call
         let args = vec![Value::I32(42), Value::I64(123)];
-        let result = strategy.before_call("source", "target", "function", &args);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), args);
+        let result = strategy.before_call("source", "target", "function", &args;
+        assert!(result.is_ok();
+        assert_eq!(result.unwrap(), args;
 
         // Check log entry
         let logs = sink.logs.lock().unwrap();
-        assert_eq!(logs.len(), 1);
-        assert!(logs[0].contains("CALL: source->target::function"));
-        assert!(logs[0].contains("I32(42)"));
-        assert!(logs[0].contains("I64(123)"));
+        assert_eq!(logs.len(), 1;
+        assert!(logs[0].contains("CALL: source->target::function");
+        assert!(logs[0].contains("I32(42)");
+        assert!(logs[0].contains("I64(123)");
     }
 
     #[test]
     fn test_logging_strategy_after_call() {
-        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) });
-        let strategy = LoggingStrategy::new(sink.clone());
+        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) };
+        let strategy = LoggingStrategy::new(sink.clone();
 
         // Test after_call with success
         let args = vec![Value::I32(42)];
-        let result = Ok(vec![Value::I64(123)]);
-        let after_result = strategy.after_call("source", "target", "function", &args, result);
-        assert!(after_result.is_ok());
-        assert_eq!(after_result.unwrap(), vec![Value::I64(123)]);
+        let result = Ok(vec![Value::I64(123)];
+        let after_result = strategy.after_call("source", "target", "function", &args, result;
+        assert!(after_result.is_ok();
+        assert_eq!(after_result.unwrap(), vec![Value::I64(123)];
 
         // Check log entry
         let logs = sink.logs.lock().unwrap();
-        assert_eq!(logs.len(), 1);
-        assert!(logs[0].contains("RETURN: source->target::function"));
-        assert!(logs[0].contains("I64(123)"));
+        assert_eq!(logs.len(), 1;
+        assert!(logs[0].contains("RETURN: source->target::function");
+        assert!(logs[0].contains("I64(123)");
     }
 
     #[test]
     fn test_logging_strategy_config() {
-        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) });
+        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) };
         let config = LoggingConfig {
             log_args: false,
             log_results: true,
@@ -417,17 +419,17 @@ mod tests {
             max_args: 5,
             max_results: 5,
         };
-        let strategy = LoggingStrategy::new(sink.clone()).with_config(config);
+        let strategy = LoggingStrategy::new(sink.clone()).with_config(config;
 
         // Test before_call with custom config
         let args = vec![Value::I32(42), Value::I64(123)];
-        let _ = strategy.before_call("source", "target", "function", &args);
+        let _ = strategy.before_call("source", "target", "function", &args;
 
         // Check log entry - should not contain args
         let logs = sink.logs.lock().unwrap();
-        assert_eq!(logs.len(), 1);
-        assert!(logs[0].contains("CALL: source->target::function"));
-        assert!(!logs[0].contains("I32(42)"));
-        assert!(!logs[0].contains("I64(123)"));
+        assert_eq!(logs.len(), 1;
+        assert!(logs[0].contains("CALL: source->target::function");
+        assert!(!logs[0].contains("I32(42)");
+        assert!(!logs[0].contains("I64(123)");
     }
 }

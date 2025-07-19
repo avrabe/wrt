@@ -3,6 +3,7 @@
 //! This module provides safe abstractions for mapping WebAssembly threads to
 //! native platform threads with proper resource controls and isolation.
 
+
 use core::{
     fmt::Debug,
     sync::atomic::{AtomicUsize, Ordering},
@@ -71,7 +72,7 @@ impl CpuSet {
     /// Remove CPU from set
     pub fn remove(&mut self, cpu: usize) {
         if cpu < 64 {
-            self.mask &= !(1 << cpu);
+            self.mask &= !(1 << cpu;
         }
     }
 
@@ -175,6 +176,14 @@ impl core::fmt::Debug for ThreadHandle {
 }
 
 impl ThreadHandle {
+    /// Create a new thread handle
+    pub fn new(id: u64, platform_handle: Box<dyn PlatformThreadHandle>) -> Self {
+        Self {
+            id,
+            platform_handle,
+        }
+    }
+
     /// Get thread ID
     pub fn id(&self) -> u64 {
         self.id
@@ -357,34 +366,34 @@ impl ResourceTracker {
     /// Binary std/no_std choice
     pub fn can_allocate_thread(&self, request: &ThreadSpawnRequest) -> Result<bool> {
         // Check total thread limit
-        let total = self.total_threads.load(Ordering::Acquire);
+        let total = self.total_threads.load(Ordering::Acquire;
         if total >= self.limits.max_total_threads {
-            return Ok(false);
+            return Ok(false;
         }
 
         // Check per-module limit
         let module_threads = {
-            let modules = self.threads_per_module.read();
+            let modules = self.threads_per_module.read);
             modules
                 .get(&request.module_id)
                 .map_or(0, |count| count.load(Ordering::Acquire))
         };
 
         if module_threads >= self.limits.max_threads_per_module {
-            return Ok(false);
+            return Ok(false;
         }
 
         // Check memory limit
         let module_memory = {
-            let memory = self.memory_per_module.read();
+            let memory = self.memory_per_module.read);
             memory
                 .get(&request.module_id)
                 .map_or(0, |usage| usage.load(Ordering::Acquire))
         };
 
-        let stack_size = request.stack_size.unwrap_or(2 * 1024 * 1024);
+        let stack_size = request.stack_size.unwrap_or(2 * 1024 * 1024;
         if module_memory + stack_size > self.limits.memory_limit_per_module {
-            return Ok(false);
+            return Ok(false;
         }
 
         Ok(true)
@@ -393,24 +402,24 @@ impl ResourceTracker {
     /// Allocate thread resources
     pub fn allocate_thread(&self, module_id: u64, stack_size: usize) -> Result<()> {
         // Increment total threads
-        self.total_threads.fetch_add(1, Ordering::AcqRel);
+        self.total_threads.fetch_add(1, Ordering::AcqRel;
 
         // Increment module threads
         {
-            let mut modules = self.threads_per_module.write();
+            let mut modules = self.threads_per_module.write);
             modules
                 .entry(module_id)
                 .or_insert_with(|| AtomicUsize::new(0))
-                .fetch_add(1, Ordering::AcqRel);
+                .fetch_add(1, Ordering::AcqRel;
         }
 
         // Add memory usage
         {
-            let mut memory = self.memory_per_module.write();
+            let mut memory = self.memory_per_module.write);
             memory
                 .entry(module_id)
                 .or_insert_with(|| AtomicUsize::new(0))
-                .fetch_add(stack_size, Ordering::AcqRel);
+                .fetch_add(stack_size, Ordering::AcqRel;
         }
 
         Ok(())
@@ -419,27 +428,28 @@ impl ResourceTracker {
     /// Release thread resources
     pub fn release_thread(&self, module_id: u64, stack_size: usize) {
         // Decrement total threads
-        self.total_threads.fetch_sub(1, Ordering::AcqRel);
+        self.total_threads.fetch_sub(1, Ordering::AcqRel;
 
         // Decrement module threads
         {
-            let modules = self.threads_per_module.read();
+            let modules = self.threads_per_module.read);
             if let Some(count) = modules.get(&module_id) {
-                count.fetch_sub(1, Ordering::AcqRel);
+                count.fetch_sub(1, Ordering::AcqRel;
             }
         }
 
         // Subtract memory usage
         {
-            let memory = self.memory_per_module.read();
+            let memory = self.memory_per_module.read);
             if let Some(usage) = memory.get(&module_id) {
-                usage.fetch_sub(stack_size, Ordering::AcqRel);
+                usage.fetch_sub(stack_size, Ordering::AcqRel;
             }
         }
     }
 }
 
 /// Create platform-specific thread pool
+#[cfg(feature = "threading")]
 pub fn create_thread_pool(_config: &ThreadPoolConfig) -> Result<Box<dyn PlatformThreadPool>> {
     #[cfg(target_os = "nto")]
     {
@@ -447,7 +457,7 @@ pub fn create_thread_pool(_config: &ThreadPoolConfig) -> Result<Box<dyn Platform
             .map(|pool| Box::new(pool) as Box<dyn PlatformThreadPool>)
     }
     
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "threading", target_os = "linux"))]
     {
         super::linux_threading::LinuxThreadPool::new(_config)
             .map(|pool| Box::new(pool) as Box<dyn PlatformThreadPool>)
@@ -455,17 +465,13 @@ pub fn create_thread_pool(_config: &ThreadPoolConfig) -> Result<Box<dyn Platform
     
     #[cfg(all(feature = "threading", not(target_os = "nto"), not(target_os = "linux")))]
     {
-        super::generic_threading::GenericThreadPool::new(_config)
+        super::generic_threading::GenericThreadPool::new(_config.clone())
             .map(|pool| Box::new(pool) as Box<dyn PlatformThreadPool>)
     }
     
     #[cfg(not(any(target_os = "nto", target_os = "linux", feature = "threading")))]   
     {
-        Err(wrt_error::Error::new(
-            wrt_error::ErrorCategory::System,
-            1,
-            "Thread pool creation requires threading feature",
-        ))
+        Err(wrt_error::Error::runtime_execution_error("Threading not supported on this platform"))
     }
 }
 
@@ -502,18 +508,18 @@ mod tests {
 
     #[test]
     fn test_cpu_set() {
-        let mut cpu_set = CpuSet::new();
-        assert!(!cpu_set.contains(0));
+        let mut cpu_set = CpuSet::new);
+        assert!(!cpu_set.contains(0);
         
-        cpu_set.add(0);
-        cpu_set.add(3);
-        assert!(cpu_set.contains(0));
-        assert!(cpu_set.contains(3));
-        assert!(!cpu_set.contains(1));
+        cpu_set.add(0;
+        cpu_set.add(3;
+        assert!(cpu_set.contains(0);
+        assert!(cpu_set.contains(3);
+        assert!(!cpu_set.contains(1);
         
-        cpu_set.remove(0);
-        assert!(!cpu_set.contains(0));
-        assert!(cpu_set.contains(3));
+        cpu_set.remove(0;
+        assert!(!cpu_set.contains(0);
+        assert!(cpu_set.contains(3);
     }
 
     #[test]
@@ -524,7 +530,7 @@ mod tests {
             ..Default::default()
         };
         
-        let tracker = ResourceTracker::new(limits);
+        let tracker = ResourceTracker::new(limits;
         
         // First thread should be allowed
         let request1 = ThreadSpawnRequest {
@@ -534,15 +540,15 @@ mod tests {
             priority: None,
             stack_size: Some(1024 * 1024),
         };
-        assert!(tracker.can_allocate_thread(&request1).unwrap());
+        assert!(tracker.can_allocate_thread(&request1).unwrap();
         tracker.allocate_thread(1, 1024 * 1024).unwrap();
         
         // Second thread for same module should be allowed
-        assert!(tracker.can_allocate_thread(&request1).unwrap());
+        assert!(tracker.can_allocate_thread(&request1).unwrap();
         tracker.allocate_thread(1, 1024 * 1024).unwrap();
         
         // Third thread for same module should be denied (per-module limit)
-        assert!(!tracker.can_allocate_thread(&request1).unwrap());
+        assert!(!tracker.can_allocate_thread(&request1).unwrap();
         
         // Thread for different module should be allowed
         let request2 = ThreadSpawnRequest {
@@ -552,7 +558,7 @@ mod tests {
             priority: None,
             stack_size: Some(1024 * 1024),
         };
-        assert!(tracker.can_allocate_thread(&request2).unwrap());
+        assert!(tracker.can_allocate_thread(&request2).unwrap();
     }
 }
 
@@ -576,12 +582,8 @@ where
     };
     
     let _handle = builder.spawn(move || {
-        let _ = task();
-    }).map_err(|_e| wrt_error::Error::new(
-        wrt_error::ErrorCategory::Runtime,
-        wrt_error::codes::EXECUTION_ERROR,
-        "Failed to spawn thread"
-    ))?;
+        let _ = task);
+    }).map_err(|_e| wrt_error::Error::runtime_execution_error("Failed to spawn thread"))?;
     
     // Create a simplified thread handle
     // This is a minimal implementation for compilation purposes
@@ -619,10 +621,6 @@ where
     F: FnOnce() -> Result<()> + Send + 'static,
 {
     // For no_std, we can't create actual threads, so return an error immediately
-    Err(wrt_error::Error::new(
-        wrt_error::ErrorCategory::Runtime,
-        wrt_error::codes::NOT_IMPLEMENTED,
-        "Thread spawning not supported in no_std environment"
-    ))
+    Err(wrt_error::Error::runtime_not_implemented("Thread spawning not supported in no_std environment"))
 }
 

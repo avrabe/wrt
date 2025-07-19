@@ -16,6 +16,6 @@
 
 #[test]
 fn foundation_memory_tests_moved_notice() {
-    println!("Foundation memory safety tests have been moved to wrt-tests/integration/memory/");
-    println!("Run: cargo test -p wrt-tests memory");
+    println!("Foundation memory safety tests have been moved to wrt-tests/integration/memory/";
+    println!("Run: cargo test -p wrt-tests memory";
 }

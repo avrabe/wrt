@@ -121,13 +121,13 @@ impl TypeConversionRegistry {
         To: Convertible + 'static,
         F: Fn(&From) -> Result<To, ConversionError> + Send + Sync + 'static,
     {
-        let key = (TypeId::of::<From>(), TypeId::of::<To>());
+        let key = (TypeId::of::<From>(), TypeId::of::<To>);
         let conversion = TypedConversion {
             convert_fn: converter,
             _phantom: std::marker::PhantomData,
         };
         
-        self.conversions.insert(key, Box::new(conversion));
+        self.conversions.insert(key, Box::new(conversion;
         self
     }
     
@@ -137,7 +137,7 @@ impl TypeConversionRegistry {
         From: Convertible + 'static,
         To: Convertible + 'static,
     {
-        let key = (TypeId::of::<From>(), TypeId::of::<To>());
+        let key = (TypeId::of::<From>(), TypeId::of::<To>);
         
         let conversion = self.conversions.get(&key).ok_or_else(|| ConversionError {
             kind: ConversionErrorKind::NotImplemented,
@@ -165,17 +165,17 @@ impl TypeConversionRegistry {
         From: Convertible + 'static,
         To: Convertible + 'static,
     {
-        let key = (TypeId::of::<From>(), TypeId::of::<To>());
+        let key = (TypeId::of::<From>(), TypeId::of::<To>);
         self.conversions.contains_key(&key)
     }
 }
 
 /// Example types for testing the conversion system
 #[derive(Debug, PartialEq, Clone)]
-struct FormatValType(String);
+struct FormatValType(String;
 
 #[derive(Debug, PartialEq, Clone)]
-struct RuntimeValType(String);
+struct RuntimeValType(String;
 
 impl Convertible for FormatValType {
     fn type_name(&self) -> &'static str {
@@ -196,12 +196,12 @@ pub struct ComponentLoader {
 
 impl ComponentLoader {
     pub fn new() -> Self {
-        let mut registry = TypeConversionRegistry::new();
+        let mut registry = TypeConversionRegistry::new);
         
         // Register default conversions for testing
         registry.register(|format: &FormatValType| -> Result<RuntimeValType, ConversionError> {
             Ok(RuntimeValType(format.0.clone()))
-        });
+        };
         
         Self {
             registry: Arc::new(registry),
@@ -219,40 +219,40 @@ mod tests {
     
     #[test]
     fn test_conversion_registry() {
-        let mut registry = TypeConversionRegistry::new();
+        let mut registry = TypeConversionRegistry::new);
         
         // Register a conversion from FormatValType to RuntimeValType
         registry.register(|format: &FormatValType| -> Result<RuntimeValType, ConversionError> {
             Ok(RuntimeValType(format.0.clone()))
-        });
+        };
         
         // Test conversion
-        let format_type = FormatValType("i32".to_string());
+        let format_type = FormatValType("i32".to_string();
         let runtime_type: RuntimeValType = registry.convert(&format_type).unwrap();
         
-        assert_eq!(runtime_type, RuntimeValType("i32".to_string()));
+        assert_eq!(runtime_type, RuntimeValType("i32".to_string();
     }
     
     #[test]
     fn test_component_loader() {
-        let loader = ComponentLoader::new();
+        let loader = ComponentLoader::new);
         
         // Test loading a component
-        let format_type = FormatValType("i32".to_string());
+        let format_type = FormatValType("i32".to_string();
         let runtime_type = loader.load_component(&format_type).unwrap();
         
-        assert_eq!(runtime_type, RuntimeValType("i32".to_string()));
+        assert_eq!(runtime_type, RuntimeValType("i32".to_string();
     }
     
     #[test]
     fn test_missing_conversion() {
-        let registry = TypeConversionRegistry::new();
+        let registry = TypeConversionRegistry::new);
         
         // Try to convert without registering a conversion
-        let format_type = FormatValType("i32".to_string());
-        let result = registry.convert::<FormatValType, RuntimeValType>(&format_type);
+        let format_type = FormatValType("i32".to_string();
+        let result = registry.convert::<FormatValType, RuntimeValType>(&format_type;
         
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err().kind, ConversionErrorKind::NotImplemented));
+        assert!(result.is_err();
+        assert!(matches!(result.unwrap_err().kind, ConversionErrorKind::NotImplemented);
     }
 } 

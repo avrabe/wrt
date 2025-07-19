@@ -304,7 +304,7 @@ impl BuiltinType {
     #[must_use]
     pub fn all_available(
     ) -> BoundedVec<Self, MAX_BUILTIN_TYPES, NoStdProvider<ALL_AVAILABLE_PROVIDER_CAPACITY>> {
-        let provider = NoStdProvider::<ALL_AVAILABLE_PROVIDER_CAPACITY>::default();
+        let provider = NoStdProvider::<ALL_AVAILABLE_PROVIDER_CAPACITY>::default);
         let mut result: BoundedVec<Self, MAX_BUILTIN_TYPES, _> = BoundedVec::new(provider)
             .expect("Static BoundedVec init failed for BuiltinType::all_available");
 
@@ -357,41 +357,41 @@ mod tests {
 
     #[test]
     fn test_builtin_name() {
-        assert_eq!(BuiltinType::ResourceCreate.name(), "resource.create");
-        assert_eq!(BuiltinType::ResourceDrop.name(), "resource.drop");
-        assert_eq!(BuiltinType::ResourceRep.name(), "resource.rep");
-        assert_eq!(BuiltinType::ResourceGet.name(), "resource.get");
+        assert_eq!(BuiltinType::ResourceCreate.name(), "resource.create";
+        assert_eq!(BuiltinType::ResourceDrop.name(), "resource.drop";
+        assert_eq!(BuiltinType::ResourceRep.name(), "resource.rep";
+        assert_eq!(BuiltinType::ResourceGet.name(), "resource.get";
     }
 
     #[test]
     fn test_builtin_from_str() {
-        assert_eq!(BuiltinType::from_str("resource.create"), Ok(BuiltinType::ResourceCreate));
-        assert_eq!(BuiltinType::from_str("resource.drop"), Ok(BuiltinType::ResourceDrop));
-        assert_eq!(BuiltinType::from_str("resource.rep"), Ok(BuiltinType::ResourceRep));
-        assert_eq!(BuiltinType::from_str("resource.get"), Ok(BuiltinType::ResourceGet));
-        assert_eq!(BuiltinType::from_str("unknown.builtin"), Err(ParseBuiltinError));
+        assert_eq!(BuiltinType::from_str("resource.create"), Ok(BuiltinType::ResourceCreate;
+        assert_eq!(BuiltinType::from_str("resource.drop"), Ok(BuiltinType::ResourceDrop;
+        assert_eq!(BuiltinType::from_str("resource.rep"), Ok(BuiltinType::ResourceRep;
+        assert_eq!(BuiltinType::from_str("resource.get"), Ok(BuiltinType::ResourceGet;
+        assert_eq!(BuiltinType::from_str("unknown.builtin"), Err(ParseBuiltinError;
 
         // Also test the parse convenience method
-        assert_eq!(BuiltinType::parse("resource.create"), Some(BuiltinType::ResourceCreate));
-        assert_eq!(BuiltinType::parse("unknown.builtin"), None);
+        assert_eq!(BuiltinType::parse("resource.create"), Some(BuiltinType::ResourceCreate;
+        assert_eq!(BuiltinType::parse("unknown.builtin"), None;
     }
 
     #[test]
     fn test_builtin_is_available() {
         // Resource built-ins should always be available
-        assert!(BuiltinType::ResourceCreate.is_available());
-        assert!(BuiltinType::ResourceDrop.is_available());
-        assert!(BuiltinType::ResourceRep.is_available());
-        assert!(BuiltinType::ResourceGet.is_available());
+        assert!(BuiltinType::ResourceCreate.is_available();
+        assert!(BuiltinType::ResourceDrop.is_available();
+        assert!(BuiltinType::ResourceRep.is_available();
+        assert!(BuiltinType::ResourceGet.is_available();
     }
 
     #[test]
     fn test_all_available() {
         // Should at least contain the resource built-ins
-        let available = BuiltinType::all_available();
-        assert!(available.contains(&BuiltinType::ResourceCreate));
-        assert!(available.contains(&BuiltinType::ResourceDrop));
-        assert!(available.contains(&BuiltinType::ResourceRep));
-        assert!(available.contains(&BuiltinType::ResourceGet));
+        let available = BuiltinType::all_available);
+        assert!(available.contains(&BuiltinType::ResourceCreate);
+        assert!(available.contains(&BuiltinType::ResourceDrop);
+        assert!(available.contains(&BuiltinType::ResourceRep);
+        assert!(available.contains(&BuiltinType::ResourceGet);
     }
 }

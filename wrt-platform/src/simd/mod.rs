@@ -1,3 +1,4 @@
+
 // Copyright (c) 2025 Ralf Anton Beier
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
@@ -110,7 +111,7 @@ impl SimdCapabilities {
         // TODO: Implement aarch64 detection
         // #[cfg(target_arch = "aarch64")]
         // {
-        //     return Self::detect_aarch64();
+        //     return Self::detect_aarch64);
         // }
         
         // Fallback for unsupported architectures
@@ -498,9 +499,9 @@ impl SimdRuntime {
         #[cfg(target_arch = "x86_64")]
         {
             if _capabilities.has_avx2 {
-                return Box::new(x86_64::X86SimdProvider::new_avx2());
+                return Box::new(x86_64::X86SimdProvider::new_avx2);
             } else if _capabilities.has_sse2 {
-                return Box::new(x86_64::X86SimdProvider::new_sse2());
+                return Box::new(x86_64::X86SimdProvider::new_sse2);
             }
         }
         

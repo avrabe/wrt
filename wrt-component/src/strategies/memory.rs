@@ -6,8 +6,8 @@
 use wrt_error::kinds::{OutOfBoundsAccess, ResourceLimitExceeded};
 
 use crate::{
+    resources::{BoundedBufferPool, MemoryStrategy},
     prelude::*,
-    resources::{BufferPool, MemoryStrategy},
 };
 
 /// Trait defining a memory optimization strategy
@@ -81,23 +81,13 @@ impl MemoryOptimizationStrategy for ZeroCopyStrategy {
     ) -> Result<()> {
         // Check bounds
         if offset + size > source.len() || size > destination.len() {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ACCESS_OUT_OF_BOUNDS,
-                OutOfBoundsAccess(format!(
-                    "Memory bounds exceeded: offset={}, size={}, source_len={}, dest_len={}",
-                    offset,
-                    size,
-                    source.len(),
-                    destination.len()
-                )),
-            ));
+            return Err(Error::runtime_execution_error("Memory bounds exceeded";
         }
 
         // In a true zero-copy implementation, we would use memory mapping or other
         // mechanisms to avoid copying. For this implementation, we still do a
         // copy but could optimize further.
-        destination[..size].copy_from_slice(&source[offset..offset + size]);
+        destination[..size].copy_from_slice(&source[offset..offset + size];
 
         Ok(())
     }
@@ -127,7 +117,7 @@ impl MemoryOptimizationStrategy for ZeroCopyStrategy {
 #[derive(Debug)]
 pub struct BoundedCopyStrategy {
     /// Binary std/no_std choice
-    buffer_pool: Arc<RwLock<BufferPool>>,
+    buffer_pool: Arc<RwLock<BoundedBufferPool>>,
     /// Maximum copy size in bytes
     max_copy_size: usize,
     /// Minimum trust level required for this strategy
@@ -137,7 +127,7 @@ pub struct BoundedCopyStrategy {
 impl BoundedCopyStrategy {
     /// Create a new bounded-copy strategy with the given parameters
     pub fn new(
-        buffer_pool: Arc<RwLock<BufferPool>>,
+        buffer_pool: Arc<RwLock<BoundedBufferPool>>,
         max_copy_size: usize,
         min_trust_level: u8,
     ) -> Self {
@@ -147,7 +137,7 @@ impl BoundedCopyStrategy {
     /// Create a new bounded-copy strategy with default settings
     pub fn default() -> Self {
         Self {
-            buffer_pool: Arc::new(RwLock::new(BufferPool::new(1024 * 1024))), // 1MB pool
+            buffer_pool: Arc::new(RwLock::new(BoundedBufferPool::new())), // Bounded pool
             max_copy_size: 64 * 1024,                                         // 64KB max copy
             min_trust_level: 1, // Works for standard trust components
         }
@@ -169,7 +159,7 @@ impl MemoryOptimizationStrategy for BoundedCopyStrategy {
         "BoundedCopy"
     }
 
-    fn memory_strategy_type(&self) -> MemoryStrategy {
+    fn memory_strategy(&self) -> MemoryStrategy {
         MemoryStrategy::BoundedCopy
     }
 
@@ -182,33 +172,16 @@ impl MemoryOptimizationStrategy for BoundedCopyStrategy {
     ) -> Result<()> {
         // Check bounds
         if offset + size > source.len() || size > destination.len() {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ACCESS_OUT_OF_BOUNDS,
-                OutOfBoundsAccess(format!(
-                    "Memory bounds exceeded: offset={}, size={}, source_len={}, dest_len={}",
-                    offset,
-                    size,
-                    source.len(),
-                    destination.len()
-                )),
-            ));
+            return Err(Error::runtime_execution_error("Memory bounds exceeded";
         }
 
         // Check maximum copy size
         if size > self.max_copy_size {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_LIMIT_EXCEEDED,
-                ResourceLimitExceeded(format!(
-                    "Copy size {} exceeds maximum allowed size {}",
-                    size, self.max_copy_size
-                )),
-            ));
+            return Err(Error::resource_limit_exceeded("Copy size exceeds maximum allowed";
         }
 
         // Perform the copy directly
-        destination[..size].copy_from_slice(&source[offset..offset + size]);
+        destination[..size].copy_from_slice(&source[offset..offset + size];
 
         Ok(())
     }
@@ -272,29 +245,12 @@ impl MemoryOptimizationStrategy for FullIsolationStrategy {
     ) -> Result<()> {
         // Check bounds
         if offset + size > source.len() || size > destination.len() {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ACCESS_OUT_OF_BOUNDS,
-                OutOfBoundsAccess(format!(
-                    "Memory bounds exceeded: offset={}, size={}, source_len={}, dest_len={}",
-                    offset,
-                    size,
-                    source.len(),
-                    destination.len()
-                )),
-            ));
+            return Err(Error::runtime_execution_error("Memory bounds exceeded";
         }
 
         // Check maximum copy size
         if size > self.max_copy_size {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_LIMIT_EXCEEDED,
-                ResourceLimitExceeded(format!(
-                    "Copy size {} exceeds maximum allowed size {}",
-                    size, self.max_copy_size
-                )),
-            ));
+            return Err(Error::resource_limit_exceeded("Copy size exceeds maximum allowed";
         }
 
         // Full validation and sanitization
@@ -342,14 +298,14 @@ pub fn create_memory_strategy(
     same_runtime: bool,
 ) -> Box<dyn MemoryOptimizationStrategy> {
     // Try strategies in order of performance (fastest to slowest)
-    let zero_copy = ZeroCopyStrategy::default();
+    let zero_copy = ZeroCopyStrategy::default);
     if zero_copy.is_appropriate_for(source_trust_level, destination_trust_level, same_runtime) {
-        return Box::new(zero_copy);
+        return Box::new(zero_copy;
     }
 
-    let bounded_copy = BoundedCopyStrategy::default();
+    let bounded_copy = BoundedCopyStrategy::default);
     if bounded_copy.is_appropriate_for(source_trust_level, destination_trust_level, same_runtime) {
-        return Box::new(bounded_copy);
+        return Box::new(bounded_copy;
     }
 
     // Fallback to full isolation for any other case
@@ -362,85 +318,85 @@ mod tests {
 
     #[test]
     fn test_zero_copy_strategy() {
-        let strategy = ZeroCopyStrategy::default();
+        let strategy = ZeroCopyStrategy::default);
         let source = vec![1, 2, 3, 4, 5];
         let mut dest = vec![0; 5];
 
         // Test valid copy
-        let result = strategy.copy_memory(&source, &mut dest, 0, 5);
-        assert!(result.is_ok());
-        assert_eq!(dest, vec![1, 2, 3, 4, 5]);
+        let result = strategy.copy_memory(&source, &mut dest, 0, 5;
+        assert!(result.is_ok();
+        assert_eq!(dest, vec![1, 2, 3, 4, 5];
 
         // Test out of bounds
-        let result = strategy.copy_memory(&source, &mut dest, 2, 5);
-        assert!(result.is_err());
+        let result = strategy.copy_memory(&source, &mut dest, 2, 5;
+        assert!(result.is_err();
 
         // Test appropriateness
-        assert!(strategy.is_appropriate_for(3, 3, true)); // Trusted components in same runtime
-        assert!(!strategy.is_appropriate_for(3, 3, false)); // Trusted components in different runtimes
-        assert!(!strategy.is_appropriate_for(2, 3, true)); // Mixed trust in
+        assert!(strategy.is_appropriate_for(3, 3, true))); // Trusted components in same runtime
+        assert!(!strategy.is_appropriate_for(3, 3, false))); // Trusted components in different runtimes
+        assert!(!strategy.is_appropriate_for(2, 3, true))); // Mixed trust in
                                                            // same runtime
     }
 
     #[test]
     fn test_bounded_copy_strategy() {
-        let strategy = BoundedCopyStrategy::default();
+        let strategy = BoundedCopyStrategy::default);
         let source = vec![1, 2, 3, 4, 5];
         let mut dest = vec![0; 5];
 
         // Test valid copy
-        let result = strategy.copy_memory(&source, &mut dest, 0, 5);
-        assert!(result.is_ok());
-        assert_eq!(dest, vec![1, 2, 3, 4, 5]);
+        let result = strategy.copy_memory(&source, &mut dest, 0, 5;
+        assert!(result.is_ok();
+        assert_eq!(dest, vec![1, 2, 3, 4, 5];
 
         // Test out of bounds
-        let result = strategy.copy_memory(&source, &mut dest, 2, 5);
-        assert!(result.is_err());
+        let result = strategy.copy_memory(&source, &mut dest, 2, 5;
+        assert!(result.is_err();
 
         // Test appropriateness
-        assert!(strategy.is_appropriate_for(1, 1, true)); // Standard trust in same runtime
-        assert!(strategy.is_appropriate_for(1, 1, false)); // Standard trust in different runtimes
-        assert!(!strategy.is_appropriate_for(0, 1, true)); // Mixed trust with
+        assert!(strategy.is_appropriate_for(1, 1, true))); // Standard trust in same runtime
+        assert!(strategy.is_appropriate_for(1, 1, false))); // Standard trust in different runtimes
+        assert!(!strategy.is_appropriate_for(0, 1, true))); // Mixed trust with
                                                            // untrusted component
     }
 
     #[test]
     fn test_full_isolation_strategy() {
-        let strategy = FullIsolationStrategy::default();
+        let strategy = FullIsolationStrategy::default);
         let source = vec![1, 2, 3, 4, 5];
         let mut dest = vec![0; 5];
 
         // Test valid copy
-        let result = strategy.copy_memory(&source, &mut dest, 0, 5);
-        assert!(result.is_ok());
-        assert_eq!(dest, vec![1, 2, 3, 4, 5]);
+        let result = strategy.copy_memory(&source, &mut dest, 0, 5;
+        assert!(result.is_ok();
+        assert_eq!(dest, vec![1, 2, 3, 4, 5];
 
         // Test out of bounds
-        let result = strategy.copy_memory(&source, &mut dest, 2, 5);
-        assert!(result.is_err());
+        let result = strategy.copy_memory(&source, &mut dest, 2, 5;
+        assert!(result.is_err();
 
         // Test appropriateness
-        assert!(strategy.is_appropriate_for(0, 1, true)); // Untrusted component
-        assert!(strategy.is_appropriate_for(1, 0, false)); // Untrusted component
-        assert!(strategy.is_appropriate_for(0, 0, true)); // Both untrusted
+        assert!(strategy.is_appropriate_for(0, 1, true))); // Untrusted component
+        assert!(strategy.is_appropriate_for(1, 0, false))); // Untrusted component
+        assert!(strategy.is_appropriate_for(0, 0, true))); // Both untrusted
     }
 
     #[test]
     fn test_strategy_selection() {
         // Test selection for trusted components in same runtime
-        let strategy = create_memory_strategy(3, 3, true);
-        assert_eq!(strategy.name(), "ZeroCopy");
+        let strategy = create_memory_strategy(3, 3, true;
+        assert_eq!(strategy.name(), "ZeroCopy";
 
         // Test selection for trusted components in different runtimes
-        let strategy = create_memory_strategy(3, 3, false);
-        assert_eq!(strategy.name(), "BoundedCopy");
+        let strategy = create_memory_strategy(3, 3, false;
+        assert_eq!(strategy.name(), "BoundedCopy";
 
         // Test selection for standard trust components
-        let strategy = create_memory_strategy(1, 1, true);
-        assert_eq!(strategy.name(), "BoundedCopy");
+        let strategy = create_memory_strategy(1, 1, true;
+        assert_eq!(strategy.name(), "BoundedCopy";
 
         // Test selection for untrusted components
-        let strategy = create_memory_strategy(0, 1, true);
-        assert_eq!(strategy.name(), "FullIsolation");
+        let strategy = create_memory_strategy(0, 1, true;
+        assert_eq!(strategy.name(), "FullIsolation";
     }
 }

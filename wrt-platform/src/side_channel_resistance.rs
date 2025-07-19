@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Side-Channel Resistance Analysis and Implementation
 // SW-REQ-ID: REQ_PLATFORM_SIDECHANNEL_001
@@ -248,13 +249,13 @@ pub mod constant_time {
         // In practice, would use specialized implementations for different types
         unsafe {
             let a_bytes =
-                core::slice::from_raw_parts(&a as *const T as *const u8, core::mem::size_of::<T>());
+                core::slice::from_raw_parts(&a as *const T as *const u8, core::mem::size_of::<T>);
             let b_bytes =
-                core::slice::from_raw_parts(&b as *const T as *const u8, core::mem::size_of::<T>());
+                core::slice::from_raw_parts(&b as *const T as *const u8, core::mem::size_of::<T>);
             let mut result_bytes = [0u8; 32]; // Assume T fits in 32 bytes
 
             for i in 0..core::mem::size_of::<T>() {
-                result_bytes[i] = (a_bytes[i] & mask) | (b_bytes[i] & !mask);
+                result_bytes[i] = (a_bytes[i] & mask) | (b_bytes[i] & !mask;
             }
 
             core::ptr::read(result_bytes.as_ptr() as *const T)
@@ -267,13 +268,10 @@ pub mod constant_time {
     /// Uses cache line alignment and prefetching for timing consistency.
     pub fn constant_time_copy(dst: &mut [u8], src: &[u8]) -> Result<(), wrt_error::Error> {
         if dst.len() != src.len() {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Memory, 1,
-                "Source and destination buffers must have the same length",
-            ));
+            return Err(wrt_error::Error::runtime_execution_error("Source and destination lengths must match";
         }
 
-        let len = dst.len();
+        let len = dst.len);
 
         // Copy in cache-line sized chunks for consistent timing
         const CACHE_LINE_SIZE: usize = 64;
@@ -293,17 +291,17 @@ pub mod constant_time {
                     core::arch::x86_64::_mm_prefetch(
                         src.as_ptr().add(next_start) as *const i8,
                         core::arch::x86_64::_MM_HINT_T0,
-                    );
+                    ;
                 }
             }
 
-            dst[start..end].copy_from_slice(&src[start..end]);
+            dst[start..end].copy_from_slice(&src[start..end];
         }
 
         // Copy remainder with padding to full cache line
         if remainder > 0 {
             let start = full_lines * CACHE_LINE_SIZE;
-            dst[start..].copy_from_slice(&src[start..]);
+            dst[start..].copy_from_slice(&src[start..];
 
             // Add dummy reads to complete cache line timing
             let dummy_reads = CACHE_LINE_SIZE - remainder;
@@ -353,14 +351,14 @@ pub mod cache_aware_allocation {
         /// Binary std/no_std choice
         /// Binary std/no_std choice
         pub unsafe fn new(pool: &'static mut [CacheBlock]) -> Self {
-            let total_blocks = pool.len();
+            let total_blocks = pool.len);
 
             // Initialize free list in constant time
             for i in 0..total_blocks.saturating_sub(1) {
-                pool[i].next_free.store(i + 1, Ordering::Relaxed);
+                pool[i].next_free.store(i + 1, Ordering::Relaxed;
             }
             if total_blocks > 0 {
-                pool[total_blocks - 1].next_free.store(usize::MAX, Ordering::Relaxed);
+                pool[total_blocks - 1].next_free.store(usize::MAX, Ordering::Relaxed;
             }
 
             Self {
@@ -381,14 +379,14 @@ pub mod cache_aware_allocation {
             const MAX_ATTEMPTS: usize = 64; // Prevent infinite loops
 
             while attempts < MAX_ATTEMPTS {
-                let bitmap = self.allocation_bitmap.load(Ordering::Acquire);
+                let bitmap = self.allocation_bitmap.load(Ordering::Acquire;
 
                 // Find first free bit in constant time
-                let free_bit = self.find_free_bit_constant_time(bitmap);
+                let free_bit = self.find_free_bit_constant_time(bitmap;
 
                 if free_bit >= self.total_blocks {
                     // Binary std/no_std choice
-                    self.dummy_allocation_work();
+                    self.dummy_allocation_work);
                     return None;
                 }
 
@@ -404,7 +402,7 @@ pub mod cache_aware_allocation {
                     Ok(_) => {
                         // Binary std/no_std choice
                         let block_ptr = &self.blocks[free_bit] as *const CacheBlock as *mut u8;
-                        return NonNull::new(block_ptr);
+                        return NonNull::new(block_ptr;
                     }
                     Err(_) => {
                         attempts += 1;
@@ -432,7 +430,7 @@ pub mod cache_aware_allocation {
 
                 // Clear bit atomically
                 loop {
-                    let bitmap = self.allocation_bitmap.load(Ordering::Acquire);
+                    let bitmap = self.allocation_bitmap.load(Ordering::Acquire;
                     match self.allocation_bitmap.compare_exchange_weak(
                         bitmap,
                         bitmap & !mask,
@@ -446,7 +444,7 @@ pub mod cache_aware_allocation {
             }
 
             // Always do the same amount of work regardless of success
-            self.dummy_deallocation_work();
+            self.dummy_deallocation_work);
         }
 
         /// Find free bit using constant-time bit operations
@@ -464,19 +462,19 @@ pub mod cache_aware_allocation {
         /// Binary std/no_std choice
         fn dummy_allocation_work(&self) {
             // Binary std/no_std choice
-            let _ = self.allocation_bitmap.load(Ordering::Acquire);
-            let _ = self.find_free_bit_constant_time(0);
+            let _ = self.allocation_bitmap.load(Ordering::Acquire;
+            let _ = self.find_free_bit_constant_time(0;
         }
 
         /// Binary std/no_std choice
         fn dummy_deallocation_work(&self) {
             // Binary std/no_std choice
-            let _ = self.allocation_bitmap.load(Ordering::Acquire);
+            let _ = self.allocation_bitmap.load(Ordering::Acquire;
         }
 
         /// Binary std/no_std choice
         pub fn stats(&self) -> AllocatorStats {
-            let bitmap = self.allocation_bitmap.load(Ordering::Acquire);
+            let bitmap = self.allocation_bitmap.load(Ordering::Acquire;
             let used_blocks = bitmap.count_ones() as usize;
 
             AllocatorStats {
@@ -533,7 +531,7 @@ pub mod access_obfuscation {
         /// - Timing independent of memory content
         /// - Resists cache-based side-channel attacks
         pub fn oblivious_read(&self, index: usize) -> u8 {
-            let len = self.memory.len();
+            let len = self.memory.len);
             if len == 0 {
                 return 0;
             }
@@ -547,7 +545,7 @@ pub mod access_obfuscation {
 
             for line in 0..cache_lines {
                 let line_start = line * self.cache_line_size;
-                let line_end = core::cmp::min(line_start + self.cache_line_size, len);
+                let line_end = core::cmp::min(line_start + self.cache_line_size, len;
 
                 // Read entire cache line
                 for offset in line_start..line_end {
@@ -555,7 +553,7 @@ pub mod access_obfuscation {
 
                     // Conditionally select the target value
                     let is_target = offset == safe_index && valid_index;
-                    result = constant_time::constant_time_select(is_target, value, result);
+                    result = constant_time::constant_time_select(is_target, value, result;
                 }
             }
 
@@ -569,7 +567,7 @@ pub mod access_obfuscation {
         /// - Timing independent of write location
         /// - Prevents write pattern analysis
         pub fn oblivious_write(&mut self, index: usize, value: u8) {
-            let len = self.memory.len();
+            let len = self.memory.len);
             if len == 0 {
                 return;
             }
@@ -582,7 +580,7 @@ pub mod access_obfuscation {
 
             for line in 0..cache_lines {
                 let line_start = line * self.cache_line_size;
-                let line_end = core::cmp::min(line_start + self.cache_line_size, len);
+                let line_end = core::cmp::min(line_start + self.cache_line_size, len;
 
                 // Access entire cache line
                 for offset in line_start..line_end {
@@ -591,7 +589,7 @@ pub mod access_obfuscation {
 
                     // Conditionally update target location
                     let new_value =
-                        constant_time::constant_time_select(is_target, value, current_value);
+                        constant_time::constant_time_select(is_target, value, current_value;
 
                     self.memory[offset] = new_value;
                 }
@@ -601,8 +599,8 @@ pub mod access_obfuscation {
         /// Copy memory with oblivious access patterns
         pub fn oblivious_copy(&mut self, dst_index: usize, src_index: usize, len: usize) {
             for i in 0..len {
-                let src_val = self.oblivious_read(src_index + i);
-                self.oblivious_write(dst_index + i, src_val);
+                let src_val = self.oblivious_read(src_index + i;
+                self.oblivious_write(dst_index + i, src_val;
             }
         }
     }
@@ -732,16 +730,16 @@ mod tests {
         let b = b"hello";
         let c = b"world";
 
-        assert!(constant_time::constant_time_eq(a, b));
-        assert!(!constant_time::constant_time_eq(a, c));
-        assert!(!constant_time::constant_time_eq(a, b"hi"));
+        assert!(constant_time::constant_time_eq(a, b);
+        assert!(!constant_time::constant_time_eq(a, c);
+        assert!(!constant_time::constant_time_eq(a, b"hi");
 
         // Test constant-time selection
-        let result1 = constant_time::constant_time_select(true, 42u32, 84u32);
-        assert_eq!(result1, 42);
+        let result1 = constant_time::constant_time_select(true, 42u32, 84u32;
+        assert_eq!(result1, 42;
 
-        let result2 = constant_time::constant_time_select(false, 42u32, 84u32);
-        assert_eq!(result2, 84);
+        let result2 = constant_time::constant_time_select(false, 42u32, 84u32;
+        assert_eq!(result2, 84;
     }
 
     #[test]
@@ -749,26 +747,26 @@ mod tests {
         let src = b"test data for copying";
         let mut dst = [0u8; 21];
 
-        let result = constant_time::constant_time_copy(&mut dst, src);
-        assert!(result.is_ok());
-        assert_eq!(&dst, src);
+        let result = constant_time::constant_time_copy(&mut dst, src;
+        assert!(result.is_ok();
+        assert_eq!(&dst, src;
 
         // Test error on size mismatch
         let mut small_dst = [0u8; 5];
-        let result = constant_time::constant_time_copy(&mut small_dst, src);
-        assert!(result.is_err());
+        let result = constant_time::constant_time_copy(&mut small_dst, src;
+        assert!(result.is_err();
     }
 
     #[test]
     fn test_side_channel_config() {
-        let config = platform_integration::security_first_side_channel_config();
-        assert_eq!(config.resistance_level, ResistanceLevel::Comprehensive);
-        assert!(config.protected_vectors.contains(&AttackVector::Timing));
-        assert!(config.protected_vectors.contains(&AttackVector::Cache));
+        let config = platform_integration::security_first_side_channel_config);
+        assert_eq!(config.resistance_level, ResistanceLevel::Comprehensive;
+        assert!(config.protected_vectors.contains(&AttackVector::Timing);
+        assert!(config.protected_vectors.contains(&AttackVector::Cache);
         assert!(config.verify_timing);
 
-        let rt_config = platform_integration::realtime_side_channel_config();
-        assert_eq!(rt_config.resistance_level, ResistanceLevel::Advanced);
+        let rt_config = platform_integration::realtime_side_channel_config);
+        assert_eq!(rt_config.resistance_level, ResistanceLevel::Advanced;
         assert!(rt_config.performance_tolerance < 0.2);
     }
 
@@ -776,18 +774,18 @@ mod tests {
     fn test_integration_analysis() {
         // Test that integration analysis functions return meaningful descriptions
         let memory_analysis =
-            integration_analysis::MemorySubsystemIntegration::analyze_allocation_timing();
-        assert!(memory_analysis.contains("Cache-aware"));
-        assert!(memory_analysis.contains("constant-time"));
+            integration_analysis::MemorySubsystemIntegration::analyze_allocation_timing);
+        assert!(memory_analysis.contains("Cache-aware");
+        assert!(memory_analysis.contains("constant-time");
 
         let hw_analysis =
-            integration_analysis::HardwareOptimizationIntegration::analyze_arm_mte_integration();
-        assert!(hw_analysis.contains("Memory Tagging Extension"));
-        assert!(hw_analysis.contains("constant-time"));
+            integration_analysis::HardwareOptimizationIntegration::analyze_arm_mte_integration);
+        assert!(hw_analysis.contains("Memory Tagging Extension");
+        assert!(hw_analysis.contains("constant-time");
 
         let sync_analysis =
-            integration_analysis::SynchronizationIntegration::analyze_lockfree_timing();
-        assert!(sync_analysis.contains("Lock-free"));
-        assert!(sync_analysis.contains("bounded timing"));
+            integration_analysis::SynchronizationIntegration::analyze_lockfree_timing);
+        assert!(sync_analysis.contains("Lock-free");
+        assert!(sync_analysis.contains("bounded timing");
     }
 }

@@ -5,17 +5,7 @@
 //! consistency across all crates in the WRT project and simplify imports in
 //! individual modules.
 
-// Core imports for both std and no_std environments
-#[cfg(feature = "std")]
-pub use std::{
-    boxed::Box,
-    collections::{BTreeMap as HashMap, BTreeSet as HashSet},
-    format,
-    string::{String, ToString},
-    sync::Arc,
-    vec,
-    vec::Vec,
-};
+// Core imports for std environments
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -23,7 +13,7 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 pub use alloc::{
     boxed::Box,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap as HashMap, BTreeSet as HashSet},
     format,
     string::{String, ToString},
     sync::Arc,
@@ -60,7 +50,6 @@ pub use std::{
     fmt as std_fmt, format, io,
     string::{String, ToString},
     sync::{Arc, Mutex, RwLock},
-    time::Instant,
     vec,
     vec::Vec,
 };
@@ -101,10 +90,11 @@ pub use wrt_foundation::component_value::ValType;
 
 // Unified type aliases for std/no_std compatibility
 #[cfg(not(feature = "std"))]
-pub type ComponentVec<T> = wrt_foundation::bounded::BoundedVec<T, 64, wrt_foundation::safe_memory::NoStdProvider<8192>>;
+pub type ComponentVec<T> = wrt_foundation::bounded::BoundedVec<T, 64, crate::bounded_component_infra::ComponentProvider>;
 
 #[cfg(feature = "std")]
 pub type ComponentVec<T> = Vec<T>;
+
 // Re-export from wrt-foundation
 pub use wrt_foundation::{
     bounded::{BoundedStack, MAX_WASM_NAME_LENGTH},
@@ -120,7 +110,6 @@ pub use wrt_foundation::{
     // Verification types
     verification::VerificationLevel,
     // Memory providers
-    memory_system::{SmallProvider, LargeProvider, MediumProvider},
     safe_memory::NoStdProvider,
     // Common types
     ExternType,
@@ -147,8 +136,8 @@ pub use wrt_host::{
 #[cfg(not(feature = "std"))]
 pub use wrt_sync::{Mutex, RwLock};
 
-// Include debug logging macro
-pub use crate::debug_println;
+// Include debug logging macro (crate-internal only)
+// pub use crate::debug_println;
 // Re-export Instant for no_std environments
 pub use crate::resources::Instant;
 // Re-export from this crate conditionally based on std/no_std
@@ -229,11 +218,11 @@ pub use crate::{
     // Resources
     resources::{
         // BoundedBufferPool, 
-        MemoryStrategy, 
+        // MemoryStrategy,  // Commented out due to resource_table_no_std being disabled
         // ResourceArena, 
         ResourceManager,
         // ResourceOperation as RuntimeResourceOperation, ResourceStrategyNoStd, 
-        ResourceTable,
+        // ResourceTable,  // Commented out due to resource_table_no_std being disabled
     },
     // Memory strategies
     // strategies::memory::{
@@ -254,3 +243,19 @@ pub use crate::{
 pub use crate::{
     // no_alloc,  // Comment out for now
 };
+
+// Global ComponentValue type alias with proper memory provider
+use crate::bounded_component_infra::ComponentProvider;
+// ComponentValue already imported above
+
+/// Unified ComponentValue type with proper memory provider for the entire wrt-component crate
+pub type WrtComponentValue = ComponentValue<ComponentProvider>;
+
+/// Unified ValType with proper memory provider
+pub type WrtValType = wrt_foundation::component_value::ValType<ComponentProvider>;
+
+/// Unified ComponentType with proper memory provider for the entire wrt-component crate
+pub type WrtComponentType = wrt_foundation::component::ComponentType<ComponentProvider>;
+
+/// Unified ExternType with proper memory provider for the entire wrt-component crate
+pub type WrtExternType = wrt_foundation::ExternType<ComponentProvider>;

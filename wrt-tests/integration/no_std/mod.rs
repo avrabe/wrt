@@ -14,7 +14,7 @@ pub mod bare_verification_tests;
 
 /// Run all no_std integration tests
 pub fn run_tests() -> TestResult {
-    let mut runner = TestRunner::new("No-std Integration");
+    let mut runner = TestRunner::new("No-std Integration";
     
     // Use the comprehensive consolidated tests instead of the old stub version
     runner.add_test_suite("No-std Compatibility", || {
@@ -37,7 +37,7 @@ mod tests {
     
     #[test]
     fn no_std_integration() {
-        let result = run_tests();
+        let result = run_tests);
         assert!(result.is_success(), "No-std integration tests failed: {:?}", result);
     }
 }

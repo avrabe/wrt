@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Advanced Synchronization Primitives
 // SW-REQ-ID: REQ_PLATFORM_SYNC_ADV_001
@@ -90,7 +91,7 @@ impl<T> LockFreeMpscQueue<T> {
     /// Create a new empty MPSC queue
     #[cfg(feature = "std")]
     pub fn new() -> Self {
-        let stub = Box::new(Node::stub());
+        let stub = Box::new(Node::stub);
         let stub_ptr = Box::as_ref(&stub) as *const Node<T> as *mut Node<T>;
 
         Self { head: AtomicPtr::new(stub_ptr), tail: AtomicPtr::new(stub_ptr), stub }
@@ -106,14 +107,14 @@ impl<T> LockFreeMpscQueue<T> {
     /// Kani proof ensures this operation maintains queue invariants.
     #[cfg(feature = "std")]
     pub fn enqueue(&self, item: T) -> Result<(), Error> {
-        let new_node = Box::into_raw(Box::new(Node::new(item)));
+        let new_node = Box::into_raw(Box::new(Node::new(item);
 
         // Atomically update tail pointer
-        let prev_tail = self.tail.swap(new_node, Ordering::AcqRel);
+        let prev_tail = self.tail.swap(new_node, Ordering::AcqRel;
 
         // Link the previous tail to the new node
         unsafe {
-            (*prev_tail).next.store(new_node, Ordering::Release);
+            (*prev_tail).next.store(new_node, Ordering::Release;
         }
 
         Ok(())
@@ -129,24 +130,24 @@ impl<T> LockFreeMpscQueue<T> {
     /// # Formal Verification
     /// Kani proof ensures memory safety and queue consistency.
     pub fn dequeue(&self) -> Option<T> {
-        let head = self.head.load(Ordering::Acquire);
+        let head = self.head.load(Ordering::Acquire;
 
         unsafe {
-            let next = (*head).next.load(Ordering::Acquire);
+            let next = (*head).next.load(Ordering::Acquire;
 
             if next.is_null() {
                 return None; // Queue is empty
             }
 
             // Move head to next node
-            self.head.store(next, Ordering::Release);
+            self.head.store(next, Ordering::Release;
 
             // Extract data from the old head
-            let data = (*next).data.take();
+            let data = (*next).data.take);
 
             // Binary std/no_std choice
             if head != Box::as_ref(&self.stub) as *const Node<T> as *mut Node<T> {
-                let _ = Box::from_raw(head);
+                let _ = Box::from_raw(head;
             }
 
             data
@@ -155,7 +156,7 @@ impl<T> LockFreeMpscQueue<T> {
 
     /// Check if queue is empty (approximate)
     pub fn is_empty(&self) -> bool {
-        let head = self.head.load(Ordering::Acquire);
+        let head = self.head.load(Ordering::Acquire;
         unsafe { (*head).next.load(Ordering::Acquire).is_null() }
     }
 }
@@ -193,18 +194,15 @@ impl LockFreeAllocator {
     /// `block_size` must be >= size_of::<FreeBlock>().
     pub unsafe fn new(pool: *mut u8, pool_size: usize, block_size: usize) -> Result<Self, Error> {
         if block_size < core::mem::size_of::<FreeBlock>() {
-            return Err(Error::new(
-                wrt_error::ErrorCategory::Validation, 1,
-                "Invalid operation",
-            ));
+            return Err(Error::runtime_execution_error("Block size too small";
         }
 
         let total_blocks = pool_size / block_size;
         if total_blocks == 0 {
             return Err(Error::new(
-                wrt_error::ErrorCategory::Validation, 1,
-                "Invalid operation",
-            ));
+                wrt_error::ErrorCategory::Validation, 
+                wrt_error::codes::VALIDATION_ERROR,
+                "Pool size too small";
         }
 
         // Initialize free list
@@ -214,7 +212,7 @@ impl LockFreeAllocator {
             (*current).next = next;
             current = next;
         }
-        (*current).next = core::ptr::null_mut();
+        (*current).next = core::ptr::null_mut);
 
         Ok(Self {
             free_list: AtomicPtr::new(pool as *mut FreeBlock),
@@ -230,7 +228,7 @@ impl LockFreeAllocator {
     /// Execution time is bounded and deterministic.
     pub fn allocate(&self) -> Option<NonNull<u8>> {
         loop {
-            let head = self.free_list.load(Ordering::Acquire);
+            let head = self.free_list.load(Ordering::Acquire;
 
             if head.is_null() {
                 return None; // No free blocks
@@ -261,7 +259,7 @@ impl LockFreeAllocator {
         let block = ptr.as_ptr() as *mut FreeBlock;
 
         loop {
-            let head = self.free_list.load(Ordering::Acquire);
+            let head = self.free_list.load(Ordering::Acquire;
             (*block).next = head;
 
             // Try to atomically update free list head
@@ -327,7 +325,7 @@ impl<T> PriorityInheritanceMutex<T> {
     /// 3. Wait until lock becomes available
     /// 4. Restore original priority when releasing
     pub fn lock(&self, current_priority: Priority) -> PriorityGuard<'_, T> {
-        self.waiters.fetch_add(1, Ordering::AcqRel);
+        self.waiters.fetch_add(1, Ordering::AcqRel;
 
         loop {
             // Try to acquire lock
@@ -339,14 +337,14 @@ impl<T> PriorityInheritanceMutex<T> {
             ) {
                 Ok(_) => {
                     // Lock acquired
-                    self.owner_priority.store(current_priority as usize, Ordering::Release);
-                    self.waiters.fetch_sub(1, Ordering::AcqRel);
+                    self.owner_priority.store(current_priority as usize, Ordering::Release;
+                    self.waiters.fetch_sub(1, Ordering::AcqRel;
 
                     return PriorityGuard { mutex: self, original_priority: current_priority };
                 }
                 Err(_) => {
                     // Lock is held - implement priority inheritance
-                    let owner_priority = self.owner_priority.load(Ordering::Acquire);
+                    let owner_priority = self.owner_priority.load(Ordering::Acquire;
 
                     if (current_priority as usize) > owner_priority {
                         // Boost owner's priority to current priority
@@ -362,7 +360,7 @@ impl<T> PriorityInheritanceMutex<T> {
                     }
 
                     // Yield and retry (in real implementation, would use futex or similar)
-                    core::hint::spin_loop();
+                    core::hint::spin_loop);
                 }
             }
         }
@@ -372,7 +370,7 @@ impl<T> PriorityInheritanceMutex<T> {
     pub fn try_lock(&self, current_priority: Priority) -> Option<PriorityGuard<'_, T>> {
         match self.locked.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed) {
             Ok(_) => {
-                self.owner_priority.store(current_priority as usize, Ordering::Release);
+                self.owner_priority.store(current_priority as usize, Ordering::Release;
                 Some(PriorityGuard { mutex: self, original_priority: current_priority })
             }
             Err(_) => None,
@@ -416,8 +414,8 @@ impl<'a, T> core::ops::DerefMut for PriorityGuard<'a, T> {
 impl<'a, T> Drop for PriorityGuard<'a, T> {
     fn drop(&mut self) {
         // Restore original priority and release lock
-        self.mutex.owner_priority.store(0, Ordering::Release);
-        self.mutex.locked.store(false, Ordering::Release);
+        self.mutex.owner_priority.store(0, Ordering::Release;
+        self.mutex.locked.store(false, Ordering::Release;
     }
 }
 
@@ -434,7 +432,7 @@ pub struct AdvancedRwLock<T> {
     writer_waiting: AtomicBool,
 }
 
-const WRITER_MASK: usize = 1 << (usize::BITS - 1);
+const WRITER_MASK: usize = 1 << (usize::BITS - 1;
 const READER_MASK: usize = !WRITER_MASK;
 
 impl<T> AdvancedRwLock<T> {
@@ -454,15 +452,15 @@ impl<T> AdvancedRwLock<T> {
         loop {
             // Check if writer is waiting or active
             if self.writer_waiting.load(Ordering::Acquire) {
-                core::hint::spin_loop();
+                core::hint::spin_loop);
                 continue;
             }
 
-            let current = self.readers.load(Ordering::Acquire);
+            let current = self.readers.load(Ordering::Acquire;
 
             // Check if writer is active
             if current & WRITER_MASK != 0 {
-                core::hint::spin_loop();
+                core::hint::spin_loop);
                 continue;
             }
 
@@ -470,7 +468,7 @@ impl<T> AdvancedRwLock<T> {
             let new_count = (current & READER_MASK) + 1;
             if new_count > READER_MASK {
                 // Too many readers
-                core::hint::spin_loop();
+                core::hint::spin_loop);
                 continue;
             }
 
@@ -492,7 +490,7 @@ impl<T> AdvancedRwLock<T> {
             return None;
         }
 
-        let current = self.readers.load(Ordering::Acquire);
+        let current = self.readers.load(Ordering::Acquire;
 
         if current & WRITER_MASK != 0 {
             return None; // Writer is active
@@ -519,7 +517,7 @@ impl<T> AdvancedRwLock<T> {
     /// Has priority over new readers to prevent writer starvation.
     pub fn write(&self) -> WriteGuard<'_, T> {
         // Signal that a writer is waiting
-        self.writer_waiting.store(true, Ordering::Release);
+        self.writer_waiting.store(true, Ordering::Release;
 
         loop {
             // Try to acquire write lock (no readers or writers)
@@ -530,7 +528,7 @@ impl<T> AdvancedRwLock<T> {
                 Ordering::Relaxed,
             ) {
                 Ok(_) => {
-                    self.writer_waiting.store(false, Ordering::Release);
+                    self.writer_waiting.store(false, Ordering::Release;
                     return WriteGuard { lock: self };
                 }
                 Err(_) => core::hint::spin_loop(),
@@ -540,15 +538,15 @@ impl<T> AdvancedRwLock<T> {
 
     /// Try to acquire write lock without blocking
     pub fn try_write(&self) -> Option<WriteGuard<'_, T>> {
-        self.writer_waiting.store(true, Ordering::Release);
+        self.writer_waiting.store(true, Ordering::Release;
 
         match self.readers.compare_exchange(0, WRITER_MASK, Ordering::Acquire, Ordering::Relaxed) {
             Ok(_) => {
-                self.writer_waiting.store(false, Ordering::Release);
+                self.writer_waiting.store(false, Ordering::Release;
                 Some(WriteGuard { lock: self })
             }
             Err(_) => {
-                self.writer_waiting.store(false, Ordering::Release);
+                self.writer_waiting.store(false, Ordering::Release;
                 None
             }
         }
@@ -556,7 +554,7 @@ impl<T> AdvancedRwLock<T> {
 
     /// Get current reader count (approximate)
     pub fn reader_count(&self) -> usize {
-        let current = self.readers.load(Ordering::Acquire);
+        let current = self.readers.load(Ordering::Acquire;
         if current & WRITER_MASK != 0 {
             0 // Writer is active
         } else {
@@ -588,7 +586,7 @@ impl<'a, T> core::ops::Deref for ReadGuard<'a, T> {
 
 impl<'a, T> Drop for ReadGuard<'a, T> {
     fn drop(&mut self) {
-        self.lock.readers.fetch_sub(1, Ordering::Release);
+        self.lock.readers.fetch_sub(1, Ordering::Release;
     }
 }
 
@@ -613,7 +611,7 @@ impl<'a, T> core::ops::DerefMut for WriteGuard<'a, T> {
 
 impl<'a, T> Drop for WriteGuard<'a, T> {
     fn drop(&mut self) {
-        self.lock.readers.store(0, Ordering::Release);
+        self.lock.readers.store(0, Ordering::Release;
     }
 }
 
@@ -640,9 +638,9 @@ impl<T> WaitFreeSpscQueue<T> {
     /// Create queue with specified capacity (rounded up to power of 2)
     #[cfg(feature = "std")]
     pub fn new(capacity: usize) -> Self {
-        let capacity = capacity.next_power_of_two();
+        let capacity = capacity.next_power_of_two);
         let buffer =
-            (0..capacity).map(|_| UnsafeCell::new(None)).collect::<Vec<_>>().into_boxed_slice();
+            (0..capacity).map(|_| UnsafeCell::new(None)).collect::<Vec<_>>().into_boxed_slice);
 
         Self {
             buffer,
@@ -657,21 +655,21 @@ impl<T> WaitFreeSpscQueue<T> {
     ///
     /// Returns `Err(item)` if queue is full.
     pub fn enqueue(&self, item: T) -> Result<(), T> {
-        let tail = self.tail.load(Ordering::Relaxed);
+        let tail = self.tail.load(Ordering::Relaxed;
         let next_tail = (tail + 1) & self.mask;
 
         // Check if queue is full
         if next_tail == self.head.load(Ordering::Acquire) {
-            return Err(item);
+            return Err(item;
         }
 
         // Store item in buffer
         unsafe {
-            *self.buffer[tail].get() = Some(item);
+            *self.buffer[tail].get() = Some(item;
         }
 
         // Update tail pointer
-        self.tail.store(next_tail, Ordering::Release);
+        self.tail.store(next_tail, Ordering::Release;
         Ok(())
     }
 
@@ -679,7 +677,7 @@ impl<T> WaitFreeSpscQueue<T> {
     ///
     /// Returns `None` if queue is empty.
     pub fn dequeue(&self) -> Option<T> {
-        let head = self.head.load(Ordering::Relaxed);
+        let head = self.head.load(Ordering::Relaxed;
 
         // Check if queue is empty
         if head == self.tail.load(Ordering::Acquire) {
@@ -691,7 +689,7 @@ impl<T> WaitFreeSpscQueue<T> {
 
         // Update head pointer
         let next_head = (head + 1) & self.mask;
-        self.head.store(next_head, Ordering::Release);
+        self.head.store(next_head, Ordering::Release;
 
         item
     }
@@ -703,15 +701,15 @@ impl<T> WaitFreeSpscQueue<T> {
 
     /// Check if queue is full  
     pub fn is_full(&self) -> bool {
-        let tail = self.tail.load(Ordering::Acquire);
+        let tail = self.tail.load(Ordering::Acquire;
         let next_tail = (tail + 1) & self.mask;
         next_tail == self.head.load(Ordering::Acquire)
     }
 
     /// Get current queue length (approximate)
     pub fn len(&self) -> usize {
-        let head = self.head.load(Ordering::Acquire);
-        let tail = self.tail.load(Ordering::Acquire);
+        let head = self.head.load(Ordering::Acquire;
+        let tail = self.tail.load(Ordering::Acquire;
         (tail.wrapping_sub(head)) & self.mask
     }
 
@@ -731,16 +729,16 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn test_mpsc_queue() {
-        let queue = LockFreeMpscQueue::new();
+        let queue = LockFreeMpscQueue::new);
 
         // Test enqueue/dequeue
         queue.enqueue(42).unwrap();
         queue.enqueue(84).unwrap();
 
-        assert_eq!(queue.dequeue(), Some(42));
-        assert_eq!(queue.dequeue(), Some(84));
-        assert_eq!(queue.dequeue(), None);
-        assert!(queue.is_empty());
+        assert_eq!(queue.dequeue(), Some(42;
+        assert_eq!(queue.dequeue(), Some(84;
+        assert_eq!(queue.dequeue(), None;
+        assert!(queue.is_empty();
     }
 
     #[test]
@@ -759,94 +757,94 @@ mod tests {
         let ptr1 = allocator.allocate().unwrap();
         let ptr2 = allocator.allocate().unwrap();
 
-        assert_ne!(ptr1.as_ptr(), ptr2.as_ptr());
+        assert_ne!(ptr1.as_ptr(), ptr2.as_ptr);
 
         // Binary std/no_std choice
         unsafe {
-            allocator.deallocate(ptr1);
-            allocator.deallocate(ptr2);
+            allocator.deallocate(ptr1;
+            allocator.deallocate(ptr2;
         }
 
         // Binary std/no_std choice
         let ptr3 = allocator.allocate().unwrap();
-        assert!(!ptr3.as_ptr().is_null());
+        assert!(!ptr3.as_ptr().is_null();
     }
 
     #[test]
     fn test_priority_inheritance_mutex() {
-        let mutex = PriorityInheritanceMutex::new(42);
+        let mutex = PriorityInheritanceMutex::new(42;
 
         // Test basic locking
         {
-            let guard = mutex.lock(100);
-            assert_eq!(*guard, 42);
-            assert_eq!(mutex.owner_priority(), 100);
+            let guard = mutex.lock(100;
+            assert_eq!(*guard, 42;
+            assert_eq!(mutex.owner_priority(), 100;
         }
 
         // Test try_lock
         let guard = mutex.try_lock(50).unwrap();
-        assert_eq!(*guard, 42);
-        assert_eq!(mutex.owner_priority(), 50);
-        drop(guard);
+        assert_eq!(*guard, 42;
+        assert_eq!(mutex.owner_priority(), 50;
+        drop(guard;
 
         // Test try_lock failure
         let _guard1 = mutex.try_lock(10).unwrap();
-        assert!(mutex.try_lock(20).is_none());
+        assert!(mutex.try_lock(20).is_none();
     }
 
     #[test]
     fn test_advanced_rwlock() {
-        let lock = AdvancedRwLock::new(42);
+        let lock = AdvancedRwLock::new(42;
 
         // Test read locks
         {
-            let read1 = lock.read();
-            let read2 = lock.read();
-            assert_eq!(*read1, 42);
-            assert_eq!(*read2, 42);
-            assert_eq!(lock.reader_count(), 2);
-            assert!(!lock.has_writer());
+            let read1 = lock.read);
+            let read2 = lock.read);
+            assert_eq!(*read1, 42;
+            assert_eq!(*read2, 42;
+            assert_eq!(lock.reader_count(), 2;
+            assert!(!lock.has_writer();
         }
 
         // Test write lock
         {
-            let mut write = lock.write();
+            let mut write = lock.write);
             *write = 84;
-            assert!(lock.has_writer());
-            assert_eq!(lock.reader_count(), 0);
+            assert!(lock.has_writer();
+            assert_eq!(lock.reader_count(), 0;
         }
 
         // Verify write persisted
-        let read = lock.read();
-        assert_eq!(*read, 84);
+        let read = lock.read);
+        assert_eq!(*read, 84;
     }
 
     #[cfg(feature = "std")]
     #[test]
     fn test_wait_free_spsc_queue() {
-        let queue = WaitFreeSpscQueue::new(4);
+        let queue = WaitFreeSpscQueue::new(4;
 
-        assert!(queue.is_empty());
-        assert!(!queue.is_full());
-        assert_eq!(queue.len(), 0);
+        assert!(queue.is_empty();
+        assert!(!queue.is_full();
+        assert_eq!(queue.len(), 0;
 
         // Fill queue
-        assert!(queue.enqueue(1).is_ok());
-        assert!(queue.enqueue(2).is_ok());
-        assert!(queue.enqueue(3).is_ok());
+        assert!(queue.enqueue(1).is_ok();
+        assert!(queue.enqueue(2).is_ok();
+        assert!(queue.enqueue(3).is_ok();
 
-        assert!(queue.is_full());
-        assert_eq!(queue.len(), 3);
+        assert!(queue.is_full();
+        assert_eq!(queue.len(), 3;
 
         // Queue should reject when full
-        assert!(queue.enqueue(4).is_err());
+        assert!(queue.enqueue(4).is_err();
 
         // Drain queue
-        assert_eq!(queue.dequeue(), Some(1));
-        assert_eq!(queue.dequeue(), Some(2));
-        assert_eq!(queue.dequeue(), Some(3));
-        assert_eq!(queue.dequeue(), None);
+        assert_eq!(queue.dequeue(), Some(1;
+        assert_eq!(queue.dequeue(), Some(2;
+        assert_eq!(queue.dequeue(), Some(3;
+        assert_eq!(queue.dequeue(), None;
 
-        assert!(queue.is_empty());
+        assert!(queue.is_empty();
     }
 }

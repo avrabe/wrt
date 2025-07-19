@@ -21,7 +21,6 @@
 //! - **Call Validator**: Ensures call safety and security compliance
 //! - **Performance Monitor**: Tracks call performance and optimization opportunities
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -33,16 +32,12 @@ use std::{vec::Vec, string::String, collections::HashMap, format};
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
 use alloc::{vec::Vec, string::String, collections::BTreeMap as HashMap, format};
 
-#[cfg(not(any(feature = "std", )))]
-use wrt_foundation::{BoundedVec, BoundedString, BoundedMap, safe_memory::NoStdProvider};
+#[cfg(not(any(feature = "std", feature = "alloc")))]
+use wrt_foundation::{BoundedVec, BoundedString, BoundedMap};
 
-// Type aliases for no_std compatibility
-#[cfg(not(any(feature = "std", )))]
-type Vec<T> = BoundedVec<T, 64, NoStdProvider<65536>>;
-#[cfg(not(any(feature = "std", )))]
-type String = BoundedString<256, NoStdProvider<65536>>;
-#[cfg(not(any(feature = "std", )))]
-type HashMap<K, V> = BoundedMap<K, V, 32, NoStdProvider<65536>>;
+// No_std provider for bounded collections
+#[cfg(not(any(feature = "std", feature = "alloc")))]
+use crate::MemoryProvider;
 
 use wrt_error::{Error, ErrorCategory, Result, codes};
 use crate::canonical_abi::{ComponentType, CanonicalABI};
@@ -65,11 +60,20 @@ const MAX_STRING_LENGTH: usize = 65536;
 /// Maximum array/vector length in parameters
 const MAX_ARRAY_LENGTH: usize = 4096;
 
+/// Maximum number of concurrent call contexts
+const MAX_CALL_CONTEXTS: usize = 256;
+
+/// Maximum number of parameters per call
+const MAX_CALL_PARAMETERS: usize = 64;
+
 /// Call context manager for managing cross-component call state
 #[derive(Debug)]
 pub struct CallContextManager {
     /// Active call contexts by call ID
+    #[cfg(feature = "std")]
     contexts: HashMap<u64, ManagedCallContext>,
+    #[cfg(not(feature = "std"))]
+    contexts: BoundedVec<(u64, ManagedCallContext), MAX_CALL_CONTEXTS, crate::MemoryProvider>,
     /// Parameter marshaler
     marshaler: ParameterMarshaler,
     /// Resource coordinator
@@ -77,7 +81,10 @@ pub struct CallContextManager {
     /// Call validator
     validator: CallValidator,
     /// Performance monitor
+    #[cfg(feature = "std")]  
     monitor: PerformanceMonitor,
+    #[cfg(not(feature = "std"))]
+    monitor: PerformanceMonitorNoStd,
     /// Manager configuration
     config: CallContextConfig,
 }
@@ -105,32 +112,51 @@ pub struct ParameterMarshaler {
     /// Marshaling configuration
     config: MarshalingConfig,
     /// Type compatibility cache
+    #[cfg(feature = "std")]
     type_cache: HashMap<String, TypeCompatibility>,
+    #[cfg(not(feature = "std"))]
+    type_cache: BoundedVec<(BoundedString<128, crate::MemoryProvider>, TypeCompatibility), 64, crate::MemoryProvider>,
 }
 
 /// Resource coordinator for managing resource transfers during calls
 #[derive(Debug)]
 pub struct ResourceCoordinator {
     /// Active resource locks
+    #[cfg(feature = "std")]
     resource_locks: HashMap<ResourceHandle, ResourceLock>,
+    #[cfg(not(feature = "std"))]
+    resource_locks: BoundedVec<(ResourceHandle, ResourceLock), 128, crate::MemoryProvider>,
     /// Transfer pending queue
+    #[cfg(feature = "std")]
     pending_transfers: Vec<PendingResourceTransfer>,
+    #[cfg(not(feature = "std"))]
+    pending_transfers: BoundedVec<PendingResourceTransfer, 64, crate::MemoryProvider>,
     /// Transfer policies
+    #[cfg(feature = "std")]
     transfer_policies: HashMap<(InstanceId, InstanceId), TransferPolicy>,
+    #[cfg(not(feature = "std"))]
+    transfer_policies: BoundedVec<((InstanceId, InstanceId), TransferPolicy), 32, crate::MemoryProvider>,
 }
 
 /// Call validator for ensuring call safety and security
 #[derive(Debug)]
 pub struct CallValidator {
     /// Security policies
+    #[cfg(feature = "std")]
     security_policies: HashMap<InstanceId, SecurityPolicy>,
+    #[cfg(not(feature = "std"))]
+    security_policies: BoundedVec<(InstanceId, SecurityPolicy), 64, crate::MemoryProvider>,
     /// Validation rules
+    #[cfg(feature = "std")]
     validation_rules: Vec<ValidationRule>,
+    #[cfg(not(feature = "std"))]
+    validation_rules: BoundedVec<ValidationRule, 32, crate::MemoryProvider>,
     /// Validation configuration
     config: ValidationConfig,
 }
 
 /// Performance monitor for tracking call performance
+#[cfg(feature = "std")]
 #[derive(Debug)]
 pub struct PerformanceMonitor {
     /// Call timing metrics
@@ -143,28 +169,60 @@ pub struct PerformanceMonitor {
     optimization_suggestions: Vec<OptimizationSuggestion>,
 }
 
+/// Performance monitor for tracking call performance (no_std version)
+#[cfg(not(feature = "std"))]
+#[derive(Debug)]
+pub struct PerformanceMonitorNoStd {
+    /// Call timing metrics
+    timing_metrics: BoundedVec<(BoundedString<128, crate::MemoryProvider>, TimingMetrics), 64, crate::MemoryProvider>,
+    /// Parameter size metrics
+    parameter_metrics: ParameterSizeMetrics,
+    /// Resource transfer metrics
+    resource_metrics: ResourceTransferMetrics,
+    /// Optimization suggestions
+    optimization_suggestions: BoundedVec<OptimizationSuggestion, 32, crate::MemoryProvider>,
+}
+
 /// Parameter marshaling state
 #[derive(Debug, Clone)]
 pub struct MarshalingState {
     /// Original parameters
+    #[cfg(feature = "std")]
     pub original_parameters: Vec<ComponentValue>,
+    #[cfg(not(feature = "std"))]
+    pub original_parameters: BoundedVec<ComponentValue, 32, crate::MemoryProvider>,
     /// Marshaled parameters
+    #[cfg(feature = "std")]
     pub marshaled_parameters: Vec<ComponentValue>,
+    #[cfg(not(feature = "std"))]
+    pub marshaled_parameters: BoundedVec<ComponentValue, 32, crate::MemoryProvider>,
     /// Marshaling metadata
     pub metadata: MarshalingMetadata,
     /// Marshaling errors (if any)
+    #[cfg(feature = "std")]
     pub errors: Vec<String>,
+    #[cfg(not(feature = "std"))]
+    pub errors: BoundedVec<BoundedString<256, crate::MemoryProvider>, 16, crate::MemoryProvider>,
 }
 
 /// Resource state during call execution
 #[derive(Debug, Clone)]
 pub struct ResourceState {
     /// Resources being transferred
+    #[cfg(feature = "std")]
     pub transferring_resources: Vec<ResourceHandle>,
+    #[cfg(not(feature = "std"))]
+    pub transferring_resources: BoundedVec<ResourceHandle, 64, crate::MemoryProvider>,
     /// Resource locks acquired
+    #[cfg(feature = "std")]
     pub acquired_locks: Vec<ResourceHandle>,
-    /// Transfer results
+    #[cfg(not(feature = "std"))]
+    pub acquired_locks: BoundedVec<ResourceHandle, 64, crate::MemoryProvider>,
+    /// Transfer results  
+    #[cfg(feature = "std")]
     pub transfer_results: Vec<TransferResult>,
+    #[cfg(not(feature = "std"))]
+    pub transfer_results: BoundedVec<TransferResult, 32, crate::MemoryProvider>,
 }
 
 /// Call performance metrics
@@ -196,7 +254,10 @@ pub struct ValidationResults {
     /// Resource validation results
     pub resource_validation: ResourceValidationResult,
     /// Validation messages
+    #[cfg(feature = "std")]
     pub messages: Vec<String>,
+    #[cfg(not(feature = "std"))]
+    pub messages: BoundedVec<BoundedString<256, crate::MemoryProvider>, 16, crate::MemoryProvider>,
 }
 
 /// Call context manager configuration
@@ -239,7 +300,10 @@ pub struct ValidationConfig {
     /// Enable performance checks
     pub enable_performance_checks: bool,
     /// Custom validation rules
+    #[cfg(feature = "std")]
     pub custom_rules: Vec<String>,
+    #[cfg(not(feature = "std"))]
+    pub custom_rules: BoundedVec<BoundedString<128, crate::MemoryProvider>, 16, crate::MemoryProvider>,
 }
 
 /// Resource lock for coordinating resource access
@@ -280,18 +344,30 @@ pub struct TransferPolicy {
     /// Maximum simultaneous transfers
     pub max_transfers: u32,
     /// Allowed transfer types
+    #[cfg(feature = "std")]
     pub allowed_types: Vec<super::component_communication::ResourceTransferType>,
+    #[cfg(not(feature = "std"))]
+    pub allowed_types: BoundedVec<super::component_communication::ResourceTransferType, 16, crate::MemoryProvider>,
     /// Required permissions
+    #[cfg(feature = "std")]
     pub required_permissions: Vec<String>,
+    #[cfg(not(feature = "std"))]
+    pub required_permissions: BoundedVec<BoundedString<128, crate::MemoryProvider>, 16, crate::MemoryProvider>,
 }
 
 /// Security policy for instance interactions
 #[derive(Debug, Clone)]
 pub struct SecurityPolicy {
     /// Allowed target instances
+    #[cfg(feature = "std")]
     pub allowed_targets: Vec<InstanceId>,
+    #[cfg(not(feature = "std"))]
+    pub allowed_targets: BoundedVec<InstanceId, 32, crate::MemoryProvider>,
     /// Allowed function patterns
+    #[cfg(feature = "std")]
     pub allowed_functions: Vec<String>,
+    #[cfg(not(feature = "std"))]
+    pub allowed_functions: BoundedVec<BoundedString<128, crate::MemoryProvider>, 32, crate::MemoryProvider>,
     /// Resource access permissions
     pub resource_permissions: ResourcePermissions,
     /// Memory access limits
@@ -302,9 +378,15 @@ pub struct SecurityPolicy {
 #[derive(Debug, Clone)]
 pub struct ValidationRule {
     /// Rule name
+    #[cfg(feature = "std")]
     pub name: String,
+    #[cfg(not(feature = "std"))]
+    pub name: BoundedString<128, crate::MemoryProvider>,
     /// Rule description
+    #[cfg(feature = "std")]
     pub description: String,
+    #[cfg(not(feature = "std"))]
+    pub description: BoundedString<256, crate::MemoryProvider>,
     /// Rule type
     pub rule_type: ValidationRuleType,
     /// Rule severity
@@ -358,7 +440,10 @@ pub struct OptimizationSuggestion {
     /// Suggestion type
     pub suggestion_type: OptimizationType,
     /// Description
+    #[cfg(feature = "std")]
     pub description: String,
+    #[cfg(not(feature = "std"))]
+    pub description: BoundedString<256, crate::MemoryProvider>,
     /// Potential impact
     pub impact: OptimizationImpact,
     /// Implementation complexity
@@ -388,7 +473,10 @@ pub struct TransferResult {
     /// New handle (if ownership transferred)
     pub new_handle: Option<ResourceHandle>,
     /// Error message (if failed)
+    #[cfg(feature = "std")]
     pub error_message: Option<String>,
+    #[cfg(not(feature = "std"))]
+    pub error_message: Option<BoundedString<256, crate::MemoryProvider>>,
 }
 
 /// Type compatibility information
@@ -416,7 +504,10 @@ pub struct ResourcePermissions {
     /// Can transfer resources
     pub can_transfer: bool,
     /// Allowed resource types
+    #[cfg(feature = "std")]
     pub allowed_types: Vec<ResourceTypeId>,
+    #[cfg(not(feature = "std"))]
+    pub allowed_types: BoundedVec<ResourceTypeId, 32, crate::MemoryProvider>,
 }
 
 /// Memory access limits
@@ -436,11 +527,20 @@ pub struct ParameterValidationResult {
     /// Validation passed
     pub valid: bool,
     /// Type checking results
+    #[cfg(feature = "std")]
     pub type_check_results: Vec<TypeCheckResult>,
+    #[cfg(not(feature = "std"))]
+    pub type_check_results: BoundedVec<TypeCheckResult, 32, crate::MemoryProvider>,
     /// Size validation results
+    #[cfg(feature = "std")]
     pub size_validation_results: Vec<SizeValidationResult>,
+    #[cfg(not(feature = "std"))]
+    pub size_validation_results: BoundedVec<SizeValidationResult, 32, crate::MemoryProvider>,
     /// Error messages
+    #[cfg(feature = "std")]
     pub error_messages: Vec<String>,
+    #[cfg(not(feature = "std"))]
+    pub error_messages: BoundedVec<BoundedString<256, crate::MemoryProvider>, 16, crate::MemoryProvider>,
 }
 
 /// Security validation result
@@ -449,11 +549,20 @@ pub struct SecurityValidationResult {
     /// Security check passed
     pub secure: bool,
     /// Permission check results
+    #[cfg(feature = "std")]
     pub permission_results: Vec<PermissionCheckResult>,
+    #[cfg(not(feature = "std"))]
+    pub permission_results: BoundedVec<PermissionCheckResult, 32, crate::MemoryProvider>,
     /// Access control results
+    #[cfg(feature = "std")]
     pub access_control_results: Vec<AccessControlResult>,
+    #[cfg(not(feature = "std"))]
+    pub access_control_results: BoundedVec<AccessControlResult, 32, crate::MemoryProvider>,
     /// Security warnings
+    #[cfg(feature = "std")]
     pub warnings: Vec<String>,
+    #[cfg(not(feature = "std"))]
+    pub warnings: BoundedVec<BoundedString<256, crate::MemoryProvider>, 16, crate::MemoryProvider>,
 }
 
 /// Resource validation result
@@ -462,11 +571,20 @@ pub struct ResourceValidationResult {
     /// Resource validation passed
     pub valid: bool,
     /// Resource availability results
+    #[cfg(feature = "std")]
     pub availability_results: Vec<ResourceAvailabilityResult>,
+    #[cfg(not(feature = "std"))]
+    pub availability_results: BoundedVec<ResourceAvailabilityResult, 32, crate::MemoryProvider>,
     /// Transfer permission results
+    #[cfg(feature = "std")]
     pub transfer_permission_results: Vec<TransferPermissionResult>,
+    #[cfg(not(feature = "std"))]
+    pub transfer_permission_results: BoundedVec<TransferPermissionResult, 32, crate::MemoryProvider>,
     /// Validation errors
+    #[cfg(feature = "std")]
     pub errors: Vec<String>,
+    #[cfg(not(feature = "std"))]
+    pub errors: BoundedVec<BoundedString<256, crate::MemoryProvider>, 16, crate::MemoryProvider>,
 }
 
 /// Type check result
@@ -481,7 +599,10 @@ pub struct TypeCheckResult {
     /// Check passed
     pub passed: bool,
     /// Error message
+    #[cfg(feature = "std")]
     pub error_message: Option<String>,
+    #[cfg(not(feature = "std"))]
+    pub error_message: Option<BoundedString<256, crate::MemoryProvider>>,
 }
 
 /// Size validation result
@@ -501,22 +622,34 @@ pub struct SizeValidationResult {
 #[derive(Debug, Clone)]
 pub struct PermissionCheckResult {
     /// Permission name
+    #[cfg(feature = "std")]
     pub permission: String,
+    #[cfg(not(feature = "std"))]
+    pub permission: BoundedString<128, crate::MemoryProvider>,
     /// Check passed
     pub granted: bool,
     /// Reason for denial (if denied)
+    #[cfg(feature = "std")]
     pub denial_reason: Option<String>,
+    #[cfg(not(feature = "std"))]
+    pub denial_reason: Option<BoundedString<256, crate::MemoryProvider>>,
 }
 
 /// Access control result
 #[derive(Debug, Clone)]
 pub struct AccessControlResult {
     /// Resource or function accessed
+    #[cfg(feature = "std")]
     pub accessed_item: String,
+    #[cfg(not(feature = "std"))]
+    pub accessed_item: BoundedString<128, crate::MemoryProvider>,
     /// Access allowed
     pub allowed: bool,
     /// Access control rule applied
+    #[cfg(feature = "std")]
     pub rule_applied: String,
+    #[cfg(not(feature = "std"))]
+    pub rule_applied: BoundedString<128, crate::MemoryProvider>,
 }
 
 /// Resource availability result
@@ -542,7 +675,10 @@ pub struct TransferPermissionResult {
     /// Permission granted
     pub permitted: bool,
     /// Policy applied
+    #[cfg(feature = "std")]
     pub policy_applied: String,
+    #[cfg(not(feature = "std"))]
+    pub policy_applied: BoundedString<128, crate::MemoryProvider>,
 }
 
 // Enumerations
@@ -696,7 +832,10 @@ impl Default for ValidationConfig {
             level: ValidationLevel::Standard,
             enable_security_checks: true,
             enable_performance_checks: true,
-            custom_rules: Vec::new(),
+            #[cfg(feature = "std")]
+            custom_rules: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            custom_rules: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 }
@@ -707,7 +846,10 @@ impl Default for ResourcePermissions {
             can_read: true,
             can_write: false,
             can_transfer: false,
-            allowed_types: Vec::new(),
+            #[cfg(feature = "std")]
+            allowed_types: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            allowed_types: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 }
@@ -733,11 +875,17 @@ impl CallContextManager {
     /// Create a new call context manager with configuration
     pub fn with_config(config: CallContextConfig) -> Self {
         Self {
-            contexts: HashMap::new(),
+            #[cfg(feature = "std")]
+            contexts: std::collections::HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            contexts: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             marshaler: ParameterMarshaler::new(MarshalingConfig::default()),
             resource_coordinator: ResourceCoordinator::new(),
             validator: CallValidator::new(ValidationConfig::default()),
+            #[cfg(feature = "std")]
             monitor: PerformanceMonitor::new(),
+            #[cfg(not(feature = "std"))]
+            monitor: PerformanceMonitorNoStd::new(),
             config,
         }
     }
@@ -759,23 +907,53 @@ impl CallContextManager {
                 status: ValidationStatus::Skipped,
                 parameter_validation: ParameterValidationResult {
                     valid: true,
-                    type_check_results: Vec::new(),
-                    size_validation_results: Vec::new(),
-                    error_messages: Vec::new(),
+                    #[cfg(feature = "std")]
+                    type_check_results: std::vec::Vec::new(),
+                    #[cfg(not(feature = "std"))]
+                    type_check_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                    #[cfg(feature = "std")]
+                    size_validation_results: std::vec::Vec::new(),
+                    #[cfg(not(feature = "std"))]
+                    size_validation_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                    #[cfg(feature = "std")]
+                    error_messages: std::vec::Vec::new(),
+                    #[cfg(not(feature = "std"))]
+                    error_messages: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
                 },
                 security_validation: SecurityValidationResult {
                     secure: true,
-                    permission_results: Vec::new(),
-                    access_control_results: Vec::new(),
-                    warnings: Vec::new(),
+                    #[cfg(feature = "std")]
+                    permission_results: std::vec::Vec::new(),
+                    #[cfg(not(feature = "std"))]
+                    permission_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                    #[cfg(feature = "std")]
+                    access_control_results: std::vec::Vec::new(),
+                    #[cfg(not(feature = "std"))]
+                    access_control_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                    #[cfg(feature = "std")]
+                    warnings: std::vec::Vec::new(),
+                    #[cfg(not(feature = "std"))]
+                    warnings: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
                 },
                 resource_validation: ResourceValidationResult {
                     valid: true,
-                    availability_results: Vec::new(),
-                    transfer_permission_results: Vec::new(),
-                    errors: Vec::new(),
+                    #[cfg(feature = "std")]
+                    availability_results: std::vec::Vec::new(),
+                    #[cfg(not(feature = "std"))]
+                    availability_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                    #[cfg(feature = "std")]
+                    transfer_permission_results: std::vec::Vec::new(),
+                    #[cfg(not(feature = "std"))]
+                    transfer_permission_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                    #[cfg(feature = "std")]
+                    errors: std::vec::Vec::new(),
+                    #[cfg(not(feature = "std"))]
+                    errors: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
                 },
-                messages: Vec::new(),
+                #[cfg(feature = "std")]
+                messages: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                messages: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             }
         };
 
@@ -787,9 +965,18 @@ impl CallContextManager {
             self.resource_coordinator.coordinate_resources(&context.resource_handles)?
         } else {
             ResourceState {
-                transferring_resources: Vec::new(),
-                acquired_locks: Vec::new(),
-                transfer_results: Vec::new(),
+                #[cfg(feature = "std")]
+                transferring_resources: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                transferring_resources: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                acquired_locks: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                acquired_locks: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                transfer_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                transfer_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             }
         };
 
@@ -803,40 +990,54 @@ impl CallContextManager {
         };
 
         // Store the context
-        self.contexts.insert(call_id, managed_context);
+        #[cfg(feature = "std")]
+        self.contexts.insert(call_id, managed_context;
+        #[cfg(not(feature = "std"))]
+        self.contexts.push((call_id, managed_context)).map_err(|_| Error::runtime_execution_error("Error occurred"))?;
 
         Ok(call_id)
     }
 
     /// Get a call context by ID
     pub fn get_call_context(&self, call_id: u64) -> Option<&ManagedCallContext> {
-        self.contexts.get(&call_id)
+        #[cfg(feature = "std")]
+        return self.contexts.get(&call_id;
+        #[cfg(not(feature = "std"))]
+        return self.contexts.iter().find(|(id, _)| *id == call_id).map(|(_, ctx)| ctx;
     }
 
     /// Complete a call context and cleanup resources
     pub fn complete_call_context(&mut self, call_id: u64) -> Result<()> {
-        let context = self.contexts.remove(&call_id);
+        #[cfg(feature = "std")]
+        let context = self.contexts.remove(&call_id;
+        #[cfg(not(feature = "std"))]
+        let context = {
+            let pos = self.contexts.iter().position(|(id, _)| *id == call_id;
+            pos.and_then(|i| self.contexts.swap_remove(i).ok()).map(|(_, ctx)| ctx)
+        };
         if let Some(context) = context {
             // Release resource locks
             self.resource_coordinator.release_locks(&context.resource_state.acquired_locks)?;
 
             // Update performance metrics
             if self.config.enable_performance_monitoring {
-                self.monitor.record_call_completion(&context.metrics);
+                self.monitor.record_call_completion(&context.metrics;
             }
 
             Ok(())
         } else {
-            Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_STATE,
-                "Call context not found",
-            ))
+            Err(Error::runtime_invalid_state("Call context not found"))
         }
     }
 
     /// Get performance statistics
+    #[cfg(feature = "std")]
     pub fn get_performance_stats(&self) -> &PerformanceMonitor {
+        &self.monitor
+    }
+    
+    #[cfg(not(feature = "std"))]
+    pub fn get_performance_stats(&self) -> &PerformanceMonitorNoStd {
         &self.monitor
     }
 }
@@ -847,7 +1048,10 @@ impl ParameterMarshaler {
         Self {
             abi: CanonicalABI::new(),
             config,
-            type_cache: HashMap::new(),
+            #[cfg(feature = "std")]
+            type_cache: std::collections::HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            type_cache: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 
@@ -857,24 +1061,25 @@ impl ParameterMarshaler {
 
         // Validate parameter count and size
         if parameters.len() > MAX_CALL_PARAMETERS {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Too many parameters",
-            ));
+            return Err(Error::validation_error("Too many parameters";
         }
 
         let total_size = self.calculate_parameter_size(parameters)?;
         if total_size > self.config.max_parameter_size {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Parameter data too large",
-            ));
+            return Err(Error::validation_error("Parameter data too large";
         }
 
         // For now, just clone the parameters (no actual marshaling)
-        let marshaled_parameters = parameters.to_vec();
+        #[cfg(feature = "std")]
+        let marshaled_parameters = parameters.to_vec);
+        #[cfg(not(feature = "std"))]
+        let marshaled_parameters = {
+            let mut vec = BoundedVec::new(crate::MemoryProvider::default()).unwrap();
+            for param in parameters {
+                vec.push(param.clone()).map_err(|_| Error::validation_error("Too many parameters for bounded vec"))?;
+            }
+            vec
+        };
 
         let end_time = 0; // Would use actual timestamp
         let metadata = MarshalingMetadata {
@@ -885,10 +1090,22 @@ impl ParameterMarshaler {
         };
 
         Ok(MarshalingState {
+            #[cfg(feature = "std")]
             original_parameters: parameters.to_vec(),
+            #[cfg(not(feature = "std"))]
+            original_parameters: {
+                let mut vec = BoundedVec::new(crate::MemoryProvider::default()).unwrap();
+                for param in parameters {
+                    vec.push(param.clone()).map_err(|_| Error::validation_error("Too many parameters for bounded vec"))?;
+                }
+                vec
+            },
             marshaled_parameters,
             metadata,
-            errors: Vec::new(),
+            #[cfg(feature = "std")]
+            errors: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            errors: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         })
     }
 
@@ -903,23 +1120,24 @@ impl ParameterMarshaler {
                 ComponentValue::S32(_) | ComponentValue::U32(_) | ComponentValue::F32(_) => 4,
                 ComponentValue::S64(_) | ComponentValue::U64(_) | ComponentValue::F64(_) => 8,
                 ComponentValue::Char(_) => 4, // UTF-32
+                #[cfg(feature = "std")]
                 ComponentValue::String(s) => {
                     if s.len() > MAX_STRING_LENGTH {
-                        return Err(Error::new(
-                            ErrorCategory::Validation,
-                            codes::VALIDATION_ERROR,
-                            "String parameter too long",
-                        ));
+                        return Err(Error::validation_error("String parameter too long";
                     }
                     s.len() as u32 + 4 // String length + size prefix
                 }
+                #[cfg(not(feature = "std"))]
+                ComponentValue::String(s) => {
+                    let len = s.as_bytes().len);
+                    if len > MAX_STRING_LENGTH {
+                        return Err(Error::validation_error("String parameter too long";
+                    }
+                    len as u32 + 4 // String length + size prefix
+                }
                 ComponentValue::List(items) => {
                     if items.len() > MAX_ARRAY_LENGTH {
-                        return Err(Error::new(
-                            ErrorCategory::Validation,
-                            codes::VALIDATION_ERROR,
-                            "Array parameter too long",
-                        ));
+                        return Err(Error::validation_error("Array parameter too long";
                     }
                     self.calculate_parameter_size(items)? + 4 // Array contents + size prefix
                 }
@@ -964,15 +1182,27 @@ impl ResourceCoordinator {
     /// Create a new resource coordinator
     pub fn new() -> Self {
         Self {
-            resource_locks: HashMap::new(),
-            pending_transfers: Vec::new(),
-            transfer_policies: HashMap::new(),
+            #[cfg(feature = "std")]
+            resource_locks: std::collections::HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            resource_locks: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            pending_transfers: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            pending_transfers: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            transfer_policies: std::collections::HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            transfer_policies: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 
     /// Coordinate resources for a call
     pub fn coordinate_resources(&mut self, resource_handles: &[ResourceHandle]) -> Result<ResourceState> {
-        let mut acquired_locks = Vec::new();
+        #[cfg(feature = "std")]
+        let mut acquired_locks = std::vec::Vec::new);
+        #[cfg(not(feature = "std"))]
+        let mut acquired_locks = BoundedVec::new(crate::MemoryProvider::default()).unwrap();
 
         // Acquire locks for all resources
         for &handle in resource_handles {
@@ -984,21 +1214,47 @@ impl ResourceCoordinator {
                 expires_at: 0, // Would calculate expiration
             };
 
-            self.resource_locks.insert(handle, lock);
+            #[cfg(feature = "std")]
+            self.resource_locks.insert(handle, lock;
+            #[cfg(not(feature = "std"))]
+            self.resource_locks.push((handle, lock)).map_err(|_| Error::runtime_execution_error("Too many resource locks"))?;
+            
+            #[cfg(feature = "std")]
             acquired_locks.push(handle);
+            #[cfg(not(feature = "std"))]
+            acquired_locks.push(handle).map_err(|_| Error::runtime_execution_error("Too many acquired locks"))?;
         }
 
         Ok(ResourceState {
+            #[cfg(feature = "std")]
             transferring_resources: resource_handles.to_vec(),
+            #[cfg(not(feature = "std"))]
+            transferring_resources: {
+                let mut vec = BoundedVec::new(crate::MemoryProvider::default()).unwrap();
+                for handle in resource_handles {
+                    vec.push(*handle).map_err(|_| Error::runtime_execution_error("Too many transferring resources"))?;
+                }
+                vec
+            },
             acquired_locks,
-            transfer_results: Vec::new(),
+            #[cfg(feature = "std")]
+            transfer_results: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            transfer_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         })
     }
 
     /// Release resource locks
     pub fn release_locks(&mut self, locks: &[ResourceHandle]) -> Result<()> {
         for &handle in locks {
-            self.resource_locks.remove(&handle);
+            #[cfg(feature = "std")]
+            self.resource_locks.remove(&handle;
+            #[cfg(not(feature = "std"))]
+            {
+                if let Some(pos) = self.resource_locks.iter().position(|(h, _)| *h == handle) {
+                    self.resource_locks.swap_remove(pos).ok();
+                }
+            }
         }
         Ok(())
     }
@@ -1008,8 +1264,14 @@ impl CallValidator {
     /// Create a new call validator
     pub fn new(config: ValidationConfig) -> Self {
         Self {
-            security_policies: HashMap::new(),
-            validation_rules: Vec::new(),
+            #[cfg(feature = "std")]
+            security_policies: std::collections::HashMap::new(),
+            #[cfg(not(feature = "std"))]
+            security_policies: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            validation_rules: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            validation_rules: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             config,
         }
     }
@@ -1026,35 +1288,66 @@ impl CallValidator {
             status: ValidationStatus::Passed,
             parameter_validation: ParameterValidationResult {
                 valid: true,
-                type_check_results: Vec::new(),
-                size_validation_results: Vec::new(),
-                error_messages: Vec::new(),
+                #[cfg(feature = "std")]
+                type_check_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                type_check_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                size_validation_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                size_validation_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                error_messages: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                error_messages: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             },
             security_validation: SecurityValidationResult {
                 secure: true,
-                permission_results: Vec::new(),
-                access_control_results: Vec::new(),
-                warnings: Vec::new(),
+                #[cfg(feature = "std")]
+                permission_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                permission_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                access_control_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                access_control_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                warnings: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                warnings: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             },
             resource_validation: ResourceValidationResult {
                 valid: true,
-                availability_results: Vec::new(),
-                transfer_permission_results: Vec::new(),
-                errors: Vec::new(),
+                #[cfg(feature = "std")]
+                availability_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                availability_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                transfer_permission_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                transfer_permission_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                errors: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                errors: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             },
-            messages: Vec::new(),
+            #[cfg(feature = "std")]
+            messages: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            messages: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         })
     }
 }
 
+#[cfg(feature = "std")]
 impl PerformanceMonitor {
     /// Create a new performance monitor
     pub fn new() -> Self {
         Self {
-            timing_metrics: HashMap::new(),
+            timing_metrics: std::collections::HashMap::new(),
             parameter_metrics: ParameterSizeMetrics::default(),
             resource_metrics: ResourceTransferMetrics::default(),
-            optimization_suggestions: Vec::new(),
+            optimization_suggestions: std::vec::Vec::new(),
         }
     }
 
@@ -1077,7 +1370,40 @@ impl Default for CallContextManager {
     }
 }
 
+#[cfg(feature = "std")]
 impl Default for PerformanceMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl PerformanceMonitorNoStd {
+    /// Create a new performance monitor
+    pub fn new() -> Self {
+        Self {
+            timing_metrics: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            parameter_metrics: ParameterSizeMetrics::default(),
+            resource_metrics: ResourceTransferMetrics::default(),
+            optimization_suggestions: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+        }
+    }
+    
+    /// Record call completion for metrics
+    pub fn record_call_completion(&mut self, _metrics: &CallMetrics) {
+        // Update metrics based on call performance
+        self.parameter_metrics.total_parameters += 1;
+        self.resource_metrics.total_transfers += 1;
+    }
+
+    /// Get optimization suggestions
+    pub fn get_optimization_suggestions(&self) -> &[OptimizationSuggestion] {
+        self.optimization_suggestions.as_slice()
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl Default for PerformanceMonitorNoStd {
     fn default() -> Self {
         Self::new()
     }
@@ -1095,22 +1421,29 @@ mod tests {
 
     #[test]
     fn test_call_context_manager_creation() {
-        let manager = CallContextManager::new();
-        assert_eq!(manager.contexts.len(), 0);
+        let manager = CallContextManager::new);
+        assert_eq!(manager.contexts.len(), 0;
     }
 
     #[test]
     fn test_parameter_marshaler_creation() {
-        let marshaler = ParameterMarshaler::new(MarshalingConfig::default());
-        assert_eq!(marshaler.config.string_encoding, StringEncoding::Utf8);
+        let marshaler = ParameterMarshaler::new(MarshalingConfig::default);
+        assert_eq!(marshaler.config.string_encoding, StringEncoding::Utf8;
     }
 
     #[test]
     fn test_parameter_size_calculation() {
-        let marshaler = ParameterMarshaler::new(MarshalingConfig::default());
+        let marshaler = ParameterMarshaler::new(MarshalingConfig::default);
         let parameters = vec![
             ComponentValue::S32(42),
+            #[cfg(feature = "std")]
             ComponentValue::String("hello".to_string()),
+            #[cfg(not(feature = "std"))]
+            ComponentValue::String({
+                let mut s = BoundedString::new(crate::MemoryProvider::default()).unwrap();
+                s.push_str("hello").unwrap();
+                s
+            }),
             ComponentValue::Bool(true),
         ];
 
@@ -1120,12 +1453,12 @@ mod tests {
 
     #[test]
     fn test_resource_coordinator() {
-        let mut coordinator = ResourceCoordinator::new();
+        let mut coordinator = ResourceCoordinator::new);
         let handles = vec![ResourceHandle::new(1), ResourceHandle::new(2)];
 
         let state = coordinator.coordinate_resources(&handles).unwrap();
-        assert_eq!(state.acquired_locks.len(), 2);
-        assert_eq!(state.transferring_resources.len(), 2);
+        assert_eq!(state.acquired_locks.len(), 2;
+        assert_eq!(state.transferring_resources.len(), 2;
     }
 
     #[test]
@@ -1134,26 +1467,56 @@ mod tests {
             status: ValidationStatus::Passed,
             parameter_validation: ParameterValidationResult {
                 valid: true,
-                type_check_results: Vec::new(),
-                size_validation_results: Vec::new(),
-                error_messages: Vec::new(),
+                #[cfg(feature = "std")]
+                type_check_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                type_check_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                size_validation_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                size_validation_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                error_messages: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                error_messages: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             },
             security_validation: SecurityValidationResult {
                 secure: true,
-                permission_results: Vec::new(),
-                access_control_results: Vec::new(),
-                warnings: Vec::new(),
+                #[cfg(feature = "std")]
+                permission_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                permission_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                access_control_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                access_control_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                warnings: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                warnings: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             },
             resource_validation: ResourceValidationResult {
                 valid: true,
-                availability_results: Vec::new(),
-                transfer_permission_results: Vec::new(),
-                errors: Vec::new(),
+                #[cfg(feature = "std")]
+                availability_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                availability_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                transfer_permission_results: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                transfer_permission_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+                #[cfg(feature = "std")]
+                errors: std::vec::Vec::new(),
+                #[cfg(not(feature = "std"))]
+                errors: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             },
-            messages: Vec::new(),
+            #[cfg(feature = "std")]
+            messages: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            messages: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         };
 
-        assert_eq!(results.status, ValidationStatus::Passed);
+        assert_eq!(results.status, ValidationStatus::Passed;
         assert!(results.parameter_validation.valid);
         assert!(results.security_validation.secure);
         assert!(results.resource_validation.valid);
@@ -1168,7 +1531,7 @@ macro_rules! impl_basic_traits {
     ($type:ty, $default_val:expr) => {
         impl Checksummable for $type {
             fn update_checksum(&self, checksum: &mut wrt_foundation::traits::Checksum) {
-                0u32.update_checksum(checksum);
+                0u32.update_checksum(checksum;
             }
         }
 
@@ -1218,10 +1581,19 @@ impl Eq for ManagedCallContext {}
 impl Default for MarshalingState {
     fn default() -> Self {
         Self {
-            original_parameters: Vec::new(),
-            marshaled_parameters: Vec::new(),
+            #[cfg(feature = "std")]
+            original_parameters: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            original_parameters: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            marshaled_parameters: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            marshaled_parameters: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             metadata: MarshalingMetadata::default(),
-            errors: Vec::new(),
+            #[cfg(feature = "std")]
+            errors: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            errors: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 }
@@ -1229,9 +1601,18 @@ impl Default for MarshalingState {
 impl Default for ResourceState {
     fn default() -> Self {
         Self {
-            transferring_resources: Vec::new(),
-            acquired_locks: Vec::new(),
-            transfer_results: Vec::new(),
+            #[cfg(feature = "std")]
+            transferring_resources: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            transferring_resources: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            acquired_locks: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            acquired_locks: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            transfer_results: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            transfer_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 }
@@ -1243,7 +1624,10 @@ impl Default for ValidationResults {
             parameter_validation: ParameterValidationResult::default(),
             security_validation: SecurityValidationResult::default(),
             resource_validation: ResourceValidationResult::default(),
-            messages: Vec::new(),
+            #[cfg(feature = "std")]
+            messages: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            messages: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 }
@@ -1252,9 +1636,18 @@ impl Default for ParameterValidationResult {
     fn default() -> Self {
         Self {
             valid: true,
-            type_check_results: Vec::new(),
-            size_validation_results: Vec::new(),
-            error_messages: Vec::new(),
+            #[cfg(feature = "std")]
+            type_check_results: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            type_check_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            size_validation_results: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            size_validation_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            error_messages: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            error_messages: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 }
@@ -1263,9 +1656,18 @@ impl Default for SecurityValidationResult {
     fn default() -> Self {
         Self {
             secure: true,
-            permission_results: Vec::new(),
-            access_control_results: Vec::new(),
-            warnings: Vec::new(),
+            #[cfg(feature = "std")]
+            permission_results: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            permission_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            access_control_results: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            access_control_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            warnings: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            warnings: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 }
@@ -1274,9 +1676,18 @@ impl Default for ResourceValidationResult {
     fn default() -> Self {
         Self {
             valid: true,
-            availability_results: Vec::new(),
-            transfer_permission_results: Vec::new(),
-            errors: Vec::new(),
+            #[cfg(feature = "std")]
+            availability_results: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            availability_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            transfer_permission_results: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            transfer_permission_results: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            errors: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            errors: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 }
@@ -1346,8 +1757,14 @@ impl Default for TransferPolicy {
     fn default() -> Self {
         Self {
             max_transfers: 1,
-            allowed_types: Vec::new(),
-            required_permissions: Vec::new(),
+            #[cfg(feature = "std")]
+            allowed_types: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            allowed_types: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            required_permissions: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            required_permissions: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 }
@@ -1363,8 +1780,14 @@ impl Eq for TransferPolicy {}
 impl Default for SecurityPolicy {
     fn default() -> Self {
         Self {
-            allowed_targets: Vec::new(),
-            allowed_functions: Vec::new(),
+            #[cfg(feature = "std")]
+            allowed_targets: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            allowed_targets: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            allowed_functions: std::vec::Vec::new(),
+            #[cfg(not(feature = "std"))]
+            allowed_functions: BoundedVec::new(crate::MemoryProvider::default()).unwrap(),
             resource_permissions: ResourcePermissions::default(),
             memory_limits: MemoryLimits::default(),
         }
@@ -1382,8 +1805,14 @@ impl Eq for SecurityPolicy {}
 impl Default for ValidationRule {
     fn default() -> Self {
         Self {
-            name: String::new(),
-            description: String::new(),
+            #[cfg(feature = "std")]
+            name: std::string::String::new(),
+            #[cfg(not(feature = "std"))]
+            name: BoundedString::new(crate::MemoryProvider::default()).unwrap(),
+            #[cfg(feature = "std")]
+            description: std::string::String::new(),
+            #[cfg(not(feature = "std"))]
+            description: BoundedString::new(crate::MemoryProvider::default()).unwrap(),
             rule_type: ValidationRuleType::Parameter,
             severity: ValidationSeverity::Info,
         }
@@ -1402,7 +1831,10 @@ impl Default for OptimizationSuggestion {
     fn default() -> Self {
         Self {
             suggestion_type: OptimizationType::ParameterMarshaling,
-            description: String::new(),
+            #[cfg(feature = "std")]
+            description: std::string::String::new(),
+            #[cfg(not(feature = "std"))]
+            description: BoundedString::new(crate::MemoryProvider::default()).unwrap(),
             impact: OptimizationImpact::Low,
             complexity: OptimizationComplexity::Simple,
         }
@@ -1420,7 +1852,10 @@ impl Eq for OptimizationSuggestion {}
 impl Default for PermissionCheckResult {
     fn default() -> Self {
         Self {
-            permission: String::new(),
+            #[cfg(feature = "std")]
+            permission: std::string::String::new(),
+            #[cfg(not(feature = "std"))]
+            permission: BoundedString::new(crate::MemoryProvider::default()).unwrap(),
             granted: false,
             denial_reason: None,
         }
@@ -1438,9 +1873,15 @@ impl Eq for PermissionCheckResult {}
 impl Default for AccessControlResult {
     fn default() -> Self {
         Self {
-            accessed_item: String::new(),
+            #[cfg(feature = "std")]
+            accessed_item: std::string::String::new(),
+            #[cfg(not(feature = "std"))]
+            accessed_item: BoundedString::new(crate::MemoryProvider::default()).unwrap(),
             allowed: false,
-            rule_applied: String::new(),
+            #[cfg(feature = "std")]
+            rule_applied: std::string::String::new(),
+            #[cfg(not(feature = "std"))]
+            rule_applied: BoundedString::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 }
@@ -1494,7 +1935,10 @@ impl Default for TransferPermissionResult {
             resource_handle: ResourceHandle::new(0),
             transfer_type: super::component_communication::ResourceTransferType::Move,
             permitted: false,
-            policy_applied: String::new(),
+            #[cfg(feature = "std")]
+            policy_applied: std::string::String::new(),
+            #[cfg(not(feature = "std"))]
+            policy_applied: BoundedString::new(crate::MemoryProvider::default()).unwrap(),
         }
     }
 }
@@ -1519,20 +1963,20 @@ impl PartialEq for SizeValidationResult {
 impl Eq for SizeValidationResult {}
 
 // Apply macro to all types that need traits
-impl_basic_traits!(ManagedCallContext, ManagedCallContext::default());
-impl_basic_traits!(TypeCompatibility, TypeCompatibility::default());
-impl_basic_traits!(ResourceLock, ResourceLock::default());
-impl_basic_traits!(PendingResourceTransfer, PendingResourceTransfer::default());
-impl_basic_traits!(TransferPolicy, TransferPolicy::default());
-impl_basic_traits!(SecurityPolicy, SecurityPolicy::default());
-impl_basic_traits!(ValidationRule, ValidationRule::default());
-impl_basic_traits!(TimingMetrics, TimingMetrics::default());
-impl_basic_traits!(OptimizationSuggestion, OptimizationSuggestion::default());
-impl_basic_traits!(PermissionCheckResult, PermissionCheckResult::default());
-impl_basic_traits!(AccessControlResult, AccessControlResult::default());
-impl_basic_traits!(ResourceAvailabilityResult, ResourceAvailabilityResult::default());
-impl_basic_traits!(TransferPermissionResult, TransferPermissionResult::default());
-impl_basic_traits!(SizeValidationResult, SizeValidationResult::default());
+impl_basic_traits!(ManagedCallContext, ManagedCallContext::default);
+impl_basic_traits!(TypeCompatibility, TypeCompatibility::default);
+impl_basic_traits!(ResourceLock, ResourceLock::default);
+impl_basic_traits!(PendingResourceTransfer, PendingResourceTransfer::default);
+impl_basic_traits!(TransferPolicy, TransferPolicy::default);
+impl_basic_traits!(SecurityPolicy, SecurityPolicy::default);
+impl_basic_traits!(ValidationRule, ValidationRule::default);
+impl_basic_traits!(TimingMetrics, TimingMetrics::default);
+impl_basic_traits!(OptimizationSuggestion, OptimizationSuggestion::default);
+impl_basic_traits!(PermissionCheckResult, PermissionCheckResult::default);
+impl_basic_traits!(AccessControlResult, AccessControlResult::default);
+impl_basic_traits!(ResourceAvailabilityResult, ResourceAvailabilityResult::default);
+impl_basic_traits!(TransferPermissionResult, TransferPermissionResult::default);
+impl_basic_traits!(SizeValidationResult, SizeValidationResult::default);
 
 // Additional Default implementations for remaining types
 impl Default for TransferResult {
@@ -1575,5 +2019,5 @@ impl PartialEq for TypeCheckResult {
 impl Eq for TypeCheckResult {}
 
 // Apply macro to additional types
-impl_basic_traits!(TransferResult, TransferResult::default());
-impl_basic_traits!(TypeCheckResult, TypeCheckResult::default());
+impl_basic_traits!(TransferResult, TransferResult::default);
+impl_basic_traits!(TypeCheckResult, TypeCheckResult::default);

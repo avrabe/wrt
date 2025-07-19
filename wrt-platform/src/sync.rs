@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Platform Synchronization Primitives
 // SW-REQ-ID: REQ_PLATFORM_001
@@ -41,11 +42,7 @@ impl Condvar {
     
     /// Wait on the condition variable (not supported in no_std)
     pub fn wait<'a, T>(&self, _guard: MutexGuard<'a, T>) -> Result<MutexGuard<'a, T>> {
-        Err(wrt_error::Error::new(
-            wrt_error::ErrorCategory::Runtime,
-            wrt_error::codes::NOT_IMPLEMENTED,
-            "Condvar not supported in no_std"
-        ))
+        Err(wrt_error::Error::runtime_not_implemented("Condvar not supported in no_std"))
     }
     
     /// Notify one waiting thread (no-op in no_std)
@@ -134,7 +131,7 @@ impl SpinFutex {
 
     /// Sets a new value.
     pub fn set(&self, new_value: u32) {
-        self.value.store(new_value, core::sync::atomic::Ordering::Release);
+        self.value.store(new_value, core::sync::atomic::Ordering::Release;
     }
 }
 
@@ -175,7 +172,7 @@ impl FutexLike for SpinFutex {
         // Check if the current value matches the expected value
         if self.value.load(Ordering::Acquire) != expected {
             // Value has changed, no need to wait
-            return Ok(());
+            return Ok();
         }
 
         // Calculate timeout in iterations (very rough estimation)
@@ -193,12 +190,12 @@ impl FutexLike for SpinFutex {
         for _ in 0..max_iterations {
             // Small delay to reduce CPU usage
             for _ in 0..100 {
-                core::hint::spin_loop();
+                core::hint::spin_loop);
             }
 
             // Check if value has changed
             if self.value.load(Ordering::Acquire) != expected {
-                return Ok(());
+                return Ok();
             }
         }
 
@@ -215,7 +212,7 @@ impl FutexLike for SpinFutex {
     fn wake(&self, _count: u32) -> Result<()> {
         // For a spin-wait implementation, we don't need to do anything
         // except ensure memory visibility
-        core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+        core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst;
         Ok(())
     }
 }
@@ -232,23 +229,23 @@ mod tests {
 
     #[test]
     fn test_spin_futex() {
-        let futex = SpinFutex::new(42);
+        let futex = SpinFutex::new(42;
 
         // Test get and set
-        assert_eq!(futex.get(), 42);
-        futex.set(123);
-        assert_eq!(futex.get(), 123);
+        assert_eq!(futex.get(), 42;
+        futex.set(123;
+        assert_eq!(futex.get(), 123;
 
         // Test wait and wake
-        futex.set(0);
+        futex.set(0;
         // Value is 0, expected is 1, should return immediately
-        let result = futex.wait(1, Some(Duration::from_micros(0)));
-        assert!(result.is_ok());
+        let result = futex.wait(1, Some(Duration::from_micros(0);
+        assert!(result.is_ok();
 
         // Value is 0, expected is 0, should wait until timeout
-        let result = futex.wait(0, Some(Duration::from_micros(1)));
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err().category(), ErrorCategory::System);
+        let result = futex.wait(0, Some(Duration::from_micros(1);
+        assert!(result.is_err();
+        assert_eq!(result.unwrap_err().category(), ErrorCategory::System;
 
         // Test wake (doesn't do much in SpinFutex but should not fail)
         futex.wake(1).expect("Wake should succeed");
@@ -257,8 +254,8 @@ mod tests {
 
     #[test]
     fn test_spin_futex_builder() {
-        let futex = SpinFutexBuilder::new().with_initial_value(42).build();
+        let futex = SpinFutexBuilder::new().with_initial_value(42).build);
 
-        assert_eq!(futex.get(), 42);
+        assert_eq!(futex.get(), 42;
     }
 }

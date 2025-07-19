@@ -19,7 +19,6 @@
 //! - **InstanceResolver**: Maps component instances to runtime instances
 //! - **HostRegistry**: Manages host function registration and invocation
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]
@@ -70,7 +69,7 @@ pub trait RuntimeBridge {
     fn get_execution_stats(&self) -> &ExecutionStats;
 
     /// Reset execution statistics
-    fn reset_execution_stats(&mut self);
+    fn reset_execution_stats(&mut self;
 }
 
 /// Value converter for translating between Component and Core value types
@@ -284,7 +283,7 @@ impl Default for RuntimeBridgeConfig {
 impl ValueConverter {
     /// Create a new value converter
     pub fn new() -> Self {
-        Self::with_config(ValueConversionConfig::default())
+        Self::with_config(ValueConversionConfig::default()
     }
 
     /// Create a value converter with custom configuration
@@ -313,38 +312,26 @@ impl ValueConverter {
             ComponentValue::Char(c) => Ok(CoreValue::I32(*c as i32)),
             ComponentValue::String(s) => {
                 if s.len() > self.config.max_string_length {
-                    return Err(Error::new(
-                        ErrorCategory::Validation,
-                        codes::VALIDATION_ERROR,
-                        "String too long for conversion",
-                    ));
+                    return Err(Error::validation_error("Error occurred";
                 }
                 // For now, return string length as i32
                 // Binary std/no_std choice
-                Ok(CoreValue::I32(s.len() as i32))
+                Ok(CoreValue::I32(s.len() as i32)
             }
             ComponentValue::List(items) => {
                 if items.len() > self.config.max_array_length {
-                    return Err(Error::new(
-                        ErrorCategory::Validation,
-                        codes::VALIDATION_ERROR,
-                        "List too long for conversion",
-                    ));
+                    return Err(Error::validation_error("Error occurred";
                 }
                 // Return list length for now
-                Ok(CoreValue::I32(items.len() as i32))
+                Ok(CoreValue::I32(items.len() as i32)
             }
             _ => {
                 // Complex types need special handling
                 if self.config.strict_type_checking {
-                    Err(Error::new(
-                        ErrorCategory::Runtime,
-                        codes::TYPE_MISMATCH,
-                        "Complex component value cannot be directly converted to core value",
-                    ))
+                    Err(Error::runtime_type_mismatch("Error occurred")
                 } else {
                     // Fallback to zero value
-                    Ok(CoreValue::I32(0))
+                    Ok(CoreValue::I32(0)
                 }
             }
         }
@@ -365,18 +352,14 @@ impl ValueConverter {
             (CoreValue::F32(v), crate::canonical_abi::ComponentType::F32) => Ok(ComponentValue::F32(*v)),
             (CoreValue::F64(v), crate::canonical_abi::ComponentType::F64) => Ok(ComponentValue::F64(*v)),
             (CoreValue::I32(v), crate::canonical_abi::ComponentType::Char) => {
-                Ok(ComponentValue::Char(char::from_u32(*v as u32).unwrap_or('\0')))
+                Ok(ComponentValue::Char(char::from_u32(*v as u32).unwrap_or('\0'))
             }
             _ => {
                 if self.config.strict_type_checking {
-                    Err(Error::new(
-                        ErrorCategory::Runtime,
-                        codes::TYPE_MISMATCH,
-                        "Component not found",
-                    ))
+                    Err(Error::runtime_type_mismatch("Error occurred")
                 } else {
                     // Fallback conversion
-                    Ok(ComponentValue::S32(0))
+                    Ok(ComponentValue::S32(0)
                 }
             }
         }
@@ -384,9 +367,9 @@ impl ValueConverter {
 
     /// Convert multiple values
     pub fn convert_values_component_to_core(&self, values: &[ComponentValue]) -> Result<Vec<CoreValue>> {
-        let mut core_values = Vec::new();
+        let mut core_values = Vec::new);
         for value in values {
-            core_values.push(self.component_to_core(value)?);
+            core_values.push(self.component_to_core(value)?;
         }
         Ok(core_values)
     }
@@ -398,16 +381,12 @@ impl ValueConverter {
         types: &[crate::canonical_abi::ComponentType]
     ) -> Result<Vec<ComponentValue>> {
         if values.len() != types.len() {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Value count does not match type count",
-            ));
+            return Err(Error::validation_error("Error occurred";
         }
 
-        let mut component_values = Vec::new();
+        let mut component_values = Vec::new);
         for (value, target_type) in values.iter().zip(types.iter()) {
-            component_values.push(self.core_to_component(value, target_type)?);
+            component_values.push(self.core_to_component(value, target_type)?;
         }
         Ok(component_values)
     }
@@ -457,19 +436,15 @@ impl InstanceResolver {
 
         #[cfg(feature = "std")]
         {
-            self.instances.insert(self.next_instance_id, runtime_info);
+            self.instances.insert(self.next_instance_id, runtime_info;
         }
 
         #[cfg(not(any(feature = "std", )))]
         {
             if self.instances.len() >= MAX_INSTANCES_NO_STD {
-                return Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_EXHAUSTED,
-                    "Maximum instances exceeded",
-                ));
+                return Err(Error::resource_exhausted("Error occurred";
             }
-            self.instances.push((self.next_instance_id, runtime_info));
+            self.instances.push((self.next_instance_id, runtime_info);
         }
 
         let instance_id = self.next_instance_id;
@@ -496,13 +471,9 @@ impl InstanceResolver {
         {
             if let Some(info) = self.instances.get_mut(&instance_id) {
                 info.state = state;
-                Ok(())
+                Ok(()
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::INSTANCE_NOT_FOUND,
-                    "Instance not found",
-                ))
+                Err(Error::instance_not_found("Error occurred")
             }
         }
 
@@ -510,13 +481,9 @@ impl InstanceResolver {
         {
             if let Some((_, info)) = self.instances.iter_mut().find(|(id, _)| *id == instance_id) {
                 info.state = state;
-                Ok(())
+                Ok(()
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::INSTANCE_NOT_FOUND,
-                    "Instance not found",
-                ))
+                Err(Error::instance_not_found("Error occurred")
             }
         }
     }
@@ -526,27 +493,19 @@ impl InstanceResolver {
         #[cfg(feature = "std")]
         {
             if self.instances.remove(&instance_id).is_some() {
-                Ok(())
+                Ok(()
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::INSTANCE_NOT_FOUND,
-                    "Instance not found",
-                ))
+                Err(Error::instance_not_found("Error occurred")
             }
         }
 
         #[cfg(not(any(feature = "std", )))]
         {
             if let Some(pos) = self.instances.iter().position(|(id, _)| *id == instance_id) {
-                self.instances.remove(pos);
-                Ok(())
+                self.instances.remove(pos;
+                Ok(()
             } else {
-                Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::INSTANCE_NOT_FOUND,
-                    "Instance not found",
-                ))
+                Err(Error::instance_not_found("Error occurred")
             }
         }
     }
@@ -581,7 +540,7 @@ impl HostFunctionRegistry {
     where
         F: Fn(&[ComponentValue]) -> Result<ComponentValue> + Send + Sync + 'static,
     {
-        let index = self.functions.len();
+        let index = self.functions.len);
         let entry = HostFunctionEntry {
             name: name.clone(),
             signature,
@@ -596,7 +555,7 @@ impl HostFunctionRegistry {
         };
 
         self.functions.push(entry);
-        self.name_lookup.insert(name, index);
+        self.name_lookup.insert(name, index;
         Ok(index)
     }
 
@@ -609,14 +568,10 @@ impl HostFunctionRegistry {
         func: fn(&[ComponentValue]) -> Result<ComponentValue>,
     ) -> Result<usize> {
         if self.functions.len() >= MAX_HOST_FUNCTIONS_NO_STD {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_EXHAUSTED,
-                "Maximum host functions exceeded",
-            ));
+            return Err(Error::resource_exhausted("Error occurred";
         }
 
-        let index = self.functions.len();
+        let index = self.functions.len);
         let entry = HostFunctionEntry {
             name,
             signature,
@@ -647,11 +602,7 @@ impl HostFunctionRegistry {
                 (entry.implementation)(args)
             }
         } else {
-            Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::FUNCTION_NOT_FOUND,
-                "Host function not found",
-            ))
+            Err(Error::runtime_function_not_found("Error occurred")
         }
     }
 
@@ -676,7 +627,7 @@ impl HostFunctionRegistry {
 impl ComponentRuntimeBridge {
     /// Create a new component runtime bridge
     pub fn new() -> Self {
-        Self::with_config(RuntimeBridgeConfig::default())
+        Self::with_config(RuntimeBridgeConfig::default()
     }
 
     /// Create a bridge with custom configuration
@@ -699,24 +650,17 @@ impl ComponentRuntimeBridge {
     ) -> Result<ComponentValue> {
         // Get instance information
         let instance_info = self.instance_resolver.get_instance(instance_id)
-            .ok_or_else(|| Error::new(
-                ErrorCategory::Runtime,
-                codes::INSTANCE_NOT_FOUND,
-                "Component instance not found",
-            ))?;
+            .ok_or_else(|| Error::instance_not_found("Error occurred"))?;
 
         // Check instance state
         if instance_info.state != RuntimeInstanceState::Ready {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_STATE,
-                "Component not found",
-            ));
+            return Err(Error::runtime_invalid_state("Error occurred"),
+            ;
         }
 
         // Check if it's a host function call
         if let Some(host_index) = self.host_registry.find_function(function_name) {
-            return self.host_registry.call_function(host_index, args);
+            return self.host_registry.call_function(host_index, args;
         }
 
         // For now, implement a simplified execution that demonstrates the bridge
@@ -730,7 +674,7 @@ impl ComponentRuntimeBridge {
         let core_args = self.value_converter.convert_values_component_to_core(args)?;
 
         // Update execution statistics
-        self.execution_stats.increment_function_calls(1);
+        self.execution_stats.increment_function_calls(1;
         self.execution_stats.increment_instructions(10); // Estimated
 
         // Simulate function execution result
@@ -807,7 +751,7 @@ impl ComponentRuntimeBridge {
 
     /// Reset bridge state
     pub fn reset(&mut self) {
-        self.execution_stats.reset();
+        self.execution_stats.reset);
         // Note: We don't reset instances and host functions as they persist
     }
 }
@@ -853,46 +797,46 @@ mod tests {
 
     #[test]
     fn test_value_converter_creation() {
-        let converter = ValueConverter::new();
+        let converter = ValueConverter::new);
         assert!(converter.config.strict_type_checking);
         assert!(converter.config.enable_caching);
     }
 
     #[test]
     fn test_component_to_core_conversion() {
-        let converter = ValueConverter::new();
+        let converter = ValueConverter::new);
         
         // Test basic conversions
-        let bool_val = ComponentValue::Bool(true);
+        let bool_val = ComponentValue::Bool(true;
         let core_val = converter.component_to_core(&bool_val).unwrap();
-        assert_eq!(core_val, CoreValue::I32(1));
+        assert_eq!(core_val, CoreValue::I32(1;
 
-        let s32_val = ComponentValue::S32(42);
+        let s32_val = ComponentValue::S32(42;
         let core_val = converter.component_to_core(&s32_val).unwrap();
-        assert_eq!(core_val, CoreValue::I32(42));
+        assert_eq!(core_val, CoreValue::I32(42;
 
-        let f64_val = ComponentValue::F64(3.14);
+        let f64_val = ComponentValue::F64(3.14;
         let core_val = converter.component_to_core(&f64_val).unwrap();
-        assert_eq!(core_val, CoreValue::F64(3.14));
+        assert_eq!(core_val, CoreValue::F64(3.14;
     }
 
     #[test]
     fn test_core_to_component_conversion() {
-        let converter = ValueConverter::new();
+        let converter = ValueConverter::new);
         
         // Test conversions with target types
-        let core_val = CoreValue::I32(1);
+        let core_val = CoreValue::I32(1;
         let component_val = converter.core_to_component(&core_val, &ComponentType::Bool).unwrap();
-        assert_eq!(component_val, ComponentValue::Bool(true));
+        assert_eq!(component_val, ComponentValue::Bool(true;
 
-        let core_val = CoreValue::I32(42);
+        let core_val = CoreValue::I32(42;
         let component_val = converter.core_to_component(&core_val, &ComponentType::S32).unwrap();
-        assert_eq!(component_val, ComponentValue::S32(42));
+        assert_eq!(component_val, ComponentValue::S32(42;
     }
 
     #[test]
     fn test_instance_resolver() {
-        let mut resolver = InstanceResolver::new();
+        let mut resolver = InstanceResolver::new);
         
         let instance_id = resolver.register_instance(
             1,
@@ -901,26 +845,26 @@ mod tests {
             65536,
         ).unwrap();
         
-        assert_eq!(instance_id, 1);
-        assert_eq!(resolver.instance_count(), 1);
+        assert_eq!(instance_id, 1;
+        assert_eq!(resolver.instance_count(), 1;
         
         let info = resolver.get_instance(instance_id).unwrap();
-        assert_eq!(info.component_id, 1);
-        assert_eq!(info.module_name, "test_module");
-        assert_eq!(info.function_count, 10);
-        assert_eq!(info.memory_size, 65536);
-        assert_eq!(info.state, RuntimeInstanceState::Initializing);
+        assert_eq!(info.component_id, 1;
+        assert_eq!(info.module_name, "test_module";
+        assert_eq!(info.function_count, 10;
+        assert_eq!(info.memory_size, 65536;
+        assert_eq!(info.state, RuntimeInstanceState::Initializing;
     }
 
     #[test]
     fn test_host_function_registry() {
-        let mut registry = HostFunctionRegistry::new();
+        let mut registry = HostFunctionRegistry::new);
         
         fn test_host_function(args: &[ComponentValue]) -> Result<ComponentValue> {
             if let Some(ComponentValue::S32(val)) = args.first() {
-                Ok(ComponentValue::S32(val * 2))
+                Ok(ComponentValue::S32(val * 2)
             } else {
-                Ok(ComponentValue::S32(0))
+                Ok(ComponentValue::S32(0)
             }
         }
         
@@ -936,35 +880,35 @@ mod tests {
             test_host_function,
         ).unwrap();
         
-        assert_eq!(index, 0);
-        assert_eq!(registry.function_count(), 1);
+        assert_eq!(index, 0;
+        assert_eq!(registry.function_count(), 1;
         
         let args = vec![ComponentValue::S32(21)];
         let result = registry.call_function(index, &args).unwrap();
-        assert_eq!(result, ComponentValue::S32(42));
+        assert_eq!(result, ComponentValue::S32(42;
     }
 
     #[test]
     fn test_runtime_bridge_creation() {
-        let bridge = ComponentRuntimeBridge::new();
-        assert_eq!(bridge.execution_stats().function_calls, 0);
-        assert_eq!(bridge.instance_resolver().instance_count(), 0);
-        assert_eq!(bridge.host_registry().function_count(), 0);
+        let bridge = ComponentRuntimeBridge::new);
+        assert_eq!(bridge.execution_stats().function_calls, 0;
+        assert_eq!(bridge.instance_resolver().instance_count(), 0;
+        assert_eq!(bridge.host_registry().function_count(), 0;
     }
 
     #[test]
     fn test_runtime_bridge_host_function() {
-        let mut bridge = ComponentRuntimeBridge::new();
+        let mut bridge = ComponentRuntimeBridge::new);
         
         fn add_function(args: &[ComponentValue]) -> Result<ComponentValue> {
             if args.len() == 2 {
                 if let (ComponentValue::S32(a), ComponentValue::S32(b)) = (&args[0], &args[1]) {
-                    Ok(ComponentValue::S32(a + b))
+                    Ok(ComponentValue::S32(a + b)
                 } else {
-                    Ok(ComponentValue::S32(0))
+                    Ok(ComponentValue::S32(0)
                 }
             } else {
-                Ok(ComponentValue::S32(0))
+                Ok(ComponentValue::S32(0)
             }
         }
         
@@ -994,7 +938,7 @@ mod tests {
         // Execute the host function
         let args = vec![ComponentValue::S32(10), ComponentValue::S32(32)];
         let result = bridge.execute_component_function(instance_id, "add", &args).unwrap();
-        assert_eq!(result, ComponentValue::S32(42));
+        assert_eq!(result, ComponentValue::S32(42;
     }
 
     #[test]
@@ -1006,10 +950,10 @@ mod tests {
             max_array_length: 256,
         };
         
-        let converter = ValueConverter::with_config(config);
+        let converter = ValueConverter::with_config(config;
         assert!(!converter.config.strict_type_checking);
         assert!(!converter.config.enable_caching);
-        assert_eq!(converter.config.max_string_length, 1024);
-        assert_eq!(converter.config.max_array_length, 256);
+        assert_eq!(converter.config.max_string_length, 1024;
+        assert_eq!(converter.config.max_array_length, 256;
     }
 }

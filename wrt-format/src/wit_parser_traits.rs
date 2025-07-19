@@ -1,17 +1,14 @@
 //! Trait implementations for WIT parser types
 
-use super::*;
+use super::wit_parser_types::*;
 use wrt_foundation::{
     traits::{Checksummable, FromBytes, ToBytes, ReadStream, WriteStream},
     verification::Checksum,
     Result as WrtResult,
-    MemoryProvider, NoStdProvider, BoundedVec,
+    MemoryProvider, BoundedVec,
 };
 use wrt_error::{Error, ErrorCategory};
 use core::default::Default;
-
-// Type alias for our memory provider
-type WitProvider = NoStdProvider<1024>;
 
 // ===== Default implementations =====
 
@@ -43,8 +40,8 @@ impl Default for WitFunction {
     fn default() -> Self {
         Self {
             name: WitBoundedString::default(),
-            params: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
-            results: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
+            params: BoundedVec::new(),
+            results: BoundedVec::new(),
             is_async: false,
         }
     }
@@ -111,7 +108,7 @@ impl Default for WitType {
 impl Default for WitRecord {
     fn default() -> Self {
         Self {
-            fields: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
+            fields: BoundedVec::new(),
         }
     }
 }
@@ -128,7 +125,7 @@ impl Default for WitRecordField {
 impl Default for WitVariant {
     fn default() -> Self {
         Self {
-            cases: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
+            cases: BoundedVec::new(),
         }
     }
 }
@@ -145,7 +142,7 @@ impl Default for WitVariantCase {
 impl Default for WitEnum {
     fn default() -> Self {
         Self {
-            cases: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
+            cases: BoundedVec::new(),
         }
     }
 }
@@ -153,7 +150,7 @@ impl Default for WitEnum {
 impl Default for WitFlags {
     fn default() -> Self {
         Self {
-            flags: BoundedVec::new(WitProvider::default()).unwrap_or_default(),
+            flags: BoundedVec::new(),
         }
     }
 }
@@ -182,15 +179,15 @@ impl Eq for WitFlags {}
 
 impl Checksummable for WitImport {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.name.update_checksum(checksum);
-        self.item.update_checksum(checksum);
+        self.name.update_checksum(checksum;
+        self.item.update_checksum(checksum;
     }
 }
 
 impl Checksummable for WitExport {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.name.update_checksum(checksum);
-        self.item.update_checksum(checksum);
+        self.name.update_checksum(checksum;
+        self.item.update_checksum(checksum;
     }
 }
 
@@ -198,20 +195,20 @@ impl Checksummable for WitItem {
     fn update_checksum(&self, checksum: &mut Checksum) {
         match self {
             WitItem::Function(f) => {
-                checksum.update(0);
-                f.update_checksum(checksum);
+                checksum.update(0;
+                f.update_checksum(checksum;
             }
             WitItem::Interface(i) => {
-                checksum.update(1);
-                i.update_checksum(checksum);
+                checksum.update(1;
+                i.update_checksum(checksum;
             }
             WitItem::Type(t) => {
-                checksum.update(2);
-                t.update_checksum(checksum);
+                checksum.update(2;
+                t.update_checksum(checksum;
             }
             WitItem::Instance(inst) => {
-                checksum.update(3);
-                inst.update_checksum(checksum);
+                checksum.update(3;
+                inst.update_checksum(checksum;
             }
         }
     }
@@ -219,17 +216,17 @@ impl Checksummable for WitItem {
 
 impl Checksummable for WitFunction {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.name.update_checksum(checksum);
-        self.params.update_checksum(checksum);
-        self.results.update_checksum(checksum);
-        checksum.update(if self.is_async { 1 } else { 0 });
+        self.name.update_checksum(checksum;
+        self.params.update_checksum(checksum;
+        self.results.update_checksum(checksum;
+        checksum.update(if self.is_async { 1 } else { 0 };
     }
 }
 
 impl Checksummable for WitParam {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.name.update_checksum(checksum);
-        self.ty.update_checksum(checksum);
+        self.name.update_checksum(checksum;
+        self.ty.update_checksum(checksum;
     }
 }
 
@@ -237,26 +234,26 @@ impl Checksummable for WitResult {
     fn update_checksum(&self, checksum: &mut Checksum) {
         match &self.name {
             Some(name) => {
-                checksum.update(1);
-                name.update_checksum(checksum);
+                checksum.update(1;
+                name.update_checksum(checksum;
             }
             None => checksum.update(0),
         }
-        self.ty.update_checksum(checksum);
+        self.ty.update_checksum(checksum;
     }
 }
 
 impl Checksummable for WitInstance {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.interface_name.update_checksum(checksum);
-        self.args.update_checksum(checksum);
+        self.interface_name.update_checksum(checksum;
+        self.args.update_checksum(checksum;
     }
 }
 
 impl Checksummable for WitInstanceArg {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.name.update_checksum(checksum);
-        self.value.update_checksum(checksum);
+        self.name.update_checksum(checksum;
+        self.value.update_checksum(checksum;
     }
 }
 
@@ -264,12 +261,12 @@ impl Checksummable for WitValue {
     fn update_checksum(&self, checksum: &mut Checksum) {
         match self {
             WitValue::Type(t) => {
-                checksum.update(0);
-                t.update_checksum(checksum);
+                checksum.update(0;
+                t.update_checksum(checksum;
             }
             WitValue::Instance(i) => {
-                checksum.update(1);
-                i.update_checksum(checksum);
+                checksum.update(1;
+                i.update_checksum(checksum;
             }
         }
     }
@@ -277,9 +274,9 @@ impl Checksummable for WitValue {
 
 impl Checksummable for WitTypeDef {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.name.update_checksum(checksum);
-        self.ty.update_checksum(checksum);
-        checksum.update(if self.is_resource { 1 } else { 0 });
+        self.name.update_checksum(checksum;
+        self.ty.update_checksum(checksum;
+        checksum.update(if self.is_resource { 1 } else { 0 };
     }
 }
 
@@ -300,69 +297,69 @@ impl Checksummable for WitType {
             WitType::Char => checksum.update(11),
             WitType::String => checksum.update(12),
             WitType::List(inner) => {
-                checksum.update(13);
-                inner.update_checksum(checksum);
+                checksum.update(13;
+                inner.update_checksum(checksum;
             }
             WitType::Option(inner) => {
-                checksum.update(14);
-                inner.update_checksum(checksum);
+                checksum.update(14;
+                inner.update_checksum(checksum;
             }
             WitType::Result { ok, err } => {
-                checksum.update(15);
+                checksum.update(15;
                 match ok {
                     Some(t) => {
-                        checksum.update(1);
-                        t.update_checksum(checksum);
+                        checksum.update(1;
+                        t.as_ref().update_checksum(checksum;
                     }
                     None => checksum.update(0),
                 }
                 match err {
                     Some(t) => {
-                        checksum.update(1);
-                        t.update_checksum(checksum);
+                        checksum.update(1;
+                        t.as_ref().update_checksum(checksum;
                     }
                     None => checksum.update(0),
                 }
             }
             WitType::Tuple(types) => {
-                checksum.update(16);
-                types.update_checksum(checksum);
+                checksum.update(16;
+                types.update_checksum(checksum;
             }
             WitType::Record(r) => {
-                checksum.update(17);
-                r.update_checksum(checksum);
+                checksum.update(17;
+                r.update_checksum(checksum;
             }
             WitType::Variant(v) => {
-                checksum.update(18);
-                v.update_checksum(checksum);
+                checksum.update(18;
+                v.update_checksum(checksum;
             }
             WitType::Enum(e) => {
-                checksum.update(19);
-                e.update_checksum(checksum);
+                checksum.update(19;
+                e.update_checksum(checksum;
             }
             WitType::Flags(f) => {
-                checksum.update(20);
-                f.update_checksum(checksum);
+                checksum.update(20;
+                f.update_checksum(checksum;
             }
             WitType::Own(name) => {
-                checksum.update(21);
-                name.update_checksum(checksum);
+                checksum.update(21;
+                name.update_checksum(checksum;
             }
             WitType::Borrow(name) => {
-                checksum.update(22);
-                name.update_checksum(checksum);
+                checksum.update(22;
+                name.update_checksum(checksum;
             }
             WitType::Named(name) => {
-                checksum.update(23);
-                name.update_checksum(checksum);
+                checksum.update(23;
+                name.update_checksum(checksum;
             }
             WitType::Stream(inner) => {
-                checksum.update(24);
-                inner.update_checksum(checksum);
+                checksum.update(24;
+                inner.update_checksum(checksum;
             }
             WitType::Future(inner) => {
-                checksum.update(25);
-                inner.update_checksum(checksum);
+                checksum.update(25;
+                inner.update_checksum(checksum;
             }
         }
     }
@@ -370,30 +367,30 @@ impl Checksummable for WitType {
 
 impl Checksummable for WitRecord {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.fields.update_checksum(checksum);
+        self.fields.update_checksum(checksum;
     }
 }
 
 impl Checksummable for WitRecordField {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.name.update_checksum(checksum);
-        self.ty.update_checksum(checksum);
+        self.name.update_checksum(checksum;
+        self.ty.update_checksum(checksum;
     }
 }
 
 impl Checksummable for WitVariant {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.cases.update_checksum(checksum);
+        self.cases.update_checksum(checksum;
     }
 }
 
 impl Checksummable for WitVariantCase {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.name.update_checksum(checksum);
+        self.name.update_checksum(checksum;
         match &self.ty {
             Some(t) => {
-                checksum.update(1);
-                t.update_checksum(checksum);
+                checksum.update(1;
+                t.update_checksum(checksum;
             }
             None => checksum.update(0),
         }
@@ -402,21 +399,21 @@ impl Checksummable for WitVariantCase {
 
 impl Checksummable for WitEnum {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.cases.update_checksum(checksum);
+        self.cases.update_checksum(checksum;
     }
 }
 
 impl Checksummable for WitFlags {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.flags.update_checksum(checksum);
+        self.flags.update_checksum(checksum;
     }
 }
 
 impl Checksummable for WitInterface {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.name.update_checksum(checksum);
-        self.functions.update_checksum(checksum);
-        self.types.update_checksum(checksum);
+        self.name.update_checksum(checksum;
+        self.functions.update_checksum(checksum;
+        self.types.update_checksum(checksum;
     }
 }
 
@@ -672,17 +669,18 @@ impl ToBytes for WitType {
                 match ok {
                     Some(t) => {
                         writer.write_u8(1)?;
-                        t.to_bytes_with_provider(writer, provider)?;
+                        t.as_ref().to_bytes_with_provider(writer, provider)?;
                     }
                     None => writer.write_u8(0)?,
                 }
                 match err {
                     Some(t) => {
                         writer.write_u8(1)?;
-                        t.to_bytes_with_provider(writer, provider)
+                        t.as_ref().to_bytes_with_provider(writer, provider)?;
                     }
-                    None => writer.write_u8(0),
+                    None => writer.write_u8(0)?,
                 }
+                Ok(())
             }
             WitType::Tuple(types) => {
                 writer.write_u8(16)?;
@@ -876,7 +874,7 @@ impl FromBytes for WitItem {
             1 => Ok(WitItem::Interface(WitInterface::from_bytes_with_provider(reader, provider)?)),
             2 => Ok(WitItem::Type(WitType::from_bytes_with_provider(reader, provider)?)),
             3 => Ok(WitItem::Instance(WitInstance::from_bytes_with_provider(reader, provider)?)),
-            _ => Err(Error::new(ErrorCategory::Parse, wrt_error::codes::PARSE_ERROR, "Invalid WitItem tag")),
+            _ => Err(Error::runtime_execution_error("Invalid WitItem tag")),
         }
     }
 }
@@ -952,7 +950,7 @@ impl FromBytes for WitValue {
         match tag {
             0 => Ok(WitValue::Type(WitType::from_bytes_with_provider(reader, provider)?)),
             1 => Ok(WitValue::Instance(WitBoundedString::from_bytes_with_provider(reader, provider)?)),
-            _ => Err(Error::new(ErrorCategory::Parse, wrt_error::codes::PARSE_ERROR, "Invalid WitValue tag")),
+            _ => Err(Error::new(ErrorCategory::Parse, wrt_error::codes::PARSE_ERROR, ")),
         }
     }
 }
@@ -1016,7 +1014,7 @@ impl FromBytes for WitType {
             23 => Ok(WitType::Named(WitBoundedString::from_bytes_with_provider(reader, provider)?)),
             24 => Ok(WitType::Stream(Box::new(WitType::from_bytes_with_provider(reader, provider)?))),
             25 => Ok(WitType::Future(Box::new(WitType::from_bytes_with_provider(reader, provider)?))),
-            _ => Err(Error::new(ErrorCategory::Parse, wrt_error::codes::PARSE_ERROR, "Invalid WitType tag")),
+            _ => Err(Error::runtime_execution_error("Invalid WitType tag")),
         }
     }
 }

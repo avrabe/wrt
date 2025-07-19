@@ -2,10 +2,11 @@
 //!
 //! This module provides types for handling logs from WebAssembly components.
 
+
 #[cfg(feature = "std")]
 use std::boxed::Box;
 
-use wrt_host::CallbackRegistry;
+use wrt_host::{CallbackRegistry, CallbackType};
 
 use crate::operation::LogOperation;
 
@@ -23,7 +24,7 @@ pub trait LoggingExt {
         F: Fn(LogOperation) + Send + Sync + 'static;
 
     /// Handle a log operation
-    fn handle_log(&self, operation: LogOperation);
+    fn handle_log(&self, operation: LogOperation;
 
     /// Check if a log handler is registered
     fn has_log_handler(&self) -> bool;
@@ -32,7 +33,7 @@ pub trait LoggingExt {
 // For pure no_std configuration
 #[cfg(all(not(feature = "std"), not(feature = "std")))]
 /// Function type for handling log operations (no dynamic dispatch in `no_std`)
-pub type LogHandler<P> = fn(LogOperation<P>);
+pub type LogHandler<P> = fn(LogOperation<P>;
 
 #[cfg(all(not(feature = "std"), not(feature = "std")))]
 /// Extension trait for `CallbackRegistry` to add logging-specific methods (`no_std`)
@@ -58,12 +59,12 @@ impl LoggingExt for CallbackRegistry {
     where
         F: Fn(LogOperation) + Send + Sync + 'static,
     {
-        self.register_callback(CallbackType::Logging, Box::new(handler) as LogHandler);
+        self.register_callback(CallbackType::Logging, Box::new(handler) as LogHandler;
     }
 
     fn handle_log(&self, operation: LogOperation) {
         if let Some(handler) = self.get_callback::<LogHandler>(&CallbackType::Logging) {
-            handler(operation);
+            handler(operation;
         }
     }
 
@@ -111,36 +112,36 @@ mod tests {
 
     #[test]
     fn test_logging_extension() {
-        let mut registry = CallbackRegistry::new();
+        let mut registry = CallbackRegistry::new);
 
         // Test without handler
-        assert!(!registry.has_log_handler());
+        assert!(!registry.has_log_handler();
 
         // Logging without handler should not panic
-        registry.handle_log(LogOperation::new(LogLevel::Info, "test message".to_string()));
+        registry.handle_log(LogOperation::new(LogLevel::Info, "test message".to_string();
 
         // Register handler
-        let received = Arc::new(Mutex::new(Vec::new()));
+        let received = Arc::new(Mutex::new(Vec::new();
         {
             let received = received.clone();
             registry.register_log_handler(move |log_op| {
-                received.lock().unwrap().push((log_op.level, log_op.message));
-            });
+                received.lock().unwrap().push((log_op.level, log_op.message);
+            };
         }
 
         // Test with handler
-        assert!(registry.has_log_handler());
+        assert!(registry.has_log_handler();
 
         // Log some messages
-        registry.handle_log(LogOperation::new(LogLevel::Info, "info message".to_string()));
+        registry.handle_log(LogOperation::new(LogLevel::Info, "info message".to_string();
 
-        registry.handle_log(LogOperation::new(LogLevel::Error, "error message".to_string()));
+        registry.handle_log(LogOperation::new(LogLevel::Error, "error message".to_string();
 
         // Check received messages
         let received = received.lock().unwrap();
-        assert_eq!(received.len(), 2);
-        assert_eq!(received[0], (LogLevel::Info, "info message".to_string()));
-        assert_eq!(received[1], (LogLevel::Error, "error message".to_string()));
+        assert_eq!(received.len(), 2;
+        assert_eq!(received[0], (LogLevel::Info, "info message".to_string();
+        assert_eq!(received[1], (LogLevel::Error, "error message".to_string();
     }
 }
 
@@ -155,32 +156,32 @@ mod no_std_alloc_tests {
 
     #[test]
     fn test_no_std_logging_extension() {
-        let mut registry = CallbackRegistry::new();
+        let mut registry = CallbackRegistry::new);
 
         // Test without handler
-        assert!(!registry.has_log_handler());
+        assert!(!registry.has_log_handler();
 
         // Logging without handler should not panic
-        registry.handle_log(LogOperation::new(LogLevel::Info, "test message".to_string()));
+        registry.handle_log(LogOperation::new(LogLevel::Info, "test message".to_string();
 
         // Use RefCell instead of Mutex for no_std
-        let received = RefCell::new(Vec::new());
+        let received = RefCell::new(Vec::new);
 
         registry.register_log_handler(move |log_op| {
-            received.borrow_mut().push((log_op.level, log_op.message));
-        });
+            received.borrow_mut().push((log_op.level, log_op.message);
+        };
 
         // Test with handler
-        assert!(registry.has_log_handler());
+        assert!(registry.has_log_handler();
 
         // Log some messages
-        registry.handle_log(LogOperation::new(LogLevel::Info, "info message".to_string()));
-        registry.handle_log(LogOperation::new(LogLevel::Error, "error message".to_string()));
+        registry.handle_log(LogOperation::new(LogLevel::Info, "info message".to_string();
+        registry.handle_log(LogOperation::new(LogLevel::Error, "error message".to_string();
 
         // Check received messages
-        let borrowed = received.borrow();
-        assert_eq!(borrowed.len(), 2);
-        assert_eq!(borrowed[0], (LogLevel::Info, "info message".to_string()));
-        assert_eq!(borrowed[1], (LogLevel::Error, "error message".to_string()));
+        let borrowed = received.borrow);
+        assert_eq!(borrowed.len(), 2;
+        assert_eq!(borrowed[0], (LogLevel::Info, "info message".to_string();
+        assert_eq!(borrowed[1], (LogLevel::Error, "error message".to_string();
     }
 }

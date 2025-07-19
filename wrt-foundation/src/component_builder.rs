@@ -10,17 +10,21 @@
 //! This module provides builders for complex types in the WebAssembly Component
 //! Model, ensuring proper initialization, validation, and resource management.
 
-#[cfg(all(not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 extern crate alloc;
 
-#[cfg(all(not(feature = "std")))]
-use std::vec::Vec;
 #[cfg(feature = "std")]
 use core::fmt::Debug;
-#[cfg(feature = "std")]
-use std::vec::Vec;
 
-#[cfg(feature = "std")]
+// Builder capacity limits for bounded collections
+const MAX_BUILDER_IMPORTS: usize = 256;
+const MAX_BUILDER_EXPORTS: usize = 256;
+const MAX_BUILDER_ALIASES: usize = 128;
+const MAX_BUILDER_INSTANCES: usize = 64;
+const MAX_BUILDER_CORE_INSTANCES: usize = 64;
+const MAX_BUILDER_COMPONENT_TYPES: usize = 128;
+const MAX_BUILDER_CORE_TYPES: usize = 128;
+
 use crate::{
     bounded::{BoundedString, BoundedVec, WasmName, MAX_WASM_NAME_LENGTH},
     component::{
@@ -35,43 +39,50 @@ use crate::{
     Error, MemoryProvider, WrtResult,
 };
 
-#[cfg(feature = "std")]
 /// Builder for `ComponentType` instances.
 ///
 /// Provides a fluent API for constructing Component Model types with
-/// proper initialization of all collections.
+/// proper initialization of all collections using bounded collections.
 #[derive(Debug)]
 pub struct ComponentTypeBuilder<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
     provider: P,
-    imports: Vec<Import<P>>,
-    exports: Vec<Export<P>>,
-    aliases: Vec<ComponentAlias<P>>,
-    instances: Vec<ComponentInstance<P>>,
-    core_instances: Vec<CoreInstance<P>>,
-    component_types: Vec<TypeRef>,
-    core_types: Vec<CoreType<P>>,
+    imports: BoundedVec<Import<P>, MAX_BUILDER_IMPORTS, P>,
+    exports: BoundedVec<Export<P>, MAX_BUILDER_EXPORTS, P>,
+    aliases: BoundedVec<ComponentAlias<P>, MAX_BUILDER_ALIASES, P>,
+    instances: BoundedVec<ComponentInstance<P>, MAX_BUILDER_INSTANCES, P>,
+    core_instances: BoundedVec<CoreInstance<P>, MAX_BUILDER_CORE_INSTANCES, P>,
+    component_types: BoundedVec<TypeRef, MAX_BUILDER_COMPONENT_TYPES, P>,
+    core_types: BoundedVec<CoreType<P>, MAX_BUILDER_CORE_TYPES, P>,
+}
+
+impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentTypeBuilder<P> {
+    /// Create a new ComponentTypeBuilder with bounded collections
+    pub fn new() -> WrtResult<Self> {
+        let provider = P::default);
+        Ok(Self {
+            imports: BoundedVec::new(provider.clone())?,
+            exports: BoundedVec::new(provider.clone())?,
+            aliases: BoundedVec::new(provider.clone())?,
+            instances: BoundedVec::new(provider.clone())?,
+            core_instances: BoundedVec::new(provider.clone())?,
+            component_types: BoundedVec::new(provider.clone())?,
+            core_types: BoundedVec::new(provider.clone())?,
+            provider,
+        })
+    }
 }
 
 #[cfg(feature = "std")]
 impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for ComponentTypeBuilder<P> {
     fn default() -> Self {
-        Self {
-            provider: P::default(),
-            imports: Vec::new(),
-            exports: Vec::new(),
-            aliases: Vec::new(),
-            instances: Vec::new(),
-            core_instances: Vec::new(),
-            component_types: Vec::new(),
-            core_types: Vec::new(),
-        }
+        Self::new().expect("Failed to create ComponentTypeBuilder with default provider")
     }
 }
 
 #[cfg(feature = "std")]
 impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentTypeBuilder<P> {
     /// Creates a new builder with default settings.
-    pub fn new() -> Self {
+    pub fn with_defaults() -> Self {
         Self::default()
     }
 
@@ -83,7 +94,8 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentTypeBuilder<
 
     /// Adds an import to the component type.
     pub fn with_import(mut self, import: Import<P>) -> Self {
-        self.imports.push(import);
+        // Note: Silently ignore capacity errors in builder pattern
+        drop(self.imports.push(import);
         self
     }
 
@@ -95,7 +107,8 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentTypeBuilder<
 
     /// Adds an export to the component type.
     pub fn with_export(mut self, export: Export<P>) -> Self {
-        self.exports.push(export);
+        // Note: Silently ignore capacity errors in builder pattern
+        drop(self.exports.push(export);
         self
     }
 
@@ -107,7 +120,8 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentTypeBuilder<
 
     /// Adds an alias to the component type.
     pub fn with_alias(mut self, alias: ComponentAlias<P>) -> Self {
-        self.aliases.push(alias);
+        // Note: Silently ignore capacity errors in builder pattern
+        drop(self.aliases.push(alias);
         self
     }
 
@@ -119,7 +133,8 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentTypeBuilder<
 
     /// Adds a component instance to the component type.
     pub fn with_instance(mut self, instance: ComponentInstance<P>) -> Self {
-        self.instances.push(instance);
+        // Note: Silently ignore capacity errors in builder pattern
+        drop(self.instances.push(instance);
         self
     }
 
@@ -134,7 +149,8 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentTypeBuilder<
 
     /// Adds a core instance to the component type.
     pub fn with_core_instance(mut self, core_instance: CoreInstance<P>) -> Self {
-        self.core_instances.push(core_instance);
+        // Note: Silently ignore capacity errors in builder pattern
+        drop(self.core_instances.push(core_instance);
         self
     }
 
@@ -149,7 +165,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentTypeBuilder<
 
     /// Adds a component type reference to the component type.
     pub fn with_component_type(mut self, component_type: TypeRef) -> Self {
-        self.component_types.push(component_type);
+        drop(self.component_types.push(component_type);
         self
     }
 
@@ -164,7 +180,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentTypeBuilder<
 
     /// Adds a core type to the component type.
     pub fn with_core_type(mut self, core_type: CoreType<P>) -> Self {
-        self.core_types.push(core_type);
+        drop(self.core_types.push(core_type);
         self
     }
 
@@ -258,33 +274,33 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ImportBuilder<P> {
 
     /// Sets the namespace for the import.
     pub fn with_namespace(mut self, namespace: Namespace<P>) -> Self {
-        self.namespace = Some(namespace);
+        self.namespace = Some(namespace;
         self
     }
 
     /// Sets the namespace for the import from a string.
     pub fn with_namespace_str(mut self, namespace_str: &str) -> WrtResult<Self> {
         let namespace = Namespace::from_str(namespace_str, self.provider.clone())?;
-        self.namespace = Some(namespace);
+        self.namespace = Some(namespace;
         Ok(self)
     }
 
     /// Sets the name for the import.
     pub fn with_name(mut self, name: WasmName<MAX_NAME_LEN, P>) -> Self {
-        self.name = Some(name);
+        self.name = Some(name;
         self
     }
 
     /// Sets the name for the import from a string.
     pub fn with_name_str(mut self, name_str: &str) -> WrtResult<Self> {
         let name = WasmName::from_str(name_str, self.provider.clone())?;
-        self.name = Some(name);
+        self.name = Some(name;
         Ok(self)
     }
 
     /// Sets the type for the import.
     pub fn with_type(mut self, ty: ExternType<P>) -> Self {
-        self.ty = Some(ty);
+        self.ty = Some(ty;
         self
     }
 
@@ -334,33 +350,33 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ExportBuilder<P> {
 
     /// Sets the name for the export.
     pub fn with_name(mut self, name: WasmName<MAX_NAME_LEN, P>) -> Self {
-        self.name = Some(name);
+        self.name = Some(name;
         self
     }
 
     /// Sets the name for the export from a string.
     pub fn with_name_str(mut self, name_str: &str) -> WrtResult<Self> {
         let name = WasmName::from_str(name_str, self.provider.clone())?;
-        self.name = Some(name);
+        self.name = Some(name;
         Ok(self)
     }
 
     /// Sets the type for the export.
     pub fn with_type(mut self, ty: ExternType<P>) -> Self {
-        self.ty = Some(ty);
+        self.ty = Some(ty;
         self
     }
 
     /// Sets the description for the export.
     pub fn with_description(mut self, desc: WasmName<MAX_NAME_LEN, P>) -> Self {
-        self.desc = Some(desc);
+        self.desc = Some(desc;
         self
     }
 
     /// Sets the description for the export from a string.
     pub fn with_description_str(mut self, desc_str: &str) -> WrtResult<Self> {
         let desc = WasmName::from_str(desc_str, self.provider.clone())?;
-        self.desc = Some(desc);
+        self.desc = Some(desc;
         Ok(self)
     }
 
@@ -379,13 +395,16 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ExportBuilder<P> {
 #[derive(Debug)]
 pub struct NamespaceBuilder<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
     provider: P,
-    elements: Vec<WasmName<MAX_NAME_LEN, P>>,
+    elements: BoundedVec<WasmName<MAX_NAME_LEN, P>, MAX_NAMESPACE_ELEMENTS, P>,
 }
 
 #[cfg(feature = "std")]
 impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for NamespaceBuilder<P> {
     fn default() -> Self {
-        Self { provider: P::default(), elements: Vec::new() }
+        let provider = P::default);
+        let elements = BoundedVec::new(provider.clone())
+            .expect("Failed to create BoundedVec with default provider");
+        Self { provider, elements }
     }
 }
 
@@ -403,15 +422,15 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> NamespaceBuilder<P> {
     }
 
     /// Adds an element to the namespace.
-    pub fn with_element(mut self, element: WasmName<MAX_NAME_LEN, P>) -> Self {
-        self.elements.push(element);
-        self
+    pub fn with_element(mut self, element: WasmName<MAX_NAME_LEN, P>) -> WrtResult<Self> {
+        self.elements.push(element)?;
+        Ok(self)
     }
 
     /// Adds an element to the namespace from a string.
     pub fn with_element_str(mut self, element_str: &str) -> WrtResult<Self> {
         let element = WasmName::from_str(element_str, self.provider.clone())?;
-        self.elements.push(element);
+        self.elements.push(element)?;
         Ok(self)
     }
 
@@ -419,14 +438,16 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> NamespaceBuilder<P> {
     pub fn with_elements(
         mut self,
         elements: impl IntoIterator<Item = WasmName<MAX_NAME_LEN, P>>,
-    ) -> Self {
-        self.elements.extend(elements);
-        self
+    ) -> WrtResult<Self> {
+        for element in elements {
+            self.elements.push(element)?;
+        }
+        Ok(self)
     }
 
     /// Creates a namespace from a colon-separated string.
     pub fn from_str(namespace_str: &str, provider: P) -> WrtResult<Self> {
-        let mut builder = Self::new().with_provider(provider.clone());
+        let mut builder = Self::new().with_provider(provider.clone();
 
         for part in namespace_str.split(':') {
             if !part.is_empty() {
@@ -439,13 +460,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> NamespaceBuilder<P> {
 
     /// Builds and returns a configured `Namespace`.
     pub fn build(self) -> WrtResult<Namespace<P>> {
-        let mut elements = BoundedVec::new(self.provider)?;
-
-        for element in self.elements {
-            elements.push(element)?;
-        }
-
-        Ok(Namespace { elements })
+        Ok(Namespace { elements: self.elements })
     }
 }
 
@@ -461,8 +476,8 @@ pub struct ResourceTypeBuilder<P: MemoryProvider + Default + Clone + PartialEq +
 /// Enum to represent the variants of `ResourceType`.
 #[derive(Debug)]
 enum ResourceTypeVariant<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
-    Record(Vec<BoundedString<MAX_WASM_NAME_LENGTH, P>>),
-    Aggregate(Vec<u32>),
+    Record(BoundedVec<BoundedString<MAX_WASM_NAME_LENGTH, P>, 32, P>),
+    Aggregate(BoundedVec<u32, { crate::resource::MAX_RESOURCE_AGGREGATE_IDS }, P>),
 }
 
 #[cfg(feature = "std")]
@@ -486,15 +501,21 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ResourceTypeBuilder<P
     }
 
     /// Configures this as a record resource type with the given field names.
-    pub fn as_record(mut self, field_names: Vec<BoundedString<MAX_WASM_NAME_LENGTH, P>>) -> Self {
-        self.variant = Some(ResourceTypeVariant::Record(field_names));
+    pub fn as_record(
+        mut self,
+        field_names: BoundedVec<BoundedString<MAX_WASM_NAME_LENGTH, P>, 32, P>,
+    ) -> Self {
+        self.variant = Some(ResourceTypeVariant::Record(field_names;
         self
     }
 
     /// Configures this as an aggregate resource type with the given resource
     /// IDs.
-    pub fn as_aggregate(mut self, resource_ids: Vec<u32>) -> Self {
-        self.variant = Some(ResourceTypeVariant::Aggregate(resource_ids));
+    pub fn as_aggregate(
+        mut self,
+        resource_ids: BoundedVec<u32, { crate::resource::MAX_RESOURCE_AGGREGATE_IDS }, P>,
+    ) -> Self {
+        self.variant = Some(ResourceTypeVariant::Aggregate(resource_ids;
         self
     }
 
@@ -522,73 +543,69 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ResourceTypeBuilder<P
                 Ok(ResourceType::Record(fields))
             }
             ResourceTypeVariant::Aggregate(resource_ids) => {
-                let mut ids = BoundedVec::new(self.provider)?;
-                for id in resource_ids {
-                    ids.push(id)?;
-                }
-                Ok(ResourceType::Aggregate(ids))
+                Ok(ResourceType::Aggregate(resource_ids))
             }
         }
     }
 }
 
-#[cfg(all(test, ))]
+#[cfg(all(test,))]
 mod tests {
     use super::*;
-    use crate::{safe_memory::NoStdProvider, traits::BoundedCapacity};
+    use crate::{safe_managed_alloc, budget_aware_provider::CrateId, traits::BoundedCapacity};
 
     #[test]
-    fn test_component_type_builder() {
-        let provider = NoStdProvider::<1024>::default();
+    fn test_component_type_builder() -> WrtResult<()> {
+        let provider = safe_managed_alloc!(1024, CrateId::Foundation)?;
 
         let component_type =
-            ComponentTypeBuilder::new().with_provider(provider.clone()).build().unwrap();
+            ComponentTypeBuilder::new().with_provider(provider.clone()).build()?;
 
         // Verify empty collections were created
-        assert_eq!(component_type.imports.len(), 0);
-        assert_eq!(component_type.exports.len(), 0);
-        assert_eq!(component_type.aliases.len(), 0);
-        assert_eq!(component_type.instances.len(), 0);
-        assert_eq!(component_type.core_instances.len(), 0);
-        assert_eq!(component_type.component_types.len(), 0);
-        assert_eq!(component_type.core_types.len(), 0);
+        assert_eq!(component_type.imports.len(), 0;
+        assert_eq!(component_type.exports.len(), 0;
+        assert_eq!(component_type.aliases.len(), 0;
+        assert_eq!(component_type.instances.len(), 0;
+        assert_eq!(component_type.core_instances.len(), 0;
+        assert_eq!(component_type.component_types.len(), 0;
+        assert_eq!(component_type.core_types.len(), 0;
+        Ok(())
     }
 
     #[test]
-    fn test_namespace_builder() {
-        let provider = NoStdProvider::<1024>::default();
+    fn test_namespace_builder() -> WrtResult<()> {
+        let provider = safe_managed_alloc!(1024, CrateId::Foundation)?;
 
         // Test building from parts
         let namespace_builder = NamespaceBuilder::new()
             .with_provider(provider.clone())
-            .with_element_str("wasm")
-            .unwrap()
-            .with_element_str("component")
-            .unwrap();
+            .with_element_str("wasm")?
+            .with_element_str("component")?;
 
-        let namespace = namespace_builder.build().unwrap();
-        assert_eq!(namespace.elements.len(), 2);
+        let namespace = namespace_builder.build()?;
+        assert_eq!(namespace.elements.len(), 2;
 
         // Test building from string
-        let namespace = NamespaceBuilder::from_str("wasm:component:model", provider.clone())
-            .unwrap()
-            .build()
-            .unwrap();
+        let namespace = NamespaceBuilder::from_str("wasm:component:model", provider.clone())?
+            .build()?;
 
-        assert_eq!(namespace.elements.len(), 3);
+        assert_eq!(namespace.elements.len(), 3;
+        Ok(())
     }
 
     #[test]
-    fn test_resource_type_builder() {
-        let provider = NoStdProvider::<1024>::default();
+    fn test_resource_type_builder() -> WrtResult<()> {
+        let provider = safe_managed_alloc!(1024, CrateId::Foundation)?;
 
         // Test record resource type
-        let field_name = BoundedString::from_str("field", provider.clone()).unwrap();
+        let field_name = BoundedString::from_str("field", provider.clone())?;
+        let mut field_names = BoundedVec::new(provider.clone())?;
+        field_names.push(field_name)?;
+
         let resource_type = ResourceTypeBuilder::new()
             .with_provider(provider.clone())
-            .as_record(vec![field_name])
-            .build()
-            .unwrap();
+            .as_record(field_names)
+            .build()?;
 
         match resource_type {
             ResourceType::Record(fields) => assert_eq!(fields.len(), 1),
@@ -596,15 +613,20 @@ mod tests {
         }
 
         // Test aggregate resource type
+        let mut resource_ids = BoundedVec::new(provider.clone())?;
+        resource_ids.push(1)?;
+        resource_ids.push(2)?;
+        resource_ids.push(3)?;
+
         let resource_type = ResourceTypeBuilder::new()
             .with_provider(provider.clone())
-            .as_aggregate(vec![1, 2, 3])
-            .build()
-            .unwrap();
+            .as_aggregate(resource_ids)
+            .build()?;
 
         match resource_type {
             ResourceType::Aggregate(ids) => assert_eq!(ids.len(), 3),
             _ => panic!("Expected ResourceType::Aggregate"),
         }
+        Ok(())
     }
 }

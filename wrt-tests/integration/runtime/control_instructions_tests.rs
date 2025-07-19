@@ -6,13 +6,13 @@ use wrt_test_registry::prelude::*;
 
 /// Test suite for control instruction functionality
 pub fn run_tests() -> TestResult {
-    let mut suite = TestSuite::new("Control Instructions");
+    let mut suite = TestSuite::new("Control Instructions";
     
-    suite.add_test("basic_block_operations", test_basic_block);
-    suite.add_test("conditional_branches", test_conditional_branches);
-    suite.add_test("loop_operations", test_loop_operations);
-    suite.add_test("function_calls", test_function_calls);
-    suite.add_test("indirect_calls", test_indirect_calls);
+    suite.add_test("basic_block_operations", test_basic_block;
+    suite.add_test("conditional_branches", test_conditional_branches;
+    suite.add_test("loop_operations", test_loop_operations;
+    suite.add_test("function_calls", test_function_calls;
+    suite.add_test("indirect_calls", test_indirect_calls;
     
     suite.run().into()
 }

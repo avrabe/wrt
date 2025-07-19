@@ -3,19 +3,36 @@
 //! This module implements the WebAssembly 3.0 atomic memory model, providing
 //! formal semantics for atomic operations, memory ordering, and thread synchronization.
 
-extern crate alloc;
+// alloc is imported in lib.rs with proper feature gates
 
 use crate::prelude::{Debug, Eq, PartialEq};
 use wrt_foundation::traits::BoundedCapacity;
 use crate::atomic_execution::{AtomicMemoryContext, AtomicExecutionStats};
 use crate::thread_manager::{ThreadManager, ThreadId, ThreadState};
-use wrt_error::{Error, ErrorCategory, Result, codes};
+use crate::bounded_runtime_infra::{
+    BoundedThreadMap, RuntimeProvider, new_thread_map, create_runtime_provider
+};
+use wrt_error::{Error, ErrorCategory, Result};
 use wrt_instructions::atomic_ops::{MemoryOrdering, AtomicOp};
-use wrt_platform::sync::Ordering as PlatformOrdering;
+use wrt_foundation::{budget_aware_provider::CrateId, safe_managed_alloc};
+
+// Import platform ordering from wrt-foundation abstraction layer
+use core::sync::atomic::Ordering as AtomicOrdering;
+
+// Type aliases for capability-based memory allocation - imported above on line 13
+type AtomicProvider1K = RuntimeProvider;
+type DataRaceVec = wrt_foundation::bounded::BoundedVec<DataRaceReport, 64, AtomicProvider1K>;
+type OrderingViolationVec = wrt_foundation::bounded::BoundedVec<OrderingViolationReport, 64, AtomicProvider1K>;
+type DeadlockVec = wrt_foundation::bounded::BoundedVec<DeadlockReport, 32, AtomicProvider1K>;
+type SyncViolationVec = wrt_foundation::bounded::BoundedVec<SyncViolationReport, 64, AtomicProvider1K>;
+type ThreadIdVec = wrt_foundation::bounded::BoundedVec<ThreadId, 16, AtomicProvider1K>;
+type ResourceVec = wrt_foundation::bounded::BoundedVec<usize, 16, AtomicProvider1K>;
+type ViolationString = wrt_foundation::bounded::BoundedString<64, AtomicProvider1K>;
+type OperationTypeVec = wrt_foundation::bounded::BoundedVec<ViolationString, 16, AtomicProvider1K>;
 
 #[cfg(feature = "std")]
 use std::{vec::Vec, sync::Arc, time::Instant};
-#[cfg(not(feature = "std"))]
+#[cfg(all(feature = "alloc", not(feature = "std")))]
 use alloc::{vec::Vec, sync::Arc};
 /// WebAssembly atomic memory model implementation
 #[derive(Debug)]
@@ -65,23 +82,19 @@ impl AtomicMemoryModel {
         
         // Record operation timing
         #[cfg(feature = "std")]
-        let start_time = Instant::now();
+        let start_time = Instant::now);
         
         // Execute the atomic operation
         let result = match &operation {
             AtomicOp::Load(_) => {
                 self.model_stats.load_operations += 1;
-                self.atomic_context.execute_atomic(thread_id, operation.clone())
+                self.atomic_context.execute_atomic_with_operands(thread_id, operation.clone(), operands)
             },
             AtomicOp::Store(_) => {
                 self.model_stats.store_operations += 1;
                 // Store operations need the value from operands
                 if operands.is_empty() {
-                    return Err(Error::new(
-                        ErrorCategory::Runtime,
-                        codes::RUNTIME_INVALID_ARGUMENT_ERROR,
-                        "Store operation missing value operand"
-                    ));
+                    return Err(Error::runtime_execution_error("Store operation requires value operand";
                 }
                 self.execute_store_with_value(thread_id, operation.clone(), operands[0])
             },
@@ -90,37 +103,32 @@ impl AtomicMemoryModel {
                 if operands.is_empty() {
                     return Err(Error::new(
                         ErrorCategory::Runtime,
-                        codes::RUNTIME_INVALID_ARGUMENT_ERROR,
-                        "RMW operation missing value operand"
-                    ));
+                        wrt_error::codes::RUNTIME_INVALID_ARGUMENT_ERROR,
+                        "RMW operation requires value operand";
                 }
                 self.execute_rmw_with_value(thread_id, operation.clone(), operands[0])
             },
             AtomicOp::Cmpxchg(_) => {
                 self.model_stats.cmpxchg_operations += 1;
                 if operands.len() < 2 {
-                    return Err(Error::new(
-                        ErrorCategory::Runtime,
-                        codes::RUNTIME_INVALID_ARGUMENT_ERROR,
-                        "Compare-exchange operation missing operands"
-                    ));
+                    return Err(Error::runtime_execution_error("Compare-exchange operation requires two operands";
                 }
                 self.execute_cmpxchg_with_values(thread_id, operation.clone(), operands[0], operands[1])
             },
             AtomicOp::WaitNotify(_) => {
                 self.model_stats.wait_notify_operations += 1;
-                self.atomic_context.execute_atomic(thread_id, operation.clone())
+                self.atomic_context.execute_atomic_with_operands(thread_id, operation.clone(), operands)
             },
             AtomicOp::Fence(_) => {
                 self.model_stats.fence_operations += 1;
-                self.atomic_context.execute_atomic(thread_id, operation.clone())
+                self.atomic_context.execute_atomic_with_operands(thread_id, operation.clone(), operands)
             },
         };
         
         // Record operation timing
         #[cfg(feature = "std")]
         {
-            let duration = start_time.elapsed();
+            let duration = start_time.elapsed);
             self.model_stats.total_execution_time += duration.as_nanos() as u64;
             if duration.as_nanos() as u64 > self.model_stats.max_operation_time {
                 self.model_stats.max_operation_time = duration.as_nanos() as u64;
@@ -138,7 +146,7 @@ impl AtomicMemoryModel {
     
     /// Validate memory consistency across all threads
     pub fn validate_memory_consistency(&self) -> Result<ConsistencyValidationResult> {
-        let mut result = ConsistencyValidationResult::new();
+        let mut result = ConsistencyValidationResult::new()?;
         
         // Check for data races
         result.data_races = self.detect_data_races()?;
@@ -155,7 +163,7 @@ impl AtomicMemoryModel {
         result.is_consistent = result.data_races.is_empty() 
             && result.ordering_violations.is_empty()
             && result.potential_deadlocks.is_empty()
-            && result.sync_violations.is_empty();
+            && result.sync_violations.is_empty);
         
         Ok(result)
     }
@@ -173,10 +181,10 @@ impl AtomicMemoryModel {
     
     /// Optimize memory model based on usage patterns
     pub fn optimize_memory_model(&mut self) -> Result<OptimizationResult> {
-        let mut result = OptimizationResult::new();
+        let mut result = OptimizationResult::new);
         
         // Analyze operation patterns
-        let patterns = self.analyze_operation_patterns();
+        let patterns = self.analyze_operation_patterns);
         
         // Optimize memory ordering policy based on patterns
         if patterns.mostly_sequential {
@@ -197,7 +205,7 @@ impl AtomicMemoryModel {
         result.total_optimizations = 
             u32::from(result.ordering_optimized) +
             u32::from(result.scheduling_optimized) +
-            u32::from(result.layout_optimized);
+            u32::from(result.layout_optimized;
         
         Ok(result)
     }
@@ -208,11 +216,7 @@ impl AtomicMemoryModel {
         let thread_info = self.atomic_context.thread_manager.get_thread_info(thread_id)?;
         
         if !thread_info.is_active() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::EXECUTION_ERROR,
-                "Inactive thread cannot perform atomic operations"
-            ));
+            return Err(Error::runtime_execution_error("Inactive thread cannot perform atomic operations";
         }
         
         Ok(())
@@ -222,7 +226,7 @@ impl AtomicMemoryModel {
         match self.ordering_policy {
             MemoryOrderingPolicy::StrictSequential => {
                 // Ensure all previous operations complete before this one
-                core::sync::atomic::fence(PlatformOrdering::SeqCst);
+                core::sync::atomic::fence(AtomicOrdering::SeqCst;
             },
             MemoryOrderingPolicy::Relaxed => {
                 // No ordering constraints
@@ -231,16 +235,16 @@ impl AtomicMemoryModel {
                 // Apply ordering based on operation type
                 match &operation {
                     AtomicOp::Load(_) => {
-                        core::sync::atomic::fence(PlatformOrdering::Acquire);
+                        core::sync::atomic::fence(AtomicOrdering::Acquire;
                     },
                     AtomicOp::Store(_) => {
-                        core::sync::atomic::fence(PlatformOrdering::Release);
+                        core::sync::atomic::fence(AtomicOrdering::Release;
                     },
                     AtomicOp::RMW(_) | AtomicOp::Cmpxchg(_) => {
-                        core::sync::atomic::fence(PlatformOrdering::SeqCst);
+                        core::sync::atomic::fence(AtomicOrdering::SeqCst;
                     },
                     AtomicOp::Fence(_) | AtomicOp::WaitNotify(_) => {
-                        core::sync::atomic::fence(PlatformOrdering::SeqCst);
+                        core::sync::atomic::fence(AtomicOrdering::SeqCst;
                     },
                 }
             },
@@ -283,21 +287,25 @@ impl AtomicMemoryModel {
         Ok(())
     }
     
-    fn detect_data_races(&self) -> Result<wrt_foundation::bounded::BoundedVec<DataRaceReport, 64, wrt_foundation::safe_memory::NoStdProvider<1024>>> {
+    fn detect_data_races(&self) -> Result<DataRaceVec> {
         // Simplified data race detection - real implementation would be more sophisticated
-        Ok(wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap())
+        wrt_foundation::bounded::BoundedVec::new(create_runtime_provider()?)
+            .map_err(|_| Error::memory_error("Failed to create data race report vector"))
     }
     
-    fn detect_ordering_violations(&self) -> Result<wrt_foundation::bounded::BoundedVec<OrderingViolationReport, 64, wrt_foundation::safe_memory::NoStdProvider<1024>>> {
-        Ok(wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap())
+    fn detect_ordering_violations(&self) -> Result<OrderingViolationVec> {
+        wrt_foundation::bounded::BoundedVec::new(create_runtime_provider()?)
+            .map_err(|_| Error::memory_error("Failed to create ordering violation report vector"))
     }
     
-    fn detect_potential_deadlocks(&self) -> Result<wrt_foundation::bounded::BoundedVec<DeadlockReport, 32, wrt_foundation::safe_memory::NoStdProvider<1024>>> {
-        Ok(wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap())
+    fn detect_potential_deadlocks(&self) -> Result<DeadlockVec> {
+        wrt_foundation::bounded::BoundedVec::new(create_runtime_provider()?)
+            .map_err(|_| Error::memory_error("Failed to create deadlock report vector"))
     }
     
-    fn validate_sync_state(&self) -> Result<wrt_foundation::bounded::BoundedVec<SyncViolationReport, 64, wrt_foundation::safe_memory::NoStdProvider<1024>>> {
-        Ok(wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap())
+    fn validate_sync_state(&self) -> Result<SyncViolationVec> {
+        wrt_foundation::bounded::BoundedVec::new(create_runtime_provider()?)
+            .map_err(|_| Error::memory_error("Failed to create sync violation report vector"))
     }
     
     fn calculate_operations_per_second(&self) -> f64 {
@@ -374,27 +382,23 @@ pub enum MemoryOrderingPolicy {
 /// Thread synchronization state tracking
 #[derive(Debug)]
 pub struct ThreadSyncState {
-    /// Active synchronization operations per thread
-    #[cfg(feature = "std")]
-    sync_operations: alloc::collections::BTreeMap<ThreadId, u32>,
-    #[cfg(not(feature = "std"))]
-    sync_operations: wrt_foundation::bounded::BoundedVec<(ThreadId, u32), 32, wrt_foundation::safe_memory::NoStdProvider<1024>>,  // Simplified for no_std
+    /// Active synchronization operations per thread using bounded collections
+    sync_operations: BoundedThreadMap<u32>,
 }
 
 impl ThreadSyncState {
     fn new() -> Result<Self> {
         Ok(Self {
-            #[cfg(feature = "std")]
-            sync_operations: alloc::collections::BTreeMap::new(),
-            #[cfg(not(feature = "std"))]
-            sync_operations: wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap(),
+            sync_operations: new_thread_map()?,
         })
     }
     
     fn record_sync_operation(&mut self, thread_id: ThreadId) -> Result<()> {
         #[cfg(feature = "std")]
         {
-            *self.sync_operations.entry(thread_id).or_insert(0) += 1;
+            // BoundedMap entry API returns the value, not a mutable reference
+            let current = self.sync_operations.get(&thread_id)?.unwrap_or(0;
+            self.sync_operations.insert(thread_id, current + 1)?;
         }
         #[cfg(not(feature = "std"))]
         {
@@ -411,7 +415,7 @@ impl ThreadSyncState {
                 }
             }
             if !found {
-                let _ = self.sync_operations.push((thread_id, 1));
+                let _ = self.sync_operations.push((thread_id, 1);
             }
         }
         Ok(())
@@ -468,24 +472,28 @@ pub struct ConsistencyValidationResult {
     /// Whether memory is consistent
     pub is_consistent: bool,
     /// Detected data races
-    pub data_races: wrt_foundation::bounded::BoundedVec<DataRaceReport, 64, wrt_foundation::safe_memory::NoStdProvider<1024>>,
+    pub data_races: DataRaceVec,
     /// Memory ordering violations
-    pub ordering_violations: wrt_foundation::bounded::BoundedVec<OrderingViolationReport, 64, wrt_foundation::safe_memory::NoStdProvider<1024>>,
+    pub ordering_violations: OrderingViolationVec,
     /// Potential deadlocks
-    pub potential_deadlocks: wrt_foundation::bounded::BoundedVec<DeadlockReport, 32, wrt_foundation::safe_memory::NoStdProvider<1024>>,
+    pub potential_deadlocks: DeadlockVec,
     /// Synchronization violations
-    pub sync_violations: wrt_foundation::bounded::BoundedVec<SyncViolationReport, 64, wrt_foundation::safe_memory::NoStdProvider<1024>>,
+    pub sync_violations: SyncViolationVec,
 }
 
 impl ConsistencyValidationResult {
-    fn new() -> Self {
-        Self {
+    fn new() -> Result<Self> {
+        Ok(Self {
             is_consistent: true,
-            data_races: wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap(),
-            ordering_violations: wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap(),
-            potential_deadlocks: wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap(),
-            sync_violations: wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap(),
-        }
+            data_races: wrt_foundation::bounded::BoundedVec::new(create_runtime_provider()?)
+                .map_err(|_| Error::memory_error("Failed to create data races vector"))?,
+            ordering_violations: wrt_foundation::bounded::BoundedVec::new(create_runtime_provider()?)
+                .map_err(|_| Error::memory_error("Failed to create ordering violations vector"))?,
+            potential_deadlocks: wrt_foundation::bounded::BoundedVec::new(create_runtime_provider()?)
+                .map_err(|_| Error::memory_error("Failed to create potential deadlocks vector"))?,
+            sync_violations: wrt_foundation::bounded::BoundedVec::new(create_runtime_provider()?)
+                .map_err(|_| Error::memory_error("Failed to create sync violations vector"))?,
+        })
     }
 }
 
@@ -540,16 +548,16 @@ struct OperationPatterns {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DataRaceReport {
     /// Threads involved in the race
-    pub thread_ids: wrt_foundation::bounded::BoundedVec<ThreadId, 16, wrt_foundation::safe_memory::NoStdProvider<1024>>,
+    pub thread_ids: ThreadIdVec,
     /// Memory address of the race
     pub memory_address: usize,
     /// Type of operations that raced
-    pub operation_types: wrt_foundation::bounded::BoundedVec<wrt_foundation::bounded::BoundedString<64, wrt_foundation::safe_memory::NoStdProvider<1024>>, 16, wrt_foundation::safe_memory::NoStdProvider<1024>>,
+    pub operation_types: OperationTypeVec,
 }
 
 impl wrt_foundation::traits::Checksummable for DataRaceReport {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        checksum.update_slice(&self.memory_address.to_le_bytes());
+        checksum.update_slice(&self.memory_address.to_le_bytes);
     }
 }
 
@@ -574,7 +582,7 @@ impl wrt_foundation::traits::FromBytes for DataRaceReport {
     ) -> wrt_foundation::Result<Self> {
         let mut bytes = [0u8; 8];
         reader.read_exact(&mut bytes)?;
-        let memory_address = usize::from_le_bytes(bytes);
+        let memory_address = usize::from_le_bytes(bytes;
         Ok(Self {
             memory_address,
             ..Default::default()
@@ -595,7 +603,7 @@ pub struct OrderingViolationReport {
 
 impl wrt_foundation::traits::Checksummable for OrderingViolationReport {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        checksum.update_slice(&[self.thread_id as u8]);
+        checksum.update_slice(&[self.thread_id as u8];
     }
 }
 
@@ -632,14 +640,14 @@ impl wrt_foundation::traits::FromBytes for OrderingViolationReport {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DeadlockReport {
     /// Threads involved in potential deadlock
-    pub thread_ids: wrt_foundation::bounded::BoundedVec<ThreadId, 16, wrt_foundation::safe_memory::NoStdProvider<1024>>,
+    pub thread_ids: ThreadIdVec,
     /// Resources being waited on
-    pub resources: wrt_foundation::bounded::BoundedVec<usize, 16, wrt_foundation::safe_memory::NoStdProvider<1024>>,
+    pub resources: ResourceVec,
 }
 
 impl wrt_foundation::traits::Checksummable for DeadlockReport {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        checksum.update_slice(b"deadlock");
+        checksum.update_slice(b"deadlock";
     }
 }
 
@@ -648,7 +656,7 @@ impl wrt_foundation::traits::ToBytes for DeadlockReport {
     fn to_bytes_with_provider<P: wrt_foundation::MemoryProvider>(
         &self, writer: &mut wrt_foundation::traits::WriteStream<'_>, _provider: &P,
     ) -> wrt_foundation::Result<()> {
-        writer.write_all(&[0u8; 4])
+        writer.write_all(&[0u8); 4])
     }
 }
 
@@ -666,12 +674,12 @@ pub struct SyncViolationReport {
     /// Thread that violated synchronization
     pub thread_id: ThreadId,
     /// Type of violation
-    pub violation_type: wrt_foundation::bounded::BoundedString<64, wrt_foundation::safe_memory::NoStdProvider<1024>>,
+    pub violation_type: ViolationString,
 }
 
 impl wrt_foundation::traits::Checksummable for SyncViolationReport {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        checksum.update_slice(&[self.thread_id as u8]);
+        checksum.update_slice(&[self.thread_id as u8];
     }
 }
 
@@ -701,21 +709,21 @@ mod tests {
     
     #[test]
     fn test_memory_ordering_policy() {
-        assert_eq!(MemoryOrderingPolicy::default(), MemoryOrderingPolicy::Adaptive);
+        assert_eq!(MemoryOrderingPolicy::default(), MemoryOrderingPolicy::Adaptive;
     }
     
     #[test]
     fn test_memory_model_stats() {
-        let stats = MemoryModelStats::new();
-        assert_eq!(stats.total_operations, 0);
-        assert_eq!(stats.total_execution_time, 0);
+        let stats = MemoryModelStats::new);
+        assert_eq!(stats.total_operations, 0;
+        assert_eq!(stats.total_execution_time, 0;
     }
     
     #[test]
     fn test_consistency_validation_result() {
-        let result = ConsistencyValidationResult::new();
+        let result = ConsistencyValidationResult::new().unwrap();
         assert!(result.is_consistent);
-        assert!(result.data_races.is_empty());
+        assert!(result.data_races.is_empty();
     }
     
     #[cfg(feature = "std")]
@@ -728,7 +736,7 @@ mod tests {
             memory.len(),
             thread_manager,
             MemoryOrderingPolicy::default()
-        );
-        assert!(model.is_ok());
+        ;
+        assert!(model.is_ok();
     }
 }

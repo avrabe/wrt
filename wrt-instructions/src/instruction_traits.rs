@@ -69,6 +69,6 @@ mod tests {
         let mut context = TestContext { value: 0 };
         let instruction = TestInstruction;
         instruction.execute(&mut context).unwrap();
-        assert_eq!(context.value, 1);
+        assert_eq!(context.value, 1;
     }
 }

@@ -478,12 +478,12 @@ pub trait SimdExecutionContext {
 impl<T: SimdExecutionContext> PureInstruction<T, wrt_error::Error> for SimdInstruction {
     fn execute(&self, context: &mut T) -> Result<()> {
         // Get the required inputs from the execution stack
-        let input_count = self.op.input_count();
-        let mut inputs = Vec::with_capacity(input_count);
+        let input_count = self.op.input_count);
+        let mut inputs = Vec::with_capacity(input_count;
         
         // Pop inputs from the stack in reverse order (stack is LIFO)
         for _ in 0..input_count {
-            inputs.push(context.pop_value()?);
+            inputs.push(context.pop_value()?;
         }
         inputs.reverse(); // Reverse to get correct order
         
@@ -503,11 +503,7 @@ impl<T: SimdExecutionContext> PureInstruction<T, wrt_error::Error> for SimdInstr
 impl<T: SimdExecutionContext> PureInstruction<T, wrt_error::Error> for SimdInstruction {
     fn execute(&self, _context: &mut T) -> Result<()> {
         // Binary std/no_std choice
-        Err(wrt_error::Error::new(
-            wrt_error::ErrorCategory::Validation,
-            1,
-            "SIMD operations require alloc feature"
-        ))
+        Err(wrt_error::Error::runtime_execution_error("SIMD operations require alloc feature"))
     }
 }
 
@@ -517,23 +513,23 @@ mod tests {
     
     #[test]
     fn test_simd_op_input_count() {
-        assert_eq!(SimdOp::I8x16Add.input_count(), 2);
-        assert_eq!(SimdOp::I8x16Neg.input_count(), 1);
-        assert_eq!(SimdOp::V128Bitselect.input_count(), 3);
-        assert_eq!(SimdOp::I8x16Splat.input_count(), 1);
-        assert_eq!(SimdOp::V128Store { offset: 0, align: 0 }.input_count(), 2);
+        assert_eq!(SimdOp::I8x16Add.input_count(), 2;
+        assert_eq!(SimdOp::I8x16Neg.input_count(), 1;
+        assert_eq!(SimdOp::V128Bitselect.input_count(), 3;
+        assert_eq!(SimdOp::I8x16Splat.input_count(), 1;
+        assert_eq!(SimdOp::V128Store { offset: 0, align: 0 }.input_count(), 2;
     }
     
     #[test]
     fn test_simd_op_output_count() {
-        assert_eq!(SimdOp::I8x16Add.output_count(), 1);
-        assert_eq!(SimdOp::V128Store { offset: 0, align: 0 }.output_count(), 0);
-        assert_eq!(SimdOp::V128AnyTrue.output_count(), 1);
+        assert_eq!(SimdOp::I8x16Add.output_count(), 1;
+        assert_eq!(SimdOp::V128Store { offset: 0, align: 0 }.output_count(), 0;
+        assert_eq!(SimdOp::V128AnyTrue.output_count(), 1;
     }
     
     #[test]
     fn test_simd_instruction_creation() {
-        let inst = SimdInstruction::new(SimdOp::I8x16Add);
-        assert_eq!(inst.op(), &SimdOp::I8x16Add);
+        let inst = SimdInstruction::new(SimdOp::I8x16Add;
+        assert_eq!(inst.op(), &SimdOp::I8x16Add;
     }
 }

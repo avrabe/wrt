@@ -3,6 +3,7 @@
 //! This module provides a thread pool that uses Linux cgroups v2 for resource
 //! isolation and control, along with real-time scheduling capabilities.
 
+
 use core::{
     fmt::{self, Debug},
     sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
@@ -119,7 +120,7 @@ mod ffi {
     pub fn CPU_SET(cpu: usize, set: *mut cpu_set_t) {
         if cpu < 1024 {
             unsafe {
-                (*set)[cpu / 64] |= 1u64 << (cpu % 64);
+                (*set)[cpu / 64] |= 1u64 << (cpu % 64;
             }
         }
     }
@@ -144,10 +145,10 @@ struct CgroupController {
 impl CgroupController {
     /// Create or attach to a cgroup
     fn new(name: &str) -> Result<Self> {
-        let path = format!("/sys/fs/cgroup/{}", name);
+        let path = format!("/sys/fs/cgroup/{}", name;
 
         // Try to create the cgroup directory
-        let path_cstr = format!("{}\0", path);
+        let path_cstr = format!("{}\0", path;
         let result = unsafe { ffi::mkdir(path_cstr.as_ptr() as *const i8, 0o755) };
 
         let owned = result == 0; // We created it
@@ -157,29 +158,24 @@ impl CgroupController {
 
     /// Write a value to a cgroup file
     fn write_file(&self, filename: &str, value: &str) -> Result<()> {
-        let filepath = format!("{}/{}\0", self.path, filename);
+        let filepath = format!("{}/{}\0", self.path, filename;
         let fd = unsafe { ffi::open(filepath.as_ptr() as *const i8, 1, 0) }; // O_WRONLY
 
         if fd < 0 {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to open cgroup file",
-            ));
+            return Err(Error::runtime_execution_error("Failed to create thread: resource limits exceeded";
         }
 
         let written = unsafe { ffi::write(fd, value.as_ptr() as *const _, value.len()) };
 
         unsafe {
-            ffi::close(fd);
+            ffi::close(fd;
         }
 
         if written < 0 {
             return Err(Error::new(
                 ErrorCategory::Platform,
                 1,
-                "Failed to write to cgroup file",
-            ));
+                ";
         }
 
         Ok(())
@@ -230,27 +226,22 @@ struct LinuxThreadHandle {
 impl PlatformThreadHandle for LinuxThreadHandle {
     fn join(self: Box<Self>) -> Result<Vec<u8>> {
         // Join the thread
-        let mut retval: *mut core::ffi::c_void = core::ptr::null_mut();
+        let mut retval: *mut core::ffi::c_void = core::ptr::null_mut);
         let result = unsafe { ffi::pthread_join(self.tid, &mut retval) };
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to join thread",
-            ));
+            return Err(Error::runtime_execution_error("Failed to set thread priority";
         }
 
         // Get the result
-        let result = self.result.lock();
+        let result = self.result.lock);
         match &*result {
             Some(Ok(data)) => Ok(data.clone()),
             Some(Err(e)) => Err(e.clone()),
             None => Err(Error::new(
                 ErrorCategory::Platform,
                 1,
-                "Thread completed without result",
-            )),
+                ")),
         }
     }
 
@@ -306,8 +297,8 @@ impl LinuxThreadPool {
                 Ok(cgroup) => {
                     // Set overall memory limit for the pool
                     if let Some(limit) = config.memory_limit_per_thread {
-                        let total_limit = limit.saturating_mul(config.max_threads);
-                        let _ = cgroup.set_memory_limit(total_limit);
+                        let total_limit = limit.saturating_mul(config.max_threads;
+                        let _ = cgroup.set_memory_limit(total_limit;
                     }
                     Some(cgroup)
                 }
@@ -318,7 +309,7 @@ impl LinuxThreadPool {
         };
 
         // Create a simple executor for now
-        let executor = Arc::new(|_task: WasmTask| -> Result<Vec<u8>> { Ok(vec![]) });
+        let executor = Arc::new(|_task: WasmTask| -> Result<Vec<u8>> { Ok(vec![]) };
 
         Ok(Self {
             config,
@@ -336,7 +327,7 @@ impl LinuxThreadPool {
     where
         F: Fn(WasmTask) -> Result<Vec<u8>> + Send + Sync + 'static,
     {
-        self.executor = Arc::new(executor);
+        self.executor = Arc::new(executor;
     }
 
     /// Map ThreadPriority to Linux nice value (-20 to 19)
@@ -353,12 +344,12 @@ impl LinuxThreadPool {
     /// Apply CPU affinity
     fn set_cpu_affinity(cpu_set: &CpuSet) -> Result<()> {
         let mut mask: ffi::cpu_set_t = [0; 16];
-        ffi::CPU_ZERO(&mut mask);
+        ffi::CPU_ZERO(&mut mask;
 
         // Set CPUs in mask
         for cpu in 0..64 {
             if cpu_set.contains(cpu) {
-                ffi::CPU_SET(cpu, &mut mask);
+                ffi::CPU_SET(cpu, &mut mask;
             }
         }
 
@@ -367,11 +358,7 @@ impl LinuxThreadPool {
         };
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to set CPU affinity",
-            ));
+            return Err(Error::runtime_execution_error("Thread join failed";
         }
 
         Ok(())
@@ -396,12 +383,12 @@ impl LinuxThreadPool {
             if result != 0 {
                 // Fall back to nice value if RT scheduling fails
                 unsafe {
-                    ffi::nice(nice_value);
+                    ffi::nice(nice_value;
                 }
             }
         } else {
             unsafe {
-                ffi::nice(nice_value);
+                ffi::nice(nice_value;
             }
         }
 
@@ -415,28 +402,28 @@ extern "C" fn thread_entry(arg: *mut core::ffi::c_void) -> *mut core::ffi::c_voi
 
     // Add thread to cgroup if available
     if let Some(ref cgroup) = context.cgroup {
-        let _ = cgroup.add_thread();
+        let _ = cgroup.add_thread);
     }
 
     // Set CPU affinity if specified
     if let Some(ref cpu_set) = context.task.cpu_affinity {
-        let _ = LinuxThreadPool::set_cpu_affinity(cpu_set);
+        let _ = LinuxThreadPool::set_cpu_affinity(cpu_set;
     }
 
     // Set thread priority
-    let _ = LinuxThreadPool::set_thread_priority(context.task.priority);
+    let _ = LinuxThreadPool::set_thread_priority(context.task.priority;
 
     // Mark as running
-    context.running.store(true, Ordering::Release);
+    context.running.store(true, Ordering::Release;
 
     // Execute the task
-    let result = (context.executor)(context.task);
+    let result = (context.executor)(context.task;
 
     // Store result
-    *context.result.lock() = Some(result);
+    *context.result.lock() = Some(result;
 
     // Mark as not running
-    context.running.store(false, Ordering::Release);
+    context.running.store(false, Ordering::Release;
 
     core::ptr::null_mut()
 }
@@ -450,25 +437,21 @@ impl PlatformThreadPool for LinuxThreadPool {
     fn spawn_wasm_thread(&self, task: WasmTask) -> Result<ThreadHandle> {
         // Check if shutting down
         if self.shutdown.load(Ordering::Acquire) {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Thread pool is shutting down",
-            ));
+            return Err(Error::runtime_execution_error("Thread pool is shutting down";
         }
 
         // Check thread limit
-        let active_count = self.active_threads.read().len();
+        let active_count = self.active_threads.read().len);
         if active_count >= self.config.max_threads {
             return Err(Error::new(
                 ErrorCategory::Resource,
                 1,
-                "Thread pool limit reached",
-            ));
+                "Thread pool has reached maximum thread limit",
+            ;
         }
 
         // Get thread ID
-        let thread_id = self.next_thread_id.fetch_add(1, Ordering::AcqRel);
+        let thread_id = self.next_thread_id.fetch_add(1, Ordering::AcqRel;
 
         // Create per-thread cgroup if needed
         let thread_cgroup = if self.base_cgroup.is_some() {
@@ -476,14 +459,14 @@ impl PlatformThreadPool for LinuxThreadPool {
                 Ok(mut cgroup) => {
                     // Set memory limit
                     if let Some(limit) = task.memory_limit.or(self.config.memory_limit_per_thread) {
-                        let _ = cgroup.set_memory_limit(limit);
+                        let _ = cgroup.set_memory_limit(limit;
                     }
 
                     // Set CPU quota if deadline is specified
                     if let Some(deadline) = task.deadline {
                         let quota_us = deadline.as_micros() as u64;
                         let period_us = 1_000_000; // 1 second period
-                        let _ = cgroup.set_cpu_quota(quota_us, period_us);
+                        let _ = cgroup.set_cpu_quota(quota_us, period_us;
                     }
 
                     Some(Arc::new(cgroup))
@@ -495,9 +478,9 @@ impl PlatformThreadPool for LinuxThreadPool {
         };
 
         // Create thread context
-        let result = Arc::new(WrtMutex::new(None));
-        let running = Arc::new(AtomicBool::new(false));
-        let stats = Arc::new(WrtMutex::new(ThreadStats::default()));
+        let result = Arc::new(WrtMutex::new(None;
+        let running = Arc::new(AtomicBool::new(false;
+        let stats = Arc::new(WrtMutex::new(ThreadStats::default();
 
         let context = Box::new(ThreadContext {
             task,
@@ -506,11 +489,11 @@ impl PlatformThreadPool for LinuxThreadPool {
             stats: stats.clone(),
             executor: self.executor.clone(),
             cgroup: thread_cgroup.clone(),
-        });
+        };
 
         // Create thread
         let mut tid: ffi::pthread_t = 0;
-        let context_ptr = Box::into_raw(context);
+        let context_ptr = Box::into_raw(context;
 
         let create_result = unsafe {
             ffi::pthread_create(
@@ -524,13 +507,9 @@ impl PlatformThreadPool for LinuxThreadPool {
         if create_result != 0 {
             // Clean up context on failure
             unsafe {
-                let _ = Box::from_raw(context_ptr);
+                let _ = Box::from_raw(context_ptr;
             }
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to create thread",
-            ));
+            return Err(Error::runtime_execution_error("Failed to create thread";
         }
 
         // Create handle
@@ -541,11 +520,11 @@ impl PlatformThreadPool for LinuxThreadPool {
             running,
             stats,
             cgroup: thread_cgroup,
-        });
+        };
 
         // Update statistics
         {
-            let mut stats = self.stats.lock();
+            let mut stats = self.stats.lock);
             stats.active_threads += 1;
             stats.total_spawned += 1;
         }
@@ -562,12 +541,12 @@ impl PlatformThreadPool for LinuxThreadPool {
 
     fn shutdown(&mut self, timeout: Duration) -> Result<()> {
         // Set shutdown flag
-        self.shutdown.store(true, Ordering::Release);
+        self.shutdown.store(true, Ordering::Release;
 
         // Wait for threads to complete
-        let start = std::time::Instant::now();
+        let start = std::time::Instant::now);
         while self.active_threads.read().len() > 0 && start.elapsed() < timeout {
-            std::thread::sleep(Duration::from_millis(10));
+            std::thread::sleep(Duration::from_millis(10;
         }
 
         Ok(())
@@ -590,7 +569,7 @@ mod tests {
         let mut pool = LinuxThreadPool::new(config).unwrap();
 
         // Set a test executor
-        pool.set_executor(|task| Ok(task.args));
+        pool.set_executor(|task| Ok(task.args;
 
         // Spawn a thread
         let task = WasmTask {
@@ -608,24 +587,24 @@ mod tests {
 
         // Join and verify result
         let result = handle.join().unwrap();
-        assert_eq!(result, vec![1, 2, 3, 4]);
+        assert_eq!(result, vec![1, 2, 3, 4];
 
         // Check stats
-        let stats = pool.get_stats();
-        assert_eq!(stats.total_spawned, 1);
+        let stats = pool.get_stats);
+        assert_eq!(stats.total_spawned, 1;
     }
 
     #[test]
     #[cfg(target_os = "linux")]
     fn test_linux_thread_pool_with_cpu_affinity() {
-        let config = ThreadPoolConfig::default();
+        let config = ThreadPoolConfig::default);
         let mut pool = LinuxThreadPool::new(config).unwrap();
 
-        pool.set_executor(|_| Ok(vec![]));
+        pool.set_executor(|_| Ok(vec![];
 
         // Create CPU set for CPU 0
-        let mut cpu_set = CpuSet::new();
-        cpu_set.add(0);
+        let mut cpu_set = CpuSet::new);
+        cpu_set.add(0;
 
         let task = WasmTask {
             id: 2,

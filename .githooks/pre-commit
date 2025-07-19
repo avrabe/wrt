@@ -1,0 +1,59 @@
+#!/bin/bash
+# Pre-commit hook to prevent test files in src/ directories
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo "🔍 Checking for test files in src/ directories..."
+
+# Find all test files in src/ directories
+test_files=$(find . -path "./target" -prune -o -path "./.git" -prune -o -path "./src/*" -name "*_test.rs" -print -o -path "./src/*" -name "*_tests.rs" -print -o -path "./src/*" -name "test.rs" -print -o -path "./src/*" -name "tests.rs" -print | grep -v target | grep -v .git)
+
+if [ -n "$test_files" ]; then
+    echo -e "${RED}❌ Error: Test files found in src/ directories!${NC}"
+    echo -e "${YELLOW}Test files should be placed in the tests/ directory, not in src/${NC}"
+    echo ""
+    echo "Found test files:"
+    echo "$test_files" | while read -r file; do
+        echo -e "  ${RED}$file${NC}"
+    done
+    echo ""
+    echo "Please move these files to the appropriate tests/ directory before committing."
+    exit 1
+fi
+
+# Check if cargo-wrt is available
+if command -v cargo-wrt &> /dev/null; then
+    # Run validation check using cargo-wrt
+    echo "🔍 Running cargo-wrt validation checks..."
+    if ! cargo-wrt validate --check-test-files; then
+        echo -e "${RED}❌ Validation failed!${NC}"
+        exit 1
+    fi
+else
+    echo -e "${YELLOW}⚠️  Warning: cargo-wrt not found. Install it for better validation:${NC}"
+    echo "  cargo install --path cargo-wrt"
+fi
+
+echo -e "${GREEN}✅ No test files found in src/ directories${NC}"
+
+# Run cargo fmt check
+echo ""
+echo "🔍 Checking code formatting with cargo fmt..."
+
+# Use the project's unified build tool for formatting check
+if ! cargo-wrt check --strict; then
+    echo -e "${RED}❌ Error: Code formatting issues detected!${NC}"
+    echo ""
+    echo "Please run 'cargo-wrt check' or 'cargo fmt' to format your code before committing."
+    echo ""
+    echo "To bypass this check (not recommended), use:"
+    echo "  git commit --no-verify"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ Code formatting check passed${NC}"
+exit 0

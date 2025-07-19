@@ -65,7 +65,7 @@ impl PlatformCapacities {
     }
 
     pub const fn validate(&self) -> bool {
-        self.small_capacity > 0 
+        self.small_capacity > 0
             && self.medium_capacity > self.small_capacity
             && self.large_capacity > self.medium_capacity
             && self.memory_provider_size >= self.large_capacity / 8
@@ -78,8 +78,8 @@ pub struct UnifiedTypes<const SMALL: usize, const MEDIUM: usize, const LARGE: us
     _phantom: PhantomData<()>,
 }
 
-impl<const SMALL: usize, const MEDIUM: usize, const LARGE: usize> 
-    UnifiedTypes<SMALL, MEDIUM, LARGE> 
+impl<const SMALL: usize, const MEDIUM: usize, const LARGE: usize>
+    UnifiedTypes<SMALL, MEDIUM, LARGE>
 {
     pub const fn validate_configuration() -> bool {
         SMALL > 0 && MEDIUM > SMALL && LARGE > MEDIUM
@@ -107,8 +107,8 @@ mod tests {
 
     #[test]
     fn test_platform_capacities_validation() {
-        let valid_caps = PlatformCapacities::default();
-        assert!(valid_caps.validate());
+        let valid_caps = PlatformCapacities::default);
+        assert!(valid_caps.validate();
 
         let invalid_caps = PlatformCapacities {
             small_capacity: 100,
@@ -116,27 +116,27 @@ mod tests {
             large_capacity: 200,
             memory_provider_size: 1024,
         };
-        assert!(!invalid_caps.validate());
+        assert!(!invalid_caps.validate();
     }
 
     #[test]
     fn test_unified_types_configuration() {
-        assert!(DefaultTypes::validate_configuration());
-        assert!(EmbeddedTypes::validate_configuration());
-        assert!(DesktopTypes::validate_configuration());
-        assert!(SafetyCriticalTypes::validate_configuration());
+        assert!(DefaultTypes::validate_configuration();
+        assert!(EmbeddedTypes::validate_configuration();
+        assert!(DesktopTypes::validate_configuration();
+        assert!(SafetyCriticalTypes::validate_configuration();
     }
 
     #[test]
     fn test_capacities() {
-        let default_caps = DefaultTypes::capacities();
-        assert_eq!(default_caps.small_capacity, 64);
-        assert_eq!(default_caps.medium_capacity, 1024);
-        assert_eq!(default_caps.large_capacity, 65536);
+        let default_caps = DefaultTypes::capacities);
+        assert_eq!(default_caps.small_capacity, 64;
+        assert_eq!(default_caps.medium_capacity, 1024;
+        assert_eq!(default_caps.large_capacity, 65536;
 
-        let embedded_caps = EmbeddedTypes::capacities();
-        assert_eq!(embedded_caps.small_capacity, 16);
-        assert_eq!(embedded_caps.medium_capacity, 128);
-        assert_eq!(embedded_caps.large_capacity, 1024);
+        let embedded_caps = EmbeddedTypes::capacities);
+        assert_eq!(embedded_caps.small_capacity, 16;
+        assert_eq!(embedded_caps.medium_capacity, 128;
+        assert_eq!(embedded_caps.large_capacity, 1024;
     }
 }

@@ -1,6 +1,13 @@
 use wrt_foundation::{
-    bounded::{BoundedVec, MAX_DWARF_ABBREV_CACHE},
-    BoundedCapacity, NoStdProvider,
+    bounded::{
+        BoundedVec,
+        MAX_DWARF_ABBREV_CACHE,
+    },
+    budget_aware_provider::CrateId,
+    memory_sizing::LargeProvider,
+    safe_managed_alloc,
+    safe_memory::NoStdProvider,
+    BoundedCapacity,
 };
 
 /// Parameter and type information support
@@ -92,15 +99,15 @@ impl BasicType {
 #[derive(Debug, Clone)]
 pub struct Parameter<'a> {
     /// Parameter name
-    pub name: Option<DebugString<'a>>,
+    pub name:        Option<DebugString<'a>>,
     /// Parameter type
-    pub param_type: BasicType,
+    pub param_type:  BasicType,
     /// Source file index where declared
-    pub file_index: u16,
+    pub file_index:  u16,
     /// Source line where declared
-    pub line: u32,
+    pub line:        u32,
     /// Parameter position (0-based)
-    pub position: u16,
+    pub position:    u16,
     /// Is this a variadic parameter?
     pub is_variadic: bool,
 }
@@ -109,11 +116,11 @@ pub struct Parameter<'a> {
 impl<'a> Default for Parameter<'a> {
     fn default() -> Self {
         Self {
-            name: None,
-            param_type: BasicType::Unknown,
-            file_index: 0,
-            line: 0,
-            position: 0,
+            name:        None,
+            param_type:  BasicType::Unknown,
+            file_index:  0,
+            line:        0,
+            position:    0,
             is_variadic: false,
         }
     }
@@ -135,16 +142,16 @@ impl<'a> Eq for Parameter<'a> {}
 impl<'a> wrt_foundation::traits::Checksummable for Parameter<'a> {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
         if let Some(ref name) = self.name {
-            checksum.update(1);
-            name.update_checksum(checksum);
+            checksum.update(1;
+            name.update_checksum(checksum;
         } else {
-            checksum.update(0);
+            checksum.update(0;
         }
-        checksum.update(self.param_type.to_u8());
-        checksum.update_slice(&self.file_index.to_le_bytes());
-        checksum.update_slice(&self.line.to_le_bytes());
-        checksum.update_slice(&self.position.to_le_bytes());
-        checksum.update(self.is_variadic as u8);
+        checksum.update(self.param_type.to_u8);
+        checksum.update_slice(&self.file_index.to_le_bytes);
+        checksum.update_slice(&self.line.to_le_bytes);
+        checksum.update_slice(&self.position.to_le_bytes);
+        checksum.update(self.is_variadic as u8;
     }
 }
 
@@ -159,10 +166,10 @@ impl<'a> wrt_foundation::traits::ToBytes for Parameter<'a> {
             Some(name) => {
                 writer.write_u8(1)?;
                 name.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             None => {
                 writer.write_u8(0)?;
-            }
+            },
         }
         writer.write_u8(self.param_type.to_u8())?;
         writer.write_u16_le(self.file_index)?;
@@ -211,9 +218,13 @@ impl<'a> ParameterList<'a> {
     /// Create a new empty parameter list
     pub fn new() -> Self {
         Self {
-            parameters:
-                BoundedVec::new(NoStdProvider::<{ MAX_DWARF_ABBREV_CACHE * 64 }>::default())
-                    .expect("Failed to create parameters BoundedVec"),
+            parameters: {
+                let provider = safe_managed_alloc!({ MAX_DWARF_ABBREV_CACHE * 64 }, CrateId::Debug)
+                    .unwrap_or_else(|_| {
+                        NoStdProvider::<{ MAX_DWARF_ABBREV_CACHE * 64 }>::default()
+                    };
+                BoundedVec::new(provider).expect("Failed to create parameters BoundedVec")
+            },
         }
     }
 
@@ -224,7 +235,7 @@ impl<'a> ParameterList<'a> {
 
     /// Get all parameters
     pub fn parameters(&self) -> &[Parameter<'a>] {
-        self.parameters.as_slice()
+        self.parameters.as_slice().unwrap_or(&[])
     }
 
     /// Get parameter count
@@ -277,35 +288,35 @@ impl<'a> ParameterList<'a> {
 #[derive(Debug, Clone)]
 pub struct InlinedFunction<'a> {
     /// Name of the inlined function
-    pub name: Option<DebugString<'a>>,
+    pub name:            Option<DebugString<'a>>,
     /// Abstract origin (reference to original function)
     pub abstract_origin: u32,
     /// Low PC (start address in parent)
-    pub low_pc: u32,
+    pub low_pc:          u32,
     /// High PC (end address in parent)
-    pub high_pc: u32,
+    pub high_pc:         u32,
     /// Call site file
-    pub call_file: u16,
+    pub call_file:       u16,
     /// Call site line
-    pub call_line: u32,
+    pub call_line:       u32,
     /// Call site column
-    pub call_column: u16,
+    pub call_column:     u16,
     /// Depth of inlining (0 = directly inlined into parent)
-    pub depth: u8,
+    pub depth:           u8,
 }
 
 // Implement required traits for BoundedVec compatibility
 impl<'a> Default for InlinedFunction<'a> {
     fn default() -> Self {
         Self {
-            name: None,
+            name:            None,
             abstract_origin: 0,
-            low_pc: 0,
-            high_pc: 0,
-            call_file: 0,
-            call_line: 0,
-            call_column: 0,
-            depth: 0,
+            low_pc:          0,
+            high_pc:         0,
+            call_file:       0,
+            call_line:       0,
+            call_column:     0,
+            depth:           0,
         }
     }
 }
@@ -328,18 +339,18 @@ impl<'a> Eq for InlinedFunction<'a> {}
 impl<'a> wrt_foundation::traits::Checksummable for InlinedFunction<'a> {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
         if let Some(ref name) = self.name {
-            checksum.update(1);
-            name.update_checksum(checksum);
+            checksum.update(1;
+            name.update_checksum(checksum;
         } else {
-            checksum.update(0);
+            checksum.update(0;
         }
-        checksum.update_slice(&self.abstract_origin.to_le_bytes());
-        checksum.update_slice(&self.low_pc.to_le_bytes());
-        checksum.update_slice(&self.high_pc.to_le_bytes());
-        checksum.update_slice(&self.call_file.to_le_bytes());
-        checksum.update_slice(&self.call_line.to_le_bytes());
-        checksum.update_slice(&self.call_column.to_le_bytes());
-        checksum.update(self.depth);
+        checksum.update_slice(&self.abstract_origin.to_le_bytes);
+        checksum.update_slice(&self.low_pc.to_le_bytes);
+        checksum.update_slice(&self.high_pc.to_le_bytes);
+        checksum.update_slice(&self.call_file.to_le_bytes);
+        checksum.update_slice(&self.call_line.to_le_bytes);
+        checksum.update_slice(&self.call_column.to_le_bytes);
+        checksum.update(self.depth;
     }
 }
 
@@ -354,10 +365,10 @@ impl<'a> wrt_foundation::traits::ToBytes for InlinedFunction<'a> {
             Some(name) => {
                 writer.write_u8(1)?;
                 name.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             None => {
                 writer.write_u8(0)?;
-            }
+            },
         }
         writer.write_u32_le(self.abstract_origin)?;
         writer.write_u32_le(self.low_pc)?;
@@ -397,6 +408,7 @@ impl<'a> wrt_foundation::traits::FromBytes for InlinedFunction<'a> {
 
 /// Collection of inlined functions
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct InlinedFunctions<'a> {
     /// Inlined function entries
     entries: BoundedVec<
@@ -406,12 +418,17 @@ pub struct InlinedFunctions<'a> {
     >,
 }
 
+#[allow(dead_code)]
 impl<'a> InlinedFunctions<'a> {
     /// Create new inlined functions collection
     pub fn new() -> Self {
         Self {
-            entries: BoundedVec::new(NoStdProvider::<{ MAX_DWARF_ABBREV_CACHE * 128 }>::default())
-                .expect("Failed to create entries BoundedVec"),
+            entries: {
+                let provider =
+                    safe_managed_alloc!({ MAX_DWARF_ABBREV_CACHE * 128 }, CrateId::Debug)
+                        .unwrap_or_else(|_| LargeProvider::default);
+                BoundedVec::new(provider).expect("Failed to create entries BoundedVec")
+            },
         }
     }
 
@@ -442,80 +459,80 @@ mod tests {
 
     #[test]
     fn test_basic_type_parsing() {
-        assert_eq!(BasicType::from_encoding(0x02, 1), BasicType::Bool);
-        assert_eq!(BasicType::from_encoding(0x05, 4), BasicType::SignedInt(4));
-        assert_eq!(BasicType::from_encoding(0x07, 8), BasicType::UnsignedInt(8));
-        assert_eq!(BasicType::from_encoding(0x04, 4), BasicType::Float(4));
+        assert_eq!(BasicType::from_encoding(0x02, 1), BasicType::Bool;
+        assert_eq!(BasicType::from_encoding(0x05, 4), BasicType::SignedInt(4;
+        assert_eq!(BasicType::from_encoding(0x07, 8), BasicType::UnsignedInt(8;
+        assert_eq!(BasicType::from_encoding(0x04, 4), BasicType::Float(4;
     }
 
     #[test]
     fn test_type_names() {
-        assert_eq!(BasicType::SignedInt(4).type_name(), "i32");
-        assert_eq!(BasicType::UnsignedInt(8).type_name(), "u64");
-        assert_eq!(BasicType::Float(4).type_name(), "f32");
-        assert_eq!(BasicType::Bool.type_name(), "bool");
+        assert_eq!(BasicType::SignedInt(4).type_name(), "i32";
+        assert_eq!(BasicType::UnsignedInt(8).type_name(), "u64";
+        assert_eq!(BasicType::Float(4).type_name(), "f32";
+        assert_eq!(BasicType::Bool.type_name(), "bool";
     }
 
     #[test]
     fn test_parameter_list_display() {
-        let mut params = ParameterList::new();
+        let mut params = ParameterList::new);
 
         // Add some test parameters
         let param1 = Parameter {
-            name: None,
-            param_type: BasicType::SignedInt(4),
-            file_index: 0,
-            line: 0,
-            position: 0,
+            name:        None,
+            param_type:  BasicType::SignedInt(4),
+            file_index:  0,
+            line:        0,
+            position:    0,
             is_variadic: false,
         };
 
         let param2 = Parameter {
-            name: None,
-            param_type: BasicType::Pointer,
-            file_index: 0,
-            line: 0,
-            position: 1,
+            name:        None,
+            param_type:  BasicType::Pointer,
+            file_index:  0,
+            line:        0,
+            position:    1,
             is_variadic: false,
         };
 
         params.add_parameter(param1).unwrap();
         params.add_parameter(param2).unwrap();
 
-        let mut output = String::new();
+        let mut output = String::new);
         params
             .display(|s| {
-                output.push_str(s);
+                output.push_str(s;
                 Ok(())
             })
             .unwrap();
 
-        assert_eq!(output, "(i32, ptr)");
+        assert_eq!(output, "(i32, ptr)";
     }
 
     #[test]
     fn test_inlined_functions() {
-        let mut inlined = InlinedFunctions::new();
+        let mut inlined = InlinedFunctions::new);
 
         let func = InlinedFunction {
-            name: None,
+            name:            None,
             abstract_origin: 0x100,
-            low_pc: 0x1000,
-            high_pc: 0x1100,
-            call_file: 1,
-            call_line: 42,
-            call_column: 8,
-            depth: 0,
+            low_pc:          0x1000,
+            high_pc:         0x1100,
+            call_file:       1,
+            call_line:       42,
+            call_column:     8,
+            depth:           0,
         };
 
         inlined.add(func).unwrap();
 
         // Test PC lookup
-        assert!(inlined.has_inlined_at(0x1050));
-        assert!(!inlined.has_inlined_at(0x2000));
+        assert!(inlined.has_inlined_at(0x1050);
+        assert!(!inlined.has_inlined_at(0x2000);
 
         let found: Vec<_> = inlined.find_at_pc(0x1050).collect();
-        assert_eq!(found.len(), 1);
-        assert_eq!(found[0].call_line, 42);
+        assert_eq!(found.len(), 1;
+        assert_eq!(found[0].call_line, 42;
     }
 }

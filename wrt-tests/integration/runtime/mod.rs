@@ -14,7 +14,7 @@ mod branch_hinting_tests;
 
 /// Run all runtime integration tests
 pub fn run_tests() -> TestResult {
-    let mut runner = TestRunner::new("Runtime Integration");
+    let mut runner = TestRunner::new("Runtime Integration";
     
     runner.add_test_suite("Control Instructions", control_instructions_tests::run_tests)?;
     runner.add_test_suite("Memory Management", memory_management_tests::run_tests)?;
@@ -37,7 +37,7 @@ mod tests {
     
     #[test]
     fn runtime_integration() {
-        let result = run_tests();
+        let result = run_tests);
         assert!(result.is_success(), "Runtime integration tests failed: {:?}", result);
     }
 }

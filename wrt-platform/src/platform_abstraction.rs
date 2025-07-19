@@ -9,6 +9,7 @@
 //! Performance guarantee: All abstractions compile down to direct platform
 //! calls with zero runtime overhead through monomorphization and inlining.
 
+
 use core::marker::PhantomData;
 
 use wrt_error::Error;
@@ -453,8 +454,8 @@ mod tests {
         let platform = PosixPlatform::new(PlatformConfig::new());
 
         // Binary std/no_std choice
-        let _allocator = platform.allocator();
-        let _synchronizer = platform.synchronizer();
+        let _allocator = platform.allocator;
+        let _synchronizer = platform.synchronizer;
     }
 
     #[cfg(feature = "platform-zephyr")]
@@ -463,7 +464,7 @@ mod tests {
         let platform = RealtimePlatform::new(PlatformConfig::new().with_rt_priority(5));
 
         // Binary std/no_std choice
-        let _allocator = platform.allocator();
-        let _synchronizer = platform.synchronizer();
+        let _allocator = platform.allocator;
+        let _synchronizer = platform.synchronizer;
     }
 }

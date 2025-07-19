@@ -32,9 +32,9 @@
 //! let panic_context = PanicContextBuilder::new()
 //!     .with_memory_budget(2048)  // 2KB for panic information
 //!     .with_safety_level(AsilLevel::AsilD)
-//!     .build();
+//!     .build);
 //! 
-//! initialize_panic_handler(panic_context);
+//! initialize_panic_handler(panic_context;
 //! ```
 //!
 //! ## Safety Compliance Features
@@ -68,9 +68,37 @@ extern crate std;
 
 use core::sync::atomic::{AtomicU8, AtomicU32, Ordering};
 
-// Re-export foundation types for user convenience
-pub use wrt_foundation::safety_system::{AsilLevel, SafetyStandard, UniversalSafetyContext};
-pub use wrt_foundation::safe_memory::{MemoryProvider, NoStdProvider};
+/// ASIL (Automotive Safety Integrity Level) as defined by ISO 26262
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+pub enum AsilLevel {
+    /// Quality Management (no safety requirements)
+    QM = 0,
+    /// ASIL-A (lowest safety integrity level)
+    AsilA = 1,
+    /// ASIL-B (medium-low safety integrity level)
+    AsilB = 2,
+    /// ASIL-C (medium-high safety integrity level)
+    AsilC = 3,
+    /// ASIL-D (highest safety integrity level)
+    AsilD = 4,
+}
+
+/// Simple memory provider trait for panic handler usage
+pub trait MemoryProvider {
+    /// Get the capacity of this memory provider
+    fn capacity(&self) -> usize;
+}
+
+/// No-std memory provider for panic handler
+#[derive(Debug, Clone, Default)]
+pub struct NoStdProvider<const N: usize>;
+
+impl<const N: usize> MemoryProvider for NoStdProvider<N> {
+    fn capacity(&self) -> usize {
+        N
+    }
+}
 
 /// Panic information magic number for debugger recognition
 pub const PANIC_MAGIC: u32 = 0xDEADBEEF;
@@ -125,6 +153,12 @@ pub struct PanicContextBuilder<P: MemoryProvider> {
     safety_level: AsilLevel,
     memory_provider: Option<P>,
     memory_budget: usize,
+}
+
+impl<P: MemoryProvider> Default for PanicContextBuilder<P> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<P: MemoryProvider> PanicContextBuilder<P> {
@@ -186,6 +220,7 @@ pub fn initialize_panic_handler<P: MemoryProvider>(context: PanicContext<P>) -> 
 }
 
 /// Hash a string at compile time for error codes
+#[allow(dead_code)]
 const fn hash_str(s: &str) -> u32 {
     let bytes = s.as_bytes();
     let mut hash = 5381u32;
@@ -198,6 +233,7 @@ const fn hash_str(s: &str) -> u32 {
 }
 
 /// Store panic information in memory with debugger-visible pattern
+#[allow(dead_code)]
 fn store_panic_info(info: &core::panic::PanicInfo) {
     let asil_level = PANIC_ASIL_LEVEL.load(Ordering::SeqCst);
     let _memory_budget = PANIC_MEMORY_BUDGET.load(Ordering::SeqCst) as usize;
@@ -218,7 +254,7 @@ fn store_panic_info(info: &core::panic::PanicInfo) {
 
     // Extract information from panic info
     if let Some(location) = info.location() {
-        let file_hash = hash_str(location.file());
+        let file_hash = hash_str(location.file);
         let line = location.line();
         panic_info.location_hash = file_hash.wrapping_add(line);
     }
@@ -510,40 +546,40 @@ mod tests {
     #[test]
     fn test_safety_level_checking() {
         // Standard level should always be met
-        assert!(meets_safety_level("standard"));
+        assert!(meets_safety_level("standard");
         
         // Invalid levels should return false
-        assert!(!meets_safety_level("invalid"));
-        assert!(!meets_safety_level(""));
+        assert!(!meets_safety_level("invalid");
+        assert!(!meets_safety_level("");
         
         // ASIL levels depend on feature flags
         #[cfg(feature = "asil-d")]
         {
-            assert!(meets_safety_level("asil-d"));
-            assert!(meets_safety_level("asil-b"));
+            assert!(meets_safety_level("asil-d");
+            assert!(meets_safety_level("asil-b");
         }
         
         #[cfg(all(feature = "asil-b", not(feature = "asil-d")))]
         {
-            assert!(!meets_safety_level("asil-d"));
-            assert!(meets_safety_level("asil-b"));
+            assert!(!meets_safety_level("asil-d");
+            assert!(meets_safety_level("asil-b");
         }
         
         #[cfg(all(not(feature = "asil-b"), not(feature = "asil-d")))]
         {
-            assert!(!meets_safety_level("asil-d"));
-            assert!(!meets_safety_level("asil-b"));
+            assert!(!meets_safety_level("asil-d");
+            assert!(!meets_safety_level("asil-b");
         }
     }
 
     #[test]
     fn test_memory_budget_configuration() {
         // Test default memory budget
-        assert_eq!(current_memory_budget(), DEFAULT_PANIC_MEMORY_BUDGET);
+        assert_eq!(current_memory_budget(), DEFAULT_PANIC_MEMORY_BUDGET;
         
         // Test ASIL level configuration
-        let level = current_asil_level();
-        assert!(matches!(level, AsilLevel::QM | AsilLevel::AsilA | AsilLevel::AsilB | AsilLevel::AsilC | AsilLevel::AsilD));
+        let level = current_asil_level);
+        assert!(matches!(level, AsilLevel::QM | AsilLevel::AsilA | AsilLevel::AsilB | AsilLevel::AsilC | AsilLevel::AsilD);
     }
 
     #[test]
@@ -551,7 +587,7 @@ mod tests {
         use core::mem;
         
         // Ensure the panic info structure has expected size constraints
-        let size = mem::size_of::<WrtPanicInfo>();
+        let size = mem::size_of::<WrtPanicInfo>);
         assert!(size >= MIN_PANIC_INFO_SIZE);
         assert!(size <= DEFAULT_PANIC_MEMORY_BUDGET);
     }
@@ -559,30 +595,30 @@ mod tests {
     #[test]
     fn test_hash_function() {
         // Test the hash function produces consistent results
-        let hash1 = hash_str("test");
-        let hash2 = hash_str("test");
-        assert_eq!(hash1, hash2);
+        let hash1 = hash_str("test";
+        let hash2 = hash_str("test";
+        assert_eq!(hash1, hash2;
         
         // Different strings should produce different hashes (usually)
-        let hash3 = hash_str("different");
-        assert_ne!(hash1, hash3);
+        let hash3 = hash_str("different";
+        assert_ne!(hash1, hash3;
     }
 
     #[test] 
     fn test_panic_context_builder() {
         type TestProvider = NoStdProvider<512>;
-        let provider = TestProvider::default();
+        let provider = TestProvider::default);
         
         let context = PanicContextBuilder::new()
             .with_safety_level(AsilLevel::AsilB)
             .with_memory_budget(512)
             .with_memory_provider(provider)
-            .build();
+            .build);
             
-        assert!(context.is_ok());
+        assert!(context.is_ok();
         
         let context = context.unwrap();
-        assert_eq!(context.safety_level, AsilLevel::AsilB);
-        assert_eq!(context.memory_budget, 512);
+        assert_eq!(context.safety_level, AsilLevel::AsilB;
+        assert_eq!(context.memory_budget, 512;
     }
 }

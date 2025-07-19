@@ -118,96 +118,108 @@ pub enum Section {
     DataCount(Vec<u8>),
 }
 
-/// WebAssembly section (no_std version)
-#[cfg(not(any(feature = "std")))]
+/// WebAssembly section (clean architecture version)
+#[cfg(not(feature = "std"))]
 #[derive(Debug, Clone)]
-pub enum Section<P: MemoryProvider + Clone + Default + Eq = NoStdProvider<1024>> {
+pub enum Section {
     /// Custom section
-    Custom(CustomSection<P>),
+    Custom(CustomSection),
     /// Type section
-    Type(WasmVec<u8, P>),
+    Type(alloc::vec::Vec<u8>),
     /// Import section
-    Import(WasmVec<u8, P>),
+    Import(alloc::vec::Vec<u8>),
     /// Function section
-    Function(WasmVec<u8, P>),
+    Function(alloc::vec::Vec<u8>),
     /// Table section
-    Table(WasmVec<u8, P>),
+    Table(alloc::vec::Vec<u8>),
     /// Memory section
-    Memory(WasmVec<u8, P>),
+    Memory(alloc::vec::Vec<u8>),
     /// Global section
-    Global(WasmVec<u8, P>),
+    Global(alloc::vec::Vec<u8>),
     /// Export section
-    Export(WasmVec<u8, P>),
+    Export(alloc::vec::Vec<u8>),
     /// Start section
-    Start(WasmVec<u8, P>),
+    Start(alloc::vec::Vec<u8>),
     /// Element section
-    Element(WasmVec<u8, P>),
+    Element(alloc::vec::Vec<u8>),
     /// Code section
-    Code(WasmVec<u8, P>),
+    Code(alloc::vec::Vec<u8>),
     /// Data section
-    Data(WasmVec<u8, P>),
+    Data(alloc::vec::Vec<u8>),
     /// Data count section
-    DataCount(WasmVec<u8, P>),
+    DataCount(alloc::vec::Vec<u8>),
 }
 
-/// WebAssembly custom section - Pure No_std Version
-#[cfg(not(any(feature = "std")))]
+/// WebAssembly custom section - Clean architecture version
+#[cfg(not(feature = "std"))]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CustomSection<
-    P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq = wrt_foundation::NoStdProvider<1024>,
-> {
+pub struct CustomSection {
     /// Section name
-    pub name: crate::WasmString<P>,
+    pub name: alloc::string::String,
     /// Section data
-    pub data: crate::WasmVec<u8, P>,
+    pub data: alloc::vec::Vec<u8>,
 }
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> Default for CustomSection<P> {
+#[cfg(not(feature = "std"))]
+impl Default for CustomSection {
     fn default() -> Self {
         Self {
-            name: crate::WasmString::from_str("", P::default()).unwrap_or_default(),
-            data: crate::WasmVec::new(P::default()).unwrap_or_default(),
+            name: alloc::string::String::new(),
+            data: alloc::vec::Vec::new(),
         }
     }
 }
 
-// Implement Checksummable for CustomSection - no_std version
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_foundation::traits::Checksummable for CustomSection<P> {
+// Implement Checksummable for CustomSection - clean version
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::Checksummable for CustomSection {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.name.update_checksum(checksum);
-        self.data.update_checksum(checksum);
+        checksum.update_slice(self.name.as_bytes);
+        checksum.update_slice(&self.data;
     }
 }
 
-// Implement ToBytes for CustomSection - no_std version
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_foundation::traits::ToBytes for CustomSection<P> {
+// Implement ToBytes for CustomSection - clean version
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::ToBytes for CustomSection {
     fn serialized_size(&self) -> usize {
-        self.name.serialized_size() + self.data.serialized_size()
+        self.name.len() + self.data.len() + 8  // 4 bytes each for lengths
     }
 
     fn to_bytes_with_provider<PStream: wrt_foundation::MemoryProvider>(
         &self,
         stream: &mut wrt_foundation::traits::WriteStream,
-        provider: &PStream,
+        _provider: &PStream,
     ) -> wrt_foundation::Result<()> {
-        self.name.to_bytes_with_provider(stream, provider)?;
-        self.data.to_bytes_with_provider(stream, provider)?;
+        // Write name length and name
+        stream.write_all(&(self.name.len() as u32).to_le_bytes())?;
+        stream.write_all(self.name.as_bytes())?;
+        // Write data length and data
+        stream.write_all(&(self.data.len() as u32).to_le_bytes())?;
+        stream.write_all(&self.data)?;
         Ok(())
     }
 }
 
 // Implement FromBytes for CustomSection - no_std version
 #[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_foundation::traits::FromBytes for CustomSection<P> {
+impl wrt_foundation::traits::FromBytes for CustomSection {
     fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
         reader: &mut wrt_foundation::traits::ReadStream<'a>,
-        provider: &PStream,
+        _provider: &PStream,
     ) -> wrt_foundation::Result<Self> {
-        let name = crate::WasmString::from_bytes_with_provider(reader, provider)?;
-        let data = crate::WasmVec::from_bytes_with_provider(reader, provider)?;
+        // Read name length
+        let name_len = reader.read_u32_le()?;
+        let mut name_bytes = alloc::vec![0u8; name_len as usize];
+        reader.read_exact(&mut name_bytes)?;
+        let name = alloc::string::String::from_utf8(name_bytes)
+            .map_err(|_| wrt_error::Error::parse_error("Invalid UTF-8 in custom section name"))?;
+        
+        // Read data length
+        let data_len = reader.read_u32_le()?;
+        let mut data = alloc::vec![0u8; data_len as usize];
+        reader.read_exact(&mut data)?;
+        
         Ok(Self { name, data })
     }
 }
@@ -247,16 +259,16 @@ impl CustomSection {
     /// Serialize the custom section to binary
     #[cfg(feature = "std")]
     pub fn to_binary(&self) -> core::result::Result<Vec<u8>, wrt_error::Error> {
-        let mut section_data = Vec::new();
+        let mut section_data = Vec::new);
 
         // Add name as encoded string (name length + name bytes)
         let name_len = self.name.len() as u32;
-        let name_len_bytes = crate::binary::with_alloc::write_leb128_u32(name_len);
-        section_data.extend_from_slice(&name_len_bytes);
-        section_data.extend_from_slice(self.name.as_bytes());
+        let name_len_bytes = crate::binary::with_alloc::write_leb128_u32(name_len;
+        section_data.extend_from_slice(&name_len_bytes;
+        section_data.extend_from_slice(self.name.as_bytes);
 
         // Add the section data
-        section_data.extend_from_slice(&self.data);
+        section_data.extend_from_slice(&self.data;
 
         Ok(section_data)
     }
@@ -269,41 +281,30 @@ impl CustomSection {
 }
 
 #[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> CustomSection<P> {
+impl CustomSection {
     /// Create a new custom section
-    pub fn new(name: crate::WasmString<P>, data: crate::WasmVec<u8, P>) -> Self {
+    pub fn new(name: alloc::string::String, data: alloc::vec::Vec<u8>) -> Self {
         Self { name, data }
     }
 
     /// Create a new custom section from raw bytes
-    pub fn from_bytes(name: &str, data: &[u8], provider: P) -> wrt_foundation::Result<Self> {
-        let bounded_name =
-            crate::WasmString::<P>::from_str(name, provider.clone()).map_err(|_| {
-                wrt_foundation::Error::new(
-                    wrt_error::ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ERROR,
-                    "Failed to create bounded string",
-                )
-            })?;
-
-        let mut bounded_data = crate::WasmVec::<u8, P>::new(provider)?;
-        bounded_data.extend_from_slice(data)?;
-
-        Ok(Self { name: bounded_name, data: bounded_data })
+    pub fn from_bytes(name: &str, data: &[u8]) -> Self {
+        Self {
+            name: alloc::string::String::from(name),
+            data: data.to_vec(),
+        }
     }
 
     /// Get section data length
-    pub fn data_len(&self) -> wrt_foundation::Result<usize> {
-        Ok(self.data.len())
+    pub fn data_len(&self) -> usize {
+        self.data.len()
     }
 
     /// Copy section data to a slice
-    pub fn copy_data_to_slice(&self, dest: &mut [u8]) -> wrt_foundation::Result<usize> {
-        let src = self.data.as_internal_slice()?;
-        let src_ref = src.as_ref();
-        let copy_len = core::cmp::min(dest.len(), src_ref.len());
-        dest[..copy_len].copy_from_slice(&src_ref[..copy_len]);
-        Ok(copy_len)
+    pub fn copy_data_to_slice(&self, dest: &mut [u8]) -> usize {
+        let copy_len = core::cmp::min(dest.len(), self.data.len);
+        dest[..copy_len].copy_from_slice(&self.data[..copy_len];
+        copy_len
     }
 }
 
@@ -380,7 +381,7 @@ pub fn parse_component_section_header(
     pos: usize,
 ) -> wrt_error::Result<(ComponentSectionHeader, usize)> {
     if pos >= bytes.len() {
-        return Err(wrt_error::Error::validation_error("Unexpected end of input"));
+        return Err(wrt_error::Error::validation_error("Unexpected end of input";
     }
 
     let section_id = bytes[pos];
@@ -400,9 +401,9 @@ pub fn write_component_section_header(
     section_type: ComponentSectionType,
     content_size: u32,
 ) -> Vec<u8> {
-    let mut bytes = Vec::new();
-    bytes.push(section_type.id());
-    bytes.extend_from_slice(&crate::binary::with_alloc::write_leb128_u32(content_size));
+    let mut bytes = Vec::new);
+    bytes.push(section_type.id();
+    bytes.extend_from_slice(&crate::binary::with_alloc::write_leb128_u32(content_size;
     bytes
 }
 
@@ -412,19 +413,21 @@ pub fn format_component_section<F>(section_type: ComponentSectionType, content_f
 where
     F: FnOnce() -> Vec<u8>,
 {
-    let content = content_fn();
+    let content = content_fn);
     let content_size = content.len() as u32;
 
-    let mut result = write_component_section_header(section_type, content_size);
-    result.extend_from_slice(&content);
+    let mut result = write_component_section_header(section_type, content_size;
+    result.extend_from_slice(&content;
 
     result
 }
 
 #[cfg(test)]
 mod tests {
-        #[cfg(all(not(feature = "std")))]
-    use std::{string::ToString, vec};
+    #[cfg(all(not(feature = "std")))]
+    extern crate alloc;
+    #[cfg(all(not(feature = "std")))]
+    use alloc::{string::ToString, vec};
     #[cfg(feature = "std")]
     use std::string::ToString;
     #[cfg(feature = "std")]
@@ -436,51 +439,51 @@ mod tests {
 
     #[test]
     fn test_section_id_conversion() {
-        assert_eq!(SectionId::from_u8(0), Some(SectionId::Custom));
-        assert_eq!(SectionId::from_u8(1), Some(SectionId::Type));
-        assert_eq!(SectionId::from_u8(2), Some(SectionId::Import));
-        assert_eq!(SectionId::from_u8(3), Some(SectionId::Function));
-        assert_eq!(SectionId::from_u8(4), Some(SectionId::Table));
-        assert_eq!(SectionId::from_u8(5), Some(SectionId::Memory));
-        assert_eq!(SectionId::from_u8(6), Some(SectionId::Global));
-        assert_eq!(SectionId::from_u8(7), Some(SectionId::Export));
-        assert_eq!(SectionId::from_u8(8), Some(SectionId::Start));
-        assert_eq!(SectionId::from_u8(9), Some(SectionId::Element));
-        assert_eq!(SectionId::from_u8(10), Some(SectionId::Code));
-        assert_eq!(SectionId::from_u8(11), Some(SectionId::Data));
-        assert_eq!(SectionId::from_u8(12), Some(SectionId::DataCount));
-        assert_eq!(SectionId::from_u8(13), None);
+        assert_eq!(SectionId::from_u8(0), Some(SectionId::Custom;
+        assert_eq!(SectionId::from_u8(1), Some(SectionId::Type;
+        assert_eq!(SectionId::from_u8(2), Some(SectionId::Import;
+        assert_eq!(SectionId::from_u8(3), Some(SectionId::Function;
+        assert_eq!(SectionId::from_u8(4), Some(SectionId::Table;
+        assert_eq!(SectionId::from_u8(5), Some(SectionId::Memory;
+        assert_eq!(SectionId::from_u8(6), Some(SectionId::Global;
+        assert_eq!(SectionId::from_u8(7), Some(SectionId::Export;
+        assert_eq!(SectionId::from_u8(8), Some(SectionId::Start;
+        assert_eq!(SectionId::from_u8(9), Some(SectionId::Element;
+        assert_eq!(SectionId::from_u8(10), Some(SectionId::Code;
+        assert_eq!(SectionId::from_u8(11), Some(SectionId::Data;
+        assert_eq!(SectionId::from_u8(12), Some(SectionId::DataCount;
+        assert_eq!(SectionId::from_u8(13), None;
     }
 
     #[test]
     fn test_component_section_type_conversion() {
-        assert_eq!(ComponentSectionType::from_u8(0), Some(ComponentSectionType::Custom));
-        assert_eq!(ComponentSectionType::from_u8(1), Some(ComponentSectionType::CoreModule));
-        assert_eq!(ComponentSectionType::from_u8(2), Some(ComponentSectionType::CoreInstance));
-        assert_eq!(ComponentSectionType::from_u8(3), Some(ComponentSectionType::CoreType));
-        assert_eq!(ComponentSectionType::from_u8(4), Some(ComponentSectionType::Component));
-        assert_eq!(ComponentSectionType::from_u8(5), Some(ComponentSectionType::Instance));
-        assert_eq!(ComponentSectionType::from_u8(6), Some(ComponentSectionType::Alias));
-        assert_eq!(ComponentSectionType::from_u8(7), Some(ComponentSectionType::Type));
-        assert_eq!(ComponentSectionType::from_u8(8), Some(ComponentSectionType::Canon));
-        assert_eq!(ComponentSectionType::from_u8(9), Some(ComponentSectionType::Start));
-        assert_eq!(ComponentSectionType::from_u8(10), Some(ComponentSectionType::Import));
-        assert_eq!(ComponentSectionType::from_u8(11), Some(ComponentSectionType::Export));
-        assert_eq!(ComponentSectionType::from_u8(12), Some(ComponentSectionType::Value));
-        assert_eq!(ComponentSectionType::from_u8(13), None);
+        assert_eq!(ComponentSectionType::from_u8(0), Some(ComponentSectionType::Custom;
+        assert_eq!(ComponentSectionType::from_u8(1), Some(ComponentSectionType::CoreModule;
+        assert_eq!(ComponentSectionType::from_u8(2), Some(ComponentSectionType::CoreInstance;
+        assert_eq!(ComponentSectionType::from_u8(3), Some(ComponentSectionType::CoreType;
+        assert_eq!(ComponentSectionType::from_u8(4), Some(ComponentSectionType::Component;
+        assert_eq!(ComponentSectionType::from_u8(5), Some(ComponentSectionType::Instance;
+        assert_eq!(ComponentSectionType::from_u8(6), Some(ComponentSectionType::Alias;
+        assert_eq!(ComponentSectionType::from_u8(7), Some(ComponentSectionType::Type;
+        assert_eq!(ComponentSectionType::from_u8(8), Some(ComponentSectionType::Canon;
+        assert_eq!(ComponentSectionType::from_u8(9), Some(ComponentSectionType::Start;
+        assert_eq!(ComponentSectionType::from_u8(10), Some(ComponentSectionType::Import;
+        assert_eq!(ComponentSectionType::from_u8(11), Some(ComponentSectionType::Export;
+        assert_eq!(ComponentSectionType::from_u8(12), Some(ComponentSectionType::Value;
+        assert_eq!(ComponentSectionType::from_u8(13), None;
     }
 
     #[test]
     #[cfg(feature = "std")]
     fn test_custom_section_serialization() {
         let test_data = vec![1, 2, 3, 4];
-        let section = CustomSection::new("test-section".to_string(), test_data.clone());
+        let section = CustomSection::new("test-section".to_string(), test_data.clone();
 
         // Serialize
         let binary = section.to_binary().unwrap();
 
         // Check that the binary data contains the section name
-        let name_bytes = "test-section".as_bytes();
+        let name_bytes = "test-section".as_bytes);
         let mut found_name = false;
 
         for i in 0..binary.len() - name_bytes.len() + 1 {
@@ -508,7 +511,7 @@ mod tests {
     #[cfg(feature = "std")]
     fn test_custom_section_data_access() {
         let test_data = vec![1, 2, 3, 4];
-        let section = CustomSection::new("test-section".to_string(), test_data);
+        let section = CustomSection::new("test-section".to_string(), test_data;
 
         // Create a safe slice
         let safe_slice = SafeSlice::new(&section.data).unwrap();
@@ -517,24 +520,24 @@ mod tests {
         let data = safe_slice.data().unwrap();
 
         // Check it matches our test data
-        assert_eq!(data, &[1, 2, 3, 4]);
+        assert_eq!(data, &[1, 2, 3, 4];
     }
 
     #[test]
     #[cfg(feature = "std")]
     fn test_component_section_header() {
         // Create a binary section header
-        let header_bytes = write_component_section_header(ComponentSectionType::CoreModule, 42);
+        let header_bytes = write_component_section_header(ComponentSectionType::CoreModule, 42;
 
         // Check the header starts with the correct ID
-        assert_eq!(header_bytes[0], ComponentSectionType::CoreModule as u8);
+        assert_eq!(header_bytes[0], ComponentSectionType::CoreModule as u8;
 
         // Parse the header
         let (header, _) = parse_component_section_header(&header_bytes, 0).unwrap();
 
         // Check the parsed values match what we wrote
-        assert_eq!(header.section_type, ComponentSectionType::CoreModule);
-        assert_eq!(header.size, 42);
+        assert_eq!(header.section_type, ComponentSectionType::CoreModule;
+        assert_eq!(header.size, 42;
     }
 
     #[test]
@@ -543,22 +546,22 @@ mod tests {
         // Create a section with some content
         let section_content = vec![1, 2, 3, 4, 5];
         let section_bytes =
-            format_component_section(ComponentSectionType::CoreModule, || section_content.clone());
+            format_component_section(ComponentSectionType::CoreModule, || section_content.clone();
 
         // Parse the section header
         let (header, content_pos) = parse_component_section_header(&section_bytes, 0).unwrap();
 
         // Check the header values
-        assert_eq!(header.section_type, ComponentSectionType::CoreModule);
+        assert_eq!(header.section_type, ComponentSectionType::CoreModule;
         assert_eq!(header.size, 5); // Length of our content
 
         // Get the actual content bytes
         let content_slice = &section_bytes[content_pos..content_pos + header.size as usize];
 
         // Check individually to avoid ordering issues
-        assert_eq!(content_slice.len(), section_content.len());
+        assert_eq!(content_slice.len(), section_content.len);
         for i in 0..section_content.len() {
-            assert!(content_slice.contains(&section_content[i]));
+            assert!(content_slice.contains(&section_content[i]);
         }
     }
 
@@ -566,13 +569,13 @@ mod tests {
     #[cfg(feature = "std")]
     fn test_invalid_component_section_id() {
         // Create an invalid section ID
-        let mut header_bytes = Vec::new();
+        let mut header_bytes = Vec::new);
         header_bytes.push(255); // Invalid section ID
         // Use a manual LEB128 encoding for 42
         header_bytes.push(42); // 42 fits in one byte for LEB128
 
         // Parse should fail
-        let result = parse_component_section_header(&header_bytes, 0);
-        assert!(result.is_err());
+        let result = parse_component_section_header(&header_bytes, 0;
+        assert!(result.is_err();
     }
 }

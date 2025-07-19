@@ -361,7 +361,6 @@ rust_crates = {
     "wrt-sync": "/wrt/wrt-sync",
     "wrt-logging": "/wrt/wrt-logging",
     "wrt-math": "/wrt/wrt-math",
-    "wrt-helper": "/wrt/wrt-helper",
     "wrt-format": "/wrt/wrt-format",
     "wrt-decoder": "/wrt/wrt-decoder",
     "wrt-host": "/wrt/wrt-host",

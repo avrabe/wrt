@@ -1,7 +1,8 @@
 //! No-std compatibility test reference for wrt-error
 //!
-//! This file references the consolidated no_std tests in wrt-tests/integration/no_std/
-//! The actual no_std tests for wrt-error are now part of the centralized test suite.
+//! This file references the consolidated no_std tests in
+//! wrt-tests/integration/no_std/ The actual no_std tests for wrt-error are now
+//! part of the centralized test suite.
 //!
 //! To run the no_std tests for wrt-error specifically:
 //! ```
@@ -23,7 +24,7 @@ mod tests {
         // This consolidation eliminates duplication and provides a single
         // location for all no_std testing across the WRT ecosystem.
 
-        println!("No-std tests for wrt-error are in wrt-tests/integration/no_std/");
-        println!("Run: cargo test -p wrt-tests consolidated_no_std_tests::wrt_error_tests");
+        println!("No-std tests for wrt-error are in wrt-tests/integration/no_std/";
+        println!("Run: cargo test -p wrt-tests consolidated_no_std_tests::wrt_error_tests";
     }
 }

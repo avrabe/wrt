@@ -4,7 +4,13 @@
 //! for the canonical ABI, ensuring proper data representation across
 //! component boundaries.
 
-use wrt_format::component::ValType;
+use wrt_format::component::FormatValType;
+use crate::bounded_component_infra::ComponentProvider;
+use wrt_foundation::{
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use crate::prelude::*;
 
@@ -38,49 +44,49 @@ impl MemoryLayout {
 }
 
 /// Calculate memory layout for a WebAssembly component model type
-pub fn calculate_layout(ty: &ValType) -> MemoryLayout {
+pub fn calculate_layout(ty: &FormatValType<ComponentProvider>) -> MemoryLayout {
     match ty {
         // Primitive types
-        ValType::Bool => MemoryLayout::new(1, 1),
-        ValType::S8 | ValType::U8 => MemoryLayout::new(1, 1),
-        ValType::S16 | ValType::U16 => MemoryLayout::new(2, 2),
-        ValType::S32 | ValType::U32 => MemoryLayout::new(4, 4),
-        ValType::S64 | ValType::U64 => MemoryLayout::new(8, 8),
-        ValType::F32 => MemoryLayout::new(4, 4),
-        ValType::F64 => MemoryLayout::new(8, 8),
-        ValType::Char => MemoryLayout::new(4, 4), // Unicode scalar value
+        FormatValType::Bool => MemoryLayout::new(1, 1),
+        FormatValType::S8 | FormatValType::U8 => MemoryLayout::new(1, 1),
+        FormatValType::S16 | FormatValType::U16 => MemoryLayout::new(2, 2),
+        FormatValType::S32 | FormatValType::U32 => MemoryLayout::new(4, 4),
+        FormatValType::S64 | FormatValType::U64 => MemoryLayout::new(8, 8),
+        FormatValType::F32 => MemoryLayout::new(4, 4),
+        FormatValType::F64 => MemoryLayout::new(8, 8),
+        FormatValType::Char => MemoryLayout::new(4, 4), // Unicode scalar value
 
         // String is represented as pointer + length
-        ValType::String => MemoryLayout::new(8, 4), // 4-byte pointer + 4-byte length
+        FormatValType::String => MemoryLayout::new(8, 4), // 4-byte pointer + 4-byte length
 
         // Lists are represented as pointer + length
-        ValType::List(_) => MemoryLayout::new(8, 4), // 4-byte pointer + 4-byte length
+        FormatValType::List(_) => MemoryLayout::new(8, 4), // 4-byte pointer + 4-byte length
 
         // Records require calculating layout for all fields
-        ValType::Record(fields) => calculate_record_layout(fields),
+        FormatValType::Record(fields) => calculate_record_layout(fields),
 
         // Tuples are similar to records
-        ValType::Tuple(types) => calculate_tuple_layout(types),
+        FormatValType::Tuple(types) => calculate_tuple_layout(types),
 
         // Variants need space for discriminant + largest payload
-        ValType::Variant(cases) => calculate_variant_layout(cases),
+        FormatValType::Variant(cases) => calculate_variant_layout(cases),
 
         // Enums need space for discriminant only
-        ValType::Enum(cases) => calculate_enum_layout(cases.len()),
+        FormatValType::Enum(cases) => calculate_enum_layout(cases.len()),
 
         // Options are variants with two cases (none/some)
-        ValType::Option(inner) => calculate_option_layout(inner),
+        FormatValType::Option(inner) => calculate_option_layout(inner),
 
         // Results are variants with two cases (ok/err)
-        ValType::Result(ok_ty, err_ty) => {
+        FormatValType::Result(ok_ty, err_ty) => {
             calculate_result_layout(ok_ty.as_deref(), err_ty.as_deref())
         }
 
         // Flags need bit storage
-        ValType::Flags(names) => calculate_flags_layout(names.len()),
+        FormatValType::Flags(names) => calculate_flags_layout(names.len()),
 
         // Resources are handles (u32)
-        ValType::Own(_) | ValType::Borrow(_) => MemoryLayout::new(4, 4),
+        FormatValType::Own(_) | FormatValType::Borrow(_) => MemoryLayout::new(4, 4),
 
         // Other types
         _ => MemoryLayout::new(0, 1), // Unknown types have zero size
@@ -88,53 +94,53 @@ pub fn calculate_layout(ty: &ValType) -> MemoryLayout {
 }
 
 /// Calculate layout for a record type
-fn calculate_record_layout(fields: &[(String, ValType)]) -> MemoryLayout {
+fn calculate_record_layout(fields: &[(String, FormatValType<ComponentProvider>)]) -> MemoryLayout {
     let mut offset = 0;
     let mut max_alignment = 1;
 
     for (_, field_type) in fields {
-        let field_layout = calculate_layout(field_type);
+        let field_layout = calculate_layout(field_type;
 
         // Align offset to field's alignment requirement
-        offset = align_to(offset, field_layout.alignment);
+        offset = align_to(offset, field_layout.alignment;
         offset += field_layout.size;
 
         // Track maximum alignment requirement
-        max_alignment = max_alignment.max(field_layout.alignment);
+        max_alignment = max_alignment.max(field_layout.alignment;
     }
 
     // Final size must be aligned to the record's alignment
-    let final_size = align_to(offset, max_alignment);
+    let final_size = align_to(offset, max_alignment;
 
     MemoryLayout::new(final_size, max_alignment)
 }
 
 /// Calculate layout for a tuple type
-fn calculate_tuple_layout(types: &[ValType]) -> MemoryLayout {
+fn calculate_tuple_layout(types: &[FormatValType<ComponentProvider>]) -> MemoryLayout {
     let mut offset = 0;
     let mut max_alignment = 1;
 
     for ty in types {
-        let layout = calculate_layout(ty);
+        let layout = calculate_layout(ty;
 
         // Align offset to element's alignment requirement
-        offset = align_to(offset, layout.alignment);
+        offset = align_to(offset, layout.alignment;
         offset += layout.size;
 
         // Track maximum alignment requirement
-        max_alignment = max_alignment.max(layout.alignment);
+        max_alignment = max_alignment.max(layout.alignment;
     }
 
     // Final size must be aligned to the tuple's alignment
-    let final_size = align_to(offset, max_alignment);
+    let final_size = align_to(offset, max_alignment;
 
     MemoryLayout::new(final_size, max_alignment)
 }
 
 /// Calculate layout for a variant type
-fn calculate_variant_layout(cases: &[(String, Option<ValType>)]) -> MemoryLayout {
+fn calculate_variant_layout(cases: &[(String, Option<FormatValType<ComponentProvider>>)]) -> MemoryLayout {
     // Discriminant size based on number of cases
-    let discriminant_size = discriminant_size(cases.len());
+    let discriminant_size = discriminant_size(cases.len);
     let discriminant_alignment = discriminant_size;
 
     // Find the largest payload
@@ -143,66 +149,66 @@ fn calculate_variant_layout(cases: &[(String, Option<ValType>)]) -> MemoryLayout
 
     for (_, payload_type) in cases {
         if let Some(ty) = payload_type {
-            let payload_layout = calculate_layout(ty);
-            max_payload_size = max_payload_size.max(payload_layout.size);
-            max_payload_alignment = max_payload_alignment.max(payload_layout.alignment);
+            let payload_layout = calculate_layout(ty;
+            max_payload_size = max_payload_size.max(payload_layout.size;
+            max_payload_alignment = max_payload_alignment.max(payload_layout.alignment;
         }
     }
 
     // Variant alignment is max of discriminant and payload alignments
-    let variant_alignment = discriminant_alignment.max(max_payload_alignment);
+    let variant_alignment = discriminant_alignment.max(max_payload_alignment;
 
     // Calculate total size
-    let payload_offset = align_to(discriminant_size, max_payload_alignment);
+    let payload_offset = align_to(discriminant_size, max_payload_alignment;
     let total_size = payload_offset + max_payload_size;
-    let final_size = align_to(total_size, variant_alignment);
+    let final_size = align_to(total_size, variant_alignment;
 
     MemoryLayout::new(final_size, variant_alignment)
 }
 
 /// Calculate layout for an enum type
 fn calculate_enum_layout(num_cases: usize) -> MemoryLayout {
-    let size = discriminant_size(num_cases);
+    let size = discriminant_size(num_cases;
     MemoryLayout::new(size, size)
 }
 
 /// Calculate layout for an option type
-fn calculate_option_layout(inner: &ValType) -> MemoryLayout {
+fn calculate_option_layout(inner: &FormatValType<ComponentProvider>) -> MemoryLayout {
     // Option is a variant with none (no payload) and some (with payload)
-    let inner_layout = calculate_layout(inner);
+    let inner_layout = calculate_layout(inner;
 
     // 1-byte discriminant + payload
-    let payload_offset = align_to(1, inner_layout.alignment);
+    let payload_offset = align_to(1, inner_layout.alignment;
     let total_size = payload_offset + inner_layout.size;
-    let alignment = inner_layout.alignment.max(1);
-    let final_size = align_to(total_size, alignment);
+    let alignment = inner_layout.alignment.max(1;
+    let final_size = align_to(total_size, alignment;
 
     MemoryLayout::new(final_size, alignment)
 }
 
 /// Calculate layout for a result type
-fn calculate_result_layout(ok_ty: Option<&ValType>, err_ty: Option<&ValType>) -> MemoryLayout {
+fn calculate_result_layout(ok_ty: Option<&FormatValType<ComponentProvider>>, err_ty: Option<&FormatValType<ComponentProvider>>) -> MemoryLayout {
     // Result is a variant with ok and err cases
     let mut max_payload_size = 0;
     let mut max_payload_alignment = 1;
 
     if let Some(ty) = ok_ty {
-        let layout = calculate_layout(ty);
-        max_payload_size = max_payload_size.max(layout.size);
-        max_payload_alignment = max_payload_alignment.max(layout.alignment);
+        let layout = calculate_layout(ty;
+        max_payload_size = max_payload_size.max(layout.size;
+        max_payload_alignment = max_payload_alignment.max(layout.alignment;
     }
 
     if let Some(ty) = err_ty {
-        let layout = calculate_layout(ty);
-        max_payload_size = max_payload_size.max(layout.size);
-        max_payload_alignment = max_payload_alignment.max(layout.alignment);
+        let layout = calculate_layout(ty;
+        max_payload_size = max_payload_size.max(layout.size;
+        max_payload_alignment = max_payload_alignment.max(layout.alignment;
     }
 
     // 1-byte discriminant + payload
-    let payload_offset = align_to(1, max_payload_alignment);
+    let payload_offset = align_to(1, max_payload_alignment;
     let total_size = payload_offset + max_payload_size;
-    let alignment = max_payload_alignment.max(1);
-    let final_size = align_to(total_size, alignment);
+    let alignment = max_payload_alignment.max(1;
+    let final_size = align_to(total_size, alignment;
 
     MemoryLayout::new(final_size, alignment)
 }
@@ -223,7 +229,7 @@ fn calculate_flags_layout(num_flags: usize) -> MemoryLayout {
         8
     };
 
-    let size = align_to(num_bytes, alignment);
+    let size = align_to(num_bytes, alignment;
     MemoryLayout::new(size, alignment)
 }
 
@@ -244,17 +250,17 @@ const fn align_to(value: usize, alignment: usize) -> usize {
 }
 
 /// Calculate field offsets for a record or struct
-pub fn calculate_field_offsets(fields: &[(String, ValType)]) -> Vec<(String, usize, MemoryLayout)> {
-    let mut result = Vec::new();
+pub fn calculate_field_offsets(fields: &[(String, FormatValType<ComponentProvider>)]) -> Vec<(String, usize, MemoryLayout)> {
+    let mut result = Vec::new);
     let mut offset = 0;
 
     for (name, field_type) in fields {
-        let layout = calculate_layout(field_type);
+        let layout = calculate_layout(field_type;
 
         // Align offset to field's alignment requirement
-        offset = align_to(offset, layout.alignment);
+        offset = align_to(offset, layout.alignment;
 
-        result.push((name.clone(), offset, layout));
+        result.push((name.clone(), offset, layout;
         offset += layout.size;
     }
 
@@ -266,11 +272,11 @@ pub struct LayoutOptimizer;
 
 impl LayoutOptimizer {
     /// Reorder fields to minimize padding (largest alignment first)
-    pub fn optimize_field_order(fields: &[(String, ValType)]) -> Vec<(String, ValType)> {
+    pub fn optimize_field_order(fields: &[(String, FormatValType<ComponentProvider>)]) -> Vec<(String, FormatValType<ComponentProvider>)> {
         let mut fields_with_layout: Vec<_> = fields
             .iter()
             .map(|(name, ty)| {
-                let layout = calculate_layout(ty);
+                let layout = calculate_layout(ty;
                 (name.clone(), ty.clone(), layout)
             })
             .collect();
@@ -278,14 +284,14 @@ impl LayoutOptimizer {
         // Sort by alignment (descending) then by size (descending)
         fields_with_layout.sort_by(|a, b| {
             b.2.alignment.cmp(&a.2.alignment).then_with(|| b.2.size.cmp(&a.2.size))
-        });
+        };
 
         fields_with_layout.into_iter().map(|(name, ty, _)| (name, ty)).collect()
     }
 
     /// Calculate padding between two adjacent fields
     pub fn calculate_padding(current_offset: usize, next_alignment: usize) -> usize {
-        let aligned_offset = align_to(current_offset, next_alignment);
+        let aligned_offset = align_to(current_offset, next_alignment;
         aligned_offset - current_offset
     }
 }
@@ -310,14 +316,31 @@ struct MemoryBuffer {
 
 impl CanonicalMemoryPool {
     /// Create a new memory pool
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self, crate::ComponentError> {
+        Ok(Self {
             #[cfg(not(any(feature = "std", )))]
-            pools: [BoundedVec::new(DefaultMemoryProvider::default()).unwrap(), BoundedVec::new(DefaultMemoryProvider::default()).unwrap(), BoundedVec::new(DefaultMemoryProvider::default()).unwrap(), BoundedVec::new(DefaultMemoryProvider::default()).unwrap()],
+            pools: [
+                {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider)?
+                },
+                {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider)?
+                },
+                {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider)?
+                },
+                {
+                    let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                    BoundedVec::new(provider)?
+                }
+            ],
             #[cfg(feature = "std")]
             pools: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
             size_classes: [64, 256, 1024, 4096],
-        }
+        })
     }
 
     /// Acquire a buffer of at least the specified size
@@ -331,7 +354,7 @@ impl CanonicalMemoryPool {
             for i in 0..self.pools[class_idx].len() {
                 if !self.pools[class_idx][i].in_use {
                     self.pools[class_idx][i].in_use = true;
-                    return Some(&mut self.pools[class_idx][i].data);
+                    return Some(&mut self.pools[class_idx][i].data;
                 }
             }
             None // Pool is full in no_std
@@ -342,12 +365,12 @@ impl CanonicalMemoryPool {
             // Find existing free buffer
             if let Some(buffer) = self.pools[class_idx].iter_mut().find(|b| !b.in_use) {
                 buffer.in_use = true;
-                return Some(&mut buffer.data);
+                return Some(&mut buffer.data;
             }
 
             // Allocate new buffer
             let buffer_size = self.size_classes[class_idx];
-            let data = vec![0u8; buffer_size].into_boxed_slice();
+            let data = vec![0u8; buffer_size].into_boxed_slice);
             self.pools[class_idx].push(MemoryBuffer { data, in_use: true });
 
             self.pools[class_idx].last_mut().map(|b| &mut b.data[..])
@@ -369,7 +392,7 @@ impl CanonicalMemoryPool {
 
 impl Default for CanonicalMemoryPool {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create CanonicalMemoryPool")
     }
 }
 
@@ -379,62 +402,62 @@ mod tests {
 
     #[test]
     fn test_primitive_layouts() {
-        assert_eq!(calculate_layout(&ValType::Bool), MemoryLayout::new(1, 1));
-        assert_eq!(calculate_layout(&ValType::U8), MemoryLayout::new(1, 1));
-        assert_eq!(calculate_layout(&ValType::U16), MemoryLayout::new(2, 2));
-        assert_eq!(calculate_layout(&ValType::U32), MemoryLayout::new(4, 4));
-        assert_eq!(calculate_layout(&ValType::U64), MemoryLayout::new(8, 8));
-        assert_eq!(calculate_layout(&ValType::F32), MemoryLayout::new(4, 4));
-        assert_eq!(calculate_layout(&ValType::F64), MemoryLayout::new(8, 8));
+        assert_eq!(calculate_layout(&FormatValType::Bool), MemoryLayout::new(1, 1;
+        assert_eq!(calculate_layout(&FormatValType::U8), MemoryLayout::new(1, 1;
+        assert_eq!(calculate_layout(&FormatValType::U16), MemoryLayout::new(2, 2;
+        assert_eq!(calculate_layout(&FormatValType::U32), MemoryLayout::new(4, 4;
+        assert_eq!(calculate_layout(&FormatValType::U64), MemoryLayout::new(8, 8;
+        assert_eq!(calculate_layout(&FormatValType::F32), MemoryLayout::new(4, 4;
+        assert_eq!(calculate_layout(&FormatValType::F64), MemoryLayout::new(8, 8;
     }
 
     #[test]
     fn test_record_layout() {
         let fields = vec![
-            ("a".to_string(), ValType::U8),
-            ("b".to_string(), ValType::U32),
-            ("c".to_string(), ValType::U16),
+            ("a".to_string(), FormatValType::U8),
+            ("b".to_string(), FormatValType::U32),
+            ("c".to_string(), FormatValType::U16),
         ];
 
-        let layout = calculate_record_layout(&fields);
+        let layout = calculate_record_layout(&fields;
         // u8 at 0, padding to 4, u32 at 4, u16 at 8, total 10 aligned to 4 = 12
-        assert_eq!(layout.size, 12);
-        assert_eq!(layout.alignment, 4);
+        assert_eq!(layout.size, 12;
+        assert_eq!(layout.alignment, 4;
     }
 
     #[test]
     fn test_alignment() {
-        assert_eq!(align_to(0, 4), 0);
-        assert_eq!(align_to(1, 4), 4);
-        assert_eq!(align_to(3, 4), 4);
-        assert_eq!(align_to(4, 4), 4);
-        assert_eq!(align_to(5, 4), 8);
+        assert_eq!(align_to(0, 4), 0;
+        assert_eq!(align_to(1, 4), 4;
+        assert_eq!(align_to(3, 4), 4;
+        assert_eq!(align_to(4, 4), 4;
+        assert_eq!(align_to(5, 4), 8;
     }
 
     #[test]
     fn test_discriminant_size() {
-        assert_eq!(discriminant_size(2), 1);
-        assert_eq!(discriminant_size(256), 1);
-        assert_eq!(discriminant_size(257), 2);
-        assert_eq!(discriminant_size(65536), 2);
-        assert_eq!(discriminant_size(65537), 4);
+        assert_eq!(discriminant_size(2), 1;
+        assert_eq!(discriminant_size(256), 1;
+        assert_eq!(discriminant_size(257), 2;
+        assert_eq!(discriminant_size(65536), 2;
+        assert_eq!(discriminant_size(65537), 4;
     }
 
     #[test]
     fn test_layout_optimizer() {
         let fields = vec![
-            ("a".to_string(), ValType::U8),
-            ("b".to_string(), ValType::U64),
-            ("c".to_string(), ValType::U16),
-            ("d".to_string(), ValType::U32),
+            ("a".to_string(), FormatValType::U8),
+            ("b".to_string(), FormatValType::U64),
+            ("c".to_string(), FormatValType::U16),
+            ("d".to_string(), FormatValType::U32),
         ];
 
-        let optimized = LayoutOptimizer::optimize_field_order(&fields);
+        let optimized = LayoutOptimizer::optimize_field_order(&fields;
 
         // Should be reordered as: u64, u32, u16, u8 (by alignment)
-        assert_eq!(optimized[0].0, "b");
-        assert_eq!(optimized[1].0, "d");
-        assert_eq!(optimized[2].0, "c");
-        assert_eq!(optimized[3].0, "a");
+        assert_eq!(optimized[0].0, "b";
+        assert_eq!(optimized[1].0, "d";
+        assert_eq!(optimized[2].0, "c";
+        assert_eq!(optimized[3].0, "a";
     }
 }

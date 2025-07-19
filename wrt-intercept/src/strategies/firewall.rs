@@ -3,6 +3,7 @@
 //! This strategy enforces security rules for function calls between
 //! components and hosts. It can allow or deny calls based on various criteria.
 
+
 use crate::prelude::{Debug, str, Value};
 use wrt_error::{Error, ErrorCategory, Result, codes};
 
@@ -101,7 +102,7 @@ impl FirewallStrategy {
     /// Check if a function call is allowed
     #[cfg(feature = "std")]
     fn is_allowed(&self, source: &str, target: &str, function: &str) -> bool {
-        let key = Self::function_key(source, target, function);
+        let key = Self::function_key(source, target, function;
 
         // Check cache first
         if let Ok(allowed) = self.allowed_functions.read() {
@@ -117,15 +118,15 @@ impl FirewallStrategy {
         }
 
         // Not in cache, apply rules
-        let allowed = self.apply_rules(source, target, function);
+        let allowed = self.apply_rules(source, target, function;
 
         // Update cache
         if allowed {
             if let Ok(mut allowed_cache) = self.allowed_functions.write() {
-                allowed_cache.insert(key);
+                allowed_cache.insert(key;
             }
         } else if let Ok(mut denied_cache) = self.denied_functions.write() {
-            denied_cache.insert(key);
+            denied_cache.insert(key;
         }
 
         allowed
@@ -190,11 +191,7 @@ impl LinkInterceptorStrategy for FirewallStrategy {
         {
             // Check if the function call is allowed
             if !self.is_allowed(source, target, function) {
-                return Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::RUNTIME_ERROR,
-                    "Security error: Function call not allowed by firewall policy",
-                ));
+                return Err(Error::runtime_error("Security error: Function call not allowed by firewall policy";
             }
         }
 
@@ -240,11 +237,7 @@ impl LinkInterceptorStrategy for FirewallStrategy {
             }
 
             if !allowed {
-                return Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::RUNTIME_ERROR,
-                    "Security error: Function call not allowed by firewall policy",
-                ));
+                return Err(Error::runtime_error("Security error: Function call not allowed by firewall policy";
             }
         }
         
@@ -252,11 +245,7 @@ impl LinkInterceptorStrategy for FirewallStrategy {
         #[cfg(not(feature = "std"))]
         {
             if !self.config.default_allow {
-                return Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::RUNTIME_ERROR,
-                    "Security error: Function call not allowed by firewall policy",
-                ));
+                return Err(Error::runtime_error("Security error: Function call not allowed by firewall policy";
             }
         }
 
@@ -304,11 +293,7 @@ impl LinkInterceptorStrategy for FirewallStrategy {
     ) -> Result<()> {
         // In pure no_std mode, we just use the default policy
         if !self.config.default_allow {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::RUNTIME_ERROR,
-                "Security error: Function call not allowed by firewall policy",
-            ));
+            return Err(Error::runtime_error("Security error: Function call not allowed by firewall policy";
         }
         Ok(())
     }
@@ -342,15 +327,15 @@ mod tests {
             )],
             check_parameters: false,
         };
-        let strategy = FirewallStrategy::new(config);
+        let strategy = FirewallStrategy::new(config;
 
         // Test allowed function
-        let result = strategy.before_call("source", "target", "allowed_function", &[]);
-        assert!(result.is_ok());
+        let result = strategy.before_call("source", "target", "allowed_function", &[];
+        assert!(result.is_ok();
 
         // Test denied function
-        let result = strategy.before_call("source", "target", "denied_function", &[]);
-        assert!(result.is_err());
+        let result = strategy.before_call("source", "target", "denied_function", &[];
+        assert!(result.is_err();
     }
 
     #[cfg(feature = "std")]
@@ -365,15 +350,15 @@ mod tests {
             )],
             check_parameters: false,
         };
-        let strategy = FirewallStrategy::new(config);
+        let strategy = FirewallStrategy::new(config;
 
         // Test allowed function
-        let result = strategy.before_call("source", "target", "allowed_function", &[]);
-        assert!(result.is_ok());
+        let result = strategy.before_call("source", "target", "allowed_function", &[];
+        assert!(result.is_ok();
 
         // Test denied function
-        let result = strategy.before_call("source", "target", "denied_function", &[]);
-        assert!(result.is_err());
+        let result = strategy.before_call("source", "target", "denied_function", &[];
+        assert!(result.is_err();
     }
 
     #[cfg(feature = "std")]
@@ -384,15 +369,15 @@ mod tests {
             rules: vec![FirewallRule::AllowSource("source".to_string(), "target".to_string())],
             check_parameters: false,
         };
-        let strategy = FirewallStrategy::new(config);
+        let strategy = FirewallStrategy::new(config;
 
         // Test allowed source
-        let result = strategy.before_call("source", "target", "any_function", &[]);
-        assert!(result.is_ok());
+        let result = strategy.before_call("source", "target", "any_function", &[];
+        assert!(result.is_ok();
 
         // Test denied source
-        let result = strategy.before_call("other_source", "target", "any_function", &[]);
-        assert!(result.is_err());
+        let result = strategy.before_call("other_source", "target", "any_function", &[];
+        assert!(result.is_err();
     }
 
     #[cfg(feature = "std")]
@@ -410,14 +395,14 @@ mod tests {
             ],
             check_parameters: false,
         };
-        let strategy = FirewallStrategy::new(config);
+        let strategy = FirewallStrategy::new(config;
 
         // Test allowed function
-        let result = strategy.before_call("source", "target", "allowed_function", &[]);
-        assert!(result.is_ok());
+        let result = strategy.before_call("source", "target", "allowed_function", &[];
+        assert!(result.is_ok();
 
         // Test denied function
-        let result = strategy.before_call("source", "target", "denied_function", &[]);
-        assert!(result.is_err());
+        let result = strategy.before_call("source", "target", "denied_function", &[];
+        assert!(result.is_err();
     }
 }

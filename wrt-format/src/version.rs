@@ -93,7 +93,7 @@ pub struct VersionInfo {
 impl Default for VersionInfo {
     fn default() -> Self {
         #[cfg(feature = "std")]
-        let features = HashMap::new();
+        let features = HashMap::new);
 
         #[cfg(not(any(feature = "std", )))]
         let features = crate::HashMap::new(wrt_foundation::NoStdProvider::default())
@@ -103,7 +103,7 @@ impl Default for VersionInfo {
             Self { version: ComponentModelVersion::default(), features, uses_experimental: false };
 
         // Initialize with default feature set for V1.0
-        info.initialize_v1_0_features();
+        info.initialize_v1_0_features);
 
         info
     }
@@ -128,8 +128,8 @@ impl Clone for VersionInfo {
 
 impl VersionInfo {
     /// Create a new VersionInfo from the binary version field
-    pub fn from_version_bytes(version_bytes: [u8; 4]) -> Self {
-        let mut info = VersionInfo::default();
+    pub fn from_version_bytes(version_bytes: [u8); 4]) -> Self {
+        let mut info = VersionInfo::default);
 
         // First two bytes are the version, next two are the layer
         let version = [version_bytes[0], version_bytes[1]];
@@ -139,12 +139,12 @@ impl VersionInfo {
             // Version 1.0
             [0x01, 0x00] => {
                 info.version = ComponentModelVersion::V1_0;
-                info.initialize_v1_0_features();
+                info.initialize_v1_0_features);
             }
             // Unknown/future version - default to V1.0 with minimal features
             _ => {
                 info.version = ComponentModelVersion::Draft;
-                info.initialize_minimal_features();
+                info.initialize_minimal_features);
             }
         }
 
@@ -154,47 +154,47 @@ impl VersionInfo {
     /// Initialize features for version 1.0
     fn initialize_v1_0_features(&mut self) {
         // Standard features in V1.0
-        let _ = self.features.insert(ComponentModelFeature::CoreModule, FeatureStatus::FullySupported);
-        let _ = self.features.insert(ComponentModelFeature::CoreInstance, FeatureStatus::FullySupported);
-        let _ = self.features.insert(ComponentModelFeature::CoreType, FeatureStatus::FullySupported);
-        let _ = self.features.insert(ComponentModelFeature::ComponentType, FeatureStatus::FullySupported);
-        let _ = self.features.insert(ComponentModelFeature::Instance, FeatureStatus::FullySupported);
-        let _ = self.features.insert(ComponentModelFeature::Alias, FeatureStatus::FullySupported);
-        let _ = self.features.insert(ComponentModelFeature::Canon, FeatureStatus::FullySupported);
-        let _ = self.features.insert(ComponentModelFeature::Start, FeatureStatus::FullySupported);
-        let _ = self.features.insert(ComponentModelFeature::Import, FeatureStatus::FullySupported);
-        let _ = self.features.insert(ComponentModelFeature::Export, FeatureStatus::FullySupported);
+        let _ = self.features.insert(ComponentModelFeature::CoreModule, FeatureStatus::FullySupported;
+        let _ = self.features.insert(ComponentModelFeature::CoreInstance, FeatureStatus::FullySupported;
+        let _ = self.features.insert(ComponentModelFeature::CoreType, FeatureStatus::FullySupported;
+        let _ = self.features.insert(ComponentModelFeature::ComponentType, FeatureStatus::FullySupported;
+        let _ = self.features.insert(ComponentModelFeature::Instance, FeatureStatus::FullySupported;
+        let _ = self.features.insert(ComponentModelFeature::Alias, FeatureStatus::FullySupported;
+        let _ = self.features.insert(ComponentModelFeature::Canon, FeatureStatus::FullySupported;
+        let _ = self.features.insert(ComponentModelFeature::Start, FeatureStatus::FullySupported;
+        let _ = self.features.insert(ComponentModelFeature::Import, FeatureStatus::FullySupported;
+        let _ = self.features.insert(ComponentModelFeature::Export, FeatureStatus::FullySupported;
 
         // Experimental features
         #[cfg(feature = "component-model-values")]
-        let _ = self.features.insert(ComponentModelFeature::Value, FeatureStatus::ExperimentalSupported);
+        let _ = self.features.insert(ComponentModelFeature::Value, FeatureStatus::ExperimentalSupported;
         #[cfg(not(feature = "component-model-values"))]
-        let _ = self.features.insert(ComponentModelFeature::Value, FeatureStatus::Unavailable);
+        let _ = self.features.insert(ComponentModelFeature::Value, FeatureStatus::Unavailable;
 
         #[cfg(feature = "component-model-resources")]
         let _ = self.features
-            .insert(ComponentModelFeature::ResourceTypes, FeatureStatus::ExperimentalSupported);
+            .insert(ComponentModelFeature::ResourceTypes, FeatureStatus::ExperimentalSupported;
         #[cfg(not(feature = "component-model-resources"))]
-        let _ = self.features.insert(ComponentModelFeature::ResourceTypes, FeatureStatus::Unavailable);
+        let _ = self.features.insert(ComponentModelFeature::ResourceTypes, FeatureStatus::Unavailable;
     }
 
     /// Initialize minimal feature set (for unknown versions)
     fn initialize_minimal_features(&mut self) {
         // Only include core features
-        let _ = self.features.insert(ComponentModelFeature::CoreModule, FeatureStatus::FullySupported);
-        let _ = self.features.insert(ComponentModelFeature::CoreInstance, FeatureStatus::FullySupported);
-        let _ = self.features.insert(ComponentModelFeature::CoreType, FeatureStatus::FullySupported);
+        let _ = self.features.insert(ComponentModelFeature::CoreModule, FeatureStatus::FullySupported;
+        let _ = self.features.insert(ComponentModelFeature::CoreInstance, FeatureStatus::FullySupported;
+        let _ = self.features.insert(ComponentModelFeature::CoreType, FeatureStatus::FullySupported;
 
         // Other features are unavailable
-        let _ = self.features.insert(ComponentModelFeature::ComponentType, FeatureStatus::Unavailable);
-        let _ = self.features.insert(ComponentModelFeature::Instance, FeatureStatus::Unavailable);
-        let _ = self.features.insert(ComponentModelFeature::Alias, FeatureStatus::Unavailable);
-        let _ = self.features.insert(ComponentModelFeature::Canon, FeatureStatus::Unavailable);
-        let _ = self.features.insert(ComponentModelFeature::Start, FeatureStatus::Unavailable);
-        let _ = self.features.insert(ComponentModelFeature::Import, FeatureStatus::Unavailable);
-        let _ = self.features.insert(ComponentModelFeature::Export, FeatureStatus::Unavailable);
-        let _ = self.features.insert(ComponentModelFeature::Value, FeatureStatus::Unavailable);
-        let _ = self.features.insert(ComponentModelFeature::ResourceTypes, FeatureStatus::Unavailable);
+        let _ = self.features.insert(ComponentModelFeature::ComponentType, FeatureStatus::Unavailable;
+        let _ = self.features.insert(ComponentModelFeature::Instance, FeatureStatus::Unavailable;
+        let _ = self.features.insert(ComponentModelFeature::Alias, FeatureStatus::Unavailable;
+        let _ = self.features.insert(ComponentModelFeature::Canon, FeatureStatus::Unavailable;
+        let _ = self.features.insert(ComponentModelFeature::Start, FeatureStatus::Unavailable;
+        let _ = self.features.insert(ComponentModelFeature::Import, FeatureStatus::Unavailable;
+        let _ = self.features.insert(ComponentModelFeature::Export, FeatureStatus::Unavailable;
+        let _ = self.features.insert(ComponentModelFeature::Value, FeatureStatus::Unavailable;
+        let _ = self.features.insert(ComponentModelFeature::ResourceTypes, FeatureStatus::Unavailable;
     }
 
     /// Check if a feature is available (either experimental or fully supported)
@@ -242,7 +242,7 @@ impl VersionInfo {
         // that correspond to experimental features
 
         let value_section_present =
-            binary.windows(1).any(|window| window[0] == crate::binary::COMPONENT_VALUE_SECTION_ID);
+            binary.windows(1).any(|window| window[0] == crate::binary::COMPONENT_VALUE_SECTION_ID;
         if value_section_present
             && self.get_feature_status(ComponentModelFeature::Value)
                 == FeatureStatus::ExperimentalSupported
@@ -257,17 +257,11 @@ impl VersionInfo {
 }
 
 // Manual trait implementations for no_std compatibility with BoundedMap
-#[cfg(not(any(feature = "std")))]
-mod no_std_traits {
-    use wrt_foundation::traits::{
-        Checksummable, FromBytes, ToBytes,
-    };
+use wrt_foundation::traits::{Checksummable, FromBytes, ToBytes};
 
-    use super::*;
-
-    impl Checksummable for ComponentModelFeature {
+impl Checksummable for ComponentModelFeature {
         fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-            checksum.update(*self as u8);
+            checksum.update(*self as u8;
         }
     }
 
@@ -304,18 +298,14 @@ mod no_std_traits {
                 9 => Ok(ComponentModelFeature::Export),
                 10 => Ok(ComponentModelFeature::Value),
                 11 => Ok(ComponentModelFeature::ResourceTypes),
-                _ => Err(wrt_error::Error::new(
-                    wrt_error::ErrorCategory::Parse,
-                    wrt_error::codes::INVALID_VALUE,
-                    "Invalid ComponentModelFeature enum value",
-                )),
+                _ => Err(wrt_error::Error::runtime_execution_error("Invalid ComponentModelFeature value")),
             }
         }
     }
 
     impl Checksummable for FeatureStatus {
         fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-            checksum.update(*self as u8);
+            checksum.update(*self as u8;
         }
     }
 
@@ -343,15 +333,12 @@ mod no_std_traits {
                 0 => Ok(FeatureStatus::Unavailable),
                 1 => Ok(FeatureStatus::ExperimentalSupported),
                 2 => Ok(FeatureStatus::FullySupported),
-                _ => Err(wrt_error::Error::new(
-                    wrt_error::ErrorCategory::Parse,
+                _ => Err(wrt_error::Error::new(wrt_error::ErrorCategory::Parse,
                     wrt_error::codes::INVALID_VALUE,
-                    "Invalid FeatureStatus enum value",
-                )),
+                    "Invalid FeatureStatus value")),
             }
         }
     }
-}
 
 #[cfg(test)]
 mod tests {
@@ -361,28 +348,28 @@ mod tests {
     fn test_version_detection() {
         // V1.0
         let v1_bytes = [0x01, 0x00, 0x01, 0x00];
-        let v1_info = VersionInfo::from_version_bytes(v1_bytes);
-        assert_eq!(v1_info.version, ComponentModelVersion::V1_0);
+        let v1_info = VersionInfo::from_version_bytes(v1_bytes;
+        assert_eq!(v1_info.version, ComponentModelVersion::V1_0;
 
         // Unknown version
         let unknown_bytes = [0x02, 0x00, 0x01, 0x00];
-        let unknown_info = VersionInfo::from_version_bytes(unknown_bytes);
-        assert_eq!(unknown_info.version, ComponentModelVersion::Draft);
+        let unknown_info = VersionInfo::from_version_bytes(unknown_bytes;
+        assert_eq!(unknown_info.version, ComponentModelVersion::Draft;
     }
 
     #[test]
     fn test_feature_availability() {
         let v1_bytes = [0x01, 0x00, 0x01, 0x00];
-        let v1_info = VersionInfo::from_version_bytes(v1_bytes);
+        let v1_info = VersionInfo::from_version_bytes(v1_bytes;
 
         // Core features should be available
-        assert!(v1_info.is_feature_available(ComponentModelFeature::CoreModule));
-        assert!(v1_info.is_feature_available(ComponentModelFeature::CoreInstance));
+        assert!(v1_info.is_feature_available(ComponentModelFeature::CoreModule);
+        assert!(v1_info.is_feature_available(ComponentModelFeature::CoreInstance);
 
         // Experimental features depend on compile-time flags
         #[cfg(feature = "component-model-values")]
-        assert!(v1_info.is_feature_available(ComponentModelFeature::Value));
+        assert!(v1_info.is_feature_available(ComponentModelFeature::Value);
         #[cfg(not(feature = "component-model-values"))]
-        assert!(!v1_info.is_feature_available(ComponentModelFeature::Value));
+        assert!(!v1_info.is_feature_available(ComponentModelFeature::Value);
     }
 }

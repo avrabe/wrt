@@ -1,34 +1,49 @@
 #![cfg(feature = "runtime-breakpoints")]
 
 use wrt_foundation::{
-    bounded::{BoundedVec, MAX_DWARF_FILE_TABLE},
+    bounded::{
+        BoundedVec,
+        MAX_DWARF_FILE_TABLE,
+    },
     NoStdProvider,
 };
 
+use crate::bounded_debug_infra;
 /// Runtime breakpoint management implementation
 /// Provides breakpoint setting, hit detection, and condition evaluation
 use crate::{
     runtime_api::{
-        Breakpoint, BreakpointCondition, BreakpointId, DebugAction, DebugError, RuntimeDebugger,
+        Breakpoint,
+        BreakpointCondition,
+        BreakpointId,
+        DebugAction,
+        DebugError,
+        RuntimeDebugger,
         RuntimeState,
     },
-    FileTable, LineInfo,
+    FileTable,
+    LineInfo,
 };
 
 /// Breakpoint manager for runtime debugging
 pub struct BreakpointManager {
     /// Active breakpoints
-    breakpoints: BoundedVec<Breakpoint, MAX_DWARF_FILE_TABLE, NoStdProvider<1024>>,
+    breakpoints:
+        BoundedVec<Breakpoint, MAX_DWARF_FILE_TABLE, crate::bounded_debug_infra::DebugProvider>,
     /// Next breakpoint ID
-    next_id: u32,
+    next_id:     u32,
     /// Global enable/disable
-    enabled: bool,
+    enabled:     bool,
 }
 
 impl BreakpointManager {
     /// Create a new breakpoint manager
     pub fn new() -> Self {
-        Self { breakpoints: BoundedVec::new(NoStdProvider), next_id: 1, enabled: true }
+        Self {
+            breakpoints: BoundedVec::new(NoStdProvider),
+            next_id:     1,
+            enabled:     true,
+        }
     }
 
     /// Enable or disable all breakpoints
@@ -40,10 +55,10 @@ impl BreakpointManager {
     pub fn add_breakpoint(&mut self, addr: u32) -> Result<BreakpointId, DebugError> {
         // Check for duplicate
         if self.find_by_address(addr).is_some() {
-            return Err(DebugError::DuplicateBreakpoint);
+            return Err(DebugError::DuplicateBreakpoint;
         }
 
-        let id = BreakpointId(self.next_id);
+        let id = BreakpointId(self.next_id;
         self.next_id += 1;
 
         let bp = Breakpoint {
@@ -70,10 +85,10 @@ impl BreakpointManager {
     ) -> Result<BreakpointId, DebugError> {
         // Check for duplicate
         if self.find_by_location(file_index, line).is_some() {
-            return Err(DebugError::DuplicateBreakpoint);
+            return Err(DebugError::DuplicateBreakpoint;
         }
 
-        let id = BreakpointId(self.next_id);
+        let id = BreakpointId(self.next_id;
         self.next_id += 1;
 
         let bp = Breakpoint {
@@ -99,7 +114,7 @@ impl BreakpointManager {
             .position(|bp| bp.id == id)
             .ok_or(DebugError::BreakpointNotFound)?;
 
-        self.breakpoints.remove(pos);
+        self.breakpoints.remove(pos;
         Ok(())
     }
 
@@ -131,7 +146,7 @@ impl BreakpointManager {
             .find(|bp| bp.id == id)
             .ok_or(DebugError::BreakpointNotFound)?;
 
-        bp.condition = Some(condition);
+        bp.condition = Some(condition;
         Ok(())
     }
 
@@ -169,7 +184,7 @@ impl BreakpointManager {
                 } else {
                     None
                 }
-            }
+            },
             Some(BreakpointCondition::LocalEquals { index, value }) => {
                 if let Some(local_val) = state.read_local(*index) {
                     if local_val == *value {
@@ -180,7 +195,7 @@ impl BreakpointManager {
                 } else {
                     None
                 }
-            }
+            },
         }
     }
 
@@ -191,7 +206,7 @@ impl BreakpointManager {
 
     /// Clear all breakpoints
     pub fn clear_all(&mut self) {
-        self.breakpoints.clear();
+        self.breakpoints.clear);
     }
 
     /// Get breakpoint by ID
@@ -203,26 +218,26 @@ impl BreakpointManager {
 /// Default debugger implementation
 pub struct DefaultDebugger {
     /// Breakpoint manager
-    breakpoints: BreakpointManager,
+    breakpoints:     BreakpointManager,
     /// Current action
-    action: DebugAction,
+    action:          DebugAction,
     /// Single step mode
-    single_step: bool,
+    single_step:     bool,
     /// Step over depth
     step_over_depth: Option<u32>,
     /// File table for display
-    file_table: Option<FileTable<'static>>,
+    file_table:      Option<FileTable<'static>>,
 }
 
 impl DefaultDebugger {
     /// Create a new debugger
     pub fn new() -> Self {
         Self {
-            breakpoints: BreakpointManager::new(),
-            action: DebugAction::Continue,
-            single_step: false,
+            breakpoints:     BreakpointManager::new(),
+            action:          DebugAction::Continue,
+            single_step:     false,
             step_over_depth: None,
-            file_table: None,
+            file_table:      None,
         }
     }
 
@@ -233,7 +248,7 @@ impl DefaultDebugger {
 
     /// Set file table for display
     pub fn set_file_table(&mut self, file_table: FileTable<'static>) {
-        self.file_table = Some(file_table);
+        self.file_table = Some(file_table;
     }
 
     /// Set next action
@@ -243,11 +258,11 @@ impl DefaultDebugger {
         match action {
             DebugAction::StepInstruction | DebugAction::StepLine => {
                 self.single_step = true;
-            }
+            },
             DebugAction::Continue => {
                 self.single_step = false;
-            }
-            _ => {}
+            },
+            _ => {},
         }
     }
 
@@ -329,7 +344,7 @@ impl RuntimeDebugger for DefaultDebugger {
     fn on_function_exit(&mut self, _func_idx: u32, _state: &dyn RuntimeState) {
         // Track for step-over
         if let Some(ref mut depth) = self.step_over_depth {
-            *depth = depth.saturating_sub(1);
+            *depth = depth.saturating_sub(1;
             if *depth == 0 {
                 self.step_over_depth = None;
                 self.single_step = true;
@@ -349,7 +364,7 @@ fn format_u32(mut n: u32, buf: &mut [u8]) -> &str {
         return "0";
     }
 
-    let mut i = buf.len();
+    let mut i = buf.len);
     while n > 0 && i > 0 {
         i -= 1;
         buf[i] = b'0' + (n % 10) as u8;
@@ -359,7 +374,7 @@ fn format_u32(mut n: u32, buf: &mut [u8]) -> &str {
     core::str::from_utf8(&buf[i..]).unwrap_or("?")
 }
 
-fn format_hex_u32(mut n: u32, buf: &mut [u8; 8]) -> &str {
+fn format_hex_u32(mut n: u32, buf: &mut [u8); 8]) -> &str {
     for i in (0..8).rev() {
         let digit = (n & 0xF) as u8;
         buf[i] = if digit < 10 { b'0' + digit } else { b'a' + digit - 10 };
@@ -374,30 +389,30 @@ mod tests {
 
     #[test]
     fn test_breakpoint_management() {
-        let mut manager = BreakpointManager::new();
+        let mut manager = BreakpointManager::new);
 
         // Add breakpoint
         let id1 = manager.add_breakpoint(0x1000).unwrap();
-        assert!(manager.find_by_address(0x1000).is_some());
+        assert!(manager.find_by_address(0x1000).is_some();
 
         // No duplicate
-        assert!(manager.add_breakpoint(0x1000).is_err());
+        assert!(manager.add_breakpoint(0x1000).is_err();
 
         // Add line breakpoint
         let id2 = manager.add_line_breakpoint(1, 42, 0x2000).unwrap();
-        assert!(manager.find_by_location(1, 42).is_some());
+        assert!(manager.find_by_location(1, 42).is_some();
 
         // Remove breakpoint
         manager.remove_breakpoint(id1).unwrap();
-        assert!(manager.find_by_address(0x1000).is_none());
+        assert!(manager.find_by_address(0x1000).is_none();
 
         // List breakpoints
-        assert_eq!(manager.list_breakpoints().len(), 1);
+        assert_eq!(manager.list_breakpoints().len(), 1;
     }
 
     #[test]
     fn test_breakpoint_conditions() {
-        let mut manager = BreakpointManager::new();
+        let mut manager = BreakpointManager::new);
 
         let id = manager.add_breakpoint(0x1000).unwrap();
 
@@ -410,18 +425,23 @@ mod tests {
             fn pc(&self) -> u32 {
                 0x1000
             }
+
             fn sp(&self) -> u32 {
                 0
             }
+
             fn fp(&self) -> Option<u32> {
                 None
             }
+
             fn read_local(&self, _: u32) -> Option<u64> {
                 None
             }
+
             fn read_stack(&self, _: u32) -> Option<u64> {
                 None
             }
+
             fn current_function(&self) -> Option<u32> {
                 None
             }
@@ -430,10 +450,10 @@ mod tests {
         let state = MockState;
 
         // Should not break on first two hits
-        assert!(manager.should_break(0x1000, &state).is_none());
-        assert!(manager.should_break(0x1000, &state).is_none());
+        assert!(manager.should_break(0x1000, &state).is_none();
+        assert!(manager.should_break(0x1000, &state).is_none();
 
         // Should break on third hit
-        assert!(manager.should_break(0x1000, &state).is_some());
+        assert!(manager.should_break(0x1000, &state).is_some();
     }
 }

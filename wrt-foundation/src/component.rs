@@ -22,7 +22,7 @@ use crate::{
 // Binary std/no_std choice
 #[cfg(not(feature = "std"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Hash)]
-pub struct TypeRef(pub u32);
+pub struct TypeRef(pub u32;
 
 #[cfg(not(feature = "std"))]
 impl TypeRef {
@@ -34,7 +34,7 @@ impl TypeRef {
 #[cfg(not(feature = "std"))]
 impl Checksummable for TypeRef {
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
-        self.0.update_checksum(checksum);
+        self.0.update_checksum(checksum;
     }
 }
 
@@ -238,7 +238,7 @@ pub enum ComponentAliasOuterKind {
 
 impl Checksummable for ComponentAliasOuterKind {
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
-        checksum.update(*self as u8);
+        checksum.update(*self as u8;
     }
 }
 
@@ -263,11 +263,7 @@ impl FromBytes for ComponentAliasOuterKind {
             1 => Ok(Self::Component),
             2 => Ok(Self::CoreType),
             3 => Ok(Self::CoreModule),
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid byte for ComponentAliasOuterKind",
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid component kind discriminant")),
         }
     }
 }
@@ -355,7 +351,7 @@ pub enum ExternKind {
 
 impl Checksummable for ExternKind {
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
-        checksum.update(*self as u8);
+        checksum.update(*self as u8;
     }
 }
 
@@ -389,8 +385,7 @@ impl FromBytes for ExternKind {
             _ => Err(Error::new(
                 ErrorCategory::Parse,
                 codes::INVALID_VALUE,
-                "Invalid byte for ExternKind",
-            )),
+                "Invalid enum value")),
         }
     }
 }
@@ -398,7 +393,7 @@ impl FromBytes for ExternKind {
 /// Placeholder for a Resource Type definition.
 /// In the component model, resources are opaque handles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ResourceType<P: MemoryProvider>(pub u32, pub PhantomData<P>);
+pub struct ResourceType<P: MemoryProvider>(pub u32, pub PhantomData<P>;
 
 // Manual Default for ResourceType<P>
 impl<P: MemoryProvider> Default for ResourceType<P> {
@@ -419,10 +414,10 @@ impl<P: MemoryProvider> Default for ResourceType<P> {
 //     ExternType<P>: Checksummable, // This will be complex for an enum
 // {
 //     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
-//         self.name.update_checksum(checksum);
-//         self.ty.update_checksum(checksum);
+//         self.name.update_checksum(checksum;
+//         self.ty.update_checksum(checksum;
 //         if let Some(desc) = &self.desc {
-//             desc.update_checksum(checksum);
+//             desc.update_checksum(checksum;
 //         } else {
 //             // Handle None case for checksum, perhaps a specific byte pattern
 //             checksum.consume(&[0u8]); // Example
@@ -553,19 +548,19 @@ mod tests {
     fn namespace_from_str_works() {
         let provider = StdProvider::new(Vec::new()); // Example provider
         let ns = Namespace::from_str("wasi:filesystem/types", provider).unwrap();
-        assert_eq!(ns.elements.len(), 3);
-        assert_eq!(ns.elements.get(0).unwrap().as_str().unwrap(), "wasi");
-        assert_eq!(ns.elements.get(1).unwrap().as_str().unwrap(), "filesystem");
-        assert_eq!(ns.elements.get(2).unwrap().as_str().unwrap(), "types");
+        assert_eq!(ns.elements.len(), 3;
+        assert_eq!(ns.elements.get(0).unwrap().as_str().unwrap(), "wasi";
+        assert_eq!(ns.elements.get(1).unwrap().as_str().unwrap(), "filesystem";
+        assert_eq!(ns.elements.get(2).unwrap().as_str().unwrap(), "types";
     }
 
     #[test]
     fn namespace_from_str_empty_parts() {
-        let provider = StdProvider::new(Vec::new());
+        let provider = StdProvider::new(Vec::new);
         let ns = Namespace::from_str("foo::bar", provider).unwrap(); // Handles empty part
-        assert_eq!(ns.elements.len(), 2);
-        assert_eq!(ns.elements.get(0).unwrap().as_str().unwrap(), "foo");
-        assert_eq!(ns.elements.get(1).unwrap().as_str().unwrap(), "bar");
+        assert_eq!(ns.elements.len(), 2;
+        assert_eq!(ns.elements.get(0).unwrap().as_str().unwrap(), "foo";
+        assert_eq!(ns.elements.get(1).unwrap().as_str().unwrap(), "bar";
     }
 }
 
@@ -686,16 +681,16 @@ macro_rules! impl_frombytes_struct {
 }
 
 // Import<P>
-impl_checksummable_struct!(Import<P: MemoryProvider + Default + Clone + PartialEq + Eq>, key, ty);
-impl_tobytes_struct!(Import<P: MemoryProvider + Default + Clone + PartialEq + Eq>, key, ty);
-impl_frombytes_struct!(Import<P: MemoryProvider + Default + Clone + PartialEq + Eq>, key: ImportKey<P>, ty: ExternType<P>);
+impl_checksummable_struct!(Import<P: MemoryProvider + Default + Clone + PartialEq + Eq>, key, ty;
+impl_tobytes_struct!(Import<P: MemoryProvider + Default + Clone + PartialEq + Eq>, key, ty;
+impl_frombytes_struct!(Import<P: MemoryProvider + Default + Clone + PartialEq + Eq>, key: ImportKey<P>, ty: ExternType<P>;
 
 // Export<P>
 impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Export<P> {
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
-        self.name.update_checksum(checksum);
-        self.ty.update_checksum(checksum);
-        self.desc.update_checksum(checksum);
+        self.name.update_checksum(checksum;
+        self.ty.update_checksum(checksum;
+        self.desc.update_checksum(checksum;
     }
 }
 
@@ -727,16 +722,16 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for Export<
 }
 
 // ImportKey<P>
-impl_checksummable_struct!(ImportKey<P: MemoryProvider + Default + Clone + PartialEq + Eq>, namespace, name);
-impl_tobytes_struct!(ImportKey<P: MemoryProvider + Default + Clone + PartialEq + Eq>, namespace, name);
-impl_frombytes_struct!(ImportKey<P: MemoryProvider + Default + Clone + PartialEq + Eq>, namespace: Namespace<P>, name: WasmName<MAX_NAME_LEN, P>);
+impl_checksummable_struct!(ImportKey<P: MemoryProvider + Default + Clone + PartialEq + Eq>, namespace, name;
+impl_tobytes_struct!(ImportKey<P: MemoryProvider + Default + Clone + PartialEq + Eq>, namespace, name;
+impl_frombytes_struct!(ImportKey<P: MemoryProvider + Default + Clone + PartialEq + Eq>, namespace: Namespace<P>, name: WasmName<MAX_NAME_LEN, P>;
 
 // Namespace<P>
-impl_checksummable_struct!(Namespace<P: MemoryProvider + Default + Clone + PartialEq + Eq>, elements);
-impl_tobytes_struct!(Namespace<P: MemoryProvider + Default + Clone + PartialEq + Eq>, elements);
+impl_checksummable_struct!(Namespace<P: MemoryProvider + Default + Clone + PartialEq + Eq>, elements;
+impl_tobytes_struct!(Namespace<P: MemoryProvider + Default + Clone + PartialEq + Eq>, elements;
 impl_frombytes_struct!(Namespace<P: MemoryProvider + Default + Clone + PartialEq + Eq>,
     elements: BoundedVec<WasmName<MAX_NAME_LEN, P>, MAX_NAMESPACE_ELEMENTS, P>
-);
+;
 
 // ExternType<P>
 impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for ExternType<P> {
@@ -842,27 +837,23 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for ExternT
             7 => Ok(Self::CoreModule(TypeRef::from_bytes_with_provider(reader, provider)?)),
             8 => Ok(Self::TypeDef(TypeRef::from_bytes_with_provider(reader, provider)?)), /* This is TypeRef */
             9 => Ok(Self::Resource(ResourceType::<P>::from_bytes_with_provider(reader, provider)?)), /* This is ResourceType<P> */
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid variant tag for ExternType",
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid component type kind discriminant")),
         }
     }
 }
 
 // CoreModuleType<P>
-impl_checksummable_struct!(CoreModuleType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports);
-impl_tobytes_struct!(CoreModuleType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports);
+impl_checksummable_struct!(CoreModuleType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports;
+impl_tobytes_struct!(CoreModuleType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports;
 impl_frombytes_struct!(CoreModuleType<P: MemoryProvider + Default + Clone + PartialEq + Eq>,
     imports: BoundedVec<Import<P>, MAX_COMPONENT_IMPORTS, P>,
     exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>
-);
+;
 
 // InstanceType<P>
-impl_checksummable_struct!(InstanceType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, exports);
-impl_tobytes_struct!(InstanceType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, exports);
-impl_frombytes_struct!(InstanceType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>);
+impl_checksummable_struct!(InstanceType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, exports;
+impl_tobytes_struct!(InstanceType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, exports;
+impl_frombytes_struct!(InstanceType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>;
 
 // ResourceType<P>
 impl<P: MemoryProvider> Checksummable for ResourceType<P> {
@@ -896,7 +887,7 @@ impl<P: MemoryProvider> FromBytes for ResourceType<P> {
 // ComponentAliasExportKind
 impl Checksummable for ComponentAliasExportKind {
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
-        checksum.update(*self as u8);
+        checksum.update(*self as u8;
     }
 }
 
@@ -926,21 +917,20 @@ impl FromBytes for ComponentAliasExportKind {
             _ => Err(Error::new(
                 ErrorCategory::Parse,
                 codes::INVALID_VALUE,
-                "Invalid byte for ComponentAliasExportKind",
-            )),
+                "Invalid enum value")),
         }
     }
 }
 
 // ComponentAliasCoreInstanceExport<P>
-impl_checksummable_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, core_instance_idx, name);
-impl_tobytes_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, core_instance_idx, name);
-impl_frombytes_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, core_instance_idx: u32, name: WasmName<MAX_NAME_LEN, P>);
+impl_checksummable_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, core_instance_idx, name;
+impl_tobytes_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, core_instance_idx, name;
+impl_frombytes_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, core_instance_idx: u32, name: WasmName<MAX_NAME_LEN, P>;
 
 // ComponentAliasInstanceExport<P>
-impl_checksummable_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, instance_idx, name, kind);
-impl_tobytes_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, instance_idx, name, kind);
-impl_frombytes_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, instance_idx: u32, name: WasmName<MAX_NAME_LEN, P>, kind: ComponentAliasExportKind);
+impl_checksummable_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, instance_idx, name, kind;
+impl_tobytes_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, instance_idx, name, kind;
+impl_frombytes_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, instance_idx: u32, name: WasmName<MAX_NAME_LEN, P>, kind: ComponentAliasExportKind;
 
 // ComponentAlias<P>
 impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for ComponentAlias<P> {
@@ -950,7 +940,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Com
             ComponentAlias::CoreInstanceExport(_) => 1u8,
             ComponentAlias::Outer(_) => 2u8,
         };
-        discriminant_byte.update_checksum(checksum);
+        discriminant_byte.update_checksum(checksum;
         match self {
             ComponentAlias::InstanceExport(e) => e.update_checksum(checksum),
             ComponentAlias::CoreInstanceExport(e) => e.update_checksum(checksum),
@@ -1006,11 +996,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for Compone
                 let inner = ComponentAliasOuter::from_bytes_with_provider(reader, provider)?;
                 Ok(ComponentAlias::Outer(inner))
             }
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid variant index for ComponentAlias",
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid variant index for ComponentAlias")),
         }
     }
     // from_bytes is provided by the trait
@@ -1026,16 +1012,16 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable
             ComponentInstanceKind::Instantiate { .. } => 1u8,
             ComponentInstanceKind::FromExports { .. } => 2u8,
         };
-        discriminant_byte.update_checksum(checksum);
+        discriminant_byte.update_checksum(checksum;
 
         match self {
             ComponentInstanceKind::Unknown => {} // No data to checksum
             ComponentInstanceKind::Instantiate { component_idx, args } => {
-                component_idx.update_checksum(checksum);
-                args.update_checksum(checksum);
+                component_idx.update_checksum(checksum;
+                args.update_checksum(checksum;
             }
             ComponentInstanceKind::FromExports { exports } => {
-                exports.update_checksum(checksum);
+                exports.update_checksum(checksum;
             }
         }
     }
@@ -1091,13 +1077,13 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for Compone
 }
 
 // ComponentInstance<P>
-impl_checksummable_struct!(ComponentInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind);
-impl_tobytes_struct!(ComponentInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind);
-impl_frombytes_struct!(ComponentInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind: ComponentInstanceKind<P>);
+impl_checksummable_struct!(ComponentInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind;
+impl_tobytes_struct!(ComponentInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind;
+impl_frombytes_struct!(ComponentInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind: ComponentInstanceKind<P>;
 
 // ComponentType<P>
-impl_checksummable_struct!(ComponentType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports, aliases, instances, core_instances, component_types, core_types);
-impl_tobytes_struct!(ComponentType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports, aliases, instances, core_instances, component_types, core_types);
+impl_checksummable_struct!(ComponentType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports, aliases, instances, core_instances, component_types, core_types;
+impl_tobytes_struct!(ComponentType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports, aliases, instances, core_instances, component_types, core_types;
 impl_frombytes_struct!(ComponentType<P: MemoryProvider + Default + Clone + PartialEq + Eq>,
     imports: BoundedVec<Import<P>, MAX_COMPONENT_IMPORTS, P>,
     exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>,
@@ -1106,7 +1092,7 @@ impl_frombytes_struct!(ComponentType<P: MemoryProvider + Default + Clone + Parti
     core_instances: BoundedVec<CoreInstance<P>, MAX_CORE_INSTANCES, P>,
     component_types: BoundedVec<TypeRef, MAX_COMPONENT_TYPES, P>,
     core_types: BoundedVec<CoreType<P>, MAX_CORE_TYPES, P>
-);
+;
 
 // CoreInstanceKind<P>
 impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for CoreInstanceKind<P> {
@@ -1116,16 +1102,16 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Cor
             CoreInstanceKind::Instantiate { .. } => 1u8,
             CoreInstanceKind::FromExports { .. } => 2u8,
         };
-        discriminant_byte.update_checksum(checksum);
+        discriminant_byte.update_checksum(checksum;
 
         match self {
             CoreInstanceKind::Unknown => {} // No data to checksum
             CoreInstanceKind::Instantiate { module_idx, args } => {
-                module_idx.update_checksum(checksum);
-                args.update_checksum(checksum);
+                module_idx.update_checksum(checksum;
+                args.update_checksum(checksum;
             }
             CoreInstanceKind::FromExports { exports } => {
-                exports.update_checksum(checksum);
+                exports.update_checksum(checksum;
             }
         }
     }
@@ -1181,9 +1167,9 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for CoreIns
 }
 
 // CoreInstance<P>
-impl_checksummable_struct!(CoreInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind);
-impl_tobytes_struct!(CoreInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind);
-impl_frombytes_struct!(CoreInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind: CoreInstanceKind<P>);
+impl_checksummable_struct!(CoreInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind;
+impl_tobytes_struct!(CoreInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind;
+impl_frombytes_struct!(CoreInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind: CoreInstanceKind<P>;
 
 // CoreType<P>
 impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for CoreType<P> {
@@ -1197,7 +1183,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Cor
             CoreType::Tag(_) => 5u8, /* Assuming Tag is the last variant based on typical enum
                                       * layouts */
         };
-        discriminant_byte.update_checksum(checksum);
+        discriminant_byte.update_checksum(checksum;
 
         match self {
             CoreType::Unknown => {} // No data
@@ -1283,8 +1269,8 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for CoreTyp
 // ComponentAliasOuter<P>)
 impl Checksummable for ComponentAliasOuter {
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
-        self.count.update_checksum(checksum);
-        self.index.update_checksum(checksum);
+        self.count.update_checksum(checksum;
+        self.index.update_checksum(checksum;
         self.kind.update_checksum(checksum); // ComponentAliasOuterKind impls
                                              // Checksummable
     }
@@ -1316,11 +1302,11 @@ impl FromBytes for ComponentAliasOuter {
 }
 
 // ComponentInstantiationArg<P>
-impl_checksummable_struct!(ComponentInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind);
-impl_tobytes_struct!(ComponentInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind);
-impl_frombytes_struct!(ComponentInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name: WasmName<MAX_NAME_LEN, P>, index: u32, kind: ExternKind);
+impl_checksummable_struct!(ComponentInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind;
+impl_tobytes_struct!(ComponentInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind;
+impl_frombytes_struct!(ComponentInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name: WasmName<MAX_NAME_LEN, P>, index: u32, kind: ExternKind;
 
 // CoreInstantiationArg<P>
-impl_checksummable_struct!(CoreInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind);
-impl_tobytes_struct!(CoreInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind);
-impl_frombytes_struct!(CoreInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name: WasmName<MAX_NAME_LEN, P>, index: u32, kind: ExternKind);
+impl_checksummable_struct!(CoreInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind;
+impl_tobytes_struct!(CoreInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind;
+impl_frombytes_struct!(CoreInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name: WasmName<MAX_NAME_LEN, P>, index: u32, kind: ExternKind;

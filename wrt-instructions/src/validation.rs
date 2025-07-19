@@ -52,7 +52,7 @@ impl ValidationContext {
     pub fn push_type(&mut self, _ty: ValueType) -> Result<()> {
         self.stack_depth += 1;
         if self.stack_depth > 1024 {
-            return Err(Error::validation_error("Stack overflow"));
+            return Err(Error::validation_error("Stack overflow";
         }
         Ok(())
     }
@@ -60,7 +60,7 @@ impl ValidationContext {
     /// Simulate popping a type from the stack
     pub fn pop_type(&mut self) -> Result<ValueType> {
         if !self.unreachable && self.stack_depth == 0 {
-            return Err(Error::validation_error("Stack underflow"));
+            return Err(Error::validation_error("Stack underflow";
         }
         if self.stack_depth > 0 {
             self.stack_depth -= 1;
@@ -154,7 +154,7 @@ pub fn validate_memory_op(
 ) -> Result<()> {
     // Check memory index
     if memory_idx >= ctx.memories {
-        return Err(Error::validation_error("Invalid memory index"));
+        return Err(Error::validation_error("Invalid memory index";
     }
 
     if !ctx.is_unreachable() {
@@ -188,7 +188,7 @@ pub fn validate_branch(
 ) -> Result<()> {
     // Basic validation only
     if depth > 1000 {
-        return Err(Error::validation_error("Invalid branch depth"));
+        return Err(Error::validation_error("Invalid branch depth";
     }
     ctx.mark_unreachable()?;
     Ok(())
@@ -300,36 +300,36 @@ mod tests {
 
     #[test]
     fn test_validation_context_creation() {
-        let ctx = ValidationContext::new();
-        assert_eq!(ctx.stack_depth, 0);
+        let ctx = ValidationContext::new);
+        assert_eq!(ctx.stack_depth, 0;
         assert!(!ctx.unreachable);
     }
 
     #[test]
     fn test_push_pop_types() {
-        let mut ctx = ValidationContext::new();
+        let mut ctx = ValidationContext::new);
         
         // Push some types
         ctx.push_type(ValueType::I32).unwrap();
         ctx.push_type(ValueType::F64).unwrap();
-        assert_eq!(ctx.stack_depth, 2);
+        assert_eq!(ctx.stack_depth, 2;
         
         // Pop types
         ctx.pop_type().unwrap();
         ctx.pop_type().unwrap();
-        assert_eq!(ctx.stack_depth, 0);
+        assert_eq!(ctx.stack_depth, 0;
         
         // Underflow should error
-        assert!(ctx.pop_type().is_err());
+        assert!(ctx.pop_type().is_err();
     }
 
     #[test]
     fn test_unreachable_handling() {
-        let mut ctx = ValidationContext::new();
+        let mut ctx = ValidationContext::new);
         
         // Mark as unreachable
         ctx.mark_unreachable().unwrap();
-        assert!(ctx.is_unreachable());
+        assert!(ctx.is_unreachable();
         
         // Pop should succeed even with empty stack when unreachable
         ctx.pop_type().unwrap();
@@ -337,7 +337,7 @@ mod tests {
 
     #[test]
     fn test_validate_arithmetic() {
-        let mut ctx = ValidationContext::new();
+        let mut ctx = ValidationContext::new);
         
         // Set up stack for i32.add
         ctx.push_type(ValueType::I32).unwrap();
@@ -352,12 +352,12 @@ mod tests {
         ).unwrap();
         
         // Should have one i32 on stack
-        assert_eq!(ctx.stack_depth, 1);
+        assert_eq!(ctx.stack_depth, 1;
     }
 
     #[test]
     fn test_validate_memory_load() {
-        let mut ctx = ValidationContext::new();
+        let mut ctx = ValidationContext::new);
         
         // Push address
         ctx.push_type(ValueType::I32).unwrap();
@@ -373,12 +373,12 @@ mod tests {
         ).unwrap();
         
         // Should have loaded value
-        assert_eq!(ctx.stack_depth, 1);
+        assert_eq!(ctx.stack_depth, 1;
     }
 
     #[test]
     fn test_validate_comparison() {
-        let mut ctx = ValidationContext::new();
+        let mut ctx = ValidationContext::new);
         
         // Push two i32s
         ctx.push_type(ValueType::I32).unwrap();
@@ -388,6 +388,6 @@ mod tests {
         validate_comparison_op(ValueType::I32, &mut ctx).unwrap();
         
         // Should have i32 result
-        assert_eq!(ctx.stack_depth, 1);
+        assert_eq!(ctx.stack_depth, 1;
     }
 }

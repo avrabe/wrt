@@ -4,25 +4,25 @@ use wrt_test_registry::prelude::*;
 
 /// Test suite for platform memory functionality
 pub fn run_tests() -> TestResult {
-    let mut suite = TestSuite::new("Platform Memory");
+    let mut suite = TestSuite::new("Platform Memory";
     
     // Cross-platform tests
-    suite.add_test("memory_allocation_basic", test_memory_allocation);
-    suite.add_test("memory_protection", test_memory_protection);
-    suite.add_test("page_management", test_page_management);
+    suite.add_test("memory_allocation_basic", test_memory_allocation;
+    suite.add_test("memory_protection", test_memory_protection;
+    suite.add_test("page_management", test_page_management;
     
     // Platform-specific tests
     #[cfg(target_os = "macos")]
-    suite.add_test("macos_vm_operations", test_macos_vm);
+    suite.add_test("macos_vm_operations", test_macos_vm;
     
     #[cfg(target_os = "linux")]
-    suite.add_test("linux_mmap_operations", test_linux_mmap);
+    suite.add_test("linux_mmap_operations", test_linux_mmap;
     
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-    suite.add_test("linux_arm64_mte", test_linux_mte);
+    suite.add_test("linux_arm64_mte", test_linux_mte;
     
     #[cfg(target_os = "nto")]
-    suite.add_test("qnx_memory_partitions", test_qnx_partitions);
+    suite.add_test("qnx_memory_partitions", test_qnx_partitions;
     
     suite.run().into()
 }

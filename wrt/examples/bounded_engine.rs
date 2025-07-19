@@ -4,12 +4,21 @@
 //! and how to configure the verification level for different safety/performance
 //! tradeoffs.
 
-use wrt::{stackless::StacklessEngine, values::Value, Module, Result};
+use wrt::{
+    stackless::StacklessEngine,
+    values::Value,
+    Module,
+    Result,
+};
 use wrt_foundation::VerificationLevel;
 
 fn main() -> Result<()> {
-    println!("Bounded Collections Example");
-    println!("==========================\n");
+    // Initialize global memory system for examples
+    wrt_foundation::memory_system_initializer::presets::development()
+        .map_err(|e| wrt::Error::Instantiation(format!("Memory system init failed: {}", e)))?;
+
+    println!("Bounded Collections Example";
+    println!("==========================\n";
 
     // Create a simple WebAssembly module with a function that adds two numbers
     let wat_code = r#"
@@ -37,10 +46,10 @@ fn main() -> Result<()> {
 
     // Run the same module with each verification level
     for level in verification_levels.iter() {
-        println!("Testing with verification level: {:?}", level);
+        println!("Testing with verification level: {:?}", level;
 
         // Create an engine with the current verification level
-        let mut engine = StacklessEngine::with_verification_level(*level);
+        let mut engine = StacklessEngine::with_verification_level(*level;
 
         // Instantiate the module
         let instance_idx = engine.instantiate(module.clone())?;
@@ -52,26 +61,29 @@ fn main() -> Result<()> {
         let result = engine.call_function(instance_idx as u32, 0, &args)?;
 
         // Print the result
-        println!("Result: {:?}", result);
+        println!("Result: {:?}", result;
 
         // Validate the engine state
         if let Err(e) = engine.validate() {
-            println!("Validation failed: {:?}", e);
+            println!("Validation failed: {:?}", e;
         } else {
-            println!("Validation passed");
+            println!("Validation passed";
         }
 
-        println!();
+        println!);
     }
 
     // Example of how to modify the verification level after engine creation
-    println!("Changing verification level on an existing engine");
-    let mut engine = StacklessEngine::new();
-    println!("Default verification level: {:?}", engine.verification_level);
+    println!("Changing verification level on an existing engine";
+    let mut engine = StacklessEngine::new);
+    println!(
+        "Default verification level: {:?}",
+        engine.verification_level
+    ;
 
     // Change to Full verification for maximum safety
-    engine.set_verification_level(VerificationLevel::Full);
-    println!("New verification level: {:?}", engine.verification_level);
+    engine.set_verification_level(VerificationLevel::Full;
+    println!("New verification level: {:?}", engine.verification_level;
 
     // Instantiate the module
     let instance_idx = engine.instantiate(module)?;
@@ -81,12 +93,12 @@ fn main() -> Result<()> {
     let result = engine.call_function(instance_idx as u32, 0, &args)?;
 
     // Print the result
-    println!("Result with Full verification: {:?}", result);
+    println!("Result with Full verification: {:?}", result;
 
     // The engine state should be valid
-    assert!(engine.validate().is_ok());
+    assert!(engine.validate().is_ok();
 
-    println!("\nAll tests completed successfully!");
+    println!("\nAll tests completed successfully!";
 
     Ok(())
 }

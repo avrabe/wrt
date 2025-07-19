@@ -28,7 +28,7 @@ const MAX_STORED_CORE_MODULE_TYPES: usize = 64; // Adjust as needed
 
 /// Represents a reference to a type stored in the `ComponentTypeStore`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct TypeRef(pub u32);
+pub struct TypeRef(pub u32;
 
 impl TypeRef {
     /// A reference that indicates no type or an invalid/uninitialized type.
@@ -44,7 +44,7 @@ impl TypeRef {
 
 impl crate::traits::Checksummable for TypeRef {
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
-        self.0.update_checksum(checksum);
+        self.0.update_checksum(checksum;
     }
 }
 
@@ -90,25 +90,16 @@ impl<P: MemoryProvider + Clone + Default + Eq> ComponentTypeStore<P> {
     {
         Ok(Self {
             component_types: BoundedVec::new(provider.clone()).map_err(|e| {
-                Error::new(
-                    wrt_error::ErrorCategory::Memory,
-                    codes::MEMORY_ALLOCATION_ERROR,
-                    "Failed to create BoundedVec for component_types",
-                )
+                Error::runtime_execution_error("Failed to create BoundedVec for component types")
             })?,
             instance_types: BoundedVec::new(provider.clone()).map_err(|e| {
                 Error::new(
                     wrt_error::ErrorCategory::Memory,
                     codes::MEMORY_ALLOCATION_ERROR,
-                    "Failed to create BoundedVec for instance_types",
-                )
+                    "Failed to allocate memory for instance types")
             })?,
             core_module_types: BoundedVec::new(provider.clone()).map_err(|e| {
-                Error::new(
-                    wrt_error::ErrorCategory::Memory,
-                    codes::MEMORY_ALLOCATION_ERROR,
-                    "Failed to create BoundedVec for core_module_types",
-                )
+                Error::runtime_execution_error("Failed to create BoundedVec for core module types")
             })?,
             provider,
         })
@@ -121,8 +112,7 @@ impl<P: MemoryProvider + Clone + Default + Eq> ComponentTypeStore<P> {
             Error::new(
                 wrt_error::ErrorCategory::Resource,
                 codes::RESOURCE_LIMIT_EXCEEDED,
-                "Failed to add component type to store",
-            )
+                "Component type store capacity exceeded")
         })?;
         Ok(TypeRef(index))
     }
@@ -140,11 +130,7 @@ impl<P: MemoryProvider + Clone + Default + Eq> ComponentTypeStore<P> {
     pub fn add_instance_type(&mut self, itype: InstanceType<P>) -> WrtResult<TypeRef> {
         let index = self.instance_types.len() as u32;
         self.instance_types.push(itype).map_err(|_e| {
-            Error::new(
-                wrt_error::ErrorCategory::Resource,
-                codes::RESOURCE_LIMIT_EXCEEDED,
-                "Failed to add instance type to store",
-            )
+            Error::runtime_execution_error("Failed to add instance type to store")
         })?;
         Ok(TypeRef(index))
     }
@@ -165,8 +151,7 @@ impl<P: MemoryProvider + Clone + Default + Eq> ComponentTypeStore<P> {
             Error::new(
                 wrt_error::ErrorCategory::Resource,
                 codes::RESOURCE_LIMIT_EXCEEDED,
-                "Failed to add core module type to store",
-            )
+                "Core module type store capacity exceeded")
         })?;
         Ok(TypeRef(index))
     }

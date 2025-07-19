@@ -68,10 +68,10 @@ impl VerificationLevel {
                 // Higher importance = higher chance of being verified
                 // This is deterministic based on a counter to ensure
                 // predictable behavior for WCET analysis
-                static COUNTER: AtomicU32 = AtomicU32::new(0);
+                static COUNTER: AtomicU32 = AtomicU32::new(0;
 
                 // Get the current counter value and increment it atomically
-                let current = COUNTER.fetch_add(1, Ordering::Relaxed);
+                let current = COUNTER.fetch_add(1, Ordering::Relaxed;
                 (current % 256) < u32::from(operation_importance)
             }
             Self::Full => true,
@@ -166,9 +166,9 @@ impl Checksum {
     /// Compute a checksum for a byte slice
     #[must_use]
     pub fn compute(data: &[u8]) -> Self {
-        let mut checksum = Self::new();
+        let mut checksum = Self::new);
         for &byte in data {
-            checksum.update(byte);
+            checksum.update(byte;
         }
         checksum
     }
@@ -182,7 +182,7 @@ impl Checksum {
     /// Update the checksum with multiple bytes
     pub fn update_slice(&mut self, data: &[u8]) {
         for &byte in data {
-            self.update(byte);
+            self.update(byte;
         }
     }
 
@@ -233,8 +233,8 @@ impl FromBytes for Checksum {
 
 impl core::hash::Hash for Checksum {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.a.hash(state);
-        self.b.hash(state);
+        self.a.hash(state;
+        self.b.hash(state;
     }
 }
 
@@ -263,7 +263,7 @@ impl Hasher {
     /// Update the hash state with bytes
     pub fn update(&mut self, bytes: &[u8]) {
         for &byte in bytes {
-            self.state ^= u32::from(byte);
+            self.state ^= u32::from(byte;
             self.state = self.state.wrapping_mul(16_777_619); // FNV-1a prime
         }
     }
@@ -281,25 +281,25 @@ mod tests {
 
     #[test]
     fn test_checksum_empty() {
-        let checksum = Checksum::compute(&[]);
-        assert_eq!(checksum.a, 1);
-        assert_eq!(checksum.b, 0);
+        let checksum = Checksum::compute(&[];
+        assert_eq!(checksum.a, 1;
+        assert_eq!(checksum.b, 0;
     }
 
     #[test]
     fn test_checksum_values() {
         let data = b"WebAssembly";
-        let checksum = Checksum::compute(data);
+        let checksum = Checksum::compute(data;
         // Verify against known good value
-        assert_eq!(checksum.value(), 422_511_711);
+        assert_eq!(checksum.value(), 422_511_711;
     }
 
     #[test]
     fn test_hasher() {
-        let mut hasher = Hasher::new();
-        hasher.update(b"test");
-        let hash = hasher.finalize();
+        let mut hasher = Hasher::new);
+        hasher.update(b"test";
+        let hash = hasher.finalize);
         // Verify against known good value
-        assert_eq!(hash, 0xafd0_71e5);
+        assert_eq!(hash, 0xafd0_71e5;
     }
 }

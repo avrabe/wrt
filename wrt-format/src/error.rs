@@ -4,12 +4,14 @@
 //! specification.
 
 #[cfg(feature = "std")]
-use std::{boxed::Box, string::String};
-
-#[cfg(not(feature = "std"))]
-use wrt_foundation::bounded::BoundedString;
+use std::{
+    boxed::Box,
+    string::String,
+};
 
 use wrt_error::Error;
+#[cfg(not(feature = "std"))]
+use wrt_foundation::bounded::BoundedString;
 
 /// Module for error codes
 pub mod codes {
@@ -32,7 +34,7 @@ pub fn parse_error(message: &'static str) -> Error {
 /// Note: This leaks the string memory, so use sparingly
 #[cfg(feature = "std")]
 pub fn parse_error_dynamic(message: String) -> Error {
-    let leaked: &'static str = Box::leak(message.into_boxed_str());
+    let leaked: &'static str = Box::leak(message.into_boxed_str);
     Error::parse_error(leaked)
 }
 
@@ -50,7 +52,7 @@ pub fn validation_error(message: &'static str) -> Error {
 /// Note: This leaks the string memory, so use sparingly
 #[cfg(feature = "std")]
 pub fn validation_error_dynamic(message: String) -> Error {
-    let leaked: &'static str = Box::leak(message.into_boxed_str());
+    let leaked: &'static str = Box::leak(message.into_boxed_str);
     Error::validation_error(leaked)
 }
 
@@ -89,22 +91,19 @@ pub fn wrt_type_error(message: &'static str) -> Error {
     Error::type_error(message)
 }
 
-/// Create a parse error with the given message
-#[deprecated(since = "0.2.0", note = "use Error::parse_error instead")]
-pub fn wrt_parse_error(message: &'static str) -> Error {
-    parse_error(message)
-}
-
 #[cfg(test)]
 mod tests {
-    use wrt_error::{ErrorCategory, ErrorSource};
+    use wrt_error::{
+        ErrorCategory,
+        ErrorSource,
+    };
 
     use super::*;
 
     #[test]
     fn test_error_creation() {
-        let error = parse_error("test error");
-        assert_eq!(error.category(), ErrorCategory::Parse);
-        assert_eq!(error.code(), codes::PARSE_ERROR);
+        let error = parse_error("test error";
+        assert_eq!(error.category(), ErrorCategory::Parse;
+        assert_eq!(error.code(), codes::PARSE_ERROR;
     }
 }

@@ -37,6 +37,6 @@ impl Module {
 
     /// Set the module name
     pub fn set_name(&mut self, name: &str) {
-        self.name = Some(name.to_string());
+        self.name = Some(name.to_string();
     }
 }

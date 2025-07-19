@@ -25,12 +25,12 @@ const MODULE_BYTES: &[u8] = &[
 #[no_mangle]
 pub extern "C" fn example_debug_info() {
     // Create debug info parser
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
 
     // Register debug sections (in practice, these offsets would come from parsing)
-    debug_info.add_section(".debug_line", 0x1000, 0x500);
-    debug_info.add_section(".debug_info", 0x1500, 0x800);
-    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200);
+    debug_info.add_section(".debug_line", 0x1000, 0x500;
+    debug_info.add_section(".debug_info", 0x1500, 0x800;
+    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200;
 
     // Check if debug info is available
     if debug_info.has_debug_info() {
@@ -42,13 +42,13 @@ pub extern "C" fn example_debug_info() {
                 let _file = line_info.file_index;
                 let _line = line_info.line;
                 let _column = line_info.column;
-            }
+            },
             Ok(None) => {
                 // No line information found
-            }
+            },
             Err(_e) => {
                 // Error finding line info
-            }
+            },
         }
     }
 }

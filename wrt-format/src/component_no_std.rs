@@ -205,7 +205,7 @@ impl<const N: usize> StaticTypeStore<N> {
     /// Add a type at compile time
     pub const fn add_type(mut self, ty: CoreValueType) -> Self {
         if self.count < N {
-            self.types[self.count] = Some(ty);
+            self.types[self.count] = Some(ty;
             self.count += 1;
         }
         self
@@ -252,26 +252,26 @@ mod tests {
 
     #[test]
     fn test_bounded_component_creation() {
-        let provider = TestProvider::default();
-        let component = BoundedComponent::new(provider);
-        assert!(component.is_ok());
+        let provider = TestProvider::default);
+        let component = BoundedComponent::new(provider;
+        assert!(component.is_ok();
 
         let component = component.unwrap();
-        assert_eq!(component.type_count(), 0);
-        assert_eq!(component.import_count(), 0);
-        assert_eq!(component.export_count(), 0);
+        assert_eq!(component.type_count(), 0;
+        assert_eq!(component.import_count(), 0;
+        assert_eq!(component.export_count(), 0;
     }
 
     #[test]
     fn test_static_type_store() {
         const STORE: StaticTypeStore<4> = StaticTypeStore::new()
             .add_type(CoreValueType::I32)
-            .add_type(CoreValueType::F64);
+            .add_type(CoreValueType::F64;
 
-        assert_eq!(STORE.len(), 2);
-        assert_eq!(STORE.get_type(0), Some(CoreValueType::I32));
-        assert_eq!(STORE.get_type(1), Some(CoreValueType::F64));
-        assert_eq!(STORE.get_type(2), None);
+        assert_eq!(STORE.len(), 2;
+        assert_eq!(STORE.get_type(0), Some(CoreValueType::I32;
+        assert_eq!(STORE.get_type(1), Some(CoreValueType::F64;
+        assert_eq!(STORE.get_type(2), None;
     }
 
     #[test]
@@ -279,11 +279,11 @@ mod tests {
         const FUNC_TYPE: (&[CoreValueType], &[CoreValueType]) = const_core_func_type(
             &[CoreValueType::I32, CoreValueType::I32],
             &[CoreValueType::I64]
-        );
+        ;
 
-        assert_eq!(FUNC_TYPE.0.len(), 2);
-        assert_eq!(FUNC_TYPE.1.len(), 1);
-        assert_eq!(FUNC_TYPE.0[0], CoreValueType::I32);
-        assert_eq!(FUNC_TYPE.1[0], CoreValueType::I64);
+        assert_eq!(FUNC_TYPE.0.len(), 2;
+        assert_eq!(FUNC_TYPE.1.len(), 1;
+        assert_eq!(FUNC_TYPE.0[0], CoreValueType::I32;
+        assert_eq!(FUNC_TYPE.1[0], CoreValueType::I64;
     }
 }

@@ -1,3 +1,4 @@
+
 // WRT - wrt-math
 // Module: Float Bit Patterns
 // SW-REQ-ID: REQ_018 (Partially, as type representation)
@@ -27,13 +28,13 @@ use crate::traits::LittleEndian; // Import the trait
 /// patterns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 #[repr(transparent)]
-pub struct FloatBits32(pub u32);
+pub struct FloatBits32(pub u32;
 
 impl FloatBits32 {
     /// Represents a canonical Not-a-Number (`NaN`) value for f32.
     /// The specific bit pattern for canonical `NaN` can vary, but this is a
     /// common one. (Sign bit 0, exponent all 1s, significand MSB 1, rest 0)
-    pub const NAN: Self = FloatBits32(0x7fc0_0000);
+    pub const NAN: Self = FloatBits32(0x7fc0_0000;
 
     /// Creates a new `FloatBits32` from an `f32` value.
     #[must_use]
@@ -62,7 +63,7 @@ impl FloatBits32 {
 
 impl Hash for FloatBits32 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
+        self.0.hash(state;
     }
 }
 
@@ -70,13 +71,13 @@ impl Hash for FloatBits32 {
 /// patterns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 #[repr(transparent)]
-pub struct FloatBits64(pub u64);
+pub struct FloatBits64(pub u64;
 
 impl FloatBits64 {
     /// Represents a canonical Not-a-Number (`NaN`) value for f64.
     /// The specific bit pattern for canonical `NaN` can vary, but this is a
     /// common one. (Sign bit 0, exponent all 1s, significand MSB 1, rest 0)
-    pub const NAN: Self = FloatBits64(0x7ff8_0000_0000_0000);
+    pub const NAN: Self = FloatBits64(0x7ff8_0000_0000_0000;
 
     /// Creates a new `FloatBits64` from an `f64` value.
     #[must_use]
@@ -105,25 +106,20 @@ impl FloatBits64 {
 
 impl Hash for FloatBits64 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
+        self.0.hash(state;
     }
 }
 
 impl LittleEndian for FloatBits32 {
     fn from_le_bytes(bytes: &[u8]) -> WrtResult<Self> {
         if bytes.len() != 4 {
-            return Err(Error::new(
-                ErrorCategory::System,
-                codes::CONVERSION_ERROR,
-                "Invalid byte length for FloatBits32",
-            ));
+            return Err(Error::runtime_execution_error("Invalid byte length for f32";
         }
         let arr: [u8; 4] = bytes.try_into().map_err(|_| {
             Error::new(
                 ErrorCategory::System,
                 codes::CONVERSION_ERROR,
-                "Slice to array conversion failed for FloatBits32",
-            )
+                "Failed to convert bytes to float bits")
         })?;
         Ok(FloatBits32(u32::from_le_bytes(arr)))
     }
@@ -137,18 +133,13 @@ impl LittleEndian for FloatBits32 {
 impl LittleEndian for FloatBits64 {
     fn from_le_bytes(bytes: &[u8]) -> WrtResult<Self> {
         if bytes.len() != 8 {
-            return Err(Error::new(
-                ErrorCategory::System,
-                codes::CONVERSION_ERROR,
-                "Invalid byte length for FloatBits64",
-            ));
+            return Err(Error::runtime_execution_error("Invalid byte length for f64";
         }
         let arr: [u8; 8] = bytes.try_into().map_err(|_| {
             Error::new(
                 ErrorCategory::System,
                 codes::CONVERSION_ERROR,
-                "Slice to array conversion failed for FloatBits64",
-            )
+                "Failed to convert bytes to float bits")
         })?;
         Ok(FloatBits64(u64::from_le_bytes(arr)))
     }

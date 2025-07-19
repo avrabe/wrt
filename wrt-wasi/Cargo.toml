@@ -1,0 +1,110 @@
+[package]
+name = "wrt-wasi"
+version.workspace = true
+edition.workspace = true
+license = { workspace = true }
+description = "WASI Preview2 implementation for WebAssembly Runtime with Preview3 preparation"
+repository = "https://github.com/pulseengine/wrt"
+readme = "README.md"
+keywords = ["wasm", "webassembly", "wasi", "preview2", "component-model"]
+categories = ["wasm", "api-bindings", "os"]
+
+[dependencies]
+# Core WRT dependencies - reuse existing patterns
+wrt-error = { workspace = true, default-features = false }
+wrt-foundation = { workspace = true, default-features = false }
+wrt-host = { workspace = true, default-features = false }
+# wrt-component = { workspace = true, default-features = false }
+wrt-platform = { workspace = true, default-features = false }
+wrt-format = { workspace = true, default-features = false }
+
+# Neural network inference backend
+tract-onnx = { version = "0.21", optional = true, default-features = false }
+
+# For capability storage in std environments
+once_cell = { version = "1.19", optional = true }
+
+[features]
+default = ["std", "preview2", "wasi-filesystem", "wasi-cli", "wasi-clocks", "wasi-io", "wasi-random"]
+
+# Standard library support
+std = [
+    "wrt-error/std",
+    "wrt-foundation/std", 
+    "wrt-host/std",
+    # "wrt-component/std",
+    "wrt-platform/std",
+    "wrt-format/std",
+    "dep:once_cell"
+]
+
+# WASI version support
+preview2 = []
+preview3-prep = ["preview2"]
+
+# Individual WASI interfaces (granular feature control)
+wasi-filesystem = ["preview2"]
+wasi-cli = ["preview2"] 
+wasi-clocks = ["preview2"]
+wasi-io = ["preview2"]
+wasi-random = ["preview2"]
+wasi-sockets = ["preview3-prep"]  # Future Preview3 feature
+
+# Neural network support (preview-agnostic)
+wasi-nn = ["nn-core", "dep:tract-onnx"]
+nn-core = []  # Core NN infrastructure without backend
+nn-preview2 = ["wasi-nn", "preview2"]  # Sync support
+nn-preview3 = ["wasi-nn", "preview3-prep"]  # Async support
+tract = ["dep:tract-onnx"]  # Tract backend feature
+
+# Component model integration
+component-model = []
+
+# Safety level presets using new capability-based features
+# wrt-wasi supports QM to ASIL-B (WASI system interfaces with bounded safety)
+qm = ["wrt-foundation/dynamic-allocation", "wrt-format/qm", "wrt-host/qm", "wrt-platform/qm"]
+asil-a = ["wrt-foundation/bounded-collections", "wrt-format/asil-a", "wrt-host/asil-a", "wrt-platform/asil-a"]
+asil-b = ["wrt-foundation/bounded-collections", "wrt-format/asil-b", "wrt-host/asil-b", "wrt-platform/asil-b"]
+# Note: ASIL-C and ASIL-D are not supported for WASI system interfaces
+# WASI involves external system calls which cannot meet ASIL-C/D determinism requirements
+
+# Legacy compatibility 
+safe-memory = ["asil-b"]
+safety-asil-b = ["asil-b"]
+safety-critical = ["asil-b"]  # Maximum safety level for WASI
+
+# Development and testing features
+# (Add more features as needed)
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] }
+missing_docs = "deny"
+unsafe_code = "deny"
+
+[lints.clippy]
+# Language subset
+inline_asm_x86_att_syntax = "warn"
+transmute_ptr_to_ref = "deny"
+# type_id lint removed - not a valid clippy lint
+dyn_trait = "warn"
+float_arithmetic = "warn"
+# Unsafe usage
+ptr_offset_with_cast = "warn"
+# Error handling & panics
+unwrap_used = "warn"
+panic = "warn"
+result_unit_err = "warn"
+let_underscore_drop = "warn"
+must_use_candidate = "warn"
+must_use_unit = "warn"
+# Control-flow soundness
+match_wildcard_for_single_variants = "warn"
+never_loop = "warn"
+unreachable = "warn"
+# Memory & concurrency safety
+# static_mut_reference renamed to static_mut_refs in newer Rust versions
+arc_mutate = "deny"
+# Static analysis gates
+pedantic = "warn"
+# Documentation
+debug_assert_with_mut_call = "warn"

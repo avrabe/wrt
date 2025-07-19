@@ -78,7 +78,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentValueStoreBu
     /// `MAX_STORE_VALUES`.
     #[must_use]
     pub fn with_initial_values_capacity(mut self, capacity: usize) -> Self {
-        self.initial_values_capacity = Some(capacity.min(MAX_STORE_VALUES));
+        self.initial_values_capacity = Some(capacity.min(MAX_STORE_VALUES;
         self
     }
 
@@ -88,7 +88,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentValueStoreBu
     /// `MAX_STORE_TYPES`.
     #[must_use]
     pub fn with_initial_types_capacity(mut self, capacity: usize) -> Self {
-        self.initial_types_capacity = Some(capacity.min(MAX_STORE_TYPES));
+        self.initial_types_capacity = Some(capacity.min(MAX_STORE_TYPES;
         self
     }
 
@@ -101,7 +101,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentValueStoreBu
     pub fn build(self) -> WrtResult<ComponentValueStore<P>> {
         // First configure the provider with the specified verification level
         let mut provider = self.provider.clone();
-        provider.set_verification_level(self.verification_level);
+        provider.set_verification_level(self.verification_level;
 
         // Create the store with the configured provider
         let mut store = ComponentValueStore::new(provider)?;
@@ -117,35 +117,35 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ComponentValueStoreBu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::safe_memory::NoStdProvider;
+    use crate::memory_sizing::SmallProvider;
 
     #[test]
     fn test_component_value_store_builder() {
         // Create a builder with default settings
-        let builder = ComponentValueStoreBuilder::<NoStdProvider<1024>>::new();
+        let builder = ComponentValueStoreBuilder::<SmallProvider>::new);
 
         // Build the store
         let store = builder.build().unwrap();
 
         // Verify the store has been properly initialized
-        assert_eq!(store.get_provider().verification_level(), VerificationLevel::default());
+        assert_eq!(store.get_provider().verification_level(), VerificationLevel::default);
     }
 
     #[test]
     fn test_component_value_store_builder_with_options() {
         // Create a builder with custom settings
-        let provider = NoStdProvider::<1024>::with_verification_level(VerificationLevel::Full);
+        let provider = SmallProvider::with_verification_level(VerificationLevel::Full;
 
-        let builder = ComponentValueStoreBuilder::<NoStdProvider<1024>>::new()
+        let builder = ComponentValueStoreBuilder::<SmallProvider>::new()
             .with_provider(provider.clone())
             .with_verification_level(VerificationLevel::Full)
             .with_initial_values_capacity(100)
-            .with_initial_types_capacity(50);
+            .with_initial_types_capacity(50;
 
         // Build the store
         let store = builder.build().unwrap();
 
         // Verify the store has been properly initialized with our settings
-        assert_eq!(store.get_provider().verification_level(), VerificationLevel::Full);
+        assert_eq!(store.get_provider().verification_level(), VerificationLevel::Full;
     }
 }

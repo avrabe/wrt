@@ -111,15 +111,15 @@ where
     let val_b = context.pop_comparison_value()?;
     let float_bits_b = match val_b {
         Value::F32(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 operand")),
+        _ => return Err(Error::type_error("Expected F32 operand")),
     };
     let val_a = context.pop_comparison_value()?;
     let float_bits_a = match val_a {
         Value::F32(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F32 operand")),
+        _ => return Err(Error::type_error("Expected F32 operand")),
     };
-    let math_bits_a = math::FloatBits32(float_bits_a.0);
-    let math_bits_b = math::FloatBits32(float_bits_b.0);
+    let math_bits_a = math::FloatBits32(float_bits_a.0;
+    let math_bits_b = math::FloatBits32(float_bits_b.0;
     let result = f(math_bits_a, math_bits_b)?;
     context.push_comparison_value(Value::I32(result))
 }
@@ -132,15 +132,15 @@ where
     let val_b = context.pop_comparison_value()?;
     let float_bits_b = match val_b {
         Value::F64(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 operand")),
+        _ => return Err(Error::type_error("Expected F64 operand")),
     };
     let val_a = context.pop_comparison_value()?;
     let float_bits_a = match val_a {
         Value::F64(bits) => bits,
-        _ => return Err(Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected F64 operand")),
+        _ => return Err(Error::type_error("Expected F64 operand")),
     };
-    let math_bits_a = math::FloatBits64(float_bits_a.0);
-    let math_bits_b = math::FloatBits64(float_bits_b.0);
+    let math_bits_a = math::FloatBits64(float_bits_a.0;
+    let math_bits_b = math::FloatBits64(float_bits_b.0;
     let result = f(math_bits_a, math_bits_b)?;
     context.push_comparison_value(Value::I32(result))
 }
@@ -151,100 +151,100 @@ impl<T: ComparisonContext> PureInstruction<T, Error> for ComparisonOp {
             // i32 comparison operations
             Self::I32Eq => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.eq operand")
+                    Error::type_error("Expected I32 for i32.eq operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.eq operand")
+                    Error::type_error("Expected I32 for i32.eq operand")
                 })?;
                 let result = math::i32_eq(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32Ne => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ne operand")
+                    Error::type_error("Expected I32 for i32.ne operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ne operand")
+                    Error::type_error("Expected I32 for i32.ne operand")
                 })?;
                 let result = math::i32_ne(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32LtS => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.lt_s operand")
+                    Error::type_error("Expected I32 for i32.lt_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.lt_s operand")
+                    Error::type_error("Expected I32 for i32.lt_s operand")
                 })?;
                 let result = math::i32_lt_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32LtU => {
                 let b = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.lt_u operand")
+                    Error::type_error("Expected I32 for i32.lt_u operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.lt_u operand")
+                    Error::type_error("Expected I32 for i32.lt_u operand")
                 })?;
                 let result = math::i32_lt_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32GtS => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.gt_s operand")
+                    Error::type_error("Expected I32 for i32.gt_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.gt_s operand")
+                    Error::type_error("Expected I32 for i32.gt_s operand")
                 })?;
                 let result = math::i32_gt_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32GtU => {
                 let b = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.gt_u operand")
+                    Error::type_error("Expected I32 for i32.gt_u operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.gt_u operand")
+                    Error::type_error("Expected I32 for i32.gt_u operand")
                 })?;
                 let result = math::i32_gt_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32LeS => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.le_s operand")
+                    Error::type_error("Expected I32 for i32.le_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.le_s operand")
+                    Error::type_error("Expected I32 for i32.le_s operand")
                 })?;
                 let result = math::i32_le_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32LeU => {
                 let b = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.le_u operand")
+                    Error::type_error("Expected I32 for i32.le_u operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.le_u operand")
+                    Error::type_error("Expected I32 for i32.le_u operand")
                 })?;
                 let result = math::i32_le_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32GeS => {
                 let b = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ge_s operand")
+                    Error::type_error("Expected I32 for i32.ge_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ge_s operand")
+                    Error::type_error("Expected I32 for i32.ge_s operand")
                 })?;
                 let result = math::i32_ge_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I32GeU => {
                 let b = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ge_u operand")
+                    Error::type_error("Expected I32 for i32.ge_u operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_u32().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.ge_u operand")
+                    Error::type_error("Expected I32 for i32.ge_u operand")
                 })?;
                 let result = math::i32_ge_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
@@ -253,100 +253,100 @@ impl<T: ComparisonContext> PureInstruction<T, Error> for ComparisonOp {
             // i64 comparison operations
             Self::I64Eq => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.eq operand")
+                    Error::type_error("Expected I64 for i64.eq operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.eq operand")
+                    Error::type_error("Expected I64 for i64.eq operand")
                 })?;
                 let result = math::i64_eq(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64Ne => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ne operand")
+                    Error::type_error("Expected I64 for i64.ne operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ne operand")
+                    Error::type_error("Expected I64 for i64.ne operand")
                 })?;
                 let result = math::i64_ne(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64LtS => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.lt_s operand")
+                    Error::type_error("Expected I64 for i64.lt_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.lt_s operand")
+                    Error::type_error("Expected I64 for i64.lt_s operand")
                 })?;
                 let result = math::i64_lt_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64LtU => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.lt_u operand")
+                    Error::type_error("Expected I64 for i64.lt_u operand")
                 })? as u64;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.lt_u operand")
+                    Error::type_error("Expected I64 for i64.lt_u operand")
                 })? as u64;
                 let result = math::i64_lt_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64GtS => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.gt_s operand")
+                    Error::type_error("Expected I64 for i64.gt_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.gt_s operand")
+                    Error::type_error("Expected I64 for i64.gt_s operand")
                 })?;
                 let result = math::i64_gt_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64GtU => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.gt_u operand")
+                    Error::type_error("Expected I64 for i64.gt_u operand")
                 })? as u64;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.gt_u operand")
+                    Error::type_error("Expected I64 for i64.gt_u operand")
                 })? as u64;
                 let result = math::i64_gt_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64LeS => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.le_s operand")
+                    Error::type_error("Expected I64 for i64.le_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.le_s operand")
+                    Error::type_error("Expected I64 for i64.le_s operand")
                 })?;
                 let result = math::i64_le_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64LeU => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.le_u operand")
+                    Error::type_error("Expected I64 for i64.le_u operand")
                 })? as u64;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.le_u operand")
+                    Error::type_error("Expected I64 for i64.le_u operand")
                 })? as u64;
                 let result = math::i64_le_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64GeS => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ge_s operand")
+                    Error::type_error("Expected I64 for i64.ge_s operand")
                 })?;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ge_s operand")
+                    Error::type_error("Expected I64 for i64.ge_s operand")
                 })?;
                 let result = math::i64_ge_s(a, b)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64GeU => {
                 let b = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ge_u operand")
+                    Error::type_error("Expected I64 for i64.ge_u operand")
                 })? as u64;
                 let a = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.ge_u operand")
+                    Error::type_error("Expected I64 for i64.ge_u operand")
                 })? as u64;
                 let result = math::i64_ge_u(a, b)?;
                 context.push_comparison_value(Value::I32(result))
@@ -371,14 +371,14 @@ impl<T: ComparisonContext> PureInstruction<T, Error> for ComparisonOp {
             // Test operations
             Self::I32Eqz => {
                 let val = context.pop_comparison_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for i32.eqz")
+                    Error::type_error("Expected I32 for i32.eqz")
                 })?;
                 let result = math::i32_eqz(val)?;
                 context.push_comparison_value(Value::I32(result))
             }
             Self::I64Eqz => {
                 let val = context.pop_comparison_value()?.as_i64().ok_or_else(|| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I64 for i64.eqz")
+                    Error::type_error("Expected I64 for i64.eqz")
                 })?;
                 let result = math::i64_eqz(val)?;
                 context.push_comparison_value(Value::I32(result))
@@ -462,237 +462,237 @@ mod tests {
 
         fn pop_comparison_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::runtime_stack_underflow("Stack underflow")
             })
         }
     }
 
     #[test]
     fn test_i32_equality() {
-        let mut context = MockComparisonContext::new();
+        let mut context = MockComparisonContext::new);
 
         // Test i32.eq (equal)
         context.push_comparison_value(Value::I32(5)).unwrap();
         context.push_comparison_value(Value::I32(5)).unwrap();
         ComparisonOp::I32Eq.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test i32.eq (not equal)
         context.push_comparison_value(Value::I32(5)).unwrap();
         context.push_comparison_value(Value::I32(7)).unwrap();
         ComparisonOp::I32Eq.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0;
 
         // Test i32.ne (not equal)
         context.push_comparison_value(Value::I32(5)).unwrap();
         context.push_comparison_value(Value::I32(7)).unwrap();
         ComparisonOp::I32Ne.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test i32.ne (equal)
         context.push_comparison_value(Value::I32(5)).unwrap();
         context.push_comparison_value(Value::I32(5)).unwrap();
         ComparisonOp::I32Ne.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0;
     }
 
     #[test]
     fn test_i32_relational_signed() {
-        let mut context = MockComparisonContext::new();
+        let mut context = MockComparisonContext::new);
 
         // Test i32.lt_s (less than, signed)
         context.push_comparison_value(Value::I32(-5)).unwrap();
         context.push_comparison_value(Value::I32(7)).unwrap();
         ComparisonOp::I32LtS.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test i32.gt_s (greater than, signed)
         context.push_comparison_value(Value::I32(10)).unwrap();
         context.push_comparison_value(Value::I32(7)).unwrap();
         ComparisonOp::I32GtS.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test i32.le_s (less than or equal, signed)
         context.push_comparison_value(Value::I32(7)).unwrap();
         context.push_comparison_value(Value::I32(7)).unwrap();
         ComparisonOp::I32LeS.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test i32.ge_s (greater than or equal, signed)
         context.push_comparison_value(Value::I32(7)).unwrap();
         context.push_comparison_value(Value::I32(7)).unwrap();
         ComparisonOp::I32GeS.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
     }
 
     #[test]
     fn test_i32_relational_unsigned() {
-        let mut context = MockComparisonContext::new();
+        let mut context = MockComparisonContext::new);
 
         // Test i32.lt_u (less than, unsigned)
         // Note: -1 as unsigned is 0xFFFFFFFF, which is larger than 7
         context.push_comparison_value(Value::I32(-1)).unwrap();
         context.push_comparison_value(Value::I32(7)).unwrap();
         ComparisonOp::I32LtU.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0;
 
         // Test i32.gt_u (greater than, unsigned)
         context.push_comparison_value(Value::I32(-1)).unwrap();
         context.push_comparison_value(Value::I32(7)).unwrap();
         ComparisonOp::I32GtU.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test with positive numbers
         context.push_comparison_value(Value::I32(5)).unwrap();
         context.push_comparison_value(Value::I32(7)).unwrap();
         ComparisonOp::I32LtU.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
     }
 
     #[test]
     fn test_i64_comparisons() {
-        let mut context = MockComparisonContext::new();
+        let mut context = MockComparisonContext::new);
 
         // Test i64.eq (equal)
         context.push_comparison_value(Value::I64(0x123456789ABCDEF0)).unwrap();
         context.push_comparison_value(Value::I64(0x123456789ABCDEF0)).unwrap();
         ComparisonOp::I64Eq.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test i64.ne (not equal)
         context.push_comparison_value(Value::I64(5)).unwrap();
         context.push_comparison_value(Value::I64(7)).unwrap();
         ComparisonOp::I64Ne.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test i64.lt_s (less than, signed)
         context.push_comparison_value(Value::I64(-1000)).unwrap();
         context.push_comparison_value(Value::I64(1000)).unwrap();
         ComparisonOp::I64LtS.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test i64.gt_u (greater than, unsigned)
         context.push_comparison_value(Value::I64(-1)).unwrap(); // Large unsigned value
         context.push_comparison_value(Value::I64(1000)).unwrap();
         ComparisonOp::I64GtU.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
     }
 
     #[test]
     fn test_f32_comparisons() {
-        let mut context = MockComparisonContext::new();
+        let mut context = MockComparisonContext::new);
 
         // Test f32.eq (equal)
         context.push_comparison_value(Value::F32(FloatBits32::from_float(5.0))).unwrap();
         context.push_comparison_value(Value::F32(FloatBits32::from_float(5.0))).unwrap();
         ComparisonOp::F32Eq.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test f32.ne (not equal)
         context.push_comparison_value(Value::F32(FloatBits32::from_float(5.0))).unwrap();
         context.push_comparison_value(Value::F32(FloatBits32::from_float(7.0))).unwrap();
         ComparisonOp::F32Ne.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test f32.lt (less than)
         context.push_comparison_value(Value::F32(FloatBits32::from_float(3.14))).unwrap();
         context.push_comparison_value(Value::F32(FloatBits32::from_float(7.0))).unwrap();
         ComparisonOp::F32Lt.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test f32.gt (greater than)
         context.push_comparison_value(Value::F32(FloatBits32::from_float(10.0))).unwrap();
         context.push_comparison_value(Value::F32(FloatBits32::from_float(7.0))).unwrap();
         ComparisonOp::F32Gt.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test f32.le (less than or equal)
         context.push_comparison_value(Value::F32(FloatBits32::from_float(7.0))).unwrap();
         context.push_comparison_value(Value::F32(FloatBits32::from_float(7.0))).unwrap();
         ComparisonOp::F32Le.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test f32.ge (greater than or equal)
         context.push_comparison_value(Value::F32(FloatBits32::from_float(7.0))).unwrap();
         context.push_comparison_value(Value::F32(FloatBits32::from_float(7.0))).unwrap();
         ComparisonOp::F32Ge.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
     }
 
     #[test]
     fn test_f64_comparisons() {
-        let mut context = MockComparisonContext::new();
+        let mut context = MockComparisonContext::new);
 
         // Test f64.eq (equal)
         context.push_comparison_value(Value::F64(FloatBits64::from_float(3.141592653589793))).unwrap();
         context.push_comparison_value(Value::F64(FloatBits64::from_float(3.141592653589793))).unwrap();
         ComparisonOp::F64Eq.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test f64.lt (less than)
         context.push_comparison_value(Value::F64(FloatBits64::from_float(2.718281828459045))).unwrap();
         context.push_comparison_value(Value::F64(FloatBits64::from_float(3.141592653589793))).unwrap();
         ComparisonOp::F64Lt.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
     }
 
     #[test]
     fn test_eqz_operations() {
-        let mut context = MockComparisonContext::new();
+        let mut context = MockComparisonContext::new);
 
         // Test i32.eqz with zero
         context.push_comparison_value(Value::I32(0)).unwrap();
         ComparisonOp::I32Eqz.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test i32.eqz with non-zero
         context.push_comparison_value(Value::I32(42)).unwrap();
         ComparisonOp::I32Eqz.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0;
 
         // Test i64.eqz with zero
         context.push_comparison_value(Value::I64(0)).unwrap();
         ComparisonOp::I64Eqz.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test i64.eqz with non-zero
         context.push_comparison_value(Value::I64(-100)).unwrap();
         ComparisonOp::I64Eqz.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0;
     }
 
     #[test]
     fn test_nan_handling() {
-        let mut context = MockComparisonContext::new();
+        let mut context = MockComparisonContext::new);
 
         // Test f32 NaN equality (should be false)
         context.push_comparison_value(Value::F32(FloatBits32::from_float(f32::NAN))).unwrap();
         context.push_comparison_value(Value::F32(FloatBits32::from_float(f32::NAN))).unwrap();
         ComparisonOp::F32Eq.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0;
 
         // Test f32 NaN inequality (should be true)
         context.push_comparison_value(Value::F32(FloatBits32::from_float(f32::NAN))).unwrap();
         context.push_comparison_value(Value::F32(FloatBits32::from_float(5.0))).unwrap();
         ComparisonOp::F32Ne.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
 
         // Test f32 NaN less than (should be false)
         context.push_comparison_value(Value::F32(FloatBits32::from_float(f32::NAN))).unwrap();
         context.push_comparison_value(Value::F32(FloatBits32::from_float(5.0))).unwrap();
         ComparisonOp::F32Lt.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0;
 
         // Test f64 NaN equality (should be false)
         context.push_comparison_value(Value::F64(FloatBits64::from_float(f64::NAN))).unwrap();
         context.push_comparison_value(Value::F64(FloatBits64::from_float(f64::NAN))).unwrap();
         ComparisonOp::F64Eq.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(0;
 
         // Test f64 NaN inequality (should be true)
         context.push_comparison_value(Value::F64(FloatBits64::from_float(f64::NAN))).unwrap();
         context.push_comparison_value(Value::F64(FloatBits64::from_float(42.0))).unwrap();
         ComparisonOp::F64Ne.execute(&mut context).unwrap();
-        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1));
+        assert_eq!(context.pop_comparison_value().unwrap(), Value::I32(1;
     }
 }

@@ -47,28 +47,28 @@ fn test_core_instance_with_multiple_arguments() -> Result<()> {
     let (instances, bytes_read) = parse_core_instance_section(&bytes)?;
     
     // Verify section was parsed correctly
-    assert_eq!(bytes_read, bytes.len());
-    assert_eq!(instances.len(), 1);
+    assert_eq!(bytes_read, bytes.len);
+    assert_eq!(instances.len(), 1;
     
     // Check the argument parsing
     use wrt_format::component::CoreInstanceExpr;
     if let CoreInstanceExpr::Instantiate { module_idx, args } = &instances[0].instance_expr {
-        assert_eq!(*module_idx, 0);
-        assert_eq!(args.len(), 3);
+        assert_eq!(*module_idx, 0;
+        assert_eq!(args.len(), 3;
         
         // Check first argument
-        assert_eq!(args[0].name, "env");
-        assert_eq!(args[0].instance_idx, 4);
+        assert_eq!(args[0].name, "env";
+        assert_eq!(args[0].instance_idx, 4;
         
         // Check second argument 
-        assert_eq!(args[1].name, "wasi1");
-        assert_eq!(args[1].instance_idx, 5);
+        assert_eq!(args[1].name, "wasi1";
+        assert_eq!(args[1].instance_idx, 5;
         
         // Check third argument
-        assert_eq!(args[2].name, "wasi2");
-        assert_eq!(args[2].instance_idx, 6);
+        assert_eq!(args[2].name, "wasi2";
+        assert_eq!(args[2].instance_idx, 6;
     } else {
-        panic!("Expected Instantiate variant");
+        panic!("Expected Instantiate variant";
     }
     
     Ok(())

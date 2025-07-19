@@ -6,7 +6,10 @@
 // Use crate-level type aliases for collection types
 #[cfg(all(not(feature = "std")))]
 #[cfg(feature = "std")]
-use std::{boxed::Box, format};
+use std::{
+    boxed::Box,
+    format,
+};
 
 // Binary std/no_std choice
 #[cfg(feature = "std")]
@@ -23,7 +26,10 @@ macro_rules! validation_error {
     };
 }
 
-use wrt_error::{Error, Result};
+use wrt_error::{
+    Error,
+    Result,
+};
 // Binary std/no_std choice
 #[cfg(feature = "std")]
 pub use wrt_foundation::component_value::ValType;
@@ -46,15 +52,31 @@ pub enum ValType {
     Char,
     String,
 }
-use wrt_foundation::resource::{ResourceDrop, ResourceNew, ResourceRep, ResourceRepresentation};
+use wrt_foundation::resource::{
+    ResourceDrop,
+    ResourceNew,
+    ResourceRep,
+    ResourceRepresentation,
+};
 #[cfg(not(any(feature = "std")))]
 use wrt_foundation::NoStdProvider;
 
-use crate::{module::Module, types::ValueType, validation::Validatable};
+use crate::{
+    module::Module,
+    types::ValueType,
+    validation::Validatable,
+};
 #[cfg(feature = "std")]
-use crate::{String, Vec};
+use crate::{
+    String,
+    Vec,
+};
 #[cfg(not(any(feature = "std")))]
-use crate::{WasmString, WasmVec, MAX_TYPE_RECURSION_DEPTH};
+use crate::{
+    WasmString,
+    WasmVec,
+    MAX_TYPE_RECURSION_DEPTH,
+};
 
 // Conditional type aliases for collection types
 #[cfg(feature = "std")]
@@ -71,33 +93,33 @@ type ComponentVec<T> = WasmVec<T, NoStdProvider<1024>>;
 #[derive(Debug, Clone)]
 pub struct Component {
     /// Component name (if available from name section)
-    pub name: Option<ComponentString>,
+    pub name:           Option<ComponentString>,
     /// Core modules included in this component
-    pub modules: ComponentVec<Module>,
+    pub modules:        ComponentVec<Module>,
     /// Core instances defined in this component
     pub core_instances: ComponentVec<CoreInstance>,
     /// Core types defined in this component
-    pub core_types: ComponentVec<CoreType>,
+    pub core_types:     ComponentVec<CoreType>,
     /// Nested components
-    pub components: ComponentVec<Component>,
+    pub components:     ComponentVec<Component>,
     /// Component instances
-    pub instances: ComponentVec<Instance>,
+    pub instances:      ComponentVec<Instance>,
     /// Component aliases
-    pub aliases: ComponentVec<Alias>,
+    pub aliases:        ComponentVec<Alias>,
     /// Component types
-    pub types: ComponentVec<ComponentType>,
+    pub types:          ComponentVec<ComponentType>,
     /// Canonical function conversions
-    pub canonicals: ComponentVec<Canon>,
+    pub canonicals:     ComponentVec<Canon>,
     /// Component start function
-    pub start: Option<Start>,
+    pub start:          Option<Start>,
     /// Component imports
-    pub imports: ComponentVec<Import>,
+    pub imports:        ComponentVec<Import>,
     /// Component exports
-    pub exports: ComponentVec<Export>,
+    pub exports:        ComponentVec<Export>,
     /// Component values
-    pub values: ComponentVec<Value>,
+    pub values:         ComponentVec<Value>,
     /// Original binary (if available)
-    pub binary: Option<ComponentVec<u8>>,
+    pub binary:         Option<ComponentVec<u8>>,
 }
 
 impl Default for Component {
@@ -110,20 +132,20 @@ impl Component {
     /// Create a new empty component
     pub fn new() -> Self {
         Self {
-            name: None,
-            modules: Self::new_vec(),
+            name:           None,
+            modules:        Self::new_vec(),
             core_instances: Self::new_vec(),
-            core_types: Self::new_vec(),
-            components: Self::new_vec(),
-            instances: Self::new_vec(),
-            aliases: Self::new_vec(),
-            types: Self::new_vec(),
-            canonicals: Self::new_vec(),
-            start: None,
-            imports: Self::new_vec(),
-            exports: Self::new_vec(),
-            values: Self::new_vec(),
-            binary: None,
+            core_types:     Self::new_vec(),
+            components:     Self::new_vec(),
+            instances:      Self::new_vec(),
+            aliases:        Self::new_vec(),
+            types:          Self::new_vec(),
+            canonicals:     Self::new_vec(),
+            start:          None,
+            imports:        Self::new_vec(),
+            exports:        Self::new_vec(),
+            values:         Self::new_vec(),
+            binary:         None,
         }
     }
 
@@ -136,8 +158,12 @@ impl Component {
     /// Helper to create a new ComponentVec for no_std
     #[cfg(not(any(feature = "std")))]
     fn new_vec<T>() -> ComponentVec<T> {
-        WasmVec::new(NoStdProvider::<1024>::default())
-            .unwrap_or_else(|_| panic!("Failed to create WasmVec"))
+        let provider = wrt_foundation::safe_managed_alloc!(
+            1024,
+            wrt_foundation::budget_aware_provider::CrateId::Format
+        )
+        .unwrap_or_else(|_| panic!("Failed to allocate memory provider";
+        WasmVec::new(provider).unwrap_or_else(|_| panic!("Failed to create WasmVec"))
     }
 }
 
@@ -146,7 +172,7 @@ impl Validatable for Component {
         // Validate component name if present
         if let Some(name) = &self.name {
             if name.is_empty() {
-                return Err(Error::validation_error("Component name cannot be empty"));
+                return Err(Error::validation_error("Component name cannot be empty";
             }
         }
 
@@ -178,68 +204,74 @@ pub struct CoreInstance {
 impl Validatable for CoreInstance {
     fn validate(&self) -> Result<()> {
         match &self.instance_expr {
-            CoreInstanceExpr::Instantiate { module_idx, args } => {
+            CoreInstanceExpr::ModuleReference {
+                module_idx,
+                arg_refs,
+            } => {
                 // Basic validation: module_idx should be reasonable
                 if *module_idx > 10000 {
                     // Arbitrary reasonable limit
                     return Err(validation_error!(
                         "Module index {} seems unreasonably large",
                         module_idx
-                    ));
+                    ;
                 }
 
-                // Validate args
-                for arg in args {
-                    if arg.name.is_empty() {
+                // Validate arg references
+                for arg_ref in arg_refs {
+                    if arg_ref.name.is_empty() {
                         return Err(Error::validation_error(
-                            "Instantiate arg name cannot be empty",
-                        ));
+                            "Arg reference name cannot be empty",
+                        ;
                     }
                 }
 
                 Ok(())
-            }
+            },
             CoreInstanceExpr::InlineExports(exports) => {
                 // Validate exports
                 for export in exports {
                     if export.name.is_empty() {
-                        return Err(Error::validation_error("Inline export name cannot be empty"));
+                        return Err(Error::validation_error(
+                            "Inline export name cannot be empty",
+                        ;
                     }
                     // Reasonable index limit
                     if export.idx > 100_000 {
                         return Err(validation_error!(
                             "Export index {} seems unreasonably large",
                             export.idx
-                        ));
+                        ;
                     }
                 }
 
                 Ok(())
-            }
+            },
         }
     }
 }
 
-/// Core WebAssembly instance expression
+/// Core WebAssembly instance expression (format representation only)
 #[derive(Debug, Clone)]
 pub enum CoreInstanceExpr {
-    /// Instantiate a core module
-    Instantiate {
+    /// Reference to a module for instantiation (format-only, runtime handles
+    /// actual instantiation)
+    ModuleReference {
         /// Module index
         module_idx: u32,
-        /// Instantiation arguments
-        args: Vec<CoreInstantiateArg>,
+        /// Format-only argument references
+        arg_refs:   Vec<CoreArgReference>,
     },
     /// Collection of inlined exports
     InlineExports(Vec<CoreInlineExport>),
 }
 
-/// Core WebAssembly instantiation argument
+/// Core WebAssembly argument reference (format representation only)
 #[derive(Debug, Clone)]
-pub struct CoreInstantiateArg {
+pub struct CoreArgReference {
     /// Name of the argument
-    pub name: String,
-    /// Instance index that provides the value
+    pub name:         String,
+    /// Instance index reference (format-only)
     pub instance_idx: u32,
 }
 
@@ -251,7 +283,7 @@ pub struct CoreInlineExport {
     /// Export reference
     pub sort: CoreSort,
     /// Index within the sort
-    pub idx: u32,
+    pub idx:  u32,
 }
 
 /// Core WebAssembly sort kinds
@@ -289,38 +321,38 @@ impl Validatable for CoreType {
                     return Err(validation_error!(
                         "Function has too many parameters ({})",
                         params.len()
-                    ));
+                    ;
                 }
 
                 if results.len() > 1000 {
                     return Err(validation_error!(
                         "Function has too many results ({})",
                         results.len()
-                    ));
+                    ;
                 }
 
                 Ok(())
-            }
+            },
             CoreTypeDefinition::Module { imports, exports } => {
                 // Validate imports
                 for (namespace, name, _) in imports {
                     if namespace.is_empty() {
-                        return Err(Error::validation_error("Import namespace cannot be empty"));
+                        return Err(Error::validation_error("Import namespace cannot be empty";
                     }
                     if name.is_empty() {
-                        return Err(Error::validation_error("Import name cannot be empty"));
+                        return Err(Error::validation_error("Import name cannot be empty";
                     }
                 }
 
                 // Validate exports
                 for (name, _) in exports {
                     if name.is_empty() {
-                        return Err(Error::validation_error("Export name cannot be empty"));
+                        return Err(Error::validation_error("Export name cannot be empty";
                     }
                 }
 
                 Ok(())
-            }
+            },
         }
     }
 }
@@ -331,7 +363,7 @@ pub enum CoreTypeDefinition {
     /// Function type
     Function {
         /// Parameter types
-        params: Vec<ValueType>,
+        params:  Vec<ValueType>,
         /// Result types
         results: Vec<ValueType>,
     },
@@ -350,7 +382,7 @@ pub enum CoreExternType {
     /// Function type
     Function {
         /// Parameter types
-        params: Vec<ValueType>,
+        params:  Vec<ValueType>,
         /// Result types
         results: Vec<ValueType>,
     },
@@ -359,16 +391,16 @@ pub enum CoreExternType {
         /// Element type
         element_type: ValueType,
         /// Minimum size
-        min: u32,
+        min:          u32,
         /// Maximum size (optional)
-        max: Option<u32>,
+        max:          Option<u32>,
     },
     /// Memory type
     Memory {
         /// Minimum size in pages
-        min: u32,
+        min:    u32,
         /// Maximum size in pages (optional)
-        max: Option<u32>,
+        max:    Option<u32>,
         /// Whether the memory is shared
         shared: bool,
     },
@@ -377,7 +409,7 @@ pub enum CoreExternType {
         /// Value type
         value_type: ValueType,
         /// Whether the global is mutable
-        mutable: bool,
+        mutable:    bool,
     },
 }
 
@@ -388,29 +420,30 @@ pub struct Instance {
     pub instance_expr: InstanceExpr,
 }
 
-/// Component instance expression
+/// Component instance expression (format representation only)
 #[derive(Debug, Clone)]
 pub enum InstanceExpr {
-    /// Instantiate a component
-    Instantiate {
+    /// Reference to a component for instantiation (format-only, runtime handles
+    /// actual instantiation)
+    ComponentReference {
         /// Component index
         component_idx: u32,
-        /// Instantiation arguments
-        args: Vec<InstantiateArg>,
+        /// Format-only argument references
+        arg_refs:      Vec<InstantiateArgReference>,
     },
     /// Collection of inlined exports
     InlineExports(Vec<InlineExport>),
 }
 
-/// Component instantiation argument
+/// Component instantiation argument reference (format representation only)
 #[derive(Debug, Clone)]
-pub struct InstantiateArg {
+pub struct InstantiateArgReference {
     /// Name of the argument
     pub name: String,
-    /// Sort of the referenced item
+    /// Sort of the referenced item (format-only)
     pub sort: Sort,
-    /// Index within the sort
-    pub idx: u32,
+    /// Index within the sort (format-only)
+    pub idx:  u32,
 }
 
 /// Component inlined export
@@ -421,7 +454,7 @@ pub struct InlineExport {
     /// Export reference
     pub sort: Sort,
     /// Index within the sort
-    pub idx: u32,
+    pub idx:  u32,
 }
 
 /// Component sort kinds
@@ -456,27 +489,27 @@ pub enum AliasTarget {
         /// Instance index
         instance_idx: u32,
         /// Export name
-        name: String,
+        name:         String,
         /// Kind of the target
-        kind: CoreSort,
+        kind:         CoreSort,
     },
     /// Export from a component instance
     InstanceExport {
         /// Instance index
         instance_idx: u32,
         /// Export name
-        name: String,
+        name:         String,
         /// Kind of the target
-        kind: Sort,
+        kind:         Sort,
     },
     /// Outer definition from an enclosing component (forwarding from parent)
     Outer {
         /// Count of components to traverse outward
         count: u32,
         /// Kind of the target
-        kind: Sort,
+        kind:  Sort,
         /// Index within the kind
-        idx: u32,
+        idx:   u32,
     },
 }
 
@@ -505,7 +538,7 @@ pub enum ComponentTypeDefinition {
     /// Function type
     Function {
         /// Parameter types
-        params: Vec<(String, FormatValType)>,
+        params:  Vec<(String, FormatValType)>,
         /// Result types
         results: Vec<FormatValType>,
     },
@@ -516,7 +549,7 @@ pub enum ComponentTypeDefinition {
         /// Resource representation type
         representation: ResourceRepresentation,
         /// Whether the resource is nullable
-        nullable: bool,
+        nullable:       bool,
     },
 }
 
@@ -526,7 +559,7 @@ pub enum ExternType {
     /// Function type
     Function {
         /// Parameter types
-        params: Vec<(String, FormatValType)>,
+        params:  Vec<(String, FormatValType)>,
         /// Result types
         results: Vec<FormatValType>,
     },
@@ -556,7 +589,7 @@ pub type TypeRef = u32;
 #[derive(Debug, Clone)]
 pub struct TypeRegistry<P: wrt_foundation::MemoryProvider = NoStdProvider<1024>> {
     /// Type definitions stored in a bounded vector
-    types: WasmVec<FormatValType<P>, P>,
+    types:    WasmVec<FormatValType<P>, P>,
     /// Next available type reference
     next_ref: TypeRef,
 }
@@ -565,7 +598,10 @@ pub struct TypeRegistry<P: wrt_foundation::MemoryProvider = NoStdProvider<1024>>
 impl<P: wrt_foundation::MemoryProvider + Clone + Default> TypeRegistry<P> {
     /// Create a new type registry
     pub fn new() -> Result<Self, wrt_foundation::bounded::CapacityError> {
-        Ok(Self { types: WasmVec::new(P::default())?, next_ref: 0 })
+        Ok(Self {
+            types:    WasmVec::new(P::default())?,
+            next_ref: 0,
+        })
     }
 
     /// Add a type to the registry and return its reference
@@ -727,14 +763,14 @@ pub enum CanonOperation {
         /// Type index for the lifted function
         type_idx: u32,
         /// Options for lifting
-        options: LiftOptions,
+        options:  LiftOptions,
     },
     /// Lower a component function to the core ABI
     Lower {
         /// Component function index
         func_idx: u32,
         /// Options for lowering
-        options: LowerOptions,
+        options:  LowerOptions,
     },
     /// Resource operations
     Resource(FormatResourceOperation),
@@ -743,7 +779,7 @@ pub enum CanonOperation {
         /// Binary std/no_std choice
         alloc_func_idx: u32,
         /// Memory index to use
-        memory_idx: u32,
+        memory_idx:     u32,
     },
     /// Post-return operation (cleanup)
     PostReturn {
@@ -757,7 +793,7 @@ pub enum CanonOperation {
         /// Destination memory index
         dst_memory_idx: u32,
         /// Function index for the copy operation
-        func_idx: u32,
+        func_idx:       u32,
     },
     /// Async operation (stackful lift)
     Async {
@@ -766,7 +802,7 @@ pub enum CanonOperation {
         /// Type index for the async function
         type_idx: u32,
         /// Options for async operations
-        options: AsyncOptions,
+        options:  AsyncOptions,
     },
 }
 
@@ -774,41 +810,41 @@ pub enum CanonOperation {
 #[derive(Debug, Clone)]
 pub struct LiftOptions {
     /// Memory index to use for string/list conversions
-    pub memory_idx: Option<u32>,
+    pub memory_idx:           Option<u32>,
     /// String encoding to use
-    pub string_encoding: Option<StringEncoding>,
+    pub string_encoding:      Option<StringEncoding>,
     /// Binary std/no_std choice
-    pub realloc_func_idx: Option<u32>,
+    pub realloc_func_idx:     Option<u32>,
     /// Post-return function index (optional)
     pub post_return_func_idx: Option<u32>,
     /// Whether this is an async lift
-    pub is_async: bool,
+    pub is_async:             bool,
 }
 
 /// Options for lowering operations
 #[derive(Debug, Clone)]
 pub struct LowerOptions {
     /// Memory index to use for string/list conversions
-    pub memory_idx: Option<u32>,
+    pub memory_idx:       Option<u32>,
     /// String encoding to use
-    pub string_encoding: Option<StringEncoding>,
+    pub string_encoding:  Option<StringEncoding>,
     /// Binary std/no_std choice
     pub realloc_func_idx: Option<u32>,
     /// Whether this is an async lower
-    pub is_async: bool,
+    pub is_async:         bool,
     /// `Error` handling mode
-    pub error_mode: Option<ErrorMode>,
+    pub error_mode:       Option<ErrorMode>,
 }
 
 /// Options for async operations
 #[derive(Debug, Clone)]
 pub struct AsyncOptions {
     /// Memory index to use
-    pub memory_idx: u32,
+    pub memory_idx:       u32,
     /// Binary std/no_std choice
     pub realloc_func_idx: Option<u32>,
     /// String encoding to use
-    pub string_encoding: Option<StringEncoding>,
+    pub string_encoding:  Option<StringEncoding>,
 }
 
 /// String encoding options
@@ -841,9 +877,9 @@ pub struct Start {
     /// Function index
     pub func_idx: u32,
     /// Value arguments
-    pub args: Vec<u32>,
+    pub args:     Vec<u32>,
     /// Number of results
-    pub results: u32,
+    pub results:  u32,
 }
 
 /// Import definition in a component
@@ -852,7 +888,7 @@ pub struct Import {
     /// Import name in namespace.name format
     pub name: ImportName,
     /// Type of the import
-    pub ty: ExternType,
+    pub ty:   ExternType,
 }
 
 /// Import name with support for nested namespaces
@@ -861,22 +897,22 @@ pub struct ImportName {
     /// Namespace of the import
     pub namespace: String,
     /// Name of the import
-    pub name: String,
+    pub name:      String,
     /// Nested namespaces (if any)
-    pub nested: Vec<String>,
+    pub nested:    Vec<String>,
     /// Package reference (if any)
-    pub package: Option<PackageReference>,
+    pub package:   Option<PackageReference>,
 }
 
 /// Package reference for imports
 #[derive(Debug, Clone)]
 pub struct PackageReference {
     /// Package name
-    pub name: String,
+    pub name:    String,
     /// Package version
     pub version: Option<String>,
     /// Package hash (for content verification)
-    pub hash: Option<String>,
+    pub hash:    Option<String>,
 }
 
 /// Export definition in a component
@@ -887,52 +923,62 @@ pub struct Export {
     /// Sort of the exported item
     pub sort: Sort,
     /// Index within the sort
-    pub idx: u32,
+    pub idx:  u32,
     /// Declared type (optional)
-    pub ty: Option<ExternType>,
+    pub ty:   Option<ExternType>,
 }
 
 /// Export name with support for nested namespaces
 #[derive(Debug, Clone)]
 pub struct ExportName {
     /// Basic name
-    pub name: String,
+    pub name:        String,
     /// Whether this export is a resource
     pub is_resource: bool,
     /// Semver compatibility string
-    pub semver: Option<String>,
+    pub semver:      Option<String>,
     /// Integrity hash for content verification
-    pub integrity: Option<String>,
+    pub integrity:   Option<String>,
     /// Nested namespaces (if any)
-    pub nested: Vec<String>,
+    pub nested:      Vec<String>,
 }
 
 impl ImportName {
     /// Create a new import name with just namespace and name
     #[cfg(feature = "std")]
     pub fn new(namespace: String, name: String) -> Self {
-        Self { namespace, name, nested: Vec::new(), package: None }
+        Self {
+            namespace,
+            name,
+            nested: Vec::new(),
+            package: None,
+        }
     }
 
     /// Create a new import name with nested namespaces
     #[cfg(feature = "std")]
     pub fn with_nested(namespace: String, name: String, nested: Vec<String>) -> Self {
-        Self { namespace, name, nested, package: None }
+        Self {
+            namespace,
+            name,
+            nested,
+            package: None,
+        }
     }
 
     /// Add package reference to an import name
     #[cfg(feature = "std")]
     pub fn with_package(mut self, package: PackageReference) -> Self {
-        self.package = Some(package);
+        self.package = Some(package;
         self
     }
 
     /// Get the full import path as a string
     #[cfg(feature = "std")]
     pub fn full_path(&self) -> String {
-        let mut path = format!("{}.{}", self.namespace, self.name);
+        let mut path = format!("{}.{}", self.namespace, self.name;
         for nested in &self.nested {
-            path.push_str(&format!(".{}", nested));
+            path.push_str(&format!(".{}", nested;
         }
         path
     }
@@ -941,12 +987,24 @@ impl ImportName {
 impl ExportName {
     /// Create a new export name
     pub fn new(name: String) -> Self {
-        Self { name, is_resource: false, semver: None, integrity: None, nested: Vec::new() }
+        Self {
+            name,
+            is_resource: false,
+            semver: None,
+            integrity: None,
+            nested: Vec::new(),
+        }
     }
 
     /// Create a new export name with nested namespaces
     pub fn with_nested(name: String, nested: Vec<String>) -> Self {
-        Self { name, is_resource: false, semver: None, integrity: None, nested }
+        Self {
+            name,
+            is_resource: false,
+            semver: None,
+            integrity: None,
+            nested,
+        }
     }
 
     /// Mark as a resource export
@@ -957,13 +1015,13 @@ impl ExportName {
 
     /// Add semver compatibility information
     pub fn with_semver(mut self, semver: String) -> Self {
-        self.semver = Some(semver);
+        self.semver = Some(semver;
         self
     }
 
     /// Add integrity hash for content verification
     pub fn with_integrity(mut self, integrity: String) -> Self {
-        self.integrity = Some(integrity);
+        self.integrity = Some(integrity;
         self
     }
 
@@ -971,7 +1029,7 @@ impl ExportName {
     pub fn full_path(&self) -> String {
         let mut path = self.name.clone();
         for nested in &self.nested {
-            path.push_str(&format!(".{}", nested));
+            path.push_str(&format!(".{}", nested;
         }
         path
     }
@@ -981,13 +1039,13 @@ impl ExportName {
 #[derive(Debug, Clone)]
 pub struct Value {
     /// Type of the value
-    pub ty: FormatValType,
+    pub ty:         FormatValType,
     /// Encoded value data
-    pub data: Vec<u8>,
+    pub data:       Vec<u8>,
     /// Value expression (if available)
     pub expression: Option<ValueExpression>,
     /// Value name (if available from custom sections)
-    pub name: Option<String>,
+    pub name:       Option<String>,
 }
 
 /// Value expression types
@@ -998,7 +1056,7 @@ pub enum ValueExpression {
         /// Sort of the referenced item
         sort: Sort,
         /// Index within the sort
-        idx: u32,
+        idx:  u32,
     },
     /// Global initialization expression
     GlobalInit {
@@ -1010,7 +1068,7 @@ pub enum ValueExpression {
         /// Function index
         func_idx: u32,
         /// Arguments (indices to other values)
-        args: Vec<u32>,
+        args:     Vec<u32>,
     },
     /// Direct constant value
     Const(ConstValue),
@@ -1052,37 +1110,42 @@ pub enum ConstValue {
 impl Validatable for Instance {
     fn validate(&self) -> Result<()> {
         match &self.instance_expr {
-            InstanceExpr::Instantiate { component_idx, args } => {
+            InstanceExpr::ComponentReference {
+                component_idx,
+                arg_refs,
+            } => {
                 // Basic validation: component_idx should be reasonable
                 if *component_idx > 10000 {
                     // Arbitrary reasonable limit
                     return Err(validation_error!(
                         "Component index {} seems unreasonably large",
                         component_idx
-                    ));
+                    ;
                 }
 
-                // Validate args
-                for arg in args {
-                    if arg.name.is_empty() {
+                // Validate arg references
+                for arg_ref in arg_refs {
+                    if arg_ref.name.is_empty() {
                         return Err(Error::validation_error(
-                            "Instantiate arg name cannot be empty",
-                        ));
+                            "Arg reference name cannot be empty",
+                        ;
                     }
                 }
 
                 Ok(())
-            }
+            },
             InstanceExpr::InlineExports(exports) => {
                 // Validate exports
                 for export in exports {
                     if export.name.is_empty() {
-                        return Err(Error::validation_error("Inline export name cannot be empty"));
+                        return Err(Error::validation_error(
+                            "Inline export name cannot be empty",
+                        ;
                     }
                 }
 
                 Ok(())
-            }
+            },
         }
     }
 }
@@ -1090,48 +1153,52 @@ impl Validatable for Instance {
 impl Validatable for Alias {
     fn validate(&self) -> Result<()> {
         match &self.target {
-            AliasTarget::CoreInstanceExport { instance_idx, name, .. } => {
+            AliasTarget::CoreInstanceExport {
+                instance_idx, name, ..
+            } => {
                 if *instance_idx > 10000 {
                     return Err(validation_error!(
                         "Instance index {} seems unreasonably large",
                         instance_idx
-                    ));
+                    ;
                 }
 
                 if name.is_empty() {
-                    return Err(Error::validation_error("Export name cannot be empty"));
+                    return Err(Error::validation_error("Export name cannot be empty";
                 }
 
                 Ok(())
-            }
-            AliasTarget::InstanceExport { instance_idx, name, .. } => {
+            },
+            AliasTarget::InstanceExport {
+                instance_idx, name, ..
+            } => {
                 if *instance_idx > 10000 {
                     return Err(validation_error!(
                         "Instance index {} seems unreasonably large",
                         instance_idx
-                    ));
+                    ;
                 }
 
                 if name.is_empty() {
-                    return Err(Error::validation_error("Export name cannot be empty"));
+                    return Err(Error::validation_error("Export name cannot be empty";
                 }
 
                 Ok(())
-            }
+            },
             AliasTarget::Outer { count, idx, .. } => {
                 if *count > 10 {
                     return Err(validation_error!(
                         "Outer count {} seems unreasonably large",
                         count
-                    ));
+                    ;
                 }
 
                 if *idx > 10000 {
-                    return Err(validation_error!("Index {} seems unreasonably large", idx));
+                    return Err(validation_error!("Index {} seems unreasonably large", idx;
                 }
 
                 Ok(())
-            }
+            },
         }
     }
 }
@@ -1143,45 +1210,45 @@ impl Validatable for ComponentType {
                 // Validate imports
                 for (namespace, name, _) in imports {
                     if namespace.is_empty() {
-                        return Err(Error::validation_error("Import namespace cannot be empty"));
+                        return Err(Error::validation_error("Import namespace cannot be empty";
                     }
                     if name.is_empty() {
-                        return Err(Error::validation_error("Import name cannot be empty"));
+                        return Err(Error::validation_error("Import name cannot be empty";
                     }
                 }
 
                 // Validate exports
                 for (name, _) in exports {
                     if name.is_empty() {
-                        return Err(Error::validation_error("Export name cannot be empty"));
+                        return Err(Error::validation_error("Export name cannot be empty";
                     }
                 }
 
                 Ok(())
-            }
+            },
             ComponentTypeDefinition::Instance { exports } => {
                 // Validate exports
                 for (name, _) in exports {
                     if name.is_empty() {
-                        return Err(Error::validation_error("Export name cannot be empty"));
+                        return Err(Error::validation_error("Export name cannot be empty";
                     }
                 }
 
                 Ok(())
-            }
+            },
             ComponentTypeDefinition::Function { params, results } => {
                 // Basic validation: reasonable limits on params and results
                 if params.len() > 1000 {
                     return Err(validation_error!(
                         "Function has too many parameters ({})",
                         params.len()
-                    ));
+                    ;
                 }
 
                 // Check param names
                 for (name, _) in params {
                     if name.is_empty() {
-                        return Err(Error::validation_error("Parameter name cannot be empty"));
+                        return Err(Error::validation_error("Parameter name cannot be empty";
                     }
                 }
 
@@ -1189,19 +1256,19 @@ impl Validatable for ComponentType {
                     return Err(validation_error!(
                         "Function has too many results ({})",
                         results.len()
-                    ));
+                    ;
                 }
 
                 Ok(())
-            }
+            },
             ComponentTypeDefinition::Value(_) => {
                 // Simple value types don't need further validation
                 Ok(())
-            }
+            },
             ComponentTypeDefinition::Resource { .. } => {
                 // Resource types are validated elsewhere
                 Ok(())
-            }
+            },
         }
     }
 }
@@ -1209,33 +1276,35 @@ impl Validatable for ComponentType {
 impl Validatable for Canon {
     fn validate(&self) -> Result<()> {
         match &self.operation {
-            CanonOperation::Lift { func_idx, type_idx, .. } => {
+            CanonOperation::Lift {
+                func_idx, type_idx, ..
+            } => {
                 if *func_idx > 10000 {
                     return Err(validation_error!(
                         "Function index {} seems unreasonably large",
                         func_idx
-                    ));
+                    ;
                 }
 
                 if *type_idx > 10000 {
                     return Err(validation_error!(
                         "Type index {} seems unreasonably large",
                         type_idx
-                    ));
+                    ;
                 }
 
                 Ok(())
-            }
+            },
             CanonOperation::Lower { func_idx, .. } => {
                 if *func_idx > 10000 {
                     return Err(validation_error!(
                         "Function index {} seems unreasonably large",
                         func_idx
-                    ));
+                    ;
                 }
 
                 Ok(())
-            }
+            },
             // Other operations have simpler validation requirements
             _ => Ok(()),
         }
@@ -1248,21 +1317,21 @@ impl Validatable for Start {
             return Err(validation_error!(
                 "Function index {} seems unreasonably large",
                 self.func_idx
-            ));
+            ;
         }
 
         if self.args.len() > 1000 {
             return Err(validation_error!(
                 "Start function has too many arguments ({})",
                 self.args.len()
-            ));
+            ;
         }
 
         if self.results > 1000 {
             return Err(validation_error!(
                 "Start function has too many results ({})",
                 self.results
-            ));
+            ;
         }
 
         Ok(())
@@ -1273,24 +1342,24 @@ impl Validatable for Import {
     fn validate(&self) -> Result<()> {
         // Validate import name
         if self.name.namespace.is_empty() {
-            return Err(Error::validation_error("Import namespace cannot be empty"));
+            return Err(Error::validation_error("Import namespace cannot be empty";
         }
 
         if self.name.name.is_empty() {
-            return Err(Error::validation_error("Import name cannot be empty"));
+            return Err(Error::validation_error("Import name cannot be empty";
         }
 
         // Nested namespaces should not be empty strings
         for nested in &self.name.nested {
             if nested.is_empty() {
-                return Err(Error::validation_error("Nested namespace cannot be empty"));
+                return Err(Error::validation_error("Nested namespace cannot be empty";
             }
         }
 
         // Validate package reference if present
         if let Some(pkg) = &self.name.package {
             if pkg.name.is_empty() {
-                return Err(Error::validation_error("Package name cannot be empty"));
+                return Err(Error::validation_error("Package name cannot be empty";
             }
         }
 
@@ -1302,19 +1371,22 @@ impl Validatable for Export {
     fn validate(&self) -> Result<()> {
         // Validate export name
         if self.name.name.is_empty() {
-            return Err(Error::validation_error("Export name cannot be empty"));
+            return Err(Error::validation_error("Export name cannot be empty";
         }
 
         // Nested namespaces should not be empty strings
         for nested in &self.name.nested {
             if nested.is_empty() {
-                return Err(Error::validation_error("Nested namespace cannot be empty"));
+                return Err(Error::validation_error("Nested namespace cannot be empty";
             }
         }
 
         // Index should be reasonable
         if self.idx > 10000 {
-            return Err(validation_error!("Export index {} seems unreasonably large", self.idx));
+            return Err(validation_error!(
+                "Export index {} seems unreasonably large",
+                self.idx
+            ;
         }
 
         Ok(())
@@ -1328,7 +1400,7 @@ impl Validatable for Value {
             return Err(validation_error!(
                 "Value data size {} seems unreasonably large",
                 self.data.len()
-            ));
+            ;
         }
 
         // Check value expression if present
@@ -1339,35 +1411,35 @@ impl Validatable for Value {
                         return Err(validation_error!(
                             "Item reference index {} seems unreasonably large",
                             idx
-                        ));
+                        ;
                     }
-                }
+                },
                 ValueExpression::GlobalInit { global_idx } => {
                     if *global_idx > 10000 {
                         return Err(validation_error!(
                             "Global index {} seems unreasonably large",
                             global_idx
-                        ));
+                        ;
                     }
-                }
+                },
                 ValueExpression::FunctionCall { func_idx, args } => {
                     if *func_idx > 10000 {
                         return Err(validation_error!(
                             "Function index {} seems unreasonably large",
                             func_idx
-                        ));
+                        ;
                     }
 
                     if args.len() > 1000 {
                         return Err(validation_error!(
                             "Function call has too many arguments ({})",
                             args.len()
-                        ));
+                        ;
                     }
-                }
+                },
                 ValueExpression::Const(_) => {
                     // Constants are validated elsewhere
-                }
+                },
             }
         }
 

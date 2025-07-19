@@ -12,7 +12,7 @@ mod conversion_tests;
 
 /// Run all core integration tests
 pub fn run_tests() -> TestResult {
-    let mut runner = TestRunner::new("Core Integration");
+    let mut runner = TestRunner::new("Core Integration";
     
     runner.add_test_suite("WRT Ecosystem Integration", || {
         // Core WRT ecosystem integration tests
@@ -43,7 +43,7 @@ mod tests {
     
     #[test]
     fn core_integration() {
-        let result = run_tests();
+        let result = run_tests);
         assert!(result.is_success(), "Core integration tests failed: {:?}", result);
     }
 }

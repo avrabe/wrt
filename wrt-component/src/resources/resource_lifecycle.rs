@@ -7,7 +7,11 @@
 #[cfg(not(feature = "std"))]
 use wrt_foundation::bounded::{BoundedString, BoundedVec};
 
-use crate::prelude::*;
+#[cfg(feature = "std")]
+use std::collections::HashMap;
+#[cfg(not(feature = "std"))]
+// HashMap disabled for no_std
+
 
 /// Maximum number of active resources in pure no_std environments
 #[cfg(not(feature = "std"))]
@@ -80,7 +84,7 @@ pub struct ResourceMetadata {
     #[cfg(feature = "std")]
     pub user_data: Option<Vec<u8>>,
     #[cfg(not(feature = "std"))]
-    pub user_data: Option<BoundedVec<u8, 256>, NoStdProvider<65536>>,
+    pub user_data: Option<BoundedVec<u8, 256, NoStdProvider<65536>>, NoStdProvider<65536>>,
 }
 
 /// Resource lifecycle manager
@@ -92,21 +96,22 @@ pub struct ResourceLifecycleManager {
     resources: HashMap<ResourceHandle, Resource>,
     #[cfg(not(feature = "std"))]
     resources:
-        wrt_foundation::no_std_hashmap::SimpleHashMap<ResourceHandle, Resource, MAX_RESOURCES>,
+        wrt_foundation::SimpleHashMap<ResourceHandle, Resource, MAX_RESOURCES, NoStdProvider<65536>>,
     /// Borrow tracking
     #[cfg(feature = "std")]
     borrows: HashMap<ResourceHandle, Vec<BorrowInfo>>,
     #[cfg(not(feature = "std"))]
-    borrows: wrt_foundation::no_std_hashmap::SimpleHashMap<
+    borrows: wrt_foundation::SimpleHashMap<
         ResourceHandle,
         BoundedVec<BorrowInfo, MAX_BORROWS_PER_RESOURCE, NoStdProvider<65536>>,
         MAX_RESOURCES,
+        NoStdProvider<65536>,
     >,
     /// Resource type registry
     #[cfg(feature = "std")]
     types: HashMap<u32, ResourceType>,
     #[cfg(not(feature = "std"))]
-    types: wrt_foundation::no_std_hashmap::SimpleHashMap<u32, ResourceType, 256>,
+    types: wrt_foundation::SimpleHashMap<u32, ResourceType, 256, NoStdProvider<65536>>,
     /// Lifecycle hooks
     hooks: LifecycleHooks,
     /// Metrics
@@ -137,15 +142,15 @@ pub struct BorrowFlags {
 #[derive(Default)]
 pub struct LifecycleHooks {
     /// Called when a resource is created
-    pub on_create: Option<fn(&Resource) -> Result<()>>,
+    pub on_create: Option<fn(&Resource) -> Result<(), Error>>,
     /// Called when a resource is destroyed
-    pub on_destroy: Option<fn(&Resource) -> Result<()>>,
+    pub on_destroy: Option<fn(&Resource) -> Result<(), Error>>,
     /// Called when a resource is borrowed
-    pub on_borrow: Option<fn(&Resource, &BorrowInfo) -> Result<()>>,
+    pub on_borrow: Option<fn(&Resource, &BorrowInfo) -> Result<(), Error>>,
     /// Called when a borrow is released
-    pub on_release: Option<fn(&Resource, &BorrowInfo) -> Result<()>>,
+    pub on_release: Option<fn(&Resource, &BorrowInfo) -> Result<(), Error>>,
     /// Called when ownership is transferred
-    pub on_transfer: Option<fn(&Resource, u32, u32) -> Result<()>>,
+    pub on_transfer: Option<fn(&Resource, u32, u32) -> Result<(), Error>>,
 }
 
 /// Resource lifecycle metrics
@@ -172,18 +177,9 @@ impl ResourceLifecycleManager {
     pub fn new() -> Self {
         Self {
             next_handle: 1, // 0 is reserved for invalid handle
-            #[cfg(feature = "std")]
             resources: HashMap::new(),
-            #[cfg(not(feature = "std"))]
-            resources: wrt_foundation::no_std_hashmap::SimpleHashMap::new(),
-            #[cfg(feature = "std")]
             borrows: HashMap::new(),
-            #[cfg(not(feature = "std"))]
-            borrows: wrt_foundation::no_std_hashmap::SimpleHashMap::new(),
-            #[cfg(feature = "std")]
             types: HashMap::new(),
-            #[cfg(not(feature = "std"))]
-            types: wrt_foundation::no_std_hashmap::SimpleHashMap::new(),
             hooks: LifecycleHooks::default(),
             metrics: ResourceMetrics::default(),
         }
@@ -202,21 +198,13 @@ impl ResourceLifecycleManager {
             name: name.to_string(),
             #[cfg(not(feature = "std"))]
             name: BoundedString::try_from(name).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_ERROR,
-                    "Resource type name too long",
-                )
+                Error::resource_error("Resource type name too long")
             })?,
             destructor,
         };
 
         self.types.insert(type_idx, resource_type).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Failed to register resource type",
-            )
+            Error::resource_error("Failed to register resource type")
         })?;
 
         Ok(())
@@ -235,11 +223,7 @@ impl ResourceLifecycleManager {
             .types
             .get(&type_idx)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_ERROR,
-                    "Component not found",
-                )
+                Error::resource_error("Component not found")
             })?
             .clone();
 
@@ -248,20 +232,16 @@ impl ResourceLifecycleManager {
             .types
             .get(&type_idx)
             .map_err(|_| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_ERROR,
-                    "Failed to get resource type",
-                )
+                Error::resource_error("Failed to get resource type")
             })?
             .ok_or_else(|| {
-                Error::new(ErrorCategory::Resource, codes::RESOURCE_ERROR, "Unknown resource type")
+                Error::resource_error("Unknown resource type")
             })?
             .clone();
 
         // Allocate handle
         let handle = self.next_handle;
-        self.next_handle = self.next_handle.wrapping_add(1);
+        self.next_handle = self.next_handle.wrapping_add(1;
         if self.next_handle == INVALID_HANDLE {
             self.next_handle = 1; // Skip invalid handle
         }
@@ -291,7 +271,7 @@ impl ResourceLifecycleManager {
 
         // Store resource
         self.resources.insert(handle, resource).map_err(|_| {
-            Error::new(ErrorCategory::Resource, codes::RESOURCE_ERROR, "Failed to store resource")
+            Error::resource_error("Failed to store resource")
         })?;
 
         // Update metrics
@@ -309,11 +289,7 @@ impl ResourceLifecycleManager {
         // Get resource
         #[cfg(feature = "std")]
         let mut resource = self.resources.remove(&handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_INVALID_HANDLE,
-                "Component not found",
-            )
+            Error::resource_invalid_handle("Component not found")
         })?;
 
         #[cfg(not(feature = "std"))]
@@ -321,36 +297,20 @@ impl ResourceLifecycleManager {
             .resources
             .remove(&handle)
             .map_err(|_| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_ERROR,
-                    "Failed to remove resource",
-                )
+                Error::resource_error("Failed to remove resource")
             })?
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_INVALID_HANDLE,
-                    "Invalid resource handle",
-                )
+                Error::resource_invalid_handle("Invalid resource handle")
             })?;
 
         // Check state
         if resource.state == ResourceState::Dropped {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Resource already dropped",
-            ));
+            return Err(Error::resource_error("Resource already dropped";
         }
 
         // Check borrows
         if resource.borrow_count > 0 {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Cannot drop resource with active borrows",
-            ));
+            return Err(Error::resource_error("Cannot drop resource with active borrows";
         }
 
         // Update state
@@ -363,14 +323,14 @@ impl ResourceLifecycleManager {
 
         // Remove any borrow info
         #[cfg(feature = "std")]
-        self.borrows.remove(&handle);
+        self.borrows.remove(&handle;
 
         #[cfg(not(feature = "std"))]
-        let _ = self.borrows.remove(&handle);
+        let _ = self.borrows.remove(&handle;
 
         // Update metrics
         self.metrics.total_destroyed += 1;
-        self.metrics.active_count = self.metrics.active_count.saturating_sub(1);
+        self.metrics.active_count = self.metrics.active_count.saturating_sub(1;
 
         Ok(())
     }
@@ -385,11 +345,7 @@ impl ResourceLifecycleManager {
         // Get resource
         #[cfg(feature = "std")]
         let resource = self.resources.get_mut(&handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_INVALID_HANDLE,
-                "Component not found",
-            )
+            Error::resource_invalid_handle("Component not found")
         })?;
 
         #[cfg(not(feature = "std"))]
@@ -397,32 +353,20 @@ impl ResourceLifecycleManager {
             .resources
             .get_mut(&handle)
             .map_err(|_| {
-                Error::new(ErrorCategory::Resource, codes::RESOURCE_ERROR, "Failed to get resource")
+                Error::resource_error("Failed to get resource")
             })?
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_INVALID_HANDLE,
-                    "Invalid resource handle",
-                )
+                Error::resource_invalid_handle("Invalid resource handle")
             })?;
 
         // Check state
         if resource.state != ResourceState::Active && resource.state != ResourceState::Borrowed {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Resource not available for borrowing",
-            ));
+            return Err(Error::resource_error("Resource not available for borrowing";
         }
 
         // Check mutable borrow rules
         if is_mutable && resource.borrow_count > 0 {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Cannot create mutable borrow with existing borrows",
-            ));
+            return Err(Error::resource_error("Cannot create mutable borrow with existing borrows";
         }
 
         // Create borrow info
@@ -440,7 +384,7 @@ impl ResourceLifecycleManager {
         // Update resource state
         resource.state = ResourceState::Borrowed;
         resource.borrow_count += 1;
-        resource.metadata.last_accessed = Some(self.get_timestamp());
+        resource.metadata.last_accessed = Some(self.get_timestamp);
 
         // Store borrow info
         #[cfg(feature = "std")]
@@ -452,18 +396,10 @@ impl ResourceLifecycleManager {
         {
             let borrows =
                 self.borrows.get_mut_or_insert(handle, BoundedVec::new).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Resource,
-                        codes::RESOURCE_ERROR,
-                        "Failed to store borrow info",
-                    )
+                    Error::resource_error("Failed to store borrow info")
                 })?;
             borrows.push(borrow_info).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_ERROR,
-                    "Too many borrows for resource",
-                )
+                Error::resource_error("Too many borrows for resource")
             })?;
         }
 
@@ -479,11 +415,7 @@ impl ResourceLifecycleManager {
         // Get resource
         #[cfg(feature = "std")]
         let resource = self.resources.get_mut(&handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_INVALID_HANDLE,
-                "Component not found",
-            )
+            Error::resource_invalid_handle("Component not found")
         })?;
 
         #[cfg(not(feature = "std"))]
@@ -491,33 +423,21 @@ impl ResourceLifecycleManager {
             .resources
             .get_mut(&handle)
             .map_err(|_| {
-                Error::new(ErrorCategory::Resource, codes::RESOURCE_ERROR, "Failed to get resource")
+                Error::resource_error("Failed to get resource")
             })?
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_INVALID_HANDLE,
-                    "Invalid resource handle",
-                )
+                Error::resource_invalid_handle("Invalid resource handle")
             })?;
 
         // Find and remove borrow
         #[cfg(feature = "std")]
         let borrow_info = {
             let borrows = self.borrows.get_mut(&handle).ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_ERROR,
-                    "No borrows for resource",
-                )
+                Error::resource_error("No borrows for resource")
             })?;
 
             let pos = borrows.iter().position(|b| b.borrower == borrower).ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_ERROR,
-                    "Borrow not found for borrower",
-                )
+                Error::resource_error("Borrow not found for borrower")
             })?;
 
             borrows.remove(pos)
@@ -529,26 +449,14 @@ impl ResourceLifecycleManager {
                 .borrows
                 .get_mut(&handle)
                 .map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Resource,
-                        codes::RESOURCE_ERROR,
-                        "Failed to get borrows",
-                    )
+                    Error::resource_error("Failed to get borrows")
                 })?
                 .ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Resource,
-                        codes::RESOURCE_ERROR,
-                        "No borrows for resource",
-                    )
+                    Error::resource_error("No borrows for resource")
                 })?;
 
             let pos = borrows.iter().position(|b| b.borrower == borrower).ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_ERROR,
-                    "Borrow not found for borrower",
-                )
+                Error::resource_error("Borrow not found for borrower")
             })?;
 
             borrows.remove(pos)
@@ -560,13 +468,13 @@ impl ResourceLifecycleManager {
         }
 
         // Update resource state
-        resource.borrow_count = resource.borrow_count.saturating_sub(1);
+        resource.borrow_count = resource.borrow_count.saturating_sub(1;
         if resource.borrow_count == 0 {
             resource.state = ResourceState::Active;
         }
 
         // Update metrics
-        self.metrics.active_borrows = self.metrics.active_borrows.saturating_sub(1);
+        self.metrics.active_borrows = self.metrics.active_borrows.saturating_sub(1;
 
         Ok(())
     }
@@ -576,11 +484,7 @@ impl ResourceLifecycleManager {
         // Get resource
         #[cfg(feature = "std")]
         let resource = self.resources.get_mut(&handle).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_INVALID_HANDLE,
-                "Component not found",
-            )
+            Error::resource_invalid_handle("Component not found")
         })?;
 
         #[cfg(not(feature = "std"))]
@@ -588,41 +492,25 @@ impl ResourceLifecycleManager {
             .resources
             .get_mut(&handle)
             .map_err(|_| {
-                Error::new(ErrorCategory::Resource, codes::RESOURCE_ERROR, "Failed to get resource")
+                Error::resource_error("Failed to get resource")
             })?
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_INVALID_HANDLE,
-                    "Invalid resource handle",
-                )
+                Error::resource_invalid_handle("Invalid resource handle")
             })?;
 
         // Check ownership
         if resource.metadata.owner != from {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Not the owner of the resource",
-            ));
+            return Err(Error::resource_error("Not the owner of the resource";
         }
 
         // Check state
         if resource.state != ResourceState::Active {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Resource not in transferable state",
-            ));
+            return Err(Error::resource_error("Resource not in transferable state";
         }
 
         // Check borrows
         if resource.borrow_count > 0 {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Cannot transfer resource with active borrows",
-            ));
+            return Err(Error::resource_error("Cannot transfer resource with active borrows";
         }
 
         // Call transfer hook
@@ -633,7 +521,7 @@ impl ResourceLifecycleManager {
         // Update ownership
         resource.state = ResourceState::Transferring;
         resource.metadata.owner = to;
-        resource.metadata.last_accessed = Some(self.get_timestamp());
+        resource.metadata.last_accessed = Some(self.get_timestamp);
         resource.state = ResourceState::Active;
 
         Ok(())
@@ -644,11 +532,7 @@ impl ResourceLifecycleManager {
         #[cfg(feature = "std")]
         {
             self.resources.get(&handle).ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_INVALID_HANDLE,
-                    "Component not found",
-                )
+                Error::resource_invalid_handle("Component not found")
             })
         }
 
@@ -657,18 +541,10 @@ impl ResourceLifecycleManager {
             self.resources
                 .get(&handle)
                 .map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Resource,
-                        codes::RESOURCE_ERROR,
-                        "Failed to get resource",
-                    )
+                    Error::resource_error("Failed to get resource")
                 })?
                 .ok_or_else(|| {
-                    Error::new(
-                        ErrorCategory::Resource,
-                        codes::RESOURCE_INVALID_HANDLE,
-                        "Invalid resource handle",
-                    )
+                    Error::resource_invalid_handle("Invalid resource handle")
                 })
         }
     }
@@ -757,10 +633,10 @@ impl<'a> Drop for ResourceGuard<'a> {
     fn drop(&mut self) {
         if self.is_borrow {
             if let Some(borrower) = self.borrower {
-                let _ = self.manager.release_borrow(self.handle, borrower);
+                let _ = self.manager.release_borrow(self.handle, borrower;
             }
         } else {
-            let _ = self.manager.drop_resource(self.handle);
+            let _ = self.manager.drop_resource(self.handle;
         }
     }
 }
@@ -771,41 +647,41 @@ mod tests {
 
     #[test]
     fn test_resource_lifecycle() {
-        let mut manager = ResourceLifecycleManager::new();
+        let mut manager = ResourceLifecycleManager::new);
 
         // Register a type
         manager.register_type(1, "TestResource", None).unwrap();
 
         // Create a resource
         let handle = manager.create_resource(1, 100, None).unwrap();
-        assert_ne!(handle, INVALID_HANDLE);
+        assert_ne!(handle, INVALID_HANDLE;
 
         // Verify resource exists
         let resource = manager.get_resource(handle).unwrap();
-        assert_eq!(resource.resource_type.type_idx, 1);
-        assert_eq!(resource.metadata.owner, 100);
+        assert_eq!(resource.resource_type.type_idx, 1;
+        assert_eq!(resource.metadata.owner, 100;
 
         // Borrow the resource
         manager.borrow_resource(handle, 200, false).unwrap();
-        assert_eq!(manager.get_resource(handle).unwrap().borrow_count, 1);
+        assert_eq!(manager.get_resource(handle).unwrap().borrow_count, 1;
 
         // Try to drop with active borrow (should fail)
-        assert!(manager.drop_resource(handle).is_err());
+        assert!(manager.drop_resource(handle).is_err();
 
         // Release borrow
         manager.release_borrow(handle, 200).unwrap();
-        assert_eq!(manager.get_resource(handle).unwrap().borrow_count, 0);
+        assert_eq!(manager.get_resource(handle).unwrap().borrow_count, 0;
 
         // Drop resource
         manager.drop_resource(handle).unwrap();
 
         // Verify resource is gone
-        assert!(manager.get_resource(handle).is_err());
+        assert!(manager.get_resource(handle).is_err();
     }
 
     #[test]
     fn test_ownership_transfer() {
-        let mut manager = ResourceLifecycleManager::new();
+        let mut manager = ResourceLifecycleManager::new);
 
         // Register and create
         manager.register_type(1, "TestResource", None).unwrap();
@@ -813,15 +689,15 @@ mod tests {
 
         // Transfer ownership
         manager.transfer_ownership(handle, 100, 200).unwrap();
-        assert_eq!(manager.get_resource(handle).unwrap().metadata.owner, 200);
+        assert_eq!(manager.get_resource(handle).unwrap().metadata.owner, 200;
 
         // Try to transfer from wrong owner (should fail)
-        assert!(manager.transfer_ownership(handle, 100, 300).is_err());
+        assert!(manager.transfer_ownership(handle, 100, 300).is_err();
     }
 
     #[test]
     fn test_borrow_rules() {
-        let mut manager = ResourceLifecycleManager::new();
+        let mut manager = ResourceLifecycleManager::new);
 
         // Register and create
         manager.register_type(1, "TestResource", None).unwrap();
@@ -830,10 +706,10 @@ mod tests {
         // Multiple immutable borrows should work
         manager.borrow_resource(handle, 200, false).unwrap();
         manager.borrow_resource(handle, 300, false).unwrap();
-        assert_eq!(manager.get_resource(handle).unwrap().borrow_count, 2);
+        assert_eq!(manager.get_resource(handle).unwrap().borrow_count, 2;
 
         // Mutable borrow with existing borrows should fail
-        assert!(manager.borrow_resource(handle, 400, true).is_err());
+        assert!(manager.borrow_resource(handle, 400, true).is_err();
 
         // Release all borrows
         manager.release_borrow(handle, 200).unwrap();
@@ -843,23 +719,23 @@ mod tests {
         manager.borrow_resource(handle, 400, true).unwrap();
 
         // Another borrow should fail
-        assert!(manager.borrow_resource(handle, 500, false).is_err());
+        assert!(manager.borrow_resource(handle, 500, false).is_err();
     }
 
     #[test]
     fn test_resource_guard() {
-        let mut manager = ResourceLifecycleManager::new();
+        let mut manager = ResourceLifecycleManager::new);
         manager.register_type(1, "TestResource", None).unwrap();
 
         {
             let handle = manager.create_resource(1, 100, None).unwrap();
-            let _guard = ResourceGuard::new_own(&mut manager, handle);
+            let _guard = ResourceGuard::new_own(&mut manager, handle;
             // Resource will be dropped when guard goes out of scope
         }
 
         // Verify metrics
-        assert_eq!(manager.get_metrics().total_created, 1);
-        assert_eq!(manager.get_metrics().total_destroyed, 1);
-        assert_eq!(manager.get_metrics().active_count, 0);
+        assert_eq!(manager.get_metrics().total_created, 1;
+        assert_eq!(manager.get_metrics().total_destroyed, 1;
+        assert_eq!(manager.get_metrics().active_count, 0;
     }
 }

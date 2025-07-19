@@ -1,9 +1,18 @@
 use std::{
     // path::{Path, PathBuf}, // Remove unused
-    sync::{Arc, Mutex},
+    sync::{
+        Arc,
+        Mutex,
+    },
 };
 
-use wrt::{Error as WrtError, Module, Result, StacklessEngine, Value};
+use wrt::{
+    Error as WrtError,
+    Module,
+    Result,
+    StacklessEngine,
+    Value,
+};
 
 #[test]
 fn test_v128_load_store() -> Result<()> {
@@ -32,7 +41,7 @@ fn test_v128_load_store() -> Result<()> {
     // Parse WAT and create module
     let wasm = wat::parse_str(wat).map_err(|e| wrt::Error::Parse(e.to_string()))?;
     let module = Module::new()?.load_from_binary(&wasm)?;
-    let mut engine = StacklessEngine::new(module.clone());
+    let mut engine = StacklessEngine::new(module.clone();
 
     // Instantiate the module
     let instance_idx = engine.instantiate(module.clone())?;
@@ -55,9 +64,9 @@ fn test_v128_load_store() -> Result<()> {
             &actual_bytes[..],
             &expected_bytes[..],
             "v128.load/store returned incorrect value"
-        );
+        ;
     } else {
-        panic!("Expected V128 result");
+        panic!("Expected V128 result";
     }
 
     Ok(())
@@ -103,12 +112,12 @@ fn test_v128_splat() -> Result<()> {
     // Parse WAT and create module
     let wasm = wat::parse_str(wat).map_err(|e| wrt::Error::Parse(e.to_string()))?;
     let module = Module::new()?.load_from_binary(&wasm)?;
-    let mut engine = StacklessEngine::new(module.clone());
+    let mut engine = StacklessEngine::new(module.clone();
 
     // Instantiate the module
     let instance_idx = engine.instantiate(module.clone())?;
 
-    println!("Running v128 splat tests");
+    println!("Running v128 splat tests";
 
     // Test i8x16.splat
     let func_idx = module.get_export("i8x16_splat").unwrap().index;
@@ -116,9 +125,13 @@ fn test_v128_splat() -> Result<()> {
     if let Some(Value::V128(v)) = result.first() {
         let actual_bytes = v;
         let expected_bytes: [u8; 16] = [10; 16];
-        assert_eq!(&actual_bytes[..], &expected_bytes[..], "i8x16.splat returned incorrect value");
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i8x16.splat returned incorrect value"
+        ;
     } else {
-        panic!("Expected V128 result for i8x16.splat");
+        panic!("Expected V128 result for i8x16.splat";
     }
 
     // Test i16x8.splat
@@ -126,11 +139,16 @@ fn test_v128_splat() -> Result<()> {
     let result = engine.execute(instance_idx, func_idx, vec![Value::I32(2000)])?;
     if let Some(Value::V128(v)) = result.first() {
         let actual_bytes = v;
-        let expected_bytes: [u8; 16] =
-            [208, 7, 208, 7, 208, 7, 208, 7, 208, 7, 208, 7, 208, 7, 208, 7]; // 2000 in little-endian i16
-        assert_eq!(&actual_bytes[..], &expected_bytes[..], "i16x8.splat returned incorrect value");
+        let expected_bytes: [u8; 16] = [
+            208, 7, 208, 7, 208, 7, 208, 7, 208, 7, 208, 7, 208, 7, 208, 7,
+        ]; // 2000 in little-endian i16
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i16x8.splat returned incorrect value"
+        ;
     } else {
-        panic!("Expected V128 result for i16x8.splat");
+        panic!("Expected V128 result for i16x8.splat";
     }
 
     // Test i32x4.splat
@@ -138,11 +156,16 @@ fn test_v128_splat() -> Result<()> {
     let result = engine.execute(instance_idx, func_idx, vec![Value::I32(300000)])?;
     if let Some(Value::V128(v)) = result.first() {
         let actual_bytes = v;
-        let expected_bytes: [u8; 16] =
-            [224, 147, 4, 0, 224, 147, 4, 0, 224, 147, 4, 0, 224, 147, 4, 0];
-        assert_eq!(&actual_bytes[..], &expected_bytes[..], "i32x4.splat returned incorrect value");
+        let expected_bytes: [u8; 16] = [
+            224, 147, 4, 0, 224, 147, 4, 0, 224, 147, 4, 0, 224, 147, 4, 0,
+        ];
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i32x4.splat returned incorrect value"
+        ;
     } else {
-        panic!("Expected V128 result for i32x4.splat");
+        panic!("Expected V128 result for i32x4.splat";
     }
 
     // Test i64x2.splat
@@ -151,9 +174,13 @@ fn test_v128_splat() -> Result<()> {
     if let Some(Value::V128(v)) = result.first() {
         let actual_bytes = v;
         let expected_bytes: [u8; 16] = [0, 40, 107, 238, 0, 0, 0, 0, 0, 40, 107, 238, 0, 0, 0, 0]; // 4000000000 in little-endian i64
-        assert_eq!(&actual_bytes[..], &expected_bytes[..], "i64x2.splat returned incorrect value");
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i64x2.splat returned incorrect value"
+        ;
     } else {
-        panic!("Expected V128 result for i64x2.splat");
+        panic!("Expected V128 result for i64x2.splat";
     }
 
     // Test f32x4.splat
@@ -162,9 +189,13 @@ fn test_v128_splat() -> Result<()> {
     if let Some(Value::V128(v)) = result.first() {
         let actual_bytes = v;
         let expected_bytes: [u8; 16] = [0, 0, 176, 64, 0, 0, 176, 64, 0, 0, 176, 64, 0, 0, 176, 64]; // 5.5 in little-endian f32
-        assert_eq!(&actual_bytes[..], &expected_bytes[..], "f32x4.splat returned incorrect value");
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "f32x4.splat returned incorrect value"
+        ;
     } else {
-        panic!("Expected V128 result for f32x4.splat");
+        panic!("Expected V128 result for f32x4.splat";
     }
 
     // Test f64x2.splat
@@ -173,9 +204,13 @@ fn test_v128_splat() -> Result<()> {
     if let Some(Value::V128(v)) = result.first() {
         let actual_bytes = v;
         let expected_bytes: [u8; 16] = [0, 0, 0, 0, 0, 0, 25, 64, 0, 0, 0, 0, 0, 0, 25, 64]; // 6.25 in little-endian f64
-        assert_eq!(&actual_bytes[..], &expected_bytes[..], "f64x2.splat returned incorrect value");
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "f64x2.splat returned incorrect value"
+        ;
     } else {
-        panic!("Expected V128 result for f64x2.splat");
+        panic!("Expected V128 result for f64x2.splat";
     }
 
     Ok(())
@@ -203,7 +238,7 @@ fn test_v128_shuffle() -> Result<()> {
     // Parse WAT and create module
     let wasm = wat::parse_str(wat).map_err(|e| wrt::Error::Parse(e.to_string()))?;
     let module = Module::new()?.load_from_binary(&wasm)?;
-    let mut engine = StacklessEngine::new(module.clone());
+    let mut engine = StacklessEngine::new(module.clone();
 
     // Instantiate the module
     let instance_idx = engine.instantiate(module.clone())?;
@@ -213,15 +248,16 @@ fn test_v128_shuffle() -> Result<()> {
     let result = engine.execute(instance_idx, func_idx, vec![])?;
     if let Some(Value::V128(v)) = result.first() {
         let actual_bytes = v;
-        let expected_bytes: [u8; 16] =
-            [31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16]; // Corrected expected shuffled bytes
+        let expected_bytes: [u8; 16] = [
+            31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16,
+        ]; // Corrected expected shuffled bytes
         assert_eq!(
             &actual_bytes[..],
             &expected_bytes[..],
             "i8x16.shuffle returned incorrect value"
-        );
+        ;
     } else {
-        panic!("Expected V128 result for i8x16.shuffle");
+        panic!("Expected V128 result for i8x16.shuffle";
     }
 
     Ok(())
@@ -255,7 +291,7 @@ fn test_v128_arithmetic() -> Result<()> {
     // Parse WAT and create module
     let wasm = wat::parse_str(wat).map_err(|e| wrt::Error::Parse(e.to_string()))?;
     let module = Module::new()?.load_from_binary(&wasm)?;
-    let mut engine = StacklessEngine::new(module.clone());
+    let mut engine = StacklessEngine::new(module.clone();
 
     // Instantiate the module
     let instance_idx = engine.instantiate(module.clone())?;
@@ -266,9 +302,13 @@ fn test_v128_arithmetic() -> Result<()> {
     if let Some(Value::V128(v)) = result_add.first() {
         let actual_bytes = v;
         let expected_bytes: [u8; 16] = [6, 0, 0, 0, 8, 0, 0, 0, 10, 0, 0, 0, 12, 0, 0, 0]; // Expected result of adding [1,2,3,4] and [5,6,7,8]
-        assert_eq!(&actual_bytes[..], &expected_bytes[..], "i32x4.add returned incorrect value");
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i32x4.add returned incorrect value"
+        ;
     } else {
-        panic!("Expected V128 result for i32x4.add");
+        panic!("Expected V128 result for i32x4.add";
     }
 
     // Test i32x4.sub
@@ -277,9 +317,13 @@ fn test_v128_arithmetic() -> Result<()> {
     if let Some(Value::V128(v)) = result_sub.first() {
         let actual_bytes = v;
         let expected_bytes: [u8; 16] = [9, 0, 0, 0, 18, 0, 0, 0, 27, 0, 0, 0, 36, 0, 0, 0];
-        assert_eq!(&actual_bytes[..], &expected_bytes[..], "i32x4.sub returned incorrect value");
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i32x4.sub returned incorrect value"
+        ;
     } else {
-        panic!("Expected V128 result for i32x4.sub");
+        panic!("Expected V128 result for i32x4.sub";
     }
 
     // Test i32x4.mul
@@ -288,9 +332,13 @@ fn test_v128_arithmetic() -> Result<()> {
     if let Some(Value::V128(v)) = result_mul.first() {
         let actual_bytes = v;
         let expected_bytes: [u8; 16] = [5, 0, 0, 0, 12, 0, 0, 0, 21, 0, 0, 0, 32, 0, 0, 0]; // Expected result of multiplying [1,2,3,4] and [5,6,7,8]
-        assert_eq!(&actual_bytes[..], &expected_bytes[..], "i32x4.mul returned incorrect value");
+        assert_eq!(
+            &actual_bytes[..],
+            &expected_bytes[..],
+            "i32x4.mul returned incorrect value"
+        ;
     } else {
-        panic!("Expected V128 result for i32x4.mul");
+        panic!("Expected V128 result for i32x4.mul";
     }
 
     Ok(())

@@ -19,16 +19,24 @@ use core::{
 extern crate alloc;
 
 // Use HashMap/HashSet in std mode, BTreeMap/BTreeSet in no_std mode
-#[cfg(feature = "std")]
-use std::collections::{HashMap as Map, HashSet as Set};
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
 use alloc::collections::{BTreeMap as Map, BTreeSet as Set};
+#[cfg(feature = "std")]
+use std::collections::{HashMap as Map, HashSet as Set};
 
 // String and Vec handling
-#[cfg(feature = "std")]
-use std::{string::{String, ToString}, vec::Vec};
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
-use alloc::{string::{String, ToString}, vec::Vec, format, vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+#[cfg(feature = "std")]
+use std::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 // Import error types
 use wrt_error::{Error, ErrorCategory};
@@ -127,7 +135,7 @@ impl Hasher {
 
     fn update(&mut self, bytes: &[u8]) {
         for &byte in bytes {
-            self.hash ^= u32::from(byte);
+            self.hash ^= u32::from(byte;
             self.hash = self.hash.wrapping_mul(0x0100_0193); // FNV prime for
                                                              // 32-bit
         }
@@ -159,9 +167,9 @@ pub enum ValueType {
     /// External reference
     ExternRef,
     /// Struct reference (WebAssembly 3.0 GC)
-    StructRef(u32),  // type index
+    StructRef(u32), // type index
     /// Array reference (WebAssembly 3.0 GC)
-    ArrayRef(u32),   // type index
+    ArrayRef(u32), // type index
 }
 
 impl core::fmt::Debug for ValueType {
@@ -176,12 +184,8 @@ impl core::fmt::Debug for ValueType {
             Self::I16x8 => write!(f, "I16x8"),
             Self::FuncRef => write!(f, "FuncRef"),
             Self::ExternRef => write!(f, "ExternRef"),
-            Self::StructRef(idx) => {
-                f.debug_tuple("StructRef").field(idx).finish()
-            }
-            Self::ArrayRef(idx) => {
-                f.debug_tuple("ArrayRef").field(idx).finish()
-            }
+            Self::StructRef(idx) => f.debug_tuple("StructRef").field(idx).finish(),
+            Self::ArrayRef(idx) => f.debug_tuple("ArrayRef").field(idx).finish(),
         }
     }
 }
@@ -191,7 +195,7 @@ impl ValueType {
     ///
     /// Uses the standardized conversion utility for consistency
     /// across all crates.
-    /// 
+    ///
     /// Note: StructRef and ArrayRef require additional type index data
     /// and should be parsed with `from_binary_with_index`.
     pub fn from_binary(byte: u8) -> Result<Self> {
@@ -204,12 +208,7 @@ impl ValueType {
             0x79 => Ok(ValueType::I16x8),
             0x70 => Ok(ValueType::FuncRef),
             0x6F => Ok(ValueType::ExternRef),
-            _ => Err(Error::new(
-                // Replace format!
-                ErrorCategory::Parse,
-                wrt_error::codes::PARSE_INVALID_VALTYPE_BYTE,
-                // A static string, or pass byte to error for later formatting
-                "Invalid value type byte", // Potential: Add byte as context to Error
+            _ => Err(Error::runtime_execution_error(", // Potential: Add byte as context to Error
             )),
         }
     }
@@ -230,8 +229,7 @@ impl ValueType {
             _ => Err(Error::new(
                 ErrorCategory::Parse,
                 wrt_error::codes::PARSE_INVALID_VALTYPE_BYTE,
-                "Invalid value type byte",
-            )),
+                ")),
         }
     }
 
@@ -288,7 +286,7 @@ impl Display for ValueType {
 
 impl Checksummable for ValueType {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        checksum.update_slice(&[self.to_binary()]);
+        checksum.update_slice(&[self.to_binary()];
     }
 }
 
@@ -303,7 +301,7 @@ impl ToBytes for ValueType {
 
     #[cfg(feature = "default-provider")]
     fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         self.to_bytes_with_provider(writer, &default_provider)
     }
 }
@@ -319,7 +317,7 @@ impl FromBytes for ValueType {
 
     #[cfg(feature = "default-provider")]
     fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         Self::from_bytes_with_provider(reader, &default_provider)
     }
 }
@@ -349,17 +347,13 @@ impl RefType {
         match vt {
             ValueType::FuncRef => Ok(RefType::Funcref),
             ValueType::ExternRef => Ok(RefType::Externref),
-            _ => Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_INVALID_CONVERSION,
-                "Cannot convert ValueType to RefType",
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid ValueType for RefType conversion")),
         }
     }
 }
 impl Checksummable for RefType {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        checksum.update_slice(&[self.to_value_type().to_binary()]);
+        checksum.update_slice(&[self.to_value_type().to_binary()];
     }
 }
 
@@ -375,7 +369,7 @@ impl ToBytes for RefType {
 
     #[cfg(feature = "default-provider")]
     fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         self.to_bytes_with_provider(writer, &default_provider)
     }
 }
@@ -391,7 +385,7 @@ impl FromBytes for RefType {
 
     #[cfg(feature = "default-provider")]
     fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         Self::from_bytes_with_provider(reader, &default_provider)
     }
 }
@@ -411,11 +405,7 @@ impl TryFrom<ValueType> for RefType {
         match vt {
             ValueType::FuncRef => Ok(RefType::Funcref),
             ValueType::ExternRef => Ok(RefType::Externref),
-            _ => Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_INVALID_CONVERSION,
-                "ValueType cannot be converted to RefType",
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid ValueType for RefType try_from conversion")),
         }
     }
 }
@@ -472,7 +462,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> De
     for FuncType<P>
 {
     fn default() -> Self {
-        let provider = P::default();
+        let provider = P::default);
         // This expect is problematic for safety if P::default() or BoundedVec::new can
         // fail. For now, to proceed with compilation, but this needs review.
         let params = BoundedVec::new(provider.clone())
@@ -488,14 +478,14 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Ch
 {
     fn update_checksum(&self, checksum: &mut Checksum) {
         // Update checksum with params
-        checksum.update_slice(&(self.params.len() as u32).to_le_bytes());
+        checksum.update_slice(&(self.params.len() as u32).to_le_bytes);
         for param in self.params.iter() {
-            param.update_checksum(checksum);
+            param.update_checksum(checksum;
         }
         // Update checksum with results
-        checksum.update_slice(&(self.results.len() as u32).to_le_bytes());
+        checksum.update_slice(&(self.results.len() as u32).to_le_bytes);
         for result in self.results.iter() {
-            result.update_checksum(checksum);
+            result.update_checksum(checksum;
         }
     }
 }
@@ -516,7 +506,7 @@ impl<PFunc: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq
 
     #[cfg(feature = "default-provider")]
     fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         self.to_bytes_with_provider(writer, &default_provider)
     }
 }
@@ -530,11 +520,7 @@ impl<PFunc: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq
     ) -> WrtResult<Self> {
         let prefix = reader.read_u8()?;
         if prefix != 0x60 {
-            return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::DECODING_ERROR,
-                "Invalid FuncType prefix",
-            ));
+            return Err(Error::runtime_execution_error("Invalid function type prefix - expected 0x60";
         }
         // PFunc must be Default + Clone for BoundedVec::from_bytes_with_provider
         // if BoundedVec needs to create its own provider. Here, we pass
@@ -555,7 +541,7 @@ impl<PFunc: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq
 
     #[cfg(feature = "default-provider")]
     fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         Self::from_bytes_with_provider(reader, &default_provider)
     }
 }
@@ -575,11 +561,7 @@ pub struct MemArg {
 
 impl Default for MemArg {
     fn default() -> Self {
-        Self {
-            align_exponent: 0,
-            offset: 0,
-            memory_index: 0,
-        }
+        Self { align_exponent: 0, offset: 0, memory_index: 0 }
     }
 }
 
@@ -596,7 +578,7 @@ impl ToBytes for MemArg {
 
     #[cfg(feature = "default-provider")]
     fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         self.to_bytes_with_provider(writer, &default_provider)
     }
 }
@@ -609,25 +591,21 @@ impl FromBytes for MemArg {
         let align_exponent = reader.read_u32_le()?;
         let offset = reader.read_u32_le()?;
         let memory_index = reader.read_u32_le()?;
-        Ok(Self {
-            align_exponent,
-            offset,
-            memory_index,
-        })
+        Ok(Self { align_exponent, offset, memory_index })
     }
 
     #[cfg(feature = "default-provider")]
     fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         Self::from_bytes_with_provider(reader, &default_provider)
     }
 }
 
 impl Checksummable for MemArg {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.align_exponent.update_checksum(checksum);
-        self.offset.update_checksum(checksum);
-        self.memory_index.update_checksum(checksum);
+        self.align_exponent.update_checksum(checksum;
+        self.offset.update_checksum(checksum;
+        self.memory_index.update_checksum(checksum;
     }
 }
 
@@ -655,12 +633,12 @@ impl Checksummable for DataMode {
     fn update_checksum(&self, checksum: &mut Checksum) {
         match self {
             Self::Active { memory_index, offset } => {
-                checksum.update_slice(&[0u8]);
-                memory_index.update_checksum(checksum);
-                offset.update_checksum(checksum);
+                checksum.update_slice(&[0u8];
+                memory_index.update_checksum(checksum;
+                offset.update_checksum(checksum;
             }
             Self::Passive => {
-                checksum.update_slice(&[1u8]);
+                checksum.update_slice(&[1u8];
             }
         }
     }
@@ -692,15 +670,15 @@ impl Checksummable for ElementMode {
     fn update_checksum(&self, checksum: &mut Checksum) {
         match self {
             Self::Active { table_index, offset } => {
-                checksum.update_slice(&[0u8]);
-                table_index.update_checksum(checksum);
-                offset.update_checksum(checksum);
+                checksum.update_slice(&[0u8];
+                table_index.update_checksum(checksum;
+                offset.update_checksum(checksum;
             }
             Self::Passive => {
-                checksum.update_slice(&[1u8]);
+                checksum.update_slice(&[1u8];
             }
             Self::Declarative => {
-                checksum.update_slice(&[2u8]);
+                checksum.update_slice(&[2u8];
             }
         }
     }
@@ -711,9 +689,15 @@ impl Checksummable for ElementMode {
 pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + Eq + Default> {
     Unreachable,
     Nop,
-    Block { block_type_idx: u32 }, // Block with type index
-    Loop { block_type_idx: u32 },  // Loop with type index
-    If { block_type_idx: u32 },    // If with type index
+    Block {
+        block_type_idx: u32,
+    }, // Block with type index
+    Loop {
+        block_type_idx: u32,
+    }, // Loop with type index
+    If {
+        block_type_idx: u32,
+    }, // If with type index
     Else,
     End,
     Br(LabelIdx),
@@ -725,15 +709,15 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     Return,
     Call(FuncIdx),
     CallIndirect(TypeIdx, TableIdx),
-    
+
     // Tail call instructions (0x12 and 0x13 opcodes)
     ReturnCall(FuncIdx),
     ReturnCallIndirect(TypeIdx, TableIdx),
-    
+
     // Branch hinting instructions (0xD5 and 0xD6 opcodes)
     BrOnNull(LabelIdx),
     BrOnNonNull(LabelIdx),
-    
+
     // Type reflection instructions
     RefIsNull,
     RefAsNonNull,
@@ -750,7 +734,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64Const(i64),
     F32Const(u32), // bits representation
     F64Const(u64), // bits representation
-    
+
     // Memory operations
     I32Load(MemArg),
     I64Load(MemArg),
@@ -766,7 +750,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64Load16U(MemArg),
     I64Load32S(MemArg),
     I64Load32U(MemArg),
-    
+
     I32Store(MemArg),
     I64Store(MemArg),
     F32Store(MemArg),
@@ -776,30 +760,30 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64Store8(MemArg),
     I64Store16(MemArg),
     I64Store32(MemArg),
-    
+
     // Memory size and grow
-    MemorySize(u32), // memory index
-    MemoryGrow(u32), // memory index
-    MemoryFill(u32), // memory index
+    MemorySize(u32),      // memory index
+    MemoryGrow(u32),      // memory index
+    MemoryFill(u32),      // memory index
     MemoryCopy(u32, u32), // dst_mem, src_mem
     MemoryInit(u32, u32), // data_seg_idx, mem_idx
-    DataDrop(u32), // data segment index
-    
+    DataDrop(u32),        // data segment index
+
     // Table operations
-    TableGet(u32), // table index
-    TableSet(u32), // table index
-    TableSize(u32), // table index
-    TableGrow(u32), // table index
-    TableFill(u32), // table index
+    TableGet(u32),       // table index
+    TableSet(u32),       // table index
+    TableSize(u32),      // table index
+    TableGrow(u32),      // table index
+    TableFill(u32),      // table index
     TableCopy(u32, u32), // dst_table, src_table
     TableInit(u32, u32), // elem_seg_idx, table_idx
-    ElemDrop(u32), // element segment index
-    
+    ElemDrop(u32),       // element segment index
+
     // Stack operations
     Drop,
     Select,
     SelectWithType(BoundedVec<ValueType, 1, P>), // typed select
-    
+
     // Arithmetic operations
     I32Add,
     I32Sub,
@@ -816,7 +800,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I32ShrU,
     I32Rotl,
     I32Rotr,
-    
+
     I64Add,
     I64Sub,
     I64Mul,
@@ -832,7 +816,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64ShrU,
     I64Rotl,
     I64Rotr,
-    
+
     F32Add,
     F32Sub,
     F32Mul,
@@ -847,7 +831,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     F32Trunc,
     F32Nearest,
     F32Sqrt,
-    
+
     F64Add,
     F64Sub,
     F64Mul,
@@ -862,7 +846,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     F64Trunc,
     F64Nearest,
     F64Sqrt,
-    
+
     // Comparison operations
     I32Eq,
     I32Ne,
@@ -874,7 +858,7 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I32LeU,
     I32GeS,
     I32GeU,
-    
+
     I64Eq,
     I64Ne,
     I64LtS,
@@ -885,25 +869,25 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64LeU,
     I64GeS,
     I64GeU,
-    
+
     F32Eq,
     F32Ne,
     F32Lt,
     F32Gt,
     F32Le,
     F32Ge,
-    
+
     F64Eq,
     F64Ne,
     F64Lt,
     F64Gt,
     F64Le,
     F64Ge,
-    
+
     // Unary test operations
     I32Eqz,
     I64Eqz,
-    
+
     // Conversion operations
     I32WrapI64,
     I32TruncF32S,
@@ -930,18 +914,18 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64ReinterpretF64,
     F32ReinterpretI32,
     F64ReinterpretI64,
-    
+
     // Sign extension operations
     I32Extend8S,
     I32Extend16S,
     I64Extend8S,
     I64Extend16S,
     I64Extend32S,
-    
+
     // Reference operations
     RefNull(RefType),
     RefFunc(FuncIdx),
-    
+
     // Other operations
     I32Clz,
     I32Ctz,
@@ -949,91 +933,223 @@ pub enum Instruction<P: MemoryProvider + Clone + core::fmt::Debug + PartialEq + 
     I64Clz,
     I64Ctz,
     I64Popcnt,
-    
+
     // Atomic memory operations (0xFE prefix in WebAssembly)
-    MemoryAtomicNotify { memarg: MemArg },
-    MemoryAtomicWait32 { memarg: MemArg },
-    MemoryAtomicWait64 { memarg: MemArg },
-    
+    MemoryAtomicNotify {
+        memarg: MemArg,
+    },
+    MemoryAtomicWait32 {
+        memarg: MemArg,
+    },
+    MemoryAtomicWait64 {
+        memarg: MemArg,
+    },
+
     // Atomic loads
-    I32AtomicLoad { memarg: MemArg },
-    I64AtomicLoad { memarg: MemArg },
-    I32AtomicLoad8U { memarg: MemArg },
-    I32AtomicLoad16U { memarg: MemArg },
-    I64AtomicLoad8U { memarg: MemArg },
-    I64AtomicLoad16U { memarg: MemArg },
-    I64AtomicLoad32U { memarg: MemArg },
-    
+    I32AtomicLoad {
+        memarg: MemArg,
+    },
+    I64AtomicLoad {
+        memarg: MemArg,
+    },
+    I32AtomicLoad8U {
+        memarg: MemArg,
+    },
+    I32AtomicLoad16U {
+        memarg: MemArg,
+    },
+    I64AtomicLoad8U {
+        memarg: MemArg,
+    },
+    I64AtomicLoad16U {
+        memarg: MemArg,
+    },
+    I64AtomicLoad32U {
+        memarg: MemArg,
+    },
+
     // Atomic stores
-    I32AtomicStore { memarg: MemArg },
-    I64AtomicStore { memarg: MemArg },
-    I32AtomicStore8 { memarg: MemArg },
-    I32AtomicStore16 { memarg: MemArg },
-    I64AtomicStore8 { memarg: MemArg },
-    I64AtomicStore16 { memarg: MemArg },
-    I64AtomicStore32 { memarg: MemArg },
-    
+    I32AtomicStore {
+        memarg: MemArg,
+    },
+    I64AtomicStore {
+        memarg: MemArg,
+    },
+    I32AtomicStore8 {
+        memarg: MemArg,
+    },
+    I32AtomicStore16 {
+        memarg: MemArg,
+    },
+    I64AtomicStore8 {
+        memarg: MemArg,
+    },
+    I64AtomicStore16 {
+        memarg: MemArg,
+    },
+    I64AtomicStore32 {
+        memarg: MemArg,
+    },
+
     // Atomic read-modify-write operations
-    I32AtomicRmwAdd { memarg: MemArg },
-    I64AtomicRmwAdd { memarg: MemArg },
-    I32AtomicRmw8AddU { memarg: MemArg },
-    I32AtomicRmw16AddU { memarg: MemArg },
-    I64AtomicRmw8AddU { memarg: MemArg },
-    I64AtomicRmw16AddU { memarg: MemArg },
-    I64AtomicRmw32AddU { memarg: MemArg },
-    
-    I32AtomicRmwSub { memarg: MemArg },
-    I64AtomicRmwSub { memarg: MemArg },
-    I32AtomicRmw8SubU { memarg: MemArg },
-    I32AtomicRmw16SubU { memarg: MemArg },
-    I64AtomicRmw8SubU { memarg: MemArg },
-    I64AtomicRmw16SubU { memarg: MemArg },
-    I64AtomicRmw32SubU { memarg: MemArg },
-    
-    I32AtomicRmwAnd { memarg: MemArg },
-    I64AtomicRmwAnd { memarg: MemArg },
-    I32AtomicRmw8AndU { memarg: MemArg },
-    I32AtomicRmw16AndU { memarg: MemArg },
-    I64AtomicRmw8AndU { memarg: MemArg },
-    I64AtomicRmw16AndU { memarg: MemArg },
-    I64AtomicRmw32AndU { memarg: MemArg },
-    
-    I32AtomicRmwOr { memarg: MemArg },
-    I64AtomicRmwOr { memarg: MemArg },
-    I32AtomicRmw8OrU { memarg: MemArg },
-    I32AtomicRmw16OrU { memarg: MemArg },
-    I64AtomicRmw8OrU { memarg: MemArg },
-    I64AtomicRmw16OrU { memarg: MemArg },
-    I64AtomicRmw32OrU { memarg: MemArg },
-    
-    I32AtomicRmwXor { memarg: MemArg },
-    I64AtomicRmwXor { memarg: MemArg },
-    I32AtomicRmw8XorU { memarg: MemArg },
-    I32AtomicRmw16XorU { memarg: MemArg },
-    I64AtomicRmw8XorU { memarg: MemArg },
-    I64AtomicRmw16XorU { memarg: MemArg },
-    I64AtomicRmw32XorU { memarg: MemArg },
-    
-    I32AtomicRmwXchg { memarg: MemArg },
-    I64AtomicRmwXchg { memarg: MemArg },
-    I32AtomicRmw8XchgU { memarg: MemArg },
-    I32AtomicRmw16XchgU { memarg: MemArg },
-    I64AtomicRmw8XchgU { memarg: MemArg },
-    I64AtomicRmw16XchgU { memarg: MemArg },
-    I64AtomicRmw32XchgU { memarg: MemArg },
-    
+    I32AtomicRmwAdd {
+        memarg: MemArg,
+    },
+    I64AtomicRmwAdd {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8AddU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16AddU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8AddU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16AddU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32AddU {
+        memarg: MemArg,
+    },
+
+    I32AtomicRmwSub {
+        memarg: MemArg,
+    },
+    I64AtomicRmwSub {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8SubU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16SubU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8SubU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16SubU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32SubU {
+        memarg: MemArg,
+    },
+
+    I32AtomicRmwAnd {
+        memarg: MemArg,
+    },
+    I64AtomicRmwAnd {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8AndU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16AndU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8AndU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16AndU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32AndU {
+        memarg: MemArg,
+    },
+
+    I32AtomicRmwOr {
+        memarg: MemArg,
+    },
+    I64AtomicRmwOr {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8OrU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16OrU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8OrU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16OrU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32OrU {
+        memarg: MemArg,
+    },
+
+    I32AtomicRmwXor {
+        memarg: MemArg,
+    },
+    I64AtomicRmwXor {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8XorU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16XorU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8XorU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16XorU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32XorU {
+        memarg: MemArg,
+    },
+
+    I32AtomicRmwXchg {
+        memarg: MemArg,
+    },
+    I64AtomicRmwXchg {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8XchgU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16XchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8XchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16XchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32XchgU {
+        memarg: MemArg,
+    },
+
     // Atomic compare-exchange operations
-    I32AtomicRmwCmpxchg { memarg: MemArg },
-    I64AtomicRmwCmpxchg { memarg: MemArg },
-    I32AtomicRmw8CmpxchgU { memarg: MemArg },
-    I32AtomicRmw16CmpxchgU { memarg: MemArg },
-    I64AtomicRmw8CmpxchgU { memarg: MemArg },
-    I64AtomicRmw16CmpxchgU { memarg: MemArg },
-    I64AtomicRmw32CmpxchgU { memarg: MemArg },
-    
+    I32AtomicRmwCmpxchg {
+        memarg: MemArg,
+    },
+    I64AtomicRmwCmpxchg {
+        memarg: MemArg,
+    },
+    I32AtomicRmw8CmpxchgU {
+        memarg: MemArg,
+    },
+    I32AtomicRmw16CmpxchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw8CmpxchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw16CmpxchgU {
+        memarg: MemArg,
+    },
+    I64AtomicRmw32CmpxchgU {
+        memarg: MemArg,
+    },
+
     // Atomic fence
     AtomicFence,
-    
+
     #[doc(hidden)]
     _Phantom(core::marker::PhantomData<P>),
 }
@@ -1058,58 +1174,58 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
             Instruction::Unreachable => checksum.update_slice(&[0x00]),
             Instruction::Nop => checksum.update_slice(&[0x01]),
             Instruction::Block { block_type_idx } => {
-                checksum.update_slice(&[0x02]);
-                block_type_idx.update_checksum(checksum);
+                checksum.update_slice(&[0x02];
+                block_type_idx.update_checksum(checksum;
             }
             Instruction::Loop { block_type_idx } => {
-                checksum.update_slice(&[0x03]);
-                block_type_idx.update_checksum(checksum);
+                checksum.update_slice(&[0x03];
+                block_type_idx.update_checksum(checksum;
             }
             Instruction::If { block_type_idx } => {
-                checksum.update_slice(&[0x04]);
-                block_type_idx.update_checksum(checksum);
+                checksum.update_slice(&[0x04];
+                block_type_idx.update_checksum(checksum;
             }
             Instruction::Else => checksum.update_slice(&[0x05]),
             Instruction::End => checksum.update_slice(&[0x0B]),
             Instruction::Br(idx) => {
-                checksum.update_slice(&[0x0C]);
-                idx.update_checksum(checksum);
+                checksum.update_slice(&[0x0C];
+                idx.update_checksum(checksum;
             }
             Instruction::BrIf(idx) => {
-                checksum.update_slice(&[0x0D]);
-                idx.update_checksum(checksum);
+                checksum.update_slice(&[0x0D];
+                idx.update_checksum(checksum;
             }
             Instruction::BrTable { targets, default_target } => {
-                checksum.update_slice(&[0x0E]);
-                targets.update_checksum(checksum);
-                default_target.update_checksum(checksum);
+                checksum.update_slice(&[0x0E];
+                targets.update_checksum(checksum;
+                default_target.update_checksum(checksum;
             }
             Instruction::Return => checksum.update_slice(&[0x0F]),
             Instruction::Call(idx) => {
-                checksum.update_slice(&[0x10]);
-                idx.update_checksum(checksum);
+                checksum.update_slice(&[0x10];
+                idx.update_checksum(checksum;
             }
             Instruction::CallIndirect(type_idx, table_idx) => {
-                checksum.update_slice(&[0x11]);
-                type_idx.update_checksum(checksum);
-                table_idx.update_checksum(checksum);
+                checksum.update_slice(&[0x11];
+                type_idx.update_checksum(checksum;
+                table_idx.update_checksum(checksum;
             }
             Instruction::ReturnCall(func_idx) => {
                 checksum.update_slice(&[0x12]); // Tail call opcode
-                func_idx.update_checksum(checksum);
+                func_idx.update_checksum(checksum;
             }
             Instruction::ReturnCallIndirect(type_idx, table_idx) => {
                 checksum.update_slice(&[0x13]); // Tail call indirect opcode
-                type_idx.update_checksum(checksum);
-                table_idx.update_checksum(checksum);
+                type_idx.update_checksum(checksum;
+                table_idx.update_checksum(checksum;
             }
             Instruction::BrOnNull(label_idx) => {
                 checksum.update_slice(&[0xD5]); // br_on_null opcode
-                label_idx.update_checksum(checksum);
+                label_idx.update_checksum(checksum;
             }
             Instruction::BrOnNonNull(label_idx) => {
                 checksum.update_slice(&[0xD6]); // br_on_non_null opcode
-                label_idx.update_checksum(checksum);
+                label_idx.update_checksum(checksum;
             }
             Instruction::RefIsNull => {
                 checksum.update_slice(&[0xD1]); // ref.is_null opcode
@@ -1129,76 +1245,76 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
                     0x21
                 } else {
                     0x22
-                }]);
-                idx.update_checksum(checksum);
+                }];
+                idx.update_checksum(checksum;
             }
             Instruction::GlobalGet(idx) | Instruction::GlobalSet(idx) => {
                 checksum.update_slice(&[if matches!(self, Instruction::GlobalGet(_)) {
                     0x23
                 } else {
                     0x24
-                }]);
-                idx.update_checksum(checksum);
+                }];
+                idx.update_checksum(checksum;
             }
             Instruction::I32Const(val) => {
-                checksum.update_slice(&[0x41]);
-                val.update_checksum(checksum);
+                checksum.update_slice(&[0x41];
+                val.update_checksum(checksum;
             }
             Instruction::I64Const(val) => {
-                checksum.update_slice(&[0x42]);
-                val.update_checksum(checksum);
+                checksum.update_slice(&[0x42];
+                val.update_checksum(checksum;
             }
             Instruction::F32Const(val) => {
-                checksum.update_slice(&[0x43]);
-                val.update_checksum(checksum);
+                checksum.update_slice(&[0x43];
+                val.update_checksum(checksum;
             }
             Instruction::F64Const(val) => {
-                checksum.update_slice(&[0x44]);
-                val.update_checksum(checksum);
+                checksum.update_slice(&[0x44];
+                val.update_checksum(checksum;
             }
-            
+
             // Memory operations
             Instruction::I32Load(memarg) => {
-                checksum.update_slice(&[0x28]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0x28];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64Load(memarg) => {
-                checksum.update_slice(&[0x29]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0x29];
+                memarg.update_checksum(checksum;
             }
             Instruction::F32Load(memarg) => {
-                checksum.update_slice(&[0x2A]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0x2A];
+                memarg.update_checksum(checksum;
             }
             Instruction::F64Load(memarg) => {
-                checksum.update_slice(&[0x2B]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0x2B];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32Store(memarg) => {
-                checksum.update_slice(&[0x36]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0x36];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64Store(memarg) => {
-                checksum.update_slice(&[0x37]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0x37];
+                memarg.update_checksum(checksum;
             }
             Instruction::F32Store(memarg) => {
-                checksum.update_slice(&[0x38]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0x38];
+                memarg.update_checksum(checksum;
             }
             Instruction::F64Store(memarg) => {
-                checksum.update_slice(&[0x39]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0x39];
+                memarg.update_checksum(checksum;
             }
             Instruction::MemorySize(mem_idx) => {
-                checksum.update_slice(&[0x3F]);
-                mem_idx.update_checksum(checksum);
+                checksum.update_slice(&[0x3F];
+                mem_idx.update_checksum(checksum;
             }
             Instruction::MemoryGrow(mem_idx) => {
-                checksum.update_slice(&[0x40]);
-                mem_idx.update_checksum(checksum);
+                checksum.update_slice(&[0x40];
+                mem_idx.update_checksum(checksum;
             }
-            
+
             // Arithmetic operations
             Instruction::I32Add => checksum.update_slice(&[0x6A]),
             Instruction::I32Sub => checksum.update_slice(&[0x6B]),
@@ -1207,305 +1323,305 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq + D
             Instruction::I32DivU => checksum.update_slice(&[0x6E]),
             Instruction::I64Add => checksum.update_slice(&[0x7C]),
             Instruction::I64Sub => checksum.update_slice(&[0x7D]),
-            
+
             // Comparison operations
             Instruction::I32Eq => checksum.update_slice(&[0x46]),
             Instruction::I32Ne => checksum.update_slice(&[0x47]),
             Instruction::I32LtS => checksum.update_slice(&[0x48]),
-            
+
             // Stack operations
             Instruction::Drop => checksum.update_slice(&[0x1A]),
             Instruction::Select => checksum.update_slice(&[0x1B]),
-            
+
             // Atomic memory operations (0xFE prefix in WebAssembly)
             Instruction::MemoryAtomicNotify { memarg } => {
-                checksum.update_slice(&[0xFE, 0x00]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x00];
+                memarg.update_checksum(checksum;
             }
             Instruction::MemoryAtomicWait32 { memarg } => {
-                checksum.update_slice(&[0xFE, 0x01]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x01];
+                memarg.update_checksum(checksum;
             }
             Instruction::MemoryAtomicWait64 { memarg } => {
-                checksum.update_slice(&[0xFE, 0x02]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x02];
+                memarg.update_checksum(checksum;
             }
-            
+
             // Atomic loads
             Instruction::I32AtomicLoad { memarg } => {
-                checksum.update_slice(&[0xFE, 0x10]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x10];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicLoad { memarg } => {
-                checksum.update_slice(&[0xFE, 0x11]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x11];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicLoad8U { memarg } => {
-                checksum.update_slice(&[0xFE, 0x12]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x12];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicLoad16U { memarg } => {
-                checksum.update_slice(&[0xFE, 0x13]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x13];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicLoad8U { memarg } => {
-                checksum.update_slice(&[0xFE, 0x14]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x14];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicLoad16U { memarg } => {
-                checksum.update_slice(&[0xFE, 0x15]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x15];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicLoad32U { memarg } => {
-                checksum.update_slice(&[0xFE, 0x16]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x16];
+                memarg.update_checksum(checksum;
             }
-            
+
             // Atomic stores
             Instruction::I32AtomicStore { memarg } => {
-                checksum.update_slice(&[0xFE, 0x17]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x17];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicStore { memarg } => {
-                checksum.update_slice(&[0xFE, 0x18]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x18];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicStore8 { memarg } => {
-                checksum.update_slice(&[0xFE, 0x19]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x19];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicStore16 { memarg } => {
-                checksum.update_slice(&[0xFE, 0x1a]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x1a];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicStore8 { memarg } => {
-                checksum.update_slice(&[0xFE, 0x1b]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x1b];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicStore16 { memarg } => {
-                checksum.update_slice(&[0xFE, 0x1c]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x1c];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicStore32 { memarg } => {
-                checksum.update_slice(&[0xFE, 0x1d]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x1d];
+                memarg.update_checksum(checksum;
             }
-            
+
             // Atomic read-modify-write operations
             Instruction::I32AtomicRmwAdd { memarg } => {
-                checksum.update_slice(&[0xFE, 0x1e]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x1e];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmwAdd { memarg } => {
-                checksum.update_slice(&[0xFE, 0x1f]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x1f];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw8AddU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x20]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x20];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw16AddU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x21]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x21];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw8AddU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x22]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x22];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw16AddU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x23]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x23];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw32AddU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x24]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x24];
+                memarg.update_checksum(checksum;
             }
-            
+
             Instruction::I32AtomicRmwSub { memarg } => {
-                checksum.update_slice(&[0xFE, 0x25]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x25];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmwSub { memarg } => {
-                checksum.update_slice(&[0xFE, 0x26]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x26];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw8SubU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x27]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x27];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw16SubU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x28]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x28];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw8SubU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x29]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x29];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw16SubU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x2a]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x2a];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw32SubU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x2b]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x2b];
+                memarg.update_checksum(checksum;
             }
-            
+
             Instruction::I32AtomicRmwAnd { memarg } => {
-                checksum.update_slice(&[0xFE, 0x2c]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x2c];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmwAnd { memarg } => {
-                checksum.update_slice(&[0xFE, 0x2d]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x2d];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw8AndU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x2e]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x2e];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw16AndU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x2f]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x2f];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw8AndU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x30]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x30];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw16AndU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x31]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x31];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw32AndU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x32]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x32];
+                memarg.update_checksum(checksum;
             }
-            
+
             Instruction::I32AtomicRmwOr { memarg } => {
-                checksum.update_slice(&[0xFE, 0x33]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x33];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmwOr { memarg } => {
-                checksum.update_slice(&[0xFE, 0x34]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x34];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw8OrU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x35]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x35];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw16OrU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x36]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x36];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw8OrU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x37]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x37];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw16OrU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x38]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x38];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw32OrU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x39]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x39];
+                memarg.update_checksum(checksum;
             }
-            
+
             Instruction::I32AtomicRmwXor { memarg } => {
-                checksum.update_slice(&[0xFE, 0x3a]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x3a];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmwXor { memarg } => {
-                checksum.update_slice(&[0xFE, 0x3b]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x3b];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw8XorU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x3c]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x3c];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw16XorU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x3d]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x3d];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw8XorU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x3e]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x3e];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw16XorU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x3f]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x3f];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw32XorU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x40]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x40];
+                memarg.update_checksum(checksum;
             }
-            
+
             Instruction::I32AtomicRmwXchg { memarg } => {
-                checksum.update_slice(&[0xFE, 0x41]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x41];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmwXchg { memarg } => {
-                checksum.update_slice(&[0xFE, 0x42]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x42];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw8XchgU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x43]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x43];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw16XchgU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x44]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x44];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw8XchgU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x45]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x45];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw16XchgU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x46]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x46];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw32XchgU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x47]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x47];
+                memarg.update_checksum(checksum;
             }
-            
+
             // Atomic compare-exchange operations
             Instruction::I32AtomicRmwCmpxchg { memarg } => {
-                checksum.update_slice(&[0xFE, 0x48]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x48];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmwCmpxchg { memarg } => {
-                checksum.update_slice(&[0xFE, 0x49]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x49];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw8CmpxchgU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x4a]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x4a];
+                memarg.update_checksum(checksum;
             }
             Instruction::I32AtomicRmw16CmpxchgU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x4b]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x4b];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw8CmpxchgU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x4c]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x4c];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw16CmpxchgU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x4d]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x4d];
+                memarg.update_checksum(checksum;
             }
             Instruction::I64AtomicRmw32CmpxchgU { memarg } => {
-                checksum.update_slice(&[0xFE, 0x4e]);
-                memarg.update_checksum(checksum);
+                checksum.update_slice(&[0xFE, 0x4e];
+                memarg.update_checksum(checksum;
             }
-            
+
             // Atomic fence
             Instruction::AtomicFence => {
-                checksum.update_slice(&[0xFE, 0x03]);
+                checksum.update_slice(&[0xFE, 0x03];
             }
-            
+
             // All other instructions - use a placeholder checksum for now
             _ => {
                 // For now, just use a simple placeholder
                 // This is a placeholder until all instructions are properly implemented
-                checksum.update_slice(&[0xFF, 0x00]);
+                checksum.update_slice(&[0xFF, 0x00];
             }
         }
     }
@@ -1581,7 +1697,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
             }
             Instruction::RefIsNull => writer.write_u8(0xD1)?, // ref.is_null opcode
             Instruction::RefAsNonNull => writer.write_u8(0xD3)?, // ref.as_non_null opcode
-            Instruction::RefEq => writer.write_u8(0xD2)?, // ref.eq opcode
+            Instruction::RefEq => writer.write_u8(0xD2)?,     // ref.eq opcode
             Instruction::LocalGet(idx) => {
                 writer.write_u8(0x20)?;
                 writer.write_u32_le(*idx)?;
@@ -1626,7 +1742,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x02)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             // Atomic loads
             Instruction::I32AtomicLoad { memarg } => {
                 writer.write_u8(0xFE)?;
@@ -1663,7 +1779,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x16)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             // Atomic stores
             Instruction::I32AtomicStore { memarg } => {
                 writer.write_u8(0xFE)?;
@@ -1700,7 +1816,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x1d)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             // Atomic read-modify-write operations
             Instruction::I32AtomicRmwAdd { memarg } => {
                 writer.write_u8(0xFE)?;
@@ -1737,7 +1853,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x24)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             Instruction::I32AtomicRmwSub { memarg } => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x25)?;
@@ -1773,7 +1889,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x2b)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             Instruction::I32AtomicRmwAnd { memarg } => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x2c)?;
@@ -1809,7 +1925,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x32)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             Instruction::I32AtomicRmwOr { memarg } => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x33)?;
@@ -1845,7 +1961,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x39)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             Instruction::I32AtomicRmwXor { memarg } => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x3a)?;
@@ -1881,7 +1997,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x40)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             Instruction::I32AtomicRmwXchg { memarg } => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x41)?;
@@ -1917,7 +2033,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x47)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             // Atomic compare-exchange operations
             Instruction::I32AtomicRmwCmpxchg { memarg } => {
                 writer.write_u8(0xFE)?;
@@ -1954,22 +2070,22 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 writer.write_u8(0x4e)?;
                 memarg.to_bytes_with_provider(writer, stream_provider)?;
             }
-            
+
             // Atomic fence
             Instruction::AtomicFence => {
                 writer.write_u8(0xFE)?;
                 writer.write_u8(0x03)?;
             }
-            
+
             // ... many more instructions
             Instruction::_Phantom(_) => {
                 // This variant should not be serialized
                 return Err(SerializationError::Custom(
                     "Cannot serialize _Phantom instruction variant",
                 )
-                .into());
+                .into();
             }
-            
+
             // Catch-all for all other instruction variants
             _ => {
                 // For now, return an error for unimplemented instructions
@@ -1977,7 +2093,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
                 return Err(SerializationError::Custom(
                     "Instruction variant not yet implemented for serialization",
                 )
-                .into());
+                .into();
             }
         }
         Ok(())
@@ -1985,7 +2101,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
 
     #[cfg(feature = "default-provider")]
     fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         self.to_bytes_with_provider(writer, &default_provider)
     }
 }
@@ -2041,7 +2157,7 @@ impl<PInstr: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + E
 
     #[cfg(feature = "default-provider")]
     fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         Self::from_bytes_with_provider(reader, &default_provider)
     }
 }
@@ -2057,8 +2173,8 @@ pub struct LocalEntry {
 
 impl Checksummable for LocalEntry {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.count.update_checksum(checksum);
-        self.value_type.update_checksum(checksum);
+        self.count.update_checksum(checksum;
+        self.value_type.update_checksum(checksum;
     }
 }
 
@@ -2075,7 +2191,7 @@ impl ToBytes for LocalEntry {
 
     #[cfg(feature = "default-provider")]
     fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
-        let provider = DefaultMemoryProvider::default();
+        let provider = DefaultMemoryProvider::default);
         self.to_bytes_with_provider(writer, &provider)
     }
 }
@@ -2092,7 +2208,7 @@ impl FromBytes for LocalEntry {
 
     #[cfg(feature = "default-provider")]
     fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
-        let provider = DefaultMemoryProvider::default();
+        let provider = DefaultMemoryProvider::default);
         Self::from_bytes_with_provider(reader, &provider)
     }
 }
@@ -2124,12 +2240,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Cu
             .map_err(|e| {
                 // Log or convert BoundedError to crate::Error
                 // For now, creating a generic error:
-                Error::new(
-                    ErrorCategory::Memory, /* Or a more specific category like `Resource` or
-                                            * `Validation` */
-                    wrt_error::codes::SYSTEM_ERROR, // Was INTERNAL_ERROR
-                    "Failed to create WasmName for custom section name",
-                )
+                Error::runtime_execution_error("Failed to create bounded string from custom section name")
             })?;
 
         // Create BoundedVec for the section data
@@ -2139,17 +2250,12 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Cu
                 Error::new(
                     ErrorCategory::Memory,
                     wrt_error::codes::SYSTEM_ERROR, // Was INTERNAL_ERROR
-                    "Failed to initialize BoundedVec for custom section data",
-                )
+                    "Failed to create bounded vector for custom section data")
             })?;
 
         data_vec.try_extend_from_slice(data).map_err(|e| {
             // Log or convert BoundedError from try_extend_from_slice to crate::Error
-            Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::SYSTEM_ERROR, // Was INTERNAL_ERROR
-                "Failed to extend BoundedVec for custom section data",
-            )
+            Error::runtime_execution_error("Failed to extend custom section data vector")
         })?;
 
         Ok(Self { name, data: data_vec })
@@ -2164,18 +2270,14 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Cu
     ///
     /// Returns an error if the name or data cannot be stored due to capacity
     /// limits.
-    #[cfg(any(feature = "std", test))]
+    #[cfg(any(feature = "std"))]
     pub fn from_name_and_data(name_str: &str, data_slice: &[u8]) -> Result<Self>
     where
         P: Default, // Ensure P can be defaulted for this convenience function
     {
-        let provider = P::default();
+        let provider = P::default);
         let name = WasmName::from_str_truncate(name_str, provider.clone()).map_err(|_| {
-            Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::SYSTEM_ERROR, // Was INTERNAL_ERROR
-                "Failed to create WasmName for custom section",
-            )
+            Error::runtime_execution_error("Failed to create WasmName from string")
         })?;
 
         let mut data_bounded_vec = BoundedVec::<u8, MAX_CUSTOM_SECTION_DATA_SIZE, P>::new(provider)
@@ -2183,16 +2285,11 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Cu
                 Error::new(
                     ErrorCategory::Memory,
                     wrt_error::codes::SYSTEM_ERROR, // Was INTERNAL_ERROR
-                    "Failed to create BoundedVec for custom section data",
-                )
+                    "Failed to create bounded vector for custom section data")
             })?;
 
         data_bounded_vec.try_extend_from_slice(data_slice).map_err(|_| {
-            Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::SYSTEM_ERROR, // Was INTERNAL_ERROR
-                "Failed to extend BoundedVec for custom section data",
-            )
+            Error::runtime_execution_error("Failed to extend data vector with slice data")
         })?;
 
         Ok(CustomSection { name, data: data_bounded_vec })
@@ -2211,8 +2308,8 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Ch
     for CustomSection<P>
 {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.name.update_checksum(checksum);
-        self.data.update_checksum(checksum);
+        self.name.update_checksum(checksum;
+        self.data.update_checksum(checksum;
     }
 }
 
@@ -2231,7 +2328,7 @@ impl<PCustom: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + 
 
     #[cfg(feature = "default-provider")]
     fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
-        let provider = DefaultMemoryProvider::default();
+        let provider = DefaultMemoryProvider::default);
         self.to_bytes_with_provider(writer, &provider)
     }
 }
@@ -2257,7 +2354,7 @@ impl<PCustom: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + 
 
     #[cfg(feature = "default-provider")]
     fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
-        let provider = DefaultMemoryProvider::default();
+        let provider = DefaultMemoryProvider::default);
         Self::from_bytes_with_provider(reader, &provider)
     }
 }
@@ -2286,8 +2383,8 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Ch
     for FuncBody<P>
 {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.locals.update_checksum(checksum);
-        self.body.update_checksum(checksum);
+        self.locals.update_checksum(checksum;
+        self.body.update_checksum(checksum;
     }
 }
 
@@ -2354,28 +2451,18 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Import<P> {
     ) -> Result<Self> {
         let module_name =
             WasmName::from_str(module_name_str, provider.clone()).map_err(|e| match e {
-                SerializationError::Custom(_) => Error::new(
-                    ErrorCategory::Capacity,
-                    wrt_error::codes::CAPACITY_EXCEEDED,
-                    "Import module name too long",
-                ),
+                SerializationError::Custom(_) => Error::runtime_execution_error("Custom serialization error in module name"),
                 _ => Error::new(
                     ErrorCategory::Validation,
                     wrt_error::codes::INVALID_VALUE,
-                    "Failed to create module name for import from SerializationError",
-                ),
+                    "Invalid module name serialization"),
             })?;
         let item_name = WasmName::from_str(item_name_str, provider).map_err(|e| match e {
-            SerializationError::Custom(_) => Error::new(
-                ErrorCategory::Capacity,
-                wrt_error::codes::CAPACITY_EXCEEDED,
-                "Import item name too long",
-            ),
+            SerializationError::Custom(_) => Error::runtime_execution_error("Custom serialization error in export item name"),
             _ => Error::new(
                 ErrorCategory::Validation,
                 wrt_error::codes::INVALID_VALUE,
-                "Failed to create item name for import from SerializationError",
-            ),
+                "Invalid export item name serialization"),
         })?;
         Ok(Self { module_name, item_name, desc })
     }
@@ -2383,9 +2470,9 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Import<P> {
 
 impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Import<P> {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.module_name.update_checksum(checksum);
-        self.item_name.update_checksum(checksum);
-        self.desc.update_checksum(checksum);
+        self.module_name.update_checksum(checksum;
+        self.item_name.update_checksum(checksum;
+        self.desc.update_checksum(checksum;
     }
 }
 
@@ -2414,28 +2501,28 @@ impl<P: MemoryProvider + PartialEq + Eq> Checksummable for ImportDesc<P> {
     fn update_checksum(&self, checksum: &mut Checksum) {
         match self {
             ImportDesc::Function(idx) => {
-                checksum.update(0);
-                idx.update_checksum(checksum);
+                checksum.update(0;
+                idx.update_checksum(checksum;
             }
             ImportDesc::Table(tt) => {
-                checksum.update(1);
-                tt.update_checksum(checksum);
+                checksum.update(1;
+                tt.update_checksum(checksum;
             }
             ImportDesc::Memory(mt) => {
-                checksum.update(2);
-                mt.update_checksum(checksum);
+                checksum.update(2;
+                mt.update_checksum(checksum;
             }
             ImportDesc::Global(gt) => {
-                checksum.update(3);
-                gt.update_checksum(checksum);
+                checksum.update(3;
+                gt.update_checksum(checksum;
             }
             ImportDesc::Extern(etp) => {
-                checksum.update(4);
-                etp.update_checksum(checksum);
+                checksum.update(4;
+                etp.update_checksum(checksum;
             }
             ImportDesc::Resource(rtp) => {
-                checksum.update(5);
-                rtp.update_checksum(checksum);
+                checksum.update(5;
+                rtp.update_checksum(checksum;
             }
             ImportDesc::_Phantom(_) => { /* No checksum update for phantom data */ }
         }
@@ -2574,24 +2661,24 @@ impl Checksummable for ExportDesc {
     fn update_checksum(&self, checksum: &mut Checksum) {
         match self {
             ExportDesc::Func(idx) => {
-                checksum.update(0x00);
-                checksum.update_slice(&idx.to_le_bytes());
+                checksum.update(0x00;
+                checksum.update_slice(&idx.to_le_bytes);
             }
             ExportDesc::Table(idx) => {
-                checksum.update(0x01);
-                checksum.update_slice(&idx.to_le_bytes());
+                checksum.update(0x01;
+                checksum.update_slice(&idx.to_le_bytes);
             }
             ExportDesc::Mem(idx) => {
-                checksum.update(0x02);
-                checksum.update_slice(&idx.to_le_bytes());
+                checksum.update(0x02;
+                checksum.update_slice(&idx.to_le_bytes);
             }
             ExportDesc::Global(idx) => {
-                checksum.update(0x03);
-                checksum.update_slice(&idx.to_le_bytes());
+                checksum.update(0x03;
+                checksum.update_slice(&idx.to_le_bytes);
             }
             ExportDesc::Tag(idx) => {
-                checksum.update(0x04);
-                checksum.update_slice(&idx.to_le_bytes());
+                checksum.update(0x04;
+                checksum.update_slice(&idx.to_le_bytes);
             }
         }
     }
@@ -2643,14 +2730,10 @@ impl FromBytes for ExportDesc {
             2 => Ok(ExportDesc::Mem(reader.read_u32_le()?)),
             3 => Ok(ExportDesc::Global(reader.read_u32_le()?)),
             4 => Ok(ExportDesc::Tag(reader.read_u32_le()?)),
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE, // Or a more specific code for invalid enum tag
-                "Invalid tag for ExportDesc deserialization",
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid export descriptor tag")),
         }
     }
-    // Default from_bytes method will be used if #cfg(feature = "default-provider")
+    // Default from_bytes method will be used if #cfg(feature = ")
     // is active
 }
 
@@ -2742,12 +2825,12 @@ impl Limits {
 
 impl Checksummable for Limits {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        checksum.update_slice(&self.min.to_le_bytes());
+        checksum.update_slice(&self.min.to_le_bytes);
         if let Some(max_val) = self.max {
-            checksum.update(1);
-            checksum.update_slice(&max_val.to_le_bytes());
+            checksum.update(1;
+            checksum.update_slice(&max_val.to_le_bytes);
         } else {
-            checksum.update(0);
+            checksum.update(0;
         }
     }
 }
@@ -2783,16 +2866,12 @@ impl FromBytes for Limits {
             1 => Some(reader.read_u32_le()?),
             0 => None,
             _ => {
-                return Err(Error::new(
-                    ErrorCategory::Parse,
-                    codes::INVALID_VALUE,
-                    "Invalid flag for Option<u32> in Limits deserialization",
-                ));
+                return Err(Error::runtime_execution_error("Invalid limits flag value";
             }
         };
         Ok(Limits { min, max })
     }
-    // Default from_bytes method will be used if #cfg(feature = "default-provider")
+    // Default from_bytes method will be used if #cfg(feature = ")
     // is active
 }
 
@@ -2825,8 +2904,8 @@ impl TableType {
 // Trait implementations for TableType
 impl Checksummable for TableType {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.element_type.update_checksum(checksum);
-        self.limits.update_checksum(checksum);
+        self.element_type.update_checksum(checksum;
+        self.limits.update_checksum(checksum;
     }
 }
 
@@ -2871,8 +2950,8 @@ impl MemoryType {
 
 impl Checksummable for MemoryType {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.limits.update_checksum(checksum);
-        checksum.update(self.shared as u8);
+        self.limits.update_checksum(checksum;
+        checksum.update(self.shared as u8;
     }
 }
 
@@ -2901,16 +2980,12 @@ impl FromBytes for MemoryType {
             0 => false,
             1 => true,
             _ => {
-                return Err(Error::new(
-                    ErrorCategory::Parse,
-                    codes::INVALID_VALUE,
-                    "Invalid boolean flag for MemoryType.shared",
-                ));
+                return Err(Error::runtime_execution_error("Invalid memory shared flag value";
             }
         };
         Ok(MemoryType { limits, shared })
     }
-    // Default from_bytes method will be used if #cfg(feature = "default-provider")
+    // Default from_bytes method will be used if #cfg(feature = ")
     // is active
 }
 
@@ -2928,8 +3003,8 @@ impl GlobalType {
 
 impl Checksummable for GlobalType {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.value_type.update_checksum(checksum);
-        checksum.update(self.mutable as u8);
+        self.value_type.update_checksum(checksum;
+        checksum.update(self.mutable as u8;
     }
 }
 
@@ -2958,16 +3033,12 @@ impl FromBytes for GlobalType {
             0 => false,
             1 => true,
             _ => {
-                return Err(Error::new(
-                    ErrorCategory::Parse,
-                    codes::INVALID_VALUE,
-                    "Invalid boolean flag for GlobalType.mutable",
-                ));
+                return Err(Error::runtime_execution_error("Invalid global type mutability flag";
             }
         };
         Ok(GlobalType { value_type, mutable })
     }
-    // Default from_bytes method will be used if #cfg(feature = "default-provider")
+    // Default from_bytes method will be used if #cfg(feature = ")
     // is active
 }
 
@@ -2984,7 +3055,7 @@ impl Tag {
 
 impl Checksummable for Tag {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.type_idx.update_checksum(checksum);
+        self.type_idx.update_checksum(checksum;
     }
 }
 
@@ -3083,7 +3154,7 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> De
     for Module<P>
 {
     fn default() -> Self {
-        let provider = P::default();
+        let provider = P::default);
         Self::new(provider)
     }
 }
@@ -3108,10 +3179,10 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Ch
             vec: &BoundedVec<T, N, Prov>,
             checksum: &mut Checksum,
         ) {
-            checksum.update_slice(&(vec.len() as u32).to_le_bytes());
+            checksum.update_slice(&(vec.len() as u32).to_le_bytes);
             for i in 0..vec.len() {
                 if let Ok(item) = vec.get(i) {
-                    item.update_checksum(checksum);
+                    item.update_checksum(checksum;
                 }
             }
         }
@@ -3123,36 +3194,36 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Ch
             vec: &BoundedVec<TypeIdx, N, Prov>,
             checksum: &mut Checksum,
         ) {
-            checksum.update_slice(&(vec.len() as u32).to_le_bytes());
+            checksum.update_slice(&(vec.len() as u32).to_le_bytes);
             for i in 0..vec.len() {
                 if let Ok(item) = vec.get(i) {
-                    checksum.update_slice(&item.to_le_bytes());
+                    checksum.update_slice(&item.to_le_bytes);
                 }
             }
         }
 
-        update_vec_checksum(&self.types, checksum);
-        update_vec_checksum(&self.imports, checksum);
-        update_idx_vec_checksum(&self.functions, checksum);
-        update_vec_checksum(&self.tables, checksum);
-        update_vec_checksum(&self.memories, checksum);
-        update_vec_checksum(&self.globals, checksum);
-        update_vec_checksum(&self.exports, checksum);
+        update_vec_checksum(&self.types, checksum;
+        update_vec_checksum(&self.imports, checksum;
+        update_idx_vec_checksum(&self.functions, checksum;
+        update_vec_checksum(&self.tables, checksum;
+        update_vec_checksum(&self.memories, checksum;
+        update_vec_checksum(&self.globals, checksum;
+        update_vec_checksum(&self.exports, checksum;
         if let Some(start_func_idx) = self.start_func {
-            checksum.update_slice(&[1]);
-            checksum.update_slice(&start_func_idx.to_le_bytes());
+            checksum.update_slice(&[1];
+            checksum.update_slice(&start_func_idx.to_le_bytes);
         } else {
-            checksum.update_slice(&[0]);
+            checksum.update_slice(&[0];
         }
-        update_vec_checksum(&self.func_bodies, checksum);
+        update_vec_checksum(&self.func_bodies, checksum;
         if let Some(data_cnt) = self.data_count {
-            checksum.update_slice(&[1]);
-            checksum.update_slice(&data_cnt.to_le_bytes());
+            checksum.update_slice(&[1];
+            checksum.update_slice(&data_cnt.to_le_bytes);
         } else {
-            checksum.update_slice(&[0]);
+            checksum.update_slice(&[0];
         }
-        update_vec_checksum(&self.custom_sections, checksum);
-        update_vec_checksum(&self.tags, checksum);
+        update_vec_checksum(&self.custom_sections, checksum;
+        update_vec_checksum(&self.tags, checksum;
         // Not checksumming the provider itself, as it's about memory
         // management, not content.
     }
@@ -3200,7 +3271,9 @@ pub enum AggregateType<P: MemoryProvider + Default + Clone + core::fmt::Debug + 
     Array(ArrayType),
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default for AggregateType<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default
+    for AggregateType<P>
+{
     fn default() -> Self {
         Self::Array(ArrayType::default())
     }
@@ -3238,9 +3311,11 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> St
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default for StructType<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Default
+    for StructType<P>
+{
     fn default() -> Self {
-        let provider = P::default();
+        let provider = P::default);
         Self::new(provider, false).expect("Default StructType creation failed")
     }
 }
@@ -3284,10 +3359,7 @@ impl FieldType {
 
 impl Default for FieldType {
     fn default() -> Self {
-        Self {
-            storage_type: StorageType::default(),
-            mutable: false,
-        }
+        Self { storage_type: StorageType::default(), mutable: false }
     }
 }
 
@@ -3348,34 +3420,32 @@ impl PackedType {
         match byte {
             0x78 => Ok(PackedType::I8),
             0x77 => Ok(PackedType::I16),
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                wrt_error::codes::PARSE_INVALID_VALTYPE_BYTE,
-                "Invalid packed type byte",
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid packed type binary representation")),
         }
     }
 }
 
 // Implement serialization traits for the new types
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Checksummable for StructType<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> Checksummable
+    for StructType<P>
+{
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.fields.update_checksum(checksum);
-        checksum.update(self.final_type as u8);
+        self.fields.update_checksum(checksum;
+        checksum.update(self.final_type as u8;
     }
 }
 
 impl Checksummable for ArrayType {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.element_type.update_checksum(checksum);
-        checksum.update(self.final_type as u8);
+        self.element_type.update_checksum(checksum;
+        checksum.update(self.final_type as u8;
     }
 }
 
 impl Checksummable for FieldType {
     fn update_checksum(&self, checksum: &mut Checksum) {
-        self.storage_type.update_checksum(checksum);
-        checksum.update(self.mutable as u8);
+        self.storage_type.update_checksum(checksum;
+        checksum.update(self.mutable as u8;
     }
 }
 
@@ -3383,12 +3453,12 @@ impl Checksummable for StorageType {
     fn update_checksum(&self, checksum: &mut Checksum) {
         match self {
             StorageType::Value(vt) => {
-                checksum.update(0);
-                vt.update_checksum(checksum);
+                checksum.update(0;
+                vt.update_checksum(checksum;
             }
             StorageType::Packed(pt) => {
-                checksum.update(1);
-                checksum.update(pt.to_binary());
+                checksum.update(1;
+                checksum.update(pt.to_binary);
             }
         }
     }
@@ -3408,7 +3478,7 @@ impl ToBytes for FieldType {
 
     #[cfg(feature = "default-provider")]
     fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         self.to_bytes_with_provider(writer, &default_provider)
     }
 }
@@ -3423,18 +3493,16 @@ impl FromBytes for FieldType {
         let mutable = match mutable_byte {
             0 => false,
             1 => true,
-            _ => return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid boolean flag for FieldType.mutable",
-            )),
+            _ => {
+                return Err(Error::runtime_execution_error("Invalid field type mutability flag";
+            }
         };
         Ok(FieldType { storage_type, mutable })
     }
 
     #[cfg(feature = "default-provider")]
     fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         Self::from_bytes_with_provider(reader, &default_provider)
     }
 }
@@ -3460,7 +3528,7 @@ impl ToBytes for StorageType {
 
     #[cfg(feature = "default-provider")]
     fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         self.to_bytes_with_provider(writer, &default_provider)
     }
 }
@@ -3481,17 +3549,13 @@ impl FromBytes for StorageType {
                 let pt = PackedType::from_binary(packed_byte)?;
                 Ok(StorageType::Packed(pt))
             }
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid tag for StorageType",
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid storage type tag")),
         }
     }
 
     #[cfg(feature = "default-provider")]
     fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         Self::from_bytes_with_provider(reader, &default_provider)
     }
 }
@@ -3509,7 +3573,7 @@ impl ToBytes for ArrayType {
 
     #[cfg(feature = "default-provider")]
     fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         self.to_bytes_with_provider(writer, &default_provider)
     }
 }
@@ -3524,23 +3588,23 @@ impl FromBytes for ArrayType {
         let final_type = match final_byte {
             0 => false,
             1 => true,
-            _ => return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid boolean flag for ArrayType.final_type",
-            )),
+            _ => {
+                return Err(Error::runtime_execution_error("Invalid array type final flag";
+            }
         };
         Ok(ArrayType { element_type, final_type })
     }
 
     #[cfg(feature = "default-provider")]
     fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         Self::from_bytes_with_provider(reader, &default_provider)
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> ToBytes for StructType<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> ToBytes
+    for StructType<P>
+{
     fn to_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         &self,
         writer: &mut WriteStream<'a>,
@@ -3553,40 +3617,44 @@ impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> To
 
     #[cfg(feature = "default-provider")]
     fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         self.to_bytes_with_provider(writer, &default_provider)
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> FromBytes for StructType<P> {
+impl<P: MemoryProvider + Default + Clone + core::fmt::Debug + PartialEq + Eq> FromBytes
+    for StructType<P>
+{
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
     ) -> WrtResult<Self> {
-        let fields = BoundedVec::<FieldType, MAX_STRUCT_FIELDS, P>::from_bytes_with_provider(reader, provider)?;
+        let fields = BoundedVec::<FieldType, MAX_STRUCT_FIELDS, P>::from_bytes_with_provider(
+            reader, provider,
+        )?;
         let final_byte = reader.read_u8()?;
         let final_type = match final_byte {
             0 => false,
             1 => true,
-            _ => return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid boolean flag for StructType.final_type",
-            )),
+            _ => {
+                return Err(Error::runtime_execution_error("Invalid struct type final flag";
+            }
         };
         Ok(StructType { fields, final_type })
     }
 
     #[cfg(feature = "default-provider")]
     fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
-        let default_provider = DefaultMemoryProvider::default();
+        let default_provider = DefaultMemoryProvider::default);
         Self::from_bytes_with_provider(reader, &default_provider)
     }
 }
 
 /// Placeholder for element segment
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ElementSegment<P: MemoryProvider + Default + Clone + PartialEq + Eq = DefaultMemoryProvider> {
+pub struct ElementSegment<
+    P: MemoryProvider + Default + Clone + PartialEq + Eq = DefaultMemoryProvider,
+> {
     /// Table index
     pub table_index: u32,
     /// Offset expression
@@ -3607,7 +3675,8 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for ElementSe
 
 /// Placeholder for data segment
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataSegment<P: MemoryProvider + Default + Clone + PartialEq + Eq = DefaultMemoryProvider> {
+pub struct DataSegment<P: MemoryProvider + Default + Clone + PartialEq + Eq = DefaultMemoryProvider>
+{
     /// Memory index
     pub memory_index: u32,
     /// Offset expression

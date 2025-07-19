@@ -29,16 +29,26 @@ default = []
 std = ["wrt-foundation/std", "wrt-sync/std", "log"]
 # This crate is no_std by default, this feature is a no-op for compatibility
 no_std = []
+
+# Allocation support for no_std environments
+alloc = ["wrt-foundation/alloc"]
 optimize = ["wrt-foundation/optimize"]
-safety = ["wrt-foundation/safety", "std"]
+
+# Safety level presets using capability-based features
+qm = ["wrt-foundation/dynamic-allocation"]
+asil-a = ["wrt-foundation/bounded-collections"]
+asil-b = ["wrt-foundation/bounded-collections"]
+asil-c = ["wrt-foundation/static-memory-safety"]
+asil-d = ["wrt-foundation/asil-d"]
+
+# Legacy compatibility features
+safe-memory = ["asil-b"]
+safety-asil-b = ["asil-b"]
+safety-asil-c = ["asil-c"]
+safety-asil-d = ["asil-d"]
+
 kani = ["dep:kani-verifier"]
 
-# Disable panic handler for library builds to avoid conflicts
-disable-panic-handler = [
-    "wrt-error/disable-panic-handler",
-    "wrt-foundation/disable-panic-handler",
-    "wrt-sync/disable-panic-handler"
-]
 
 [lints]
 rust.unexpected_cfgs = { level = "allow", check-cfg = ['cfg(kani)', 'cfg(coverage)', 'cfg(doc)'] }
@@ -57,13 +67,13 @@ clippy.unreachable = "deny" # Rule 4
 clippy.float_arithmetic = "warn" # Rule 1
 clippy.inline_asm_x86_att_syntax = "deny" # Rule 1
 clippy.transmute_ptr_to_ref = "deny" # Rule 1
-clippy.type_id = "deny" # Rule 1
+# clippy.type_id removed - not a valid clippy lint
 clippy.dyn_trait = "warn" # Rule 1
 clippy.ptr_offset_with_cast = "warn" # Rule 2
 clippy.result_unit_err = "warn" # Rule 3
 clippy.let_underscore_drop = "warn" # Rule 3
 clippy.must_use = "warn" # Rule 3
-clippy.static_mut_reference = "deny" # Rule 5
+# clippy.static_mut_reference renamed to static_mut_refs in newer Rust versions
 clippy.arc_mutate = "deny" # Rule 5
 clippy.missing_docs_in_private_items = "allow" # To be reviewed if too noisy
 clippy.debug_assert_with_mut_call = "warn" # Rule 9, ADDED

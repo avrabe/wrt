@@ -113,10 +113,10 @@ where
     K: AsRef<[u8]>,
     V: AsRef<[u8]>,
 {
-    let mut checksum = crate::verification::Checksum::new();
+    let mut checksum = crate::verification::Checksum::new);
     for (key, value) in items {
-        checksum.update_slice(key.as_ref());
-        checksum.update_slice(value.as_ref());
+        checksum.update_slice(key.as_ref);
+        checksum.update_slice(value.as_ref);
     }
     checksum
 }
@@ -146,7 +146,10 @@ pub fn validate_checksum(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{traits::importance, verification::{VerificationLevel, Checksum}};
+    use crate::{
+        traits::importance,
+        verification::{Checksum, VerificationLevel},
+    };
     // For BoundedVec tests
     #[cfg(feature = "std")]
     use crate::safe_memory::StdProvider;
@@ -156,11 +159,11 @@ mod tests {
     #[test]
     fn test_should_validate() {
         // Off level should never validate (should_verify for Off is false)
-        assert!(!should_validate(VerificationLevel::Off, importance::CRITICAL));
+        assert!(!should_validate(VerificationLevel::Off, importance::CRITICAL);
 
         // Full level should always validate
-        assert!(should_validate(VerificationLevel::Full, importance::READ));
-        assert!(should_validate(VerificationLevel::Full, 1)); // Even low importance
+        assert!(should_validate(VerificationLevel::Full, importance::READ);
+        assert!(should_validate(VerificationLevel::Full, 1))); // Even low importance
 
         // Assertions for VerificationLevel::Sampling with importance::READ are
         // removed as they are flaky due to the shared atomic counter in
@@ -179,10 +182,10 @@ mod tests {
     #[test]
     fn test_should_validate_redundant() {
         // Only Full level should do redundant validation
-        assert!(!should_validate_redundant(VerificationLevel::Off)); // None -> Off
-        assert!(!should_validate_redundant(VerificationLevel::Sampling));
-        assert!(!should_validate_redundant(VerificationLevel::Basic)); // Standard -> Basic (as an example of not Full)
-        assert!(should_validate_redundant(VerificationLevel::Full));
+        assert!(!should_validate_redundant(VerificationLevel::Off))); // None -> Off
+        assert!(!should_validate_redundant(VerificationLevel::Sampling);
+        assert!(!should_validate_redundant(VerificationLevel::Basic))); // Standard -> Basic (as an example of not Full)
+        assert!(should_validate_redundant(VerificationLevel::Full);
     }
 
     #[test]
@@ -196,38 +199,39 @@ mod tests {
         let items: [(&[u8], &[u8]); 2] =
             [("key1".as_bytes(), "value1".as_bytes()), ("key2".as_bytes(), "value2".as_bytes())];
 
-        let checksum = calculate_keyed_checksum(&items);
+        let checksum = calculate_keyed_checksum(&items;
 
         // Calculate manually to verify
-        let mut expected = Checksum::new();
-        expected.update_slice("key1".as_bytes());
-        expected.update_slice("value1".as_bytes());
-        expected.update_slice("key2".as_bytes());
-        expected.update_slice("value2".as_bytes());
+        let mut expected = Checksum::new);
+        expected.update_slice("key1".as_bytes);
+        expected.update_slice("value1".as_bytes);
+        expected.update_slice("key2".as_bytes);
+        expected.update_slice("value2".as_bytes);
 
-        assert_eq!(checksum, expected);
+        assert_eq!(checksum, expected;
     }
 
     // #[cfg(feature = "std")] // Test should run always now
     #[test]
     fn test_validate_checksum() {
-        let checksum1 = Checksum::new();
-        let mut checksum2_val = Checksum::new();
+        let checksum1 = Checksum::new);
+        let mut checksum2_val = Checksum::new);
         checksum2_val.update(1); // Make it different
         let checksum2 = checksum2_val;
 
         // Same checksums should validate
-        assert!(validate_checksum(checksum1, checksum1, "test_same").is_ok());
+        assert!(validate_checksum(checksum1, checksum1, "test_same").is_ok();
 
         // Different checksums should fail
-        let err_result = validate_checksum(checksum1, checksum2, "test_diff");
-        assert!(err_result.is_err());
+        let err_result = validate_checksum(checksum1, checksum2, "test_diff";
+        assert!(err_result.is_err();
         match err_result {
             Err(ValidationError::ChecksumMismatch { expected, actual, description }) => {
-                assert_eq!(expected, checksum1);
-                assert_eq!(actual, checksum2);
-                assert_eq!(description, "test_diff");
-            } // _ => panic!("Unexpected error type"), // Not needed if only one variant
+                assert_eq!(expected, checksum1;
+                assert_eq!(actual, checksum2;
+                assert_eq!(description, "test_diff";
+            }
+            Ok(_) => panic!("Expected error but got Ok"),
         }
     }
 }

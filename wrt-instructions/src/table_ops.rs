@@ -42,7 +42,7 @@
 //! // Execute with appropriate context
 //! ```
 
-use crate::prelude::{BoundedCapacity, Debug, Error, PartialEq, PureInstruction, Result, Value, ValueType};
+use crate::prelude::{Debug, Error, PartialEq, PureInstruction, Result, Value, ValueType, BoundedCapacity};
 use crate::validation::{Validate, ValidationContext};
 
 /// Table operations trait defining the interface to table implementations
@@ -106,7 +106,7 @@ impl TableGet {
         let idx = match index {
             Value::I32(i) => {
                 if *i < 0 {
-                    return Err(Error::runtime_error("Table index cannot be negative"));
+                    return Err(Error::runtime_error("Table index cannot be negative";
                 }
                 *i as u32
             }
@@ -145,7 +145,7 @@ impl TableSet {
         let idx = match index {
             Value::I32(i) => {
                 if *i < 0 {
-                    return Err(Error::runtime_error("Table index cannot be negative"));
+                    return Err(Error::runtime_error("Table index cannot be negative";
                 }
                 *i as u32
             }
@@ -265,7 +265,7 @@ impl TableFill {
         let dest_idx = match dest {
             Value::I32(d) => {
                 if *d < 0 {
-                    return Err(Error::runtime_error("Table destination index cannot be negative"));
+                    return Err(Error::runtime_error("Table destination index cannot be negative";
                 }
                 *d as u32
             }
@@ -275,7 +275,7 @@ impl TableFill {
         let fill_size = match size {
             Value::I32(s) => {
                 if *s < 0 {
-                    return Err(Error::runtime_error("Table fill size cannot be negative"));
+                    return Err(Error::runtime_error("Table fill size cannot be negative";
                 }
                 *s as u32
             }
@@ -323,7 +323,7 @@ impl TableCopy {
         let dest_idx = match dest {
             Value::I32(d) => {
                 if *d < 0 {
-                    return Err(Error::runtime_error("Table destination index cannot be negative"));
+                    return Err(Error::runtime_error("Table destination index cannot be negative";
                 }
                 *d as u32
             }
@@ -333,7 +333,7 @@ impl TableCopy {
         let src_idx = match src {
             Value::I32(s) => {
                 if *s < 0 {
-                    return Err(Error::runtime_error("Table source index cannot be negative"));
+                    return Err(Error::runtime_error("Table source index cannot be negative";
                 }
                 *s as u32
             }
@@ -343,7 +343,7 @@ impl TableCopy {
         let copy_size = match size {
             Value::I32(s) => {
                 if *s < 0 {
-                    return Err(Error::runtime_error("Table copy size cannot be negative"));
+                    return Err(Error::runtime_error("Table copy size cannot be negative";
                 }
                 *s as u32
             }
@@ -393,7 +393,7 @@ impl TableInit {
         let dest_idx = match dest {
             Value::I32(d) => {
                 if *d < 0 {
-                    return Err(Error::runtime_error("Table destination index cannot be negative"));
+                    return Err(Error::runtime_error("Table destination index cannot be negative";
                 }
                 *d as u32
             }
@@ -403,7 +403,7 @@ impl TableInit {
         let src_idx = match src {
             Value::I32(s) => {
                 if *s < 0 {
-                    return Err(Error::runtime_error("Element segment source index cannot be negative"));
+                    return Err(Error::runtime_error("Element segment source index cannot be negative";
                 }
                 *s as u32
             }
@@ -413,7 +413,7 @@ impl TableInit {
         let copy_size = match size {
             Value::I32(s) => {
                 if *s < 0 {
-                    return Err(Error::runtime_error("Table init size cannot be negative"));
+                    return Err(Error::runtime_error("Table init size cannot be negative";
                 }
                 *s as u32
             }
@@ -431,7 +431,7 @@ impl TableInit {
         })?;
         
         if src_end > elements_len {
-            return Err(Error::runtime_error("table.init src out of bounds"));
+            return Err(Error::runtime_error("table.init src out of bounds";
         }
         
         // Check table bounds
@@ -441,7 +441,7 @@ impl TableInit {
         })?;
         
         if dest_end > table_size {
-            return Err(Error::runtime_error("table.init dest out of bounds"));
+            return Err(Error::runtime_error("table.init dest out of bounds";
         }
         
         // Copy elements from segment to table
@@ -744,7 +744,7 @@ mod tests {
 
     impl MockTable {
         fn new(initial_size: u32, max_size: Option<u32>) -> Self {
-            let mut elements = Vec::with_capacity(initial_size as usize);
+            let mut elements = Vec::with_capacity(initial_size as usize;
             for _ in 0..initial_size {
                 elements.push(Value::FuncRef(None)); // Initialize with null references
             }
@@ -759,7 +759,7 @@ mod tests {
 
     impl MockTableOperations {
         fn new() -> Self {
-            let mut tables = Vec::new();
+            let mut tables = Vec::new);
             tables.push(MockTable::new(10, Some(20))); // Table 0: size 10, max 20
             tables.push(MockTable::new(5, None));       // Table 1: size 5, no max
             Self { tables }
@@ -811,7 +811,7 @@ mod tests {
             
             // Grow the table
             for _ in 0..delta {
-                table.elements.push(init_value.clone());
+                table.elements.push(init_value.clone();
             }
             
             Ok(old_size)
@@ -823,7 +823,7 @@ mod tests {
             
             let end_idx = dst as usize + len as usize;
             if end_idx > table.elements.len() {
-                return Err(Error::runtime_error("Table fill out of bounds"));
+                return Err(Error::runtime_error("Table fill out of bounds";
             }
             
             for i in 0..len {
@@ -836,7 +836,7 @@ mod tests {
         fn copy_table(&mut self, dst_table: u32, dst_index: u32, src_table: u32, src_index: u32, len: u32) -> Result<()> {
             // For simplicity, handle same-table copy only in this test
             if dst_table != src_table {
-                return Err(Error::runtime_error("Cross-table copy not implemented in test"));
+                return Err(Error::runtime_error("Cross-table copy not implemented in test";
             }
             
             let table = self.tables.get_mut(dst_table as usize)
@@ -846,12 +846,12 @@ mod tests {
             let dst_end = dst_index as usize + len as usize;
             
             if src_end > table.elements.len() || dst_end > table.elements.len() {
-                return Err(Error::runtime_error("Table copy out of bounds"));
+                return Err(Error::runtime_error("Table copy out of bounds";
             }
             
             // Copy elements (handle overlapping regions correctly)
             if len > 0 {
-                let temp: Vec<Value> = table.elements[src_index as usize..src_end].to_vec();
+                let temp: Vec<Value> = table.elements[src_index as usize..src_end].to_vec);
                 for (i, value) in temp.into_iter().enumerate() {
                     table.elements[dst_index as usize + i] = value;
                 }
@@ -868,20 +868,20 @@ mod tests {
 
     impl MockElementSegments {
         fn new() -> Self {
-            let mut segments = Vec::new();
+            let mut segments = Vec::new);
             
             // Segment 0: [FuncRef(1), FuncRef(2), FuncRef(3)]
-            let mut seg0 = Vec::new();
-            seg0.push(Value::FuncRef(Some(FuncRef::from_index(1))));
-            seg0.push(Value::FuncRef(Some(FuncRef::from_index(2))));
-            seg0.push(Value::FuncRef(Some(FuncRef::from_index(3))));
-            segments.push(Some(seg0));
+            let mut seg0 = Vec::new);
+            seg0.push(Value::FuncRef(Some(FuncRef::from_index(1));
+            seg0.push(Value::FuncRef(Some(FuncRef::from_index(2));
+            seg0.push(Value::FuncRef(Some(FuncRef::from_index(3));
+            segments.push(Some(seg0);
             
             // Segment 1: [ExternRef(4), ExternRef(5)]
-            let mut seg1 = Vec::new();
-            seg1.push(Value::ExternRef(Some(ExternRef { index: 4 })));
-            seg1.push(Value::ExternRef(Some(ExternRef { index: 5 })));
-            segments.push(Some(seg1));
+            let mut seg1 = Vec::new);
+            seg1.push(Value::ExternRef(Some(ExternRef { index: 4 });
+            seg1.push(Value::ExternRef(Some(ExternRef { index: 5 });
+            segments.push(Some(seg1);
             
             Self { segments }
         }
@@ -900,7 +900,7 @@ mod tests {
         #[cfg(not(feature = "std"))]
         fn get_element_segment(&self, elem_index: u32) -> Result<Option<wrt_foundation::BoundedVec<Value, 65536, wrt_foundation::NoStdProvider<65536>>>> {
             if let Some(Some(seg)) = self.segments.get(elem_index as usize) {
-                let mut bounded = wrt_foundation::BoundedVec::new();
+                let mut bounded = wrt_foundation::BoundedVec::new);
                 for value in seg {
                     bounded.push(value.clone()).map_err(|_| Error::runtime_error("BoundedVec capacity exceeded"))?;
                 }
@@ -966,7 +966,7 @@ mod tests {
             src: i32,
             size: i32,
         ) -> Result<()> {
-            let init_op = TableInit::new(table_index, elem_index);
+            let init_op = TableInit::new(table_index, elem_index;
             init_op.execute(
                 &mut self.tables,
                 &self.elements,
@@ -979,48 +979,48 @@ mod tests {
 
     #[test]
     fn test_table_get_set() {
-        let mut tables = MockTableOperations::new();
+        let mut tables = MockTableOperations::new);
         
         // Test set operation
-        let set_op = TableSet::new(0);
-        let func_ref = Value::FuncRef(Some(FuncRef::from_index(42)));
+        let set_op = TableSet::new(0;
+        let func_ref = Value::FuncRef(Some(FuncRef::from_index(42);
         set_op.execute(&mut tables, &Value::I32(5), &func_ref).unwrap();
         
         // Test get operation
-        let get_op = TableGet::new(0);
+        let get_op = TableGet::new(0;
         let result = get_op.execute(&tables, &Value::I32(5)).unwrap();
-        assert_eq!(result, func_ref);
+        assert_eq!(result, func_ref;
     }
 
     #[test]
     fn test_table_size_grow() {
-        let mut tables = MockTableOperations::new();
+        let mut tables = MockTableOperations::new);
         
         // Test size operation
-        let size_op = TableSize::new(0);
+        let size_op = TableSize::new(0;
         let size = size_op.execute(&tables).unwrap();
-        assert_eq!(size, Value::I32(10));
+        assert_eq!(size, Value::I32(10;
         
         // Test grow operation
-        let grow_op = TableGrow::new(0);
+        let grow_op = TableGrow::new(0;
         let prev_size = grow_op.execute(
             &mut tables,
             &Value::FuncRef(None),
             &Value::I32(3)
         ).unwrap();
-        assert_eq!(prev_size, Value::I32(10));
+        assert_eq!(prev_size, Value::I32(10;
         
         // Check new size
         let new_size = size_op.execute(&tables).unwrap();
-        assert_eq!(new_size, Value::I32(13));
+        assert_eq!(new_size, Value::I32(13;
     }
 
     #[test]
     fn test_table_fill() {
-        let mut tables = MockTableOperations::new();
+        let mut tables = MockTableOperations::new);
         
-        let fill_op = TableFill::new(0);
-        let func_ref = Value::FuncRef(Some(FuncRef::from_index(99)));
+        let fill_op = TableFill::new(0;
+        let func_ref = Value::FuncRef(Some(FuncRef::from_index(99);
         
         // Fill table[0][2..5] with FuncRef(99)
         fill_op.execute(
@@ -1031,25 +1031,25 @@ mod tests {
         ).unwrap();
         
         // Verify fill worked
-        let get_op = TableGet::new(0);
+        let get_op = TableGet::new(0;
         for i in 2..5 {
             let result = get_op.execute(&tables, &Value::I32(i)).unwrap();
-            assert_eq!(result, func_ref);
+            assert_eq!(result, func_ref;
         }
     }
 
     #[test]
     fn test_table_copy() {
-        let mut tables = MockTableOperations::new();
+        let mut tables = MockTableOperations::new);
         
         // Set up source values
-        let set_op = TableSet::new(0);
+        let set_op = TableSet::new(0;
         set_op.execute(&mut tables, &Value::I32(1), &Value::FuncRef(Some(FuncRef::from_index(101)))).unwrap();
         set_op.execute(&mut tables, &Value::I32(2), &Value::FuncRef(Some(FuncRef::from_index(102)))).unwrap();
         set_op.execute(&mut tables, &Value::I32(3), &Value::FuncRef(Some(FuncRef::from_index(103)))).unwrap();
         
         // Copy table[0][1..4] to table[0][6..9]
-        let copy_op = TableCopy::new(0, 0);
+        let copy_op = TableCopy::new(0, 0;
         copy_op.execute(
             &mut tables,
             &Value::I32(6),      // dest
@@ -1058,7 +1058,7 @@ mod tests {
         ).unwrap();
         
         // Verify copy worked
-        let get_op = TableGet::new(0);
+        let get_op = TableGet::new(0;
         let expected = [
             Value::FuncRef(Some(FuncRef::from_index(101))),
             Value::FuncRef(Some(FuncRef::from_index(102))),
@@ -1067,17 +1067,17 @@ mod tests {
         
         for (i, expected_val) in expected.iter().enumerate() {
             let result = get_op.execute(&tables, &Value::I32(6 + i as i32)).unwrap();
-            assert_eq!(result, *expected_val);
+            assert_eq!(result, *expected_val;
         }
     }
 
     #[test]
     fn test_table_init_elem_drop() {
-        let mut tables = MockTableOperations::new();
-        let mut elements = MockElementSegments::new();
+        let mut tables = MockTableOperations::new);
+        let mut elements = MockElementSegments::new);
         
         // Initialize table[0][4..6] from element segment 0[1..3]
-        let init_op = TableInit::new(0, 0);
+        let init_op = TableInit::new(0, 0;
         init_op.execute(
             &mut tables,
             &elements,
@@ -1087,15 +1087,15 @@ mod tests {
         ).unwrap();
         
         // Verify initialization (should copy FuncRef(2) and FuncRef(3))
-        let get_op = TableGet::new(0);
+        let get_op = TableGet::new(0;
         let result1 = get_op.execute(&tables, &Value::I32(4)).unwrap();
-        assert_eq!(result1, Value::FuncRef(Some(FuncRef::from_index(2))));
+        assert_eq!(result1, Value::FuncRef(Some(FuncRef::from_index(2));
         
         let result2 = get_op.execute(&tables, &Value::I32(5)).unwrap();
-        assert_eq!(result2, Value::FuncRef(Some(FuncRef::from_index(3))));
+        assert_eq!(result2, Value::FuncRef(Some(FuncRef::from_index(3));
         
         // Drop element segment
-        let drop_op = ElemDrop::new(0);
+        let drop_op = ElemDrop::new(0;
         drop_op.execute(&mut elements).unwrap();
         
         // Try to init from dropped segment - should fail
@@ -1105,52 +1105,52 @@ mod tests {
             &Value::I32(7),
             &Value::I32(0),
             &Value::I32(1)
-        );
-        assert!(result.is_err());
+        ;
+        assert!(result.is_err();
     }
 
     #[test]
     fn test_unified_table_operations() {
-        let mut ctx = MockTableContext::new();
+        let mut ctx = MockTableContext::new);
         
         // Test unified table.size
-        let size_op = TableOp::Size(TableSize::new(0));
+        let size_op = TableOp::Size(TableSize::new(0;
         size_op.execute(&mut ctx).unwrap();
-        assert_eq!(ctx.pop_value().unwrap(), Value::I32(10));
+        assert_eq!(ctx.pop_value().unwrap(), Value::I32(10;
         
         // Test unified table.set
         ctx.push_value(Value::I32(3)).unwrap();    // index
         ctx.push_value(Value::FuncRef(Some(FuncRef::from_index(77)))).unwrap(); // value
-        let set_op = TableOp::Set(TableSet::new(0));
+        let set_op = TableOp::Set(TableSet::new(0;
         set_op.execute(&mut ctx).unwrap();
         
         // Test unified table.get
         ctx.push_value(Value::I32(3)).unwrap();    // index
-        let get_op = TableOp::Get(TableGet::new(0));
+        let get_op = TableOp::Get(TableGet::new(0;
         get_op.execute(&mut ctx).unwrap();
-        assert_eq!(ctx.pop_value().unwrap(), Value::FuncRef(Some(FuncRef::from_index(77))));
+        assert_eq!(ctx.pop_value().unwrap(), Value::FuncRef(Some(FuncRef::from_index(77));
     }
 
     #[test] 
     fn test_error_handling() {
-        let mut tables = MockTableOperations::new();
+        let mut tables = MockTableOperations::new);
         
         // Test negative index
-        let get_op = TableGet::new(0);
-        let result = get_op.execute(&tables, &Value::I32(-1));
-        assert!(result.is_err());
+        let get_op = TableGet::new(0;
+        let result = get_op.execute(&tables, &Value::I32(-1;
+        assert!(result.is_err();
         
         // Test out of bounds
-        let result = get_op.execute(&tables, &Value::I32(100));
-        assert!(result.is_err());
+        let result = get_op.execute(&tables, &Value::I32(100;
+        assert!(result.is_err();
         
         // Test invalid table index
-        let invalid_get_op = TableGet::new(99);
-        let result = invalid_get_op.execute(&tables, &Value::I32(0));
-        assert!(result.is_err());
+        let invalid_get_op = TableGet::new(99;
+        let result = invalid_get_op.execute(&tables, &Value::I32(0;
+        assert!(result.is_err();
         
         // Test grow beyond max size
-        let grow_op = TableGrow::new(0);
+        let grow_op = TableGrow::new(0;
         let result = grow_op.execute(
             &mut tables,
             &Value::FuncRef(None),

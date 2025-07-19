@@ -1,19 +1,21 @@
 //! Component Linker and Import/Export Resolution System
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // Cross-environment imports
 #[cfg(feature = "std")]
 use std::{boxed::Box, collections::HashMap, format, string::String, vec::Vec};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedString as String, BoundedVec as Vec, no_std_hashmap::NoStdHashMap as HashMap, safe_memory::NoStdProvider};
-
-// Type aliases for no_std compatibility
+use alloc::boxed::Box;
 #[cfg(not(feature = "std"))]
-type Box<T> = wrt_foundation::SafeBox<T, NoStdProvider<65536>>;
+use wrt_foundation::{
+    bounded::BoundedString as String, bounded::BoundedVec as Vec, 
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
-use crate::component_instantiation::{
+use crate::components::component_instantiation::{
     create_component_export, create_component_import, ComponentExport, ComponentImport,
     ComponentInstance, ExportType, FunctionSignature, ImportType, InstanceConfig, InstanceId,
     ResolvedImport,
@@ -49,11 +51,11 @@ pub struct ComponentDefinition {
     /// Component ID
     pub id: ComponentId,
     /// Component binary (simplified as bytes)
-    pub binary: Vec<u8>,
+    pub binary: BoundedVec<u8, 1048576, NoStdProvider<65536>>, // 1MB max binary size
     /// Parsed exports
-    pub exports: Vec<ComponentExport>,
+    pub exports: BoundedVec<ComponentExport, 64, NoStdProvider<65536>>,
     /// Parsed imports
-    pub imports: Vec<ComponentImport>,
+    pub imports: BoundedVec<ComponentImport, 64, NoStdProvider<65536>>,
     /// Component metadata
     pub metadata: ComponentMetadata,
 }
@@ -196,11 +198,7 @@ impl ComponentLinker {
     /// Add a component to the linker
     pub fn add_component(&mut self, id: ComponentId, binary: &[u8]) -> Result<()> {
         if self.components.len() >= MAX_LINKED_COMPONENTS {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_EXHAUSTED,
-                "Maximum number of components reached",
-            ));
+            return Err(Error::resource_exhausted("Maximum number of components reached";
         }
 
         // Parse component binary (simplified)
@@ -215,7 +213,7 @@ impl ComponentLinker {
         };
 
         // Add to components map
-        self.components.insert(id.clone(), definition);
+        self.components.insert(id.clone(), definition;
 
         // Update dependency graph
         self.link_graph.add_component(id)?;
@@ -230,11 +228,7 @@ impl ComponentLinker {
     pub fn remove_component(&mut self, id: &ComponentId) -> Result<()> {
         // Check if component exists
         if !self.components.contains_key(id) {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found",
-            ));
+            return Err(Error::component_not_found("Component not found";
         }
 
         // Check if any instances are using this component
@@ -246,15 +240,12 @@ impl ComponentLinker {
             .collect();
 
         if !dependent_instances.is_empty() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::RESOURCE_IN_USE,
-                "Component is in use by active instances",
-            ));
+            return Err(Error::runtime_execution_error("Component has active instances and cannot be removed")
+            ;
         }
 
         // Remove from components and graph
-        self.components.remove(id);
+        self.components.remove(id;
         self.link_graph.remove_component(id)?;
 
         Ok(())
@@ -268,11 +259,7 @@ impl ComponentLinker {
     ) -> Result<InstanceId> {
         // Find component definition
         let component = self.components.get(component_id).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found",
-            )
+            Error::component_not_found("Component not found")
         })?;
 
         // Resolve dependencies
@@ -282,7 +269,7 @@ impl ComponentLinker {
         let instance_id = self.next_instance_id;
         self.next_instance_id += 1;
 
-        let instance_config = config.unwrap_or_else(InstanceConfig::default);
+        let instance_config = config.unwrap_or_else(InstanceConfig::default;
 
         let mut instance = ComponentInstance::new(
             instance_id,
@@ -301,7 +288,7 @@ impl ComponentLinker {
         instance.initialize()?;
 
         // Add to instances map
-        self.instances.insert(instance_id, instance);
+        self.instances.insert(instance_id, instance;
 
         // Update statistics
         self.stats.instances_created += 1;
@@ -311,7 +298,7 @@ impl ComponentLinker {
 
     /// Link all components and create instances
     pub fn link_all(&mut self) -> Result<Vec<InstanceId>> {
-        let mut instance_ids = Vec::new();
+        let mut instance_ids = Vec::new);
 
         // Topological sort to determine instantiation order
         let sorted_components = self.link_graph.topological_sort()?;
@@ -345,14 +332,11 @@ impl ComponentLinker {
     fn parse_component_binary(
         &self,
         binary: &[u8],
-    ) -> Result<(Vec<ComponentExport>, Vec<ComponentImport>, ComponentMetadata)> {
+    ) -> core::result::Result<(Vec<ComponentExport>, Vec<ComponentImport>, ComponentMetadata)> {
         // Simplified component parsing
         if binary.is_empty() {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::INVALID_BINARY,
-                "Empty component binary",
-            ));
+            return Err(Error::runtime_execution_error("Empty component binary")
+            ;
         }
 
         // Create some example exports and imports based on binary content
@@ -368,37 +352,21 @@ impl ComponentLinker {
         
         #[cfg(not(feature = "std"))]
         let exports = {
-            let mut exports = Vec::new();
-            let mut params = Vec::new();
-            let mut results = Vec::new();
-            results.push(crate::canonical_abi::ComponentType::S32).map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_FAILED,
-                "Memory allocation failed"
-            ))?;
+            let mut exports = Vec::new);
+            let mut params = Vec::new);
+            let mut results = Vec::new);
+            results.push(crate::canonical_abi::ComponentType::S32).map_err(|_| Error::platform_memory_allocation_failed("Memory allocation failed"))?;
             
             let signature = crate::component_instantiation::create_function_signature(
-                String::new_from_str("main").map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    codes::MEMORY_ALLOCATION_FAILED,
-                    "Memory allocation failed"
-                ))?,
+                String::new_from_str("main").map_err(|_| Error::platform_memory_allocation_failed("Memory allocation failed"))?,
                 params,
                 results,
-            );
+            ;
             
             exports.push(create_component_export(
-                String::new_from_str("main").map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    codes::MEMORY_ALLOCATION_FAILED,
-                    "Memory allocation failed"
-                ))?,
+                String::new_from_str("main").map_err(|_| Error::platform_memory_allocation_failed("Memory allocation failed"))?,
                 ExportType::Function(signature),
-            )).map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_FAILED,
-                "Memory allocation failed"
-            ))?;
+            )).map_err(|_| Error::platform_memory_allocation_failed("Memory allocation failed"))?;
             exports
         };
 
@@ -413,7 +381,7 @@ impl ComponentLinker {
             )),
         )];
 
-        let metadata = ComponentMetadata::default();
+        let metadata = ComponentMetadata::default);
 
         Ok((exports, imports, metadata))
     }
@@ -423,7 +391,7 @@ impl ComponentLinker {
         component_id: &ComponentId,
         imports: &[ComponentImport],
     ) -> Result<Vec<ResolvedImport>> {
-        let mut resolved = Vec::new();
+        let mut resolved = Vec::new);
 
         for import in imports {
             let resolution = self.resolve_single_import(component_id, import)?;
@@ -447,16 +415,12 @@ impl ComponentLinker {
                         import: import.clone(),
                         provider_id: 1, // Simplified - would map component ID to instance ID
                         provider_export: export.name.clone(),
-                    });
+                    };
                 }
             }
         }
 
-        Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::IMPORT_NOT_SATISFIED,
-            "Component not found",
-        ))
+        Err(Error::component_not_found("Component not found"))
     }
 
     fn is_compatible_import_export(
@@ -466,7 +430,7 @@ impl ComponentLinker {
     ) -> Result<bool> {
         // Check name compatibility
         if import.name != export.name {
-            return Ok(false);
+            return Ok(false;
         }
 
         // Check type compatibility
@@ -510,11 +474,8 @@ impl LinkGraph {
     pub fn add_component(&mut self, component_id: ComponentId) -> Result<()> {
         // Check if component already exists
         if self.find_node_index(&component_id).is_some() {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::DUPLICATE_COMPONENT,
-                "Component already exists in graph",
-            ));
+            return Err(Error::runtime_execution_error("Component already exists in graph")
+            ;
         }
 
         let node = GraphNode {
@@ -534,15 +495,14 @@ impl LinkGraph {
             Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found in graph",
-            )
+                "Component not found in graph")
         })?;
 
         // Remove all edges involving this node
-        self.edges.retain(|edge| edge.from != node_index && edge.to != node_index);
+        self.edges.retain(|edge| edge.from != node_index && edge.to != node_index;
 
         // Remove the node
-        self.nodes.remove(node_index);
+        self.nodes.remove(node_index;
 
         // Update indices in remaining nodes and edges
         for node in &mut self.nodes[node_index..] {
@@ -567,7 +527,7 @@ impl LinkGraph {
         {
             let mut visited = vec![false; self.nodes.len()];
             let mut temp_visited = vec![false; self.nodes.len()];
-            let mut result = Vec::new();
+            let mut result = Vec::new);
             
             for i in 0..self.nodes.len() {
                 if !visited[i] {
@@ -575,28 +535,26 @@ impl LinkGraph {
                 }
             }
             
-            result.reverse();
+            result.reverse);
             Ok(result)
         }
         #[cfg(not(feature = "std"))]
         {
             // For no_std, create bounded vectors
-            let mut visited = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-            let mut temp_visited = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-            let mut result = Vec::new();
+            let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+            let mut visited = BoundedVec::new(provider).map_err(|_| {
+                Error::platform_memory_allocation_failed("Failed to create visited vector")
+            })?;
+            let provider2 = safe_managed_alloc!(65536, CrateId::Component)?;
+            let mut temp_visited = BoundedVec::new(provider2).map_err(|_| {
+                Error::platform_memory_allocation_failed("Failed to create temp_visited vector")
+            })?;
+            let mut result = Vec::new);
             
             // Initialize with false values
             for _ in 0..self.nodes.len() {
-                visited.push(false).map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    codes::MEMORY_ALLOCATION_FAILED,
-                    "Memory allocation failed"
-                ))?;
-                temp_visited.push(false).map_err(|_| Error::new(
-                    ErrorCategory::Memory,
-                    codes::MEMORY_ALLOCATION_FAILED,
-                    "Memory allocation failed"
-                ))?;
+                visited.push(false).map_err(|_| Error::platform_memory_allocation_failed("Memory allocation failed"))?;
+                temp_visited.push(false).map_err(|_| Error::platform_memory_allocation_failed("Memory allocation failed"))?;
             }
             
             for i in 0..self.nodes.len() {
@@ -605,7 +563,7 @@ impl LinkGraph {
                 }
             }
             
-            result.reverse();
+            result.reverse);
             Ok(result)
         }
     }
@@ -618,15 +576,11 @@ impl LinkGraph {
         result: &mut Vec<ComponentId>,
     ) -> Result<()> {
         if temp_visited[node_index] {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::CIRCULAR_DEPENDENCY,
-                "Circular dependency detected",
-            ));
+            return Err(Error::validation_error("Circular dependency detected";
         }
 
         if visited[node_index] {
-            return Ok(());
+            return Ok();
         }
 
         temp_visited[node_index] = true;
@@ -638,7 +592,7 @@ impl LinkGraph {
 
         temp_visited[node_index] = false;
         visited[node_index] = true;
-        result.push(self.nodes[node_index].component_id.clone());
+        result.push(self.nodes[node_index].component_id.clone();
 
         Ok(())
     }
@@ -660,87 +614,87 @@ mod tests {
 
     #[test]
     fn test_linker_creation() {
-        let linker = ComponentLinker::new();
-        assert_eq!(linker.components.len(), 0);
-        assert_eq!(linker.instances.len(), 0);
-        assert_eq!(linker.next_instance_id, 1);
+        let linker = ComponentLinker::new);
+        assert_eq!(linker.components.len(), 0;
+        assert_eq!(linker.instances.len(), 0;
+        assert_eq!(linker.next_instance_id, 1;
     }
 
     #[test]
     fn test_add_component() {
-        let mut linker = ComponentLinker::new();
+        let mut linker = ComponentLinker::new);
         let binary = vec![0x00, 0x61, 0x73, 0x6d]; // "wasm" magic
 
-        let result = linker.add_component("test_component".to_string(), &binary);
-        assert!(result.is_ok());
-        assert_eq!(linker.components.len(), 1);
-        assert_eq!(linker.stats.components_registered, 1);
+        let result = linker.add_component("test_component".to_string(), &binary;
+        assert!(result.is_ok();
+        assert_eq!(linker.components.len(), 1;
+        assert_eq!(linker.stats.components_registered, 1;
     }
 
     #[test]
     fn test_remove_component() {
-        let mut linker = ComponentLinker::new();
+        let mut linker = ComponentLinker::new);
         let binary = vec![0x00, 0x61, 0x73, 0x6d];
 
         linker.add_component("test_component".to_string(), &binary).unwrap();
-        assert_eq!(linker.components.len(), 1);
+        assert_eq!(linker.components.len(), 1;
 
-        let result = linker.remove_component(&"test_component".to_string());
-        assert!(result.is_ok());
-        assert_eq!(linker.components.len(), 0);
+        let result = linker.remove_component(&"test_component".to_string();
+        assert!(result.is_ok();
+        assert_eq!(linker.components.len(), 0;
     }
 
     #[test]
     fn test_link_graph_operations() {
-        let mut graph = LinkGraph::new();
+        let mut graph = LinkGraph::new);
 
         // Add components
         graph.add_component("comp1".to_string()).unwrap();
         graph.add_component("comp2".to_string()).unwrap();
-        assert_eq!(graph.nodes.len(), 2);
+        assert_eq!(graph.nodes.len(), 2;
 
         // Remove component
         graph.remove_component(&"comp1".to_string()).unwrap();
-        assert_eq!(graph.nodes.len(), 1);
-        assert_eq!(graph.nodes[0].component_id, "comp2");
+        assert_eq!(graph.nodes.len(), 1;
+        assert_eq!(graph.nodes[0].component_id, "comp2";
     }
 
     #[test]
     fn test_topological_sort_empty() {
-        let graph = LinkGraph::new();
+        let graph = LinkGraph::new);
         let result = graph.topological_sort().unwrap();
-        assert!(result.is_empty());
+        assert!(result.is_empty();
     }
 
     #[test]
     fn test_topological_sort_single() {
-        let mut graph = LinkGraph::new();
+        let mut graph = LinkGraph::new);
         graph.add_component("comp1".to_string()).unwrap();
 
         let result = graph.topological_sort().unwrap();
-        assert_eq!(result, vec!["comp1".to_string()]);
+        assert_eq!(result, vec!["comp1".to_string()];
     }
 
     #[test]
     fn test_linker_config_default() {
-        let config = LinkerConfig::default();
+        let config = LinkerConfig::default);
         assert!(config.strict_typing);
         assert!(!config.allow_hot_swap);
-        assert_eq!(config.max_instance_memory, 64 * 1024 * 1024);
+        assert_eq!(config.max_instance_memory, 64 * 1024 * 1024;
         assert!(config.validate_dependencies);
-        assert_eq!(config.circular_dependency_mode, CircularDependencyMode::Reject);
+        assert_eq!(config.circular_dependency_mode, CircularDependencyMode::Reject;
     }
 
     #[test]
     fn test_linking_stats() {
-        let mut linker = ComponentLinker::new();
+        let mut linker = ComponentLinker::new);
         let binary = vec![0x00, 0x61, 0x73, 0x6d];
 
         linker.add_component("test".to_string(), &binary).unwrap();
 
-        let stats = linker.get_stats();
-        assert_eq!(stats.components_registered, 1);
-        assert_eq!(stats.instances_created, 0);
+        let stats = linker.get_stats);
+        assert_eq!(stats.components_registered, 1;
+        assert_eq!(stats.instances_created, 0;
     }
 }
 
@@ -752,7 +706,7 @@ macro_rules! impl_basic_traits {
     ($type:ty, $default_val:expr) => {
         impl Checksummable for $type {
             fn update_checksum(&self, checksum: &mut wrt_foundation::traits::Checksum) {
-                0u32.update_checksum(checksum);
+                0u32.update_checksum(checksum;
             }
         }
 
@@ -816,5 +770,5 @@ impl Default for GraphNode {
     }
 }
 
-impl_basic_traits!(GraphEdge, GraphEdge::default());
-impl_basic_traits!(GraphNode, GraphNode::default());
+impl_basic_traits!(GraphEdge, GraphEdge::default);
+impl_basic_traits!(GraphNode, GraphNode::default);
