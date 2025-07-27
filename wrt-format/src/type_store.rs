@@ -37,18 +37,14 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> TypeStore<P> {
         // Check if we already have this type
         for (index, stored_type) in self.types.iter().enumerate() {
             if stored_type == val_type {
-                return Ok(ValTypeRef(index as u32));
+                return Ok(ValTypeRef(index as u32;
             }
         }
         
         // Add new type
         let index = self.types.len() as u32;
         self.types.push(val_type).map_err(|_| {
-            Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_ERROR,
-                "Type store capacity exceeded"
-            )
+            Error::memory_error("Type store capacity exceeded")
         })?;
         Ok(ValTypeRef(index))
     }
@@ -85,7 +81,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> TypeStore<P> {
     
     /// Clear all stored types
     pub fn clear(&mut self) {
-        let _ = self.types.clear();
+        let _ = self.types.clear);
     }
 }
 
@@ -150,7 +146,7 @@ mod tests {
     
     #[test]
     fn test_type_store_basic() {
-        let provider = DefaultMemoryProvider::default();
+        let provider = DefaultMemoryProvider::default());
         let mut store = TypeStore::new(provider.clone()).unwrap();
         
         // Store a simple type
@@ -159,26 +155,26 @@ mod tests {
         
         // Should get the same reference for the same type
         let i32_ref2 = store.intern(i32_type.clone()).unwrap();
-        assert_eq!(i32_ref.0, i32_ref2.0);
+        assert_eq!(i32_ref.0, i32_ref2.0;
         
         // Should be able to retrieve it
         let retrieved = store.get(i32_ref).unwrap();
-        assert_eq!(retrieved, &i32_type);
+        assert_eq!(retrieved, &i32_type;
     }
     
     #[test]
     fn test_type_builder() {
-        let provider = DefaultMemoryProvider::default();
+        let provider = DefaultMemoryProvider::default());
         let mut store = TypeStore::new(provider.clone()).unwrap();
-        let mut builder = TypeBuilder::new(&mut store, provider);
+        let mut builder = TypeBuilder::new(&mut store, provider;
         
         // Build a list of i32
         let list_type = builder.list(ValType::S32).unwrap();
         if let ValType::List(elem_ref) = &list_type {
             let elem_type = store.get(*elem_ref).unwrap();
-            assert_eq!(elem_type, &ValType::S32);
+            assert_eq!(elem_type, &ValType::S32;
         } else {
-            panic!("Expected List type");
+            panic!("Expected List type";
         }
     }
 }

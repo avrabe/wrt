@@ -22,11 +22,11 @@ const MODULE_BYTES: &[u8] = &[
 #[no_mangle]
 pub extern "C" fn minimal_debug_usage() -> bool {
     // Create debug info parser - this always works
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
 
     // Register sections - this always works
-    debug_info.add_section(".debug_line", 0x1000, 0x500);
-    debug_info.add_section(".debug_info", 0x1500, 0x800);
+    debug_info.add_section(".debug_line", 0x1000, 0x500;
+    debug_info.add_section(".debug_info", 0x1500, 0x800;
 
     // Check if debug info is available - this always works
     debug_info.has_debug_info()
@@ -35,8 +35,8 @@ pub extern "C" fn minimal_debug_usage() -> bool {
 /// Example showing conditional compilation based on features
 #[no_mangle]
 pub extern "C" fn conditional_debug_features() -> u32 {
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
-    debug_info.add_section(".debug_line", 0x1000, 0x500);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
+    debug_info.add_section(".debug_line", 0x1000, 0x500;
 
     let mut feature_count = 0;
 

@@ -146,7 +146,10 @@ pub fn validate_checksum(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{traits::importance, verification::{VerificationLevel, Checksum}};
+    use crate::{
+        traits::importance,
+        verification::{Checksum, VerificationLevel},
+    };
     // For BoundedVec tests
     #[cfg(feature = "std")]
     use crate::safe_memory::StdProvider;
@@ -159,8 +162,8 @@ mod tests {
         assert!(!should_validate(VerificationLevel::Off, importance::CRITICAL));
 
         // Full level should always validate
-        assert!(should_validate(VerificationLevel::Full, importance::READ));
-        assert!(should_validate(VerificationLevel::Full, 1)); // Even low importance
+        assert!(should_validate(VerificationLevel::Full, importance::READ);
+        assert!(should_validate(VerificationLevel::Full, 1))); // Even low importance
 
         // Assertions for VerificationLevel::Sampling with importance::READ are
         // removed as they are flaky due to the shared atomic counter in
@@ -180,8 +183,8 @@ mod tests {
     fn test_should_validate_redundant() {
         // Only Full level should do redundant validation
         assert!(!should_validate_redundant(VerificationLevel::Off)); // None -> Off
-        assert!(!should_validate_redundant(VerificationLevel::Sampling));
-        assert!(!should_validate_redundant(VerificationLevel::Basic)); // Standard -> Basic (as an example of not Full)
+        assert!(!should_validate_redundant(VerificationLevel::Sampling);
+        assert!(!should_validate_redundant(VerificationLevel::Basic))); // Standard -> Basic (as an example of not Full)
         assert!(should_validate_redundant(VerificationLevel::Full));
     }
 
@@ -200,10 +203,10 @@ mod tests {
 
         // Calculate manually to verify
         let mut expected = Checksum::new();
-        expected.update_slice("key1".as_bytes());
-        expected.update_slice("value1".as_bytes());
-        expected.update_slice("key2".as_bytes());
-        expected.update_slice("value2".as_bytes());
+        expected.update_slice("key1".as_bytes);
+        expected.update_slice("value1".as_bytes);
+        expected.update_slice("key2".as_bytes);
+        expected.update_slice("value2".as_bytes);
 
         assert_eq!(checksum, expected);
     }
@@ -227,7 +230,8 @@ mod tests {
                 assert_eq!(expected, checksum1);
                 assert_eq!(actual, checksum2);
                 assert_eq!(description, "test_diff");
-            } // _ => panic!("Unexpected error type"), // Not needed if only one variant
+            }
+            Ok(_) => panic!("Expected error but got Ok"),
         }
     }
 }

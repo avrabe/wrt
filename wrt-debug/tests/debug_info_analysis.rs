@@ -97,21 +97,28 @@ mod debug_info_analysis {
 
         // Test our cursor implementation
         let cursor_data = &MOCK_DEBUG_LINE[0..8];
-        let unit_length =
-            u32::from_le_bytes([cursor_data[0], cursor_data[1], cursor_data[2], cursor_data[3]]);
-        let version = u16::from_le_bytes([cursor_data[4], cursor_data[5]]);
+        let unit_length = u32::from_le_bytes([
+            cursor_data[0],
+            cursor_data[1],
+            cursor_data[2],
+            cursor_data[3],
+        ];
+        let version = u16::from_le_bytes([cursor_data[4], cursor_data[5]];
 
-        println!("✓ Raw DWARF parsing: unit_length={}, version={}", unit_length, version);
+        println!(
+            "✓ Raw DWARF parsing: unit_length={}, version={}",
+            unit_length, version
+        ;
 
         // Analyze what information we can extract
-        analyze_line_numbers();
-        analyze_function_info();
-        analyze_string_data();
-        analyze_type_information();
-        analyze_variable_information();
+        analyze_line_numbers);
+        analyze_function_info);
+        analyze_string_data);
+        analyze_type_information);
+        analyze_variable_information);
 
         println!("\n=== Summary ===");
-        print_capabilities_summary();
+        print_capabilities_summary);
     }
 
     fn analyze_line_numbers() {
@@ -127,7 +134,7 @@ mod debug_info_analysis {
             MOCK_DEBUG_LINE[7],
             MOCK_DEBUG_LINE[8],
             MOCK_DEBUG_LINE[9],
-        ]);
+        ];
         println!("  Header length: {} bytes", header_length);
 
         let min_instr_length = MOCK_DEBUG_LINE[10];
@@ -151,14 +158,14 @@ mod debug_info_analysis {
             MOCK_DEBUG_INFO[1],
             MOCK_DEBUG_INFO[2],
             MOCK_DEBUG_INFO[3],
-        ]);
-        let version = u16::from_le_bytes([MOCK_DEBUG_INFO[4], MOCK_DEBUG_INFO[5]]);
+        ];
+        let version = u16::from_le_bytes([MOCK_DEBUG_INFO[4], MOCK_DEBUG_INFO[5]];
         let addr_size = MOCK_DEBUG_INFO[11];
 
         println!(
             "  Compilation unit: {} bytes, version {}, {}-byte addresses",
             unit_length, version, addr_size
-        );
+        ;
     }
 
     fn analyze_string_data() {
@@ -168,8 +175,8 @@ mod debug_info_analysis {
         println!("✓ Can provide string references with lifetime bounds");
 
         // Demonstrate string extraction
-        let str_at_7 = extract_null_terminated_str(&MOCK_DEBUG_STR[7..]);
-        let str_at_15 = extract_null_terminated_str(&MOCK_DEBUG_STR[15..]);
+        let str_at_7 = extract_null_terminated_str(&MOCK_DEBUG_STR[7..];
+        let str_at_15 = extract_null_terminated_str(&MOCK_DEBUG_STR[15..];
 
         println!("  String at offset 7: {:?}", str_at_7);
         println!("  String at offset 15: {:?}", str_at_15);
@@ -224,7 +231,7 @@ mod debug_info_analysis {
 
     // Helper function to extract null-terminated strings
     fn extract_null_terminated_str(data: &[u8]) -> &str {
-        let end = data.iter().position(|&b| b == 0).unwrap_or(data.len());
+        let end = data.iter().position(|&b| b == 0).unwrap_or(data.len);
         core::str::from_utf8(&data[..end]).unwrap_or("<invalid utf8>")
     }
 

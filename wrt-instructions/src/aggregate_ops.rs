@@ -12,7 +12,7 @@
 //! These operations support the WebAssembly 3.0 GC proposal
 //! and work across std, `no_std+alloc`, and pure `no_std` environments.
 
-use crate::prelude::{BoundedCapacity, Debug, Eq, PartialEq, PureInstruction};
+use crate::prelude::{Debug, Eq, PartialEq};
 use wrt_error::{Error, Result};
 use wrt_foundation::{
     types::{ValueType},
@@ -69,7 +69,7 @@ impl StructGet {
             Value::StructRef(Some(struct_ref)) => {
                 // Verify type index matches
                 if struct_ref.type_index != self.type_index {
-                    return Err(Error::type_error("Struct type index mismatch"));
+                    return Err(Error::type_error("Struct type index mismatch";
                 }
                 
                 // Get the field value
@@ -106,7 +106,7 @@ impl StructSet {
             Value::StructRef(Some(mut struct_ref)) => {
                 // Verify type index matches
                 if struct_ref.type_index != self.type_index {
-                    return Err(Error::type_error("Struct type index mismatch"));
+                    return Err(Error::type_error("Struct type index mismatch";
                 }
                 
                 // Set the field value
@@ -170,7 +170,7 @@ impl ArrayGet {
             Value::ArrayRef(Some(array_ref)) => {
                 // Verify type index matches
                 if array_ref.type_index != self.type_index {
-                    return Err(Error::type_error("Array type index mismatch"));
+                    return Err(Error::type_error("Array type index mismatch";
                 }
                 
                 // Get the element value
@@ -205,7 +205,7 @@ impl ArraySet {
             Value::ArrayRef(Some(mut array_ref)) => {
                 // Verify type index matches
                 if array_ref.type_index != self.type_index {
-                    return Err(Error::type_error("Array type index mismatch"));
+                    return Err(Error::type_error("Array type index mismatch";
                 }
                 
                 // Set the element value
@@ -242,7 +242,7 @@ impl ArrayLen {
             Value::ArrayRef(Some(array_ref)) => {
                 // Verify type index matches
                 if array_ref.type_index != self.type_index {
-                    return Err(Error::type_error("Array type index mismatch"));
+                    return Err(Error::type_error("Array type index mismatch";
                 }
                 
                 // Return the array length as i32
@@ -307,7 +307,7 @@ impl AggregateOp {
             }
             AggregateOp::StructGet(op) => {
                 if operands.is_empty() {
-                    return Err(Error::runtime_error("struct.get requires one operand"));
+                    return Err(Error::runtime_error("struct.get requires one operand";
                 }
                 // Validate struct type exists
                 context.validate_struct_type(op.type_index)?;
@@ -315,7 +315,7 @@ impl AggregateOp {
             }
             AggregateOp::StructSet(op) => {
                 if operands.len() < 2 {
-                    return Err(Error::runtime_error("struct.set requires two operands"));
+                    return Err(Error::runtime_error("struct.set requires two operands";
                 }
                 // Validate struct type exists
                 context.validate_struct_type(op.type_index)?;
@@ -323,7 +323,7 @@ impl AggregateOp {
             }
             AggregateOp::ArrayNew(op) => {
                 if operands.len() < 2 {
-                    return Err(Error::runtime_error("array.new requires two operands (size, init_value)"));
+                    return Err(Error::runtime_error("array.new requires two operands (size, init_value)";
                 }
                 // Validate array type exists
                 context.validate_array_type(op.type_index)?;
@@ -338,7 +338,7 @@ impl AggregateOp {
             }
             AggregateOp::ArrayGet(op) => {
                 if operands.len() < 2 {
-                    return Err(Error::runtime_error("array.get requires two operands"));
+                    return Err(Error::runtime_error("array.get requires two operands";
                 }
                 // Validate array type exists
                 context.validate_array_type(op.type_index)?;
@@ -352,7 +352,7 @@ impl AggregateOp {
             }
             AggregateOp::ArraySet(op) => {
                 if operands.len() < 3 {
-                    return Err(Error::runtime_error("array.set requires three operands"));
+                    return Err(Error::runtime_error("array.set requires three operands";
                 }
                 // Validate array type exists
                 context.validate_array_type(op.type_index)?;
@@ -366,7 +366,7 @@ impl AggregateOp {
             }
             AggregateOp::ArrayLen(op) => {
                 if operands.is_empty() {
-                    return Err(Error::runtime_error("array.len requires one operand"));
+                    return Err(Error::runtime_error("array.len requires one operand";
                 }
                 // Validate array type exists
                 context.validate_array_type(op.type_index)?;
@@ -399,10 +399,10 @@ impl Validate for StructGet {
                     ctx.push_type(ValueType::I32)?;
                 }
                 ValueType::StructRef(_) => {
-                    return Err(Error::type_error("struct.get type index mismatch"));
+                    return Err(Error::type_error("struct.get type index mismatch";
                 }
                 _ => {
-                    return Err(Error::type_error("struct.get expects struct reference"));
+                    return Err(Error::type_error("struct.get expects struct reference";
                 }
             }
         }
@@ -421,10 +421,10 @@ impl Validate for StructSet {
                     // struct.set doesn't push anything to the stack
                 }
                 ValueType::StructRef(_) => {
-                    return Err(Error::type_error("struct.set type index mismatch"));
+                    return Err(Error::type_error("struct.set type index mismatch";
                 }
                 _ => {
-                    return Err(Error::type_error("struct.set expects struct reference"));
+                    return Err(Error::type_error("struct.set expects struct reference";
                 }
             }
         }
@@ -443,7 +443,7 @@ impl Validate for ArrayNew {
                     ctx.push_type(ValueType::ArrayRef(self.type_index))?;
                 }
                 _ => {
-                    return Err(Error::type_error("array.new expects i32 size"));
+                    return Err(Error::type_error("array.new expects i32 size";
                 }
             }
         }
@@ -464,10 +464,10 @@ impl Validate for ArrayGet {
                     ctx.push_type(ValueType::I32)?;
                 }
                 (ValueType::ArrayRef(_), ValueType::I32) => {
-                    return Err(Error::type_error("array.get type index mismatch"));
+                    return Err(Error::type_error("array.get type index mismatch";
                 }
                 _ => {
-                    return Err(Error::type_error("array.get expects array reference and i32 index"));
+                    return Err(Error::type_error("array.get expects array reference and i32 index";
                 }
             }
         }
@@ -487,10 +487,10 @@ impl Validate for ArraySet {
                     // array.set doesn't push anything to the stack
                 }
                 (ValueType::ArrayRef(_), ValueType::I32) => {
-                    return Err(Error::type_error("array.set type index mismatch"));
+                    return Err(Error::type_error("array.set type index mismatch";
                 }
                 _ => {
-                    return Err(Error::type_error("array.set expects array reference and i32 index"));
+                    return Err(Error::type_error("array.set expects array reference and i32 index";
                 }
             }
         }
@@ -508,10 +508,10 @@ impl Validate for ArrayLen {
                     ctx.push_type(ValueType::I32)?;
                 }
                 ValueType::ArrayRef(_) => {
-                    return Err(Error::type_error("array.len type index mismatch"));
+                    return Err(Error::type_error("array.len type index mismatch";
                 }
                 _ => {
-                    return Err(Error::type_error("array.len expects array reference"));
+                    return Err(Error::type_error("array.len expects array reference";
                 }
             }
         }
@@ -578,15 +578,15 @@ mod tests {
 
     #[test]
     fn test_struct_new() {
-        let op = StructNew::new(1);
+        let op = StructNew::new(1;
         let field_values = vec![Value::I32(42), Value::I64(123)];
         let result = op.execute(&field_values).unwrap();
         
         match result {
             Value::StructRef(Some(struct_ref)) => {
                 assert_eq!(struct_ref.type_index, 1);
-                assert_eq!(struct_ref.get_field(0).unwrap(), Value::I32(42));
-                assert_eq!(struct_ref.get_field(1).unwrap(), Value::I64(123));
+                assert_eq!(struct_ref.get_field(0).unwrap(), Value::I32(42;
+                assert_eq!(struct_ref.get_field(1).unwrap(), Value::I64(123;
             }
             _ => panic!("Expected struct reference"),
         }
@@ -599,17 +599,17 @@ mod tests {
         // Create a struct to test with
         let mut struct_ref = StructRef::new(1, DefaultMemoryProvider::default()).unwrap();
         struct_ref.add_field(Value::I32(42)).unwrap();
-        let struct_value = Value::StructRef(Some(struct_ref));
+        let struct_value = Value::StructRef(Some(struct_ref;
         
         let result = op.execute(struct_value).unwrap();
-        assert_eq!(result, Value::I32(42));
+        assert_eq!(result, Value::I32(42;
     }
 
     #[test]
     fn test_struct_get_null() {
         let op = StructGet::new(1, 0);
-        let result = op.execute(Value::StructRef(None));
-        assert!(result.is_err());
+        let result = op.execute(Value::StructRef(None;
+        assert!(result.is_err();
     }
 
     #[test]
@@ -619,13 +619,13 @@ mod tests {
         // Create a struct to test with
         let mut struct_ref = StructRef::new(1, DefaultMemoryProvider::default()).unwrap();
         struct_ref.add_field(Value::I32(42)).unwrap();
-        let struct_value = Value::StructRef(Some(struct_ref));
+        let struct_value = Value::StructRef(Some(struct_ref;
         
         let result = op.execute(struct_value, Value::I32(100)).unwrap();
         
         match result {
             Value::StructRef(Some(struct_ref)) => {
-                assert_eq!(struct_ref.get_field(0).unwrap(), Value::I32(100));
+                assert_eq!(struct_ref.get_field(0).unwrap(), Value::I32(100;
             }
             _ => panic!("Expected struct reference"),
         }
@@ -633,16 +633,16 @@ mod tests {
 
     #[test]
     fn test_array_new() {
-        let op = ArrayNew::new(2);
+        let op = ArrayNew::new(2;
         let result = op.execute(3, Value::I32(42)).unwrap();
         
         match result {
             Value::ArrayRef(Some(array_ref)) => {
-                assert_eq!(array_ref.type_index, 2);
-                assert_eq!(array_ref.len(), 3);
-                assert_eq!(array_ref.get(0).unwrap(), Value::I32(42));
-                assert_eq!(array_ref.get(1).unwrap(), Value::I32(42));
-                assert_eq!(array_ref.get(2).unwrap(), Value::I32(42));
+                assert_eq!(array_ref.type_index, 2;
+                assert_eq!(array_ref.len(), 3;
+                assert_eq!(array_ref.get(0).unwrap(), Value::I32(42;
+                assert_eq!(array_ref.get(1).unwrap(), Value::I32(42;
+                assert_eq!(array_ref.get(2).unwrap(), Value::I32(42;
             }
             _ => panic!("Expected array reference"),
         }
@@ -650,29 +650,29 @@ mod tests {
 
     #[test]
     fn test_array_get() {
-        let op = ArrayGet::new(2);
+        let op = ArrayGet::new(2;
         
         // Create an array to test with
         let array_ref = ArrayRef::with_size(2, 2, Value::I32(42), DefaultMemoryProvider::default()).unwrap();
-        let array_value = Value::ArrayRef(Some(array_ref));
+        let array_value = Value::ArrayRef(Some(array_ref;
         
         let result = op.execute(array_value, 1).unwrap();
-        assert_eq!(result, Value::I32(42));
+        assert_eq!(result, Value::I32(42;
     }
 
     #[test]
     fn test_array_set() {
-        let op = ArraySet::new(2);
+        let op = ArraySet::new(2;
         
         // Create an array to test with
         let array_ref = ArrayRef::with_size(2, 2, Value::I32(42), DefaultMemoryProvider::default()).unwrap();
-        let array_value = Value::ArrayRef(Some(array_ref));
+        let array_value = Value::ArrayRef(Some(array_ref;
         
         let result = op.execute(array_value, 1, Value::I32(100)).unwrap();
         
         match result {
             Value::ArrayRef(Some(array_ref)) => {
-                assert_eq!(array_ref.get(1).unwrap(), Value::I32(100));
+                assert_eq!(array_ref.get(1).unwrap(), Value::I32(100;
             }
             _ => panic!("Expected array reference"),
         }
@@ -680,14 +680,14 @@ mod tests {
 
     #[test]
     fn test_array_len() {
-        let op = ArrayLen::new(2);
+        let op = ArrayLen::new(2;
         
         // Create an array to test with
         let array_ref = ArrayRef::with_size(2, 5, Value::I32(42), DefaultMemoryProvider::default()).unwrap();
-        let array_value = Value::ArrayRef(Some(array_ref));
+        let array_value = Value::ArrayRef(Some(array_ref;
         
         let result = op.execute(array_value).unwrap();
-        assert_eq!(result, Value::I32(5));
+        assert_eq!(result, Value::I32(5;
     }
 
     #[test]
@@ -695,18 +695,18 @@ mod tests {
         let context = MockAggregateContext;
 
         // Test StructNew
-        let struct_new_op = AggregateOp::StructNew(StructNew::new(1));
+        let struct_new_op = AggregateOp::StructNew(StructNew::new(1;
         let result = struct_new_op.execute(&context, &[Value::I32(42)]).unwrap();
-        assert!(matches!(result, Value::StructRef(Some(_))));
+        assert!(matches!(result, Value::StructRef(Some(_)));
 
         // Test ArrayNew
-        let array_new_op = AggregateOp::ArrayNew(ArrayNew::new(2));
+        let array_new_op = AggregateOp::ArrayNew(ArrayNew::new(2;
         let result = array_new_op.execute(&context, &[Value::I32(3), Value::I32(42)]).unwrap();
-        assert!(matches!(result, Value::ArrayRef(Some(_))));
+        assert!(matches!(result, Value::ArrayRef(Some(_)));
 
         // Test invalid type index
-        let invalid_struct_op = AggregateOp::StructNew(StructNew::new(15));
-        let result = invalid_struct_op.execute(&context, &[]);
-        assert!(result.is_err());
+        let invalid_struct_op = AggregateOp::StructNew(StructNew::new(15;
+        let result = invalid_struct_op.execute(&context, &[];
+        assert!(result.is_err();
     }
 }

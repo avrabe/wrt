@@ -45,11 +45,7 @@ impl<T: ParametricContext> PureInstruction<T, Error> for ParametricOp {
             Self::Select => {
                 // Pop condition
                 let condition = context.pop_value()?.into_i32().map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::TYPE_MISMATCH,
-                        "Select condition must be i32",
-                    )
+                    Error::type_error("Select condition must be i32")
                 })?;
                 
                 // Pop val2 (second option)
@@ -60,11 +56,7 @@ impl<T: ParametricContext> PureInstruction<T, Error> for ParametricOp {
                 
                 // Type check - both values must have the same type
                 if core::mem::discriminant(&val1) != core::mem::discriminant(&val2) {
-                    return Err(Error::new(
-                        ErrorCategory::Type,
-                        codes::TYPE_MISMATCH,
-                        "Select operands must have the same type",
-                    ));
+                    return Err(Error::type_error("Select operands must have the same type";
                 }
                 
                 // Push selected value
@@ -73,11 +65,7 @@ impl<T: ParametricContext> PureInstruction<T, Error> for ParametricOp {
             Self::SelectTyped(expected_type) => {
                 // Pop condition
                 let condition = context.pop_value()?.into_i32().map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Type,
-                        codes::TYPE_MISMATCH,
-                        "Select condition must be i32",
-                    )
+                    Error::type_error("Select condition must be i32")
                 })?;
                 
                 // Pop val2 (second option)
@@ -87,15 +75,11 @@ impl<T: ParametricContext> PureInstruction<T, Error> for ParametricOp {
                 let val1 = context.pop_value()?;
                 
                 // Type check against expected type
-                let val1_type = val1.value_type();
-                let val2_type = val2.value_type();
+                let val1_type = val1.value_type);
+                let val2_type = val2.value_type);
                 
                 if val1_type != *expected_type || val2_type != *expected_type {
-                    return Err(Error::new(
-                        ErrorCategory::Type,
-                        codes::TYPE_MISMATCH,
-                        "Select operands must match expected type",
-                    ));
+                    return Err(Error::type_error("Select operands must match expected type";
                 }
                 
                 // Push selected value
@@ -135,21 +119,13 @@ mod tests {
         
         fn pop_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    codes::STACK_UNDERFLOW,
-                    "Stack underflow",
-                )
+                Error::runtime_stack_underflow("Stack underflow")
             })
         }
         
         fn peek_value(&self) -> Result<&Value> {
             self.stack.last().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    codes::STACK_UNDERFLOW,
-                    "Stack underflow",
-                )
+                Error::runtime_stack_underflow("Stack underflow")
             })
         }
     }
@@ -167,8 +143,8 @@ mod tests {
         assert_eq!(context.stack.len(), 0);
         
         // Test drop on empty stack
-        let result = ParametricOp::Drop.execute(&mut context);
-        assert!(result.is_err());
+        let result = ParametricOp::Drop.execute(&mut context;
+        assert!(result.is_err();
     }
     
     #[test]
@@ -176,28 +152,28 @@ mod tests {
         let mut context = MockParametricContext::new();
         
         // Test selecting first value (condition true)
-        context.push_value(Value::I32(10)).unwrap(); // val1
-        context.push_value(Value::I32(20)).unwrap(); // val2
-        context.push_value(Value::I32(1)).unwrap();  // condition (true)
+        context.push_value(Value::I32(10)).unwrap()); // val1
+        context.push_value(Value::I32(20)).unwrap()); // val2
+        context.push_value(Value::I32(1)).unwrap());  // condition (true)
         
         ParametricOp::Select.execute(&mut context).unwrap();
-        assert_eq!(context.pop_value().unwrap(), Value::I32(10));
+        assert_eq!(context.pop_value().unwrap(), Value::I32(10;
         
         // Test selecting second value (condition false)
-        context.push_value(Value::I32(10)).unwrap(); // val1
-        context.push_value(Value::I32(20)).unwrap(); // val2
-        context.push_value(Value::I32(0)).unwrap();  // condition (false)
+        context.push_value(Value::I32(10)).unwrap()); // val1
+        context.push_value(Value::I32(20)).unwrap()); // val2
+        context.push_value(Value::I32(0)).unwrap());  // condition (false)
         
         ParametricOp::Select.execute(&mut context).unwrap();
-        assert_eq!(context.pop_value().unwrap(), Value::I32(20));
+        assert_eq!(context.pop_value().unwrap(), Value::I32(20;
         
         // Test with different types
-        context.push_value(Value::F32(FloatBits32::from_float(1.0))).unwrap(); // val1
-        context.push_value(Value::F32(FloatBits32::from_float(2.0))).unwrap(); // val2
-        context.push_value(Value::I32(1)).unwrap();   // condition
+        context.push_value(Value::F32(FloatBits32::from_float(1.0))).unwrap()); // val1
+        context.push_value(Value::F32(FloatBits32::from_float(2.0))).unwrap()); // val2
+        context.push_value(Value::I32(1)).unwrap());   // condition
         
         ParametricOp::Select.execute(&mut context).unwrap();
-        assert_eq!(context.pop_value().unwrap(), Value::F32(FloatBits32::from_float(1.0)));
+        assert_eq!(context.pop_value().unwrap(), Value::F32(FloatBits32::from_float(1.0);
     }
     
     #[test]
@@ -205,12 +181,12 @@ mod tests {
         let mut context = MockParametricContext::new();
         
         // Push values of different types
-        context.push_value(Value::I32(10)).unwrap();  // val1
-        context.push_value(Value::F32(FloatBits32::from_float(2.0))).unwrap(); // val2 (different type)
-        context.push_value(Value::I32(1)).unwrap();   // condition
+        context.push_value(Value::I32(10)).unwrap());  // val1
+        context.push_value(Value::F32(FloatBits32::from_float(2.0))).unwrap()); // val2 (different type)
+        context.push_value(Value::I32(1)).unwrap());   // condition
         
-        let result = ParametricOp::Select.execute(&mut context);
-        assert!(result.is_err());
+        let result = ParametricOp::Select.execute(&mut context;
+        assert!(result.is_err();
     }
     
     #[test]
@@ -218,19 +194,19 @@ mod tests {
         let mut context = MockParametricContext::new();
         
         // Test with correct types
-        context.push_value(Value::I64(100)).unwrap(); // val1
-        context.push_value(Value::I64(200)).unwrap(); // val2
-        context.push_value(Value::I32(0)).unwrap();   // condition
+        context.push_value(Value::I64(100)).unwrap()); // val1
+        context.push_value(Value::I64(200)).unwrap()); // val2
+        context.push_value(Value::I32(0)).unwrap());   // condition
         
         ParametricOp::SelectTyped(ValueType::I64).execute(&mut context).unwrap();
-        assert_eq!(context.pop_value().unwrap(), Value::I64(200));
+        assert_eq!(context.pop_value().unwrap(), Value::I64(200;
         
         // Test with incorrect types
-        context.push_value(Value::I32(10)).unwrap(); // val1 (wrong type)
-        context.push_value(Value::I32(20)).unwrap(); // val2 (wrong type)
-        context.push_value(Value::I32(1)).unwrap();  // condition
+        context.push_value(Value::I32(10)).unwrap()); // val1 (wrong type)
+        context.push_value(Value::I32(20)).unwrap()); // val2 (wrong type)
+        context.push_value(Value::I32(1)).unwrap());  // condition
         
-        let result = ParametricOp::SelectTyped(ValueType::I64).execute(&mut context);
-        assert!(result.is_err());
+        let result = ParametricOp::SelectTyped(ValueType::I64).execute(&mut context;
+        assert!(result.is_err();
     }
 }

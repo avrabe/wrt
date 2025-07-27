@@ -18,7 +18,10 @@ extern crate alloc;
 use alloc::{vec, boxed::Box};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedVec as Vec, safe_memory::NoStdProvider};
+use wrt_foundation::{
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
@@ -26,7 +29,10 @@ use wrt_foundation::{
 };
 
 use crate::async_::async_types::{AsyncReadResult, Future as ComponentFuture, FutureHandle, FutureState, Stream, StreamHandle, StreamState};
+#[cfg(feature = "component-model-threading")]
 use crate::threading::task_manager::{Task, TaskContext, TaskId, TaskState};
+#[cfg(not(feature = "component-model-threading"))]
+use crate::types::TaskId;
 use crate::types::{ValType, Value};
 use wrt_error::Result as WrtResult;
 
@@ -45,13 +51,13 @@ pub struct AsyncExecutionEngine {
     #[cfg(feature = "std")]
     executions: Vec<AsyncExecution>,
     #[cfg(not(any(feature = "std", )))]
-    executions: BoundedVec<AsyncExecution, MAX_CONCURRENT_EXECUTIONS, NoStdProvider<65536>>,
+    executions: BoundedVec<AsyncExecution, MAX_CONCURRENT_EXECUTIONS, crate::bounded_component_infra::ComponentProvider>,
     
     /// Execution context pool for reuse
     #[cfg(feature = "std")]
     context_pool: Vec<ExecutionContext>,
     #[cfg(not(any(feature = "std", )))]
-    context_pool: BoundedVec<ExecutionContext, 16, NoStdProvider<65536>>,
+    context_pool: BoundedVec<ExecutionContext, 16, crate::bounded_component_infra::ComponentProvider>,
     
     /// Next execution ID
     next_execution_id: u64,
@@ -88,7 +94,7 @@ pub struct AsyncExecution {
     #[cfg(feature = "std")]
     pub children: Vec<ExecutionId>,
     #[cfg(not(any(feature = "std", )))]
-    pub children: BoundedVec<ExecutionId, 16, NoStdProvider<65536>>,
+    pub children: BoundedVec<ExecutionId, 16, crate::bounded_component_infra::ComponentProvider>,
 }
 
 /// Execution context for async operations
@@ -98,19 +104,19 @@ pub struct ExecutionContext {
     pub component_instance: u32,
     
     /// Current function being executed
-    pub function_name: BoundedString<128, NoStdProvider<65536>>,
+    pub function_name: BoundedString<128>,
     
     /// Call stack
     #[cfg(feature = "std")]
     pub call_stack: Vec<CallFrame>,
     #[cfg(not(any(feature = "std", )))]
-    pub call_stack: BoundedVec<CallFrame, MAX_ASYNC_CALL_DEPTH, NoStdProvider<65536>>,
+    pub call_stack: BoundedVec<CallFrame, MAX_ASYNC_CALL_DEPTH, crate::bounded_component_infra::ComponentProvider>,
     
     /// Local variables
     #[cfg(feature = "std")]
     pub locals: Vec<Value>,
     #[cfg(not(any(feature = "std", )))]
-    pub locals: BoundedVec<Value, 256, NoStdProvider<65536>>,
+    pub locals: BoundedVec<Value, 256, crate::bounded_component_infra::ComponentProvider>,
     
     /// Memory views for the execution
     pub memory_views: MemoryViews,
@@ -120,7 +126,7 @@ pub struct ExecutionContext {
 #[derive(Debug, Clone)]
 pub struct CallFrame {
     /// Function name
-    pub function: BoundedString<128, NoStdProvider<65536>>,
+    pub function: BoundedString<128>,
     
     /// Return address (instruction pointer)
     pub return_ip: usize,
@@ -155,13 +161,13 @@ pub struct WaitSet {
     #[cfg(feature = "std")]
     pub futures: Vec<FutureHandle>,
     #[cfg(not(any(feature = "std", )))]
-    pub futures: BoundedVec<FutureHandle, 16, NoStdProvider<65536>>,
+    pub futures: BoundedVec<FutureHandle, 16, crate::bounded_component_infra::ComponentProvider>,
     
     /// Streams to wait for
     #[cfg(feature = "std")]
     pub streams: Vec<StreamHandle>,
     #[cfg(not(any(feature = "std", )))]
-    pub streams: BoundedVec<StreamHandle, 16, NoStdProvider<65536>>,
+    pub streams: BoundedVec<StreamHandle, 16, crate::bounded_component_infra::ComponentProvider>,
 }
 
 /// Memory views for async execution
@@ -236,8 +242,8 @@ pub enum AsyncExecutionState {
 pub enum AsyncExecutionOperation {
     /// Calling an async function
     FunctionCall {
-        name: BoundedString<128, NoStdProvider<65536>>,
-        args: Vec<Value>,
+        name: BoundedString<128>,
+        args: ComponentVec<Value>,
     },
     
     /// Reading from a stream
@@ -249,7 +255,7 @@ pub enum AsyncExecutionOperation {
     /// Writing to a stream
     StreamWrite {
         handle: StreamHandle,
-        data: Vec<u8>,
+        data: ComponentVec<u8>,
     },
     
     /// Getting a future value
@@ -270,8 +276,8 @@ pub enum AsyncExecutionOperation {
     
     /// Creating a subtask
     SpawnSubtask {
-        function: BoundedString<128, NoStdProvider<65536>>,
-        args: Vec<Value>,
+        function: BoundedString<128>,
+        args: ComponentVec<Value>,
     },
 }
 
@@ -279,7 +285,7 @@ pub enum AsyncExecutionOperation {
 #[derive(Debug, Clone)]
 pub struct ExecutionResult {
     /// Returned values
-    pub values: Vec<Value>,
+    pub values: ComponentVec<Value>,
     
     /// Execution time in microseconds
     pub execution_time_us: u64,
@@ -318,7 +324,7 @@ pub struct ExecutionStats {
 
 /// Execution ID type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ExecutionId(pub u64);
+pub struct ExecutionId(pub u64;
 
 /// Async execution future for Rust integration
 pub struct AsyncExecutionFuture {
@@ -331,21 +337,27 @@ pub struct AsyncExecutionFuture {
 
 impl AsyncExecutionEngine {
     /// Create new async execution engine
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             executions: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            executions: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            executions: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| Error::runtime_execution_error("Failed to create executions vector"))?
+            },
             
             #[cfg(feature = "std")]
             context_pool: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            context_pool: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            context_pool: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| Error::runtime_execution_error("Failed to create context pool"))?
+            },
             
             next_execution_id: 1,
             stats: ExecutionStats::new(),
-        }
+        })
     }
     
     /// Start a new async execution
@@ -355,7 +367,7 @@ impl AsyncExecutionEngine {
         operation: AsyncExecutionOperation,
         parent: Option<ExecutionId>,
     ) -> Result<ExecutionId> {
-        let execution_id = ExecutionId(self.next_execution_id);
+        let execution_id = ExecutionId(self.next_execution_id;
         self.next_execution_id += 1;
         
         // Get or create execution context
@@ -372,15 +384,14 @@ impl AsyncExecutionEngine {
             #[cfg(feature = "std")]
             children: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            children: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            children: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| Error::runtime_execution_error("Failed to create children vector"))?
+            },
         };
         
         self.executions.push(execution).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many concurrent executions"
-            )
+            Error::runtime_execution_error("Failed to push execution to executions vector")
         })?;
         
         self.stats.executions_started += 1;
@@ -472,7 +483,7 @@ impl AsyncExecutionEngine {
         
         // Cancel all children first
         for child_id in children {
-            let _ = self.cancel_execution(child_id);
+            let _ = self.cancel_execution(child_id;
         }
         
         // Cancel this execution
@@ -481,7 +492,7 @@ impl AsyncExecutionEngine {
         
         // Return context to pool
         let context = self.executions[execution_index].context.clone();
-        self.return_context_to_pool(context);
+        self.return_context_to_pool(context;
         
         Ok(())
     }
@@ -511,8 +522,7 @@ impl AsyncExecutionEngine {
                 Error::new(
                     ErrorCategory::Runtime,
                     wrt_error::codes::EXECUTION_ERROR,
-                    "Execution not found"
-                )
+                    "Execution not found")
             })
     }
     
@@ -521,11 +531,7 @@ impl AsyncExecutionEngine {
             .iter()
             .find(|e| e.id == execution_id)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::EXECUTION_ERROR,
-                    "Execution not found"
-                )
+                Error::runtime_execution_error("Execution not found")
             })
     }
     
@@ -535,7 +541,7 @@ impl AsyncExecutionEngine {
             if let Some(context) = self.context_pool.pop() {
                 Ok(context)
             } else {
-                Ok(ExecutionContext::new())
+                ExecutionContext::new()
             }
         }
         #[cfg(not(any(feature = "std", )))]
@@ -543,24 +549,20 @@ impl AsyncExecutionEngine {
             if !self.context_pool.is_empty() {
                 Ok(self.context_pool.remove(0))
             } else {
-                Ok(ExecutionContext::new())
+                ExecutionContext::new()
             }
         }
     }
     
     fn return_context_to_pool(&mut self, mut context: ExecutionContext) {
-        context.reset();
+        context.reset);
         let _ = self.context_pool.push(context);
     }
     
     fn register_subtask(&mut self, parent_id: ExecutionId, child_id: ExecutionId) -> Result<()> {
         let parent_index = self.find_execution_index(parent_id)?;
         self.executions[parent_index].children.push(child_id).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many subtasks"
-            )
+            Error::runtime_execution_error("Failed to register subtask")
         })?;
         self.stats.subtasks_spawned += 1;
         Ok(())
@@ -587,19 +589,30 @@ impl AsyncExecutionEngine {
             Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::EXECUTION_ERROR,
-                "Call stack overflow"
-            )
+                "Failed to push call frame")
         })?;
         
         // Simulate execution completing
         let result = ExecutionResult {
-            values: vec![Value::U32(42)], // Placeholder result
+            values: {
+                #[cfg(feature = "std")]
+                {
+                    vec![Value::U32(42)]
+                }
+                #[cfg(not(feature = "std"))]
+                {
+                    let provider = safe_managed_alloc!(1024, CrateId::Component)?;
+                    let mut values = ComponentVec::new(provider)?;
+                    values.push(Value::U32(42)).map_err(|_| Error::runtime_execution_error("Failed to create result values"))?;
+                    values
+                }
+            }, // Placeholder result
             execution_time_us: 100,
             memory_allocated: 0,
             instructions_executed: 1000,
         };
         
-        self.executions[execution_index].result = Some(result);
+        self.executions[execution_index].result = Some(result;
         
         Ok(StepResult::Completed)
     }
@@ -620,11 +633,7 @@ impl AsyncExecutionEngine {
         };
         
         self.executions[execution_index].context.call_stack.push(frame).map_err(|_| {
-            Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::EXECUTION_ERROR,
-                "Call stack overflow"
-            )
+            Error::runtime_execution_error("Failed to push call frame")
         })?;
         
         Ok(StepResult::Waiting)
@@ -639,13 +648,25 @@ impl AsyncExecutionEngine {
         // Write data to stream
         // For now, we simulate immediate completion
         let result = ExecutionResult {
-            values: vec![Value::U32(data.len() as u32)],
+            values: {
+                #[cfg(feature = "std")]
+                {
+                    vec![Value::U32(data.len() as u32)]
+                }
+                #[cfg(not(feature = "std"))]
+                {
+                    let provider = safe_managed_alloc!(1024, CrateId::Component)?;
+                    let mut values = ComponentVec::new(provider)?;
+                    values.push(Value::U32(data.len() as u32)).map_err(|_| Error::runtime_execution_error("Failed to create result values"))?;
+                    values
+                }
+            },
             execution_time_us: 50,
             memory_allocated: 0,
             instructions_executed: 100,
         };
         
-        self.executions[execution_index].result = Some(result);
+        self.executions[execution_index].result = Some(result;
         
         Ok(StepResult::Completed)
     }
@@ -665,11 +686,7 @@ impl AsyncExecutionEngine {
         };
         
         self.executions[execution_index].context.call_stack.push(frame).map_err(|_| {
-            Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::EXECUTION_ERROR,
-                "Call stack overflow"
-            )
+            Error::runtime_execution_error("Failed to push call frame")
         })?;
         
         Ok(StepResult::Waiting)
@@ -684,13 +701,23 @@ impl AsyncExecutionEngine {
         // Set future value
         // For now, we simulate immediate completion
         let result = ExecutionResult {
-            values: vec![],
+            values: {
+                #[cfg(feature = "std")]
+                {
+                    vec![]
+                }
+                #[cfg(not(feature = "std"))]
+                {
+                    let provider = safe_managed_alloc!(1024, CrateId::Component)?;
+                    ComponentVec::new(provider).map_err(|_| Error::runtime_execution_error("Failed to create result values"))?
+                }
+            },
             execution_time_us: 10,
             memory_allocated: 0,
             instructions_executed: 50,
         };
         
-        self.executions[execution_index].result = Some(result);
+        self.executions[execution_index].result = Some(result;
         
         Ok(StepResult::Completed)
     }
@@ -709,11 +736,7 @@ impl AsyncExecutionEngine {
         };
         
         self.executions[execution_index].context.call_stack.push(frame).map_err(|_| {
-            Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::EXECUTION_ERROR,
-                "Call stack overflow"
-            )
+            Error::runtime_execution_error("Failed to push call frame")
         })?;
         
         Ok(StepResult::Waiting)
@@ -731,7 +754,21 @@ impl AsyncExecutionEngine {
         // Create subtask operation
         let subtask_op = AsyncExecutionOperation::FunctionCall {
             name: BoundedString::from_str(function).unwrap_or_default(),
-            args: args.to_vec(),
+            args: {
+                #[cfg(feature = "std")]
+                {
+                    args.to_vec()
+                }
+                #[cfg(not(feature = "std"))]
+                {
+                    let provider = safe_managed_alloc!(4096, CrateId::Component)?;
+                    let mut arg_vec = ComponentVec::new(provider)?;
+                    for arg in args {
+                        arg_vec.push(arg.clone()).map_err(|_| Error::runtime_execution_error("Failed to copy args"))?;
+                    }
+                    arg_vec
+                }
+            },
         };
         
         // Start subtask execution
@@ -739,13 +776,25 @@ impl AsyncExecutionEngine {
         
         // Return subtask handle as result
         let result = ExecutionResult {
-            values: vec![Value::U64(subtask_id.0)],
+            values: {
+                #[cfg(feature = "std")]
+                {
+                    vec![Value::U64(subtask_id.0)]
+                }
+                #[cfg(not(feature = "std"))]
+                {
+                    let provider = safe_managed_alloc!(1024, CrateId::Component)?;
+                    let mut values = ComponentVec::new(provider)?;
+                    values.push(Value::U64(subtask_id.0)).map_err(|_| Error::runtime_execution_error("Failed to create result values"))?;
+                    values
+                }
+            },
             execution_time_us: 20,
             memory_allocated: 0,
             instructions_executed: 100,
         };
         
-        self.executions[execution_index].result = Some(result);
+        self.executions[execution_index].result = Some(result;
         
         Ok(StepResult::Completed)
     }
@@ -775,28 +824,34 @@ pub enum StepResult {
 
 impl ExecutionContext {
     /// Create new execution context
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
             component_instance: 0,
             function_name: BoundedString::new(),
             #[cfg(feature = "std")]
             call_stack: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            call_stack: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            call_stack: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| Error::runtime_execution_error("Failed to create call stack"))?
+            },
             #[cfg(feature = "std")]
             locals: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            locals: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            locals: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| Error::runtime_execution_error("Failed to create locals vector"))?
+            },
             memory_views: MemoryViews::new(),
-        }
+        })
     }
     
     /// Reset context for reuse
     pub fn reset(&mut self) {
         self.component_instance = 0;
         self.function_name = BoundedString::new();
-        self.call_stack.clear();
-        self.locals.clear();
+        self.call_stack.clear);
+        self.locals.clear);
         self.memory_views = MemoryViews::new();
     }
 }
@@ -846,13 +901,13 @@ impl ExecutionStats {
 
 impl Default for AsyncExecutionEngine {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create default AsyncExecutionEngine")
     }
 }
 
 impl Default for ExecutionContext {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create default ExecutionContext")
     }
 }
 
@@ -884,81 +939,122 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_async_execution_engine_creation() {
-        let engine = AsyncExecutionEngine::new();
+    fn test_async_execution_engine_creation() -> Result<()> {
+        let engine = AsyncExecutionEngine::new()?;
         assert_eq!(engine.executions.len(), 0);
         assert_eq!(engine.next_execution_id, 1);
+        Ok(())
     }
     
     #[test]
-    fn test_start_execution() {
-        let mut engine = AsyncExecutionEngine::new();
-        let task_id = TaskId(1);
+    fn test_start_execution() -> Result<()> {
+        let mut engine = AsyncExecutionEngine::new()?;
+        let task_id = TaskId(1;
         let operation = AsyncExecutionOperation::FunctionCall {
             name: BoundedString::from_str("test_function").unwrap(),
-            args: vec![Value::U32(42)],
+            args: {
+                #[cfg(feature = "std")]
+                {
+                    vec![Value::U32(42)]
+                }
+                #[cfg(not(feature = "std"))]
+                {
+                    let provider = safe_managed_alloc!(1024, CrateId::Component)?;
+                    let mut args = ComponentVec::new(provider)?;
+                    args.push(Value::U32(42)).map_err(|_| Error::runtime_execution_error("Failed to create test args"))?;
+                    args
+                }
+            },
         };
         
-        let execution_id = engine.start_execution(task_id, operation, None).unwrap();
+        let execution_id = engine.start_execution(task_id, operation, None)?;
         assert_eq!(execution_id.0, 1);
         assert_eq!(engine.executions.len(), 1);
         assert_eq!(engine.stats.executions_started, 1);
+        Ok(())
     }
     
     #[test]
-    fn test_step_execution() {
-        let mut engine = AsyncExecutionEngine::new();
-        let task_id = TaskId(1);
+    fn test_step_execution() -> Result<()> {
+        let mut engine = AsyncExecutionEngine::new()?;
+        let task_id = TaskId(1;
         let operation = AsyncExecutionOperation::FunctionCall {
             name: BoundedString::from_str("test_function").unwrap(),
-            args: vec![Value::U32(42)],
+            args: {
+                #[cfg(feature = "std")]
+                {
+                    vec![Value::U32(42)]
+                }
+                #[cfg(not(feature = "std"))]
+                {
+                    let provider = safe_managed_alloc!(1024, CrateId::Component)?;
+                    let mut args = ComponentVec::new(provider)?;
+                    args.push(Value::U32(42)).map_err(|_| Error::runtime_execution_error("Failed to create test args"))?;
+                    args
+                }
+            },
         };
         
-        let execution_id = engine.start_execution(task_id, operation, None).unwrap();
-        let result = engine.step_execution(execution_id).unwrap();
+        let execution_id = engine.start_execution(task_id, operation, None)?;
+        let result = engine.step_execution(execution_id)?;
         
-        assert_eq!(result, StepResult::Completed);
+        assert_eq!(result, StepResult::Completed;
         assert_eq!(engine.stats.executions_completed, 1);
         assert_eq!(engine.stats.async_operations, 1);
+        Ok(())
     }
     
     #[test]
-    fn test_cancel_execution() {
-        let mut engine = AsyncExecutionEngine::new();
-        let task_id = TaskId(1);
+    fn test_cancel_execution() -> Result<()> {
+        let mut engine = AsyncExecutionEngine::new()?;
+        let task_id = TaskId(1;
         let operation = AsyncExecutionOperation::StreamRead {
             handle: StreamHandle(1),
             count: 100,
         };
         
-        let execution_id = engine.start_execution(task_id, operation, None).unwrap();
-        engine.cancel_execution(execution_id).unwrap();
+        let execution_id = engine.start_execution(task_id, operation, None)?;
+        engine.cancel_execution(execution_id)?;
         
-        let execution = engine.find_execution(execution_id).unwrap();
-        assert_eq!(execution.state, AsyncExecutionState::Cancelled);
+        let execution = engine.find_execution(execution_id)?;
+        assert_eq!(execution.state, AsyncExecutionState::Cancelled;
         assert_eq!(engine.stats.executions_cancelled, 1);
+        Ok(())
     }
     
     #[test]
-    fn test_subtask_spawning() {
-        let mut engine = AsyncExecutionEngine::new();
-        let task_id = TaskId(1);
+    fn test_subtask_spawning() -> Result<()> {
+        let mut engine = AsyncExecutionEngine::new()?;
+        let task_id = TaskId(1;
         let operation = AsyncExecutionOperation::SpawnSubtask {
             function: BoundedString::from_str("child_function").unwrap(),
-            args: vec![Value::U32(100)],
+            args: {
+                #[cfg(feature = "std")]
+                {
+                    vec![Value::U32(100)]
+                }
+                #[cfg(not(feature = "std"))]
+                {
+                    let provider = safe_managed_alloc!(1024, CrateId::Component)?;
+                    let mut args = ComponentVec::new(provider)?;
+                    args.push(Value::U32(100)).map_err(|_| Error::runtime_execution_error("Failed to create test args"))?;
+                    args
+                }
+            },
         };
         
-        let parent_id = engine.start_execution(task_id, operation, None).unwrap();
-        let result = engine.step_execution(parent_id).unwrap();
+        let parent_id = engine.start_execution(task_id, operation, None)?;
+        let result = engine.step_execution(parent_id)?;
         
-        assert_eq!(result, StepResult::Completed);
+        assert_eq!(result, StepResult::Completed;
         assert_eq!(engine.stats.subtasks_spawned, 1);
         assert_eq!(engine.executions.len(), 2); // Parent and child
+        Ok(())
     }
     
     #[test]
-    fn test_execution_context() {
-        let mut context = ExecutionContext::new();
+    fn test_execution_context() -> Result<()> {
+        let mut context = ExecutionContext::new()?;
         
         let frame = CallFrame {
             function: BoundedString::from_str("test").unwrap(),
@@ -967,36 +1063,41 @@ mod tests {
             async_state: FrameAsyncState::Sync,
         };
         
-        context.call_stack.push(frame).unwrap();
+        context.call_stack.push(frame).map_err(|_| Error::runtime_execution_error("Context access failed"))?;
         assert_eq!(context.call_stack.len(), 1);
         
-        context.reset();
+        context.reset);
         assert_eq!(context.call_stack.len(), 0);
+        Ok(())
     }
     
     #[test]
-    fn test_wait_set() {
+    fn test_wait_set() -> Result<()> {
         let wait_set = WaitSet {
             #[cfg(feature = "std")]
             futures: vec![FutureHandle(1), FutureHandle(2)],
-            #[cfg(not(any(feature = "std", )))]
+            #[cfg(not(feature = "std"))]
             futures: {
-                let mut futures = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-                futures.push(FutureHandle(1)).unwrap();
-                futures.push(FutureHandle(2)).unwrap();
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                let mut futures = BoundedVec::new(provider).map_err(|_| Error::runtime_execution_error("Context access failed"))?;
+                futures.push(FutureHandle(1)).map_err(|_| Error::runtime_execution_error("Context access failed"))?;
+                futures.push(FutureHandle(2)).map_err(|_| Error::runtime_execution_error("Context access failed"))?;
                 futures
             },
             #[cfg(feature = "std")]
             streams: vec![StreamHandle(3)],
-            #[cfg(not(any(feature = "std", )))]
+            #[cfg(not(feature = "std"))]
             streams: {
-                let mut streams = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-                streams.push(StreamHandle(3)).unwrap();
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                let mut streams = BoundedVec::new(provider).map_err(|_| Error::runtime_execution_error("Context access failed"))?;
+                streams.push(StreamHandle(3)).map_err(|_| Error::runtime_execution_error("Context access failed"))?;
                 streams
             },
         };
         
-        assert_eq!(wait_set.futures.len(), 2);
+        assert_eq!(wait_set.futures.len(), 2;
         assert_eq!(wait_set.streams.len(), 1);
+        
+        Ok(())
     }
 }

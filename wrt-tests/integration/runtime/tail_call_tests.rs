@@ -24,7 +24,7 @@ fn test_basic_tail_call() -> Result<()> {
         params: vec![ValueType::I32],
         results: vec![ValueType::I32],
     };
-    module.add_type(recursive_type.clone());
+    module.add_type(recursive_type.clone();
     
     // Add a recursive function using tail calls
     // This would be equivalent to:
@@ -54,7 +54,7 @@ fn test_tail_call_stack_usage() -> Result<()> {
         params: vec![ValueType::I32], // counter
         results: vec![ValueType::I32], // final value
     };
-    module.add_type(count_type);
+    module.add_type(count_type;
     
     // In a real implementation, we'd check that stack depth remains constant
     // even with many tail calls
@@ -75,7 +75,7 @@ fn test_return_call_indirect() -> Result<()> {
         params: vec![ValueType::I32],
         results: vec![ValueType::I32],
     };
-    module.add_type(func_type);
+    module.add_type(func_type;
     
     // Add table for indirect calls
     // In real implementation, would populate with function references
@@ -109,7 +109,7 @@ fn test_tail_call_type_validation() -> Result<()> {
     };
     
     // Should fail - different return types
-    assert!(validation::validate_tail_call(&func1, &func3).is_err());
+    assert!(validation::validate_tail_call(&func1, &func3).is_err();
     
     // Test with multiple return values
     let func4 = FuncType {
@@ -208,13 +208,13 @@ fn test_tail_call_optimization_constraints() -> Result<()> {
     // Test when tail call optimization should be disabled
     
     // In try-catch blocks
-    assert!(!validation::can_optimize_tail_call(true, false));
+    assert!(!validation::can_optimize_tail_call(true, false);
     
     // In multi-value blocks
-    assert!(!validation::can_optimize_tail_call(false, true));
+    assert!(!validation::can_optimize_tail_call(false, true);
     
     // Normal case - should optimize
-    assert!(validation::can_optimize_tail_call(false, false));
+    assert!(validation::can_optimize_tail_call(false, false);
     
     Ok(())
 }

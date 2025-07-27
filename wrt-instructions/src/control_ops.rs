@@ -49,7 +49,7 @@
 
 // Remove unused imports
 
-use crate::prelude::{BlockType, BoundedCapacity, BoundedVec, Debug, Error, ErrorCategory, PartialEq, PureInstruction, Result, Value, codes, str};
+use crate::prelude::{BlockType, Debug, Error, ErrorCategory, PartialEq, PureInstruction, Result, Value, codes, str, BoundedVec, BoundedCapacity};
 // use crate::validation::{Validate, ValidationContext}; // Currently unused
 
 
@@ -79,7 +79,7 @@ pub enum Block {
 }
 
 /// Represents a pure control flow operation for WebAssembly.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ControlOp {
     /// A basic block of instructions with a label that can be branched to
     Block(ControlBlockType),
@@ -134,6 +134,12 @@ pub enum ControlOp {
     BrOnNull(u32),
     /// Branch if reference is not null (`br_on_non_null`)
     BrOnNonNull(u32),
+}
+
+impl Default for ControlOp {
+    fn default() -> Self {
+        ControlOp::Nop
+    }
 }
 
 /// Return operation (return)
@@ -198,7 +204,7 @@ impl CallIndirect {
         
         // Validate function index is not negative
         if func_idx < 0 {
-            return Err(Error::runtime_error("Invalid function index for call_indirect"));
+            return Err(Error::runtime_error("Invalid function index for call_indirect";
         }
         
         // Execute the indirect call with validation
@@ -244,7 +250,7 @@ impl ReturnCallIndirect {
         
         // Validate function index is not negative
         if func_idx < 0 {
-            return Err(Error::runtime_error("Invalid function index for return_call_indirect"));
+            return Err(Error::runtime_error("Invalid function index for return_call_indirect";
         }
         
         // Execute the tail call indirect
@@ -293,7 +299,7 @@ impl BrTable {
         }
         #[cfg(not(feature = "std"))]
         {
-            let provider = wrt_foundation::NoStdProvider::<8192>::new();
+            let provider = wrt_foundation::safe_managed_alloc!(8192, wrt_foundation::budget_aware_provider::CrateId::Instructions)?;
             let mut table = wrt_foundation::BoundedVec::new(provider).map_err(|_| {
                 Error::memory_error("Could not create BoundedVec")
             })?;
@@ -330,7 +336,7 @@ impl BrTable {
         {
             // For no_std, we create a temporary slice on the stack
             let mut slice_vec = [0u32; 256]; // Static array for no_std
-            let len = core::cmp::min(self.table.len(), 256);
+            let len = core::cmp::min(BoundedCapacity::len(&self.table), 256;
             for i in 0..len {
                 slice_vec[i] = self.table.get(i).map_err(|_| {
                     Error::runtime_error("Branch table index out of bounds")
@@ -423,7 +429,7 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
             Self::Loop(block_type) => context.enter_block(Block::Loop(*block_type)),
             Self::If(block_type) => {
                 let condition = context.pop_control_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for if condition")
+                    Error::type_error("Expected I32 for if condition")
                 })?;
 
                 if condition != 0 {
@@ -454,7 +460,7 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
             }
             Self::BrIf(label_idx) => {
                 let condition = context.pop_control_value()?.into_i32().map_err(|_| {
-                    Error::new(ErrorCategory::Type, codes::INVALID_TYPE, "Expected I32 for br_if condition")
+                    Error::type_error("Expected I32 for br_if condition")
                 })?;
 
                 if condition != 0 {
@@ -470,7 +476,11 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
             }
             Self::BrTable { table, default } => {
                 // Use from_slice for unified interface across all feature configurations
-                let slice: &[u32] = table.as_slice();
+                #[cfg(feature = "std")]
+                let slice: &[u32] = table.as_slice);
+                #[cfg(not(feature = "std"))]
+                let slice: &[u32] = table.as_slice().map_err(|_| Error::runtime_error("Failed to get table slice"))?;
+                
                 let br_table = BrTable::from_slice(slice, *default)?;
                 br_table.execute(context)
             }
@@ -480,12 +490,12 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
             }
             Self::Call(func_idx) => context.call_function(*func_idx),
             Self::CallIndirect { table_idx, type_idx } => {
-                let call_op = CallIndirect::new(*table_idx, *type_idx);
+                let call_op = CallIndirect::new(*table_idx, *type_idx;
                 call_op.execute(context)
             }
             Self::ReturnCall(func_idx) => context.return_call(*func_idx),
             Self::ReturnCallIndirect { table_idx, type_idx } => {
-                let call_op = ReturnCallIndirect::new(*table_idx, *type_idx);
+                let call_op = ReturnCallIndirect::new(*table_idx, *type_idx;
                 call_op.execute(context)
             }
             Self::Nop => {
@@ -509,7 +519,7 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
                         false
                     }
                     _ => {
-                        return Err(Error::type_error("br_on_null requires a reference type"));
+                        return Err(Error::type_error("br_on_null requires a reference type";
                     }
                 };
                 
@@ -532,7 +542,7 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
                         true
                     }
                     _ => {
-                        return Err(Error::type_error("br_on_non_null requires a reference type"));
+                        return Err(Error::type_error("br_on_non_null requires a reference type";
                     }
                 };
                 
@@ -546,7 +556,7 @@ impl<T: ControlContext> PureInstruction<T, Error> for ControlOp {
     }
 }
 
-#[cfg(all(test, any(feature = "std", )))]
+#[cfg(all(test, feature = "std"))]
 mod tests {
         use std::vec;
         use std::vec::Vec;
@@ -591,7 +601,7 @@ mod tests {
 
         fn pop_control_value(&mut self) -> Result<Value> {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::runtime_stack_underflow("Stack underflow")
             })
         }
 
@@ -606,16 +616,12 @@ mod tests {
 
         fn exit_block(&mut self) -> Result<Block> {
             self.blocks.pop().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    codes::EXECUTION_ERROR,
-                    "Invalid branch target",
-                )
+                Error::runtime_execution_error("Invalid branch target")
             })
         }
 
         fn branch(&mut self, target: BranchTarget) -> Result<()> {
-            self.branched = Some(target);
+            self.branched = Some(target;
             Ok(())
         }
 
@@ -625,18 +631,18 @@ mod tests {
         }
 
         fn call_function(&mut self, func_idx: u32) -> Result<()> {
-            self.func_called = Some(func_idx);
+            self.func_called = Some(func_idx;
             Ok(())
         }
 
         fn call_indirect(&mut self, table_idx: u32, type_idx: u32) -> Result<()> {
-            self.indirect_call = Some((table_idx, type_idx));
+            self.indirect_call = Some((table_idx, type_idx;
             Ok(())
         }
 
         fn trap(&mut self, _message: &str) -> Result<()> {
             self.trapped = true;
-            Err(Error::new(ErrorCategory::Runtime, codes::EXECUTION_ERROR, "Execution trapped"))
+            Err(Error::runtime_trap_error("Execution trapped"))
         }
 
         fn get_current_block(&self) -> Option<&Block> {
@@ -654,9 +660,9 @@ mod tests {
         
         fn execute_call_indirect(&mut self, table_idx: u32, type_idx: u32, func_idx: i32) -> Result<()> {
             if func_idx < 0 {
-                return Err(Error::runtime_error("Invalid function index"));
+                return Err(Error::runtime_error("Invalid function index";
             }
-            self.indirect_call = Some((table_idx, type_idx));
+            self.indirect_call = Some((table_idx, type_idx;
             Ok(())
         }
         
@@ -671,7 +677,7 @@ mod tests {
                 label_idx,
                 keep_values: 0,
             };
-            self.branched = Some(target);
+            self.branched = Some(target;
             Ok(())
         }
         
@@ -680,7 +686,7 @@ mod tests {
                 label_idx: label,
                 keep_values: 0,
             };
-            self.branched = Some(target);
+            self.branched = Some(target;
             Ok(())
         }
         
@@ -689,17 +695,17 @@ mod tests {
                 label_idx: label,
                 keep_values: 0,
             };
-            self.branched = Some(target);
+            self.branched = Some(target;
             Ok(())
         }
         
         fn return_call(&mut self, func_idx: u32) -> Result<()> {
-            self.func_called = Some(func_idx);
+            self.func_called = Some(func_idx;
             Ok(())
         }
         
         fn return_call_indirect(&mut self, table_idx: u32, type_idx: u32) -> Result<()> {
-            self.indirect_call = Some((table_idx, type_idx));
+            self.indirect_call = Some((table_idx, type_idx;
             Ok(())
         }
     }
@@ -723,7 +729,7 @@ mod tests {
         }
         
         fn execute_function_call(&mut self, func_idx: u32) -> Result<()> {
-            self.func_called = Some(func_idx);
+            self.func_called = Some(func_idx;
             Ok(())
         }
     }
@@ -733,7 +739,7 @@ mod tests {
         let mut context = MockControlContext::new();
 
         // Test block instruction
-        let block_type = ControlBlockType::ValueType(Some(ValueType::I32));
+        let block_type = ControlBlockType::ValueType(Some(ValueType::I32;
         ControlOp::Block(block_type.clone()).execute(&mut context).unwrap();
         assert_eq!(context.get_block_depth(), 1);
 
@@ -742,7 +748,7 @@ mod tests {
         assert_eq!(context.get_block_depth(), 0);
 
         // Test loop instruction
-        let loop_type = ControlBlockType::ValueType(None);
+        let loop_type = ControlBlockType::ValueType(None;
         ControlOp::Loop(loop_type).execute(&mut context).unwrap();
         assert_eq!(context.get_block_depth(), 1);
 
@@ -758,8 +764,8 @@ mod tests {
         let mut context = MockControlContext::new();
 
         // Test if instruction with true condition
-        context.push_control_value(Value::I32(1)).unwrap(); // True condition
-        let if_type = ControlBlockType::ValueType(None);
+        context.push_control_value(Value::I32(1)).unwrap()); // True condition
+        let if_type = ControlBlockType::ValueType(None;
         ControlOp::If(if_type.clone()).execute(&mut context).unwrap();
         assert_eq!(context.get_block_depth(), 1);
 
@@ -772,7 +778,7 @@ mod tests {
         assert_eq!(context.get_block_depth(), 0);
 
         // Test if instruction with false condition
-        context.push_control_value(Value::I32(0)).unwrap(); // False condition
+        context.push_control_value(Value::I32(0)).unwrap()); // False condition
         ControlOp::If(if_type).execute(&mut context).unwrap();
         assert_eq!(context.get_block_depth(), 1);
     }
@@ -783,25 +789,25 @@ mod tests {
 
         // Test br instruction
         ControlOp::Br(1).execute(&mut context).unwrap();
-        assert!(context.branched.is_some());
+        assert!(context.branched.is_some();
         assert_eq!(context.branched.unwrap().label_idx, 1);
 
         // Reset branched flag
         context.branched = None;
 
         // Test br_if instruction with true condition
-        context.push_control_value(Value::I32(1)).unwrap(); // True condition
+        context.push_control_value(Value::I32(1)).unwrap()); // True condition
         ControlOp::BrIf(2).execute(&mut context).unwrap();
-        assert!(context.branched.is_some());
-        assert_eq!(context.branched.unwrap().label_idx, 2);
+        assert!(context.branched.is_some();
+        assert_eq!(context.branched.unwrap().label_idx, 2;
 
         // Reset branched flag
         context.branched = None;
 
         // Test br_if instruction with false condition
-        context.push_control_value(Value::I32(0)).unwrap(); // False condition
+        context.push_control_value(Value::I32(0)).unwrap()); // False condition
         ControlOp::BrIf(3).execute(&mut context).unwrap();
-        assert!(context.branched.is_none()); // Should not branch
+        assert!(context.branched.is_none())); // Should not branch
     }
 
     #[test]
@@ -809,23 +815,23 @@ mod tests {
         let mut context = MockControlContext::new();
 
         // Test br_table instruction with in-range index
-        context.push_control_value(Value::I32(1)).unwrap(); // Index 1
-        let mut table = Vec::new();
+        context.push_control_value(Value::I32(1)).unwrap()); // Index 1
+        let mut table = Vec::new());
         table.push(10);
         table.push(20);
         table.push(30);
         let default = 99;
         ControlOp::BrTable { table: table.clone(), default }.execute(&mut context).unwrap();
-        assert!(context.branched.is_some());
+        assert!(context.branched.is_some();
         assert_eq!(context.branched.unwrap().label_idx, 20); // table[1]
 
         // Reset branched flag
         context.branched = None;
 
         // Test br_table instruction with out-of-range index
-        context.push_control_value(Value::I32(5)).unwrap(); // Index out of range
+        context.push_control_value(Value::I32(5)).unwrap()); // Index out of range
         ControlOp::BrTable { table, default }.execute(&mut context).unwrap();
-        assert!(context.branched.is_some());
+        assert!(context.branched.is_some();
         assert_eq!(context.branched.unwrap().label_idx, 99); // default
     }
 
@@ -839,11 +845,11 @@ mod tests {
 
         // Test call instruction
         ControlOp::Call(42).execute(&mut context).unwrap();
-        assert_eq!(context.func_called, Some(42));
+        assert_eq!(context.func_called, Some(42;
 
         // Test call_indirect instruction
         ControlOp::CallIndirect { table_idx: 1, type_idx: 5 }.execute(&mut context).unwrap();
-        assert_eq!(context.indirect_call, Some((1, 5)));
+        assert_eq!(context.indirect_call, Some((1, 5);
     }
 
     #[test]
@@ -854,8 +860,8 @@ mod tests {
         ControlOp::Nop.execute(&mut context).unwrap();
 
         // Test unreachable instruction
-        let result = ControlOp::Unreachable.execute(&mut context);
-        assert!(result.is_err());
+        let result = ControlOp::Unreachable.execute(&mut context;
+        assert!(result.is_err();
         assert!(context.trapped);
     }
 
@@ -874,10 +880,10 @@ mod tests {
         assert_eq!(call_indirect.type_idx, 1);
         
         // Test BrTable creation from slice
-        let br_table = BrTable::from_slice(&[1, 2, 3], 99);
+        let br_table = BrTable::from_slice(&[1, 2, 3], 99;
         assert!(br_table.is_ok());
         let table = br_table.unwrap();
-        assert_eq!(table.default, 99);
+        assert_eq!(table.default, 99;
     }
 }
 

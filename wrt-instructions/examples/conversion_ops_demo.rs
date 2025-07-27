@@ -62,7 +62,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   Result: i32 = 0x{:08X} (lower 32 bits)", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 2. Integer sign extension (i64.extend_i32_s)
     println!("\n2. Sign Extension (i64.extend_i32_s):");
@@ -72,7 +72,7 @@ fn main() -> Result<()> {
     if let Some(Value::I64(result)) = context.peek() {
         println!("   Result: i64 = {} (sign extended)", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 3. Integer zero extension (i64.extend_i32_u)
     println!("\n3. Zero Extension (i64.extend_i32_u):");
@@ -82,7 +82,7 @@ fn main() -> Result<()> {
     if let Some(Value::I64(result)) = context.peek() {
         println!("   Result: i64 = {} (zero extended)", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 4. Float to integer conversion with trapping (i32.trunc_f32_s)
     println!("\n4. Float to Integer Truncation (i32.trunc_f32_s):");
@@ -92,7 +92,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   Result: i32 = {} (truncated)", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 5. Integer to float conversion (f32.convert_i32_s)
     println!("\n5. Integer to Float Conversion (f32.convert_i32_s):");
@@ -100,9 +100,9 @@ fn main() -> Result<()> {
     println!("   Input: i32 = -100");
     ConversionOp::F32ConvertI32S.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   Result: f32 = {}", result.value());
+        println!("   Result: f32 = {}", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 6. Float promotion (f64.promote_f32)
     println!("\n6. Float Promotion (f64.promote_f32):");
@@ -110,9 +110,9 @@ fn main() -> Result<()> {
     println!("   Input: f32 = 3.14159");
     ConversionOp::F64PromoteF32.execute(&mut context)?;
     if let Some(Value::F64(result)) = context.peek() {
-        println!("   Result: f64 = {} (promoted)", result.value());
+        println!("   Result: f64 = {} (promoted)", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 7. Float demotion (f32.demote_f64)
     println!("\n7. Float Demotion (f32.demote_f64):");
@@ -120,20 +120,20 @@ fn main() -> Result<()> {
     println!("   Input: f64 = 3.141592653589793");
     ConversionOp::F32DemoteF64.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   Result: f32 = {} (demoted, precision lost)", result.value());
+        println!("   Result: f32 = {} (demoted, precision lost)", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 8. Reinterpret operations (i32.reinterpret_f32)
     println!("\n8. Reinterpret Operations (i32.reinterpret_f32):");
-    let float_val = FloatBits32::from_float(1.0);
+    let float_val = FloatBits32::from_float(1.0;
     context.push_conversion_value(Value::F32(float_val))?;
     println!("   Input: f32 = 1.0 (bits: 0x{:08X})", float_val.0);
     ConversionOp::I32ReinterpretF32.execute(&mut context)?;
     if let Some(Value::I32(result)) = context.peek() {
         println!("   Result: i32 = 0x{:08X} (same bit pattern)", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 9. Saturating truncation (i32.trunc_sat_f32_s)
     println!("\n9. Saturating Truncation (i32.trunc_sat_f32_s):");
@@ -145,7 +145,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   Result: i32 = {} (saturated to i32::MAX)", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Test with NaN
     context.push_conversion_value(Value::F32(FloatBits32::from_float(f32::NAN)))?;
@@ -154,7 +154,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   Result: i32 = {} (NaN converts to 0)", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 10. Sign extension operations
     println!("\n10. Sign Extension Operations:");
@@ -166,7 +166,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   Result after i32.extend8_s: {} (sign extended from 8 bits)", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // i32.extend16_s
     context.push_conversion_value(Value::I32(0x8000))?; // -32768 as i16
@@ -182,6 +182,7 @@ fn main() -> Result<()> {
 
 #[cfg(not(feature = "std"))]
 fn main() {
-    // Binary std/no_std choice
-    panic!("This example requires std or alloc features");
+    // Binary std/no_std choice - ASIL-D safe: exit gracefully
+    eprintln!("This example requires std or alloc features"));
+    core::process::exit(1;
 }

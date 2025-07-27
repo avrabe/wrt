@@ -1,11 +1,21 @@
 use std::sync::Arc;
 
-use wrt_component::{Component, ComponentType};
+use wrt_component::{
+    Component,
+    ComponentType,
+};
 use wrt_error::Result;
 use wrt_foundation::values::Value;
-use wrt_host::{function::CloneableFn, CallbackRegistry};
+use wrt_host::{
+    function::CloneableFn,
+    CallbackRegistry,
+};
 use wrt_intercept::{
-    strategies::{FirewallBuilder, LoggingStrategy, StatisticsStrategy},
+    strategies::{
+        FirewallBuilder,
+        LoggingStrategy,
+        StatisticsStrategy,
+    },
     LinkInterceptor,
 };
 use wrt_runtime::RuntimeInstance;
@@ -23,32 +33,32 @@ fn main() -> Result<()> {
             println!("Host function 'test.double' called");
             Ok(vec![Value::I32(84)]) // Double 42
         }),
-    );
+    ;
 
     // Create a logging interceptor
-    let log_sink = Arc::new(|log_entry: &str| println!("[LOG] {}", log_entry));
-    let logging_strategy = LoggingStrategy::new(log_sink);
+    let log_sink = Arc::new(|log_entry: &str| println!("[LOG] {}", log_entry);
+    let logging_strategy = LoggingStrategy::new(log_sink;
 
     // Create a firewall interceptor
     let firewall = FirewallBuilder::new(false)
         .allow_function("component", "test::double", "test.double")
-        .build();
+        .build);
 
     // Create a statistics interceptor
     let stats = StatisticsStrategy::new();
-    let stats_rc = Arc::new(stats);
+    let stats_rc = Arc::new(stats;
 
     // Create an interceptor and add strategies
-    let mut interceptor = LinkInterceptor::new("example_interceptor");
-    interceptor.add_strategy(Arc::new(logging_strategy));
-    interceptor.add_strategy(Arc::new(firewall));
-    interceptor.add_strategy(stats_rc.clone());
+    let mut interceptor = LinkInterceptor::new("example_interceptor";
+    interceptor.add_strategy(Arc::new(logging_strategy;
+    interceptor.add_strategy(Arc::new(firewall;
+    interceptor.add_strategy(stats_rc.clone();
 
     // Create a component with the interceptor
     let component = Component::new(component_type)
         .with_callback_registry(Arc::new(registry))
         .with_runtime(RuntimeInstance::new())
-        .with_interceptor(Arc::new(interceptor));
+        .with_interceptor(Arc::new(interceptor;
 
     // Call a host function through the component
     println!("\nCalling test.double function...");
@@ -61,12 +71,12 @@ fn main() -> Result<()> {
         println!(
             "{}: {} calls, {} successful, {} errors, avg time: {:.2}ms",
             name, stats.call_count, stats.success_count, stats.error_count, stats.avg_time_ms
-        );
+        ;
     }
 
     // Try calling a disallowed function
     println!("\nTrying to call a disallowed function...");
-    let result = component.call_host_function("forbidden.function", &[Value::I32(42)]);
+    let result = component.call_host_function("forbidden.function", &[Value::I32(42)];
     println!("Result: {:?}", result);
 
     Ok(())

@@ -41,7 +41,10 @@ impl<T> WrtMutex<T> {
     /// Creates a new `WrtMutex` protecting the given data.
     #[inline]
     pub const fn new(data: T) -> Self {
-        WrtMutex { locked: AtomicBool::new(false), data: UnsafeCell::new(data) }
+        WrtMutex {
+            locked: AtomicBool::new(false),
+            data: UnsafeCell::new(data),
+        }
     }
 }
 
@@ -128,6 +131,7 @@ impl<T: ?Sized + fmt::Debug> fmt::Debug for WrtMutex<T> {
 
 impl<T: ?Sized> Deref for WrtMutexGuard<'_, T> {
     type Target = T;
+
     #[inline]
     fn deref(&self) -> &Self::Target {
         // # Safety
@@ -180,6 +184,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(any(feature = "std", feature = "dynamic-allocation"))]
     fn test_mutex_modification() {
         let mutex = WrtMutex::new(vec![1, 2, 3]);
         {
@@ -191,6 +196,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(any(feature = "std", feature = "dynamic-allocation"))]
     fn test_mutex_multiple_locks() {
         let mutex = WrtMutex::new(String::from("test"));
         {

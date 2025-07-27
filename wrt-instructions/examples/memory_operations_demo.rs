@@ -83,7 +83,7 @@ impl MemoryOperations for MockMemory {
 
     fn copy(&mut self, dest: u32, src: u32, size: u32) -> Result<()> {
         if dest == src || size == 0 {
-            return Ok(());
+            return Ok();
         }
         
         let dest_start = dest as usize;
@@ -91,7 +91,7 @@ impl MemoryOperations for MockMemory {
         let copy_size = size as usize;
         
         // Extend data if necessary
-        let max_end = core::cmp::max(dest_start + copy_size, src_start + copy_size);
+        let max_end = core::cmp::max(dest_start + copy_size, src_start + copy_size;
         if max_end > self.data.len() {
             self.data.resize(max_end, 0);
         }
@@ -113,11 +113,15 @@ impl MemoryOperations for MockMemory {
 }
 
 fn main() -> Result<()> {
-    println!("WebAssembly Memory Operations Demo");
-    println!("==================================");
+    // Initialize global memory system first
+    wrt_foundation::memory_init::MemoryInitializer::initialize()
+        .expect("Failed to initialize memory system"));
+
+    println!("WebAssembly Memory Operations Demo"));
+    println!("=================================="));
     
     // Create a mock memory instance
-    let mut memory = MockMemory::new(1024);
+    let mut memory = MockMemory::new(1024;
     
     // Demonstrate i32 store and load operations
     println!("\n1. Testing i32 store and load:");
@@ -162,18 +166,18 @@ fn main() -> Result<()> {
     println!("\n4. Testing different data types:");
     
     // f32 operations
-    let f32_store = MemoryStore::f32(300, 4);
+    let f32_store = MemoryStore::f32(300, 4;
     f32_store.execute(&mut memory, &Value::I32(0), &Value::F32(wrt_foundation::FloatBits32::from_float(3.14159)))?;
     
-    let f32_load = MemoryLoad::f32(300, 4);
+    let f32_load = MemoryLoad::f32(300, 4;
     let f32_value = f32_load.execute(&memory, &Value::I32(0))?;
     println!("  f32 value: {:?}", f32_value);
     
     // i64 operations
-    let i64_store = MemoryStore::i64(400, 8);
+    let i64_store = MemoryStore::i64(400, 8;
     i64_store.execute(&mut memory, &Value::I32(0), &Value::I64(0x123456789ABCDEF0))?;
     
-    let i64_load = MemoryLoad::i64(400, 8);
+    let i64_load = MemoryLoad::i64(400, 8;
     let i64_value = i64_load.execute(&memory, &Value::I32(0))?;
     println!("  i64 value: {:?}", i64_value);
     
@@ -189,6 +193,9 @@ fn main() -> Result<()> {
     println!("\n✓ All memory operations completed successfully!");
     println!("✓ The MemoryOperations trait successfully bridges wrt-instructions and wrt-runtime!");
     
+    // Memory cleanup happens automatically via RAII
+    println!("\nMemory operations demo completed successfully!");
+    
     Ok(())
 }
 
@@ -198,26 +205,26 @@ mod tests {
 
     #[test]
     fn test_memory_operations_integration() -> Result<()> {
-        let mut memory = MockMemory::new(1024);
+        let mut memory = MockMemory::new(1024;
         
         // Test basic store/load cycle
-        let store = MemoryStore::i32(0, 4);
+        let store = MemoryStore::i32(0, 4;
         store.execute(&mut memory, &Value::I32(0), &Value::I32(42))?;
         
-        let load = MemoryLoad::i32_legacy(0, 4);
+        let load = MemoryLoad::i32_legacy(0, 4;
         let result = load.execute(&memory, &Value::I32(0))?;
         
-        assert_eq!(result, Value::I32(42));
+        assert_eq!(result, Value::I32(42;
         
         Ok(())
     }
     
     #[test]
     fn test_memory_fill_and_copy() -> Result<()> {
-        let mut memory = MockMemory::new(1024);
+        let mut memory = MockMemory::new(1024;
         
         // Fill a region
-        let fill = MemoryFill::new(0);
+        let fill = MemoryFill::new(0;
         fill.execute(&mut memory, &Value::I32(0), &Value::I32(0xFF), &Value::I32(10))?;
         
         // Copy to another region
@@ -226,38 +233,29 @@ mod tests {
         
         // Verify the copy
         let copied_data = memory.read_bytes(20, 5)?;
-        assert_eq!(copied_data, vec![0xFF; 5]);
+        assert_eq!(copied_data, vec![0xFF; 5];
         
         Ok(())
     }
     
     #[test]
     fn test_different_data_types() -> Result<()> {
-        let mut memory = MockMemory::new(1024);
+        let mut memory = MockMemory::new(1024;
         
         // Test f64
-        let f64_store = MemoryStore::f64(0, 8);
+        let f64_store = MemoryStore::f64(0, 8;
         f64_store.execute(&mut memory, &Value::I32(0), &Value::F64(wrt_foundation::FloatBits64::from_float(2.71828)))?;
         
-        let f64_load = MemoryLoad::f64(0, 8);
+        let f64_load = MemoryLoad::f64(0, 8;
         let result = f64_load.execute(&memory, &Value::I32(0))?;
         
         if let Value::F64(bits) = result {
             assert!((bits.to_float() - 2.71828).abs() < 1e-10);
         } else {
-            panic!("Expected F64 value");
+            panic!("Expected F64 value";
         }
         
         Ok(())
     }
 }
 
-fn main() -> Result<()> {
-    println!("=== Memory Operations Demo ===");
-    
-    let demo = MemoryOperationsDemo::new();
-    demo.demo_memory_operations()?;
-    
-    println!("Demo completed successfully!");
-    Ok(())
-}

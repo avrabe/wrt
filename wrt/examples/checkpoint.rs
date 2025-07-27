@@ -8,11 +8,14 @@ fn main() -> wrt::error::Result<()> {
     use wrt::{
         error::Result,
         module::Module,
-        serialization::{deserialize_from_module, serialize_to_module},
+        serialization::{
+            deserialize_from_module,
+            serialize_to_module,
+        },
         stackless::StacklessEngine,
     };
 
-    println!("WebAssembly Runtime State Checkpoint Example");
+    println!("WebAssembly Runtime State Checkpoint Example"));
 
     // Create a new engine
     let mut engine = StacklessEngine::new();
@@ -23,34 +26,34 @@ fn main() -> wrt::error::Result<()> {
 
     // Instantiate the module
     let instance_idx = engine.instantiate(module)?;
-    println!("Created module instance: {}", instance_idx);
+    println!("Created module instance: {}", instance_idx));
 
     // Execute some code (placeholder)
     // In a real example, you would call exported functions or run code
-    println!("Executing WebAssembly code...");
+    println!("Executing WebAssembly code..."));
 
     // Serialize the engine state to a module
-    println!("Serializing engine state...");
+    println!("Serializing engine state..."));
     let serialized_module = serialize_to_module(&engine)?;
 
     // In a real application, you would save this module to a file:
     // std::fs::write("checkpoint.wasm", serialized_module.to_binary()?)?;
 
     // Create a new engine to restore the state
-    println!("Creating new engine for restoration...");
+    println!("Creating new engine for restoration..."));
     let mut restored_engine = deserialize_from_module(&serialized_module)?;
 
     // Continue execution from where we left off
-    println!("Continuing execution from checkpoint...");
+    println!("Continuing execution from checkpoint..."));
 
     // In a real example, you would continue executing code
-    println!("Execution completed successfully");
+    println!("Execution completed successfully"));
 
     Ok(())
 }
 
 #[cfg(not(feature = "serialization"))]
 fn main() {
-    println!("This example requires the 'serialization' feature.");
-    println!("Please rebuild with: cargo run --example checkpoint --features=serialization");
+    println!("This example requires the 'serialization' feature."));
+    println!("Please rebuild with: cargo run --example checkpoint --features=serialization"));
 }

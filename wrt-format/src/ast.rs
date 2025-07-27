@@ -65,7 +65,7 @@ impl SourceSpan {
 
     /// Merge two spans to create a span covering both
     pub fn merge(&self, other: &Self) -> Self {
-        assert_eq!(self.file_id, other.file_id, "Cannot merge spans from different files");
+        assert_eq!(self.file_id, other.file_id, "Cannot merge spans from different files";
         Self {
             start: self.start.min(other.start),
             end: self.end.max(other.end),

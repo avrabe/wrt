@@ -52,7 +52,7 @@ impl ValidationContext {
     pub fn push_type(&mut self, _ty: ValueType) -> Result<()> {
         self.stack_depth += 1;
         if self.stack_depth > 1024 {
-            return Err(Error::validation_error("Stack overflow"));
+            return Err(Error::validation_error("Stack overflow";
         }
         Ok(())
     }
@@ -60,7 +60,7 @@ impl ValidationContext {
     /// Simulate popping a type from the stack
     pub fn pop_type(&mut self) -> Result<ValueType> {
         if !self.unreachable && self.stack_depth == 0 {
-            return Err(Error::validation_error("Stack underflow"));
+            return Err(Error::validation_error("Stack underflow";
         }
         if self.stack_depth > 0 {
             self.stack_depth -= 1;
@@ -154,7 +154,7 @@ pub fn validate_memory_op(
 ) -> Result<()> {
     // Check memory index
     if memory_idx >= ctx.memories {
-        return Err(Error::validation_error("Invalid memory index"));
+        return Err(Error::validation_error("Invalid memory index";
     }
 
     if !ctx.is_unreachable() {
@@ -188,7 +188,7 @@ pub fn validate_branch(
 ) -> Result<()> {
     // Basic validation only
     if depth > 1000 {
-        return Err(Error::validation_error("Invalid branch depth"));
+        return Err(Error::validation_error("Invalid branch depth";
     }
     ctx.mark_unreachable()?;
     Ok(())
@@ -312,7 +312,7 @@ mod tests {
         // Push some types
         ctx.push_type(ValueType::I32).unwrap();
         ctx.push_type(ValueType::F64).unwrap();
-        assert_eq!(ctx.stack_depth, 2);
+        assert_eq!(ctx.stack_depth, 2;
         
         // Pop types
         ctx.pop_type().unwrap();
@@ -320,7 +320,7 @@ mod tests {
         assert_eq!(ctx.stack_depth, 0);
         
         // Underflow should error
-        assert!(ctx.pop_type().is_err());
+        assert!(ctx.pop_type().is_err();
     }
 
     #[test]
@@ -329,7 +329,7 @@ mod tests {
         
         // Mark as unreachable
         ctx.mark_unreachable().unwrap();
-        assert!(ctx.is_unreachable());
+        assert!(ctx.is_unreachable();
         
         // Pop should succeed even with empty stack when unreachable
         ctx.pop_type().unwrap();

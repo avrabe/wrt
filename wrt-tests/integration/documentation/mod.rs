@@ -10,7 +10,7 @@ pub mod doc_validation_tests;
 
 /// Run all documentation integration tests
 pub fn run_tests() -> TestResult {
-    let mut runner = TestRunner::new("Documentation Integration");
+    let mut runner = TestRunner::new("Documentation Integration";
     
     runner.add_test_suite("Documentation Examples", || {
         // Validate that documentation examples compile and run
@@ -31,7 +31,7 @@ mod tests {
     
     #[test]
     fn documentation_integration() {
-        let result = run_tests();
+        let result = run_tests);
         assert!(result.is_success(), "Documentation integration tests failed: {:?}", result);
     }
 }

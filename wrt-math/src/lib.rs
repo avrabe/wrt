@@ -35,6 +35,7 @@ extern crate alloc;
 pub mod float_bits;
 pub mod ops;
 pub mod prelude;
+pub mod safety;
 pub mod traits;
 
 // SIMD operations module (requires platform feature)
@@ -48,6 +49,9 @@ pub use ops::*; // Consider selectively exporting if API needs to be controlled
 // Re-export error type from wrt-error for convenience
 pub use wrt_error::Error as WrtMathError; // Alias specific to this crate context
 pub use wrt_error::Result as WrtMathResult; // Alias specific to this crate context
+
+// Re-export safety operations
+pub use safety::{RoundingMode, SafeArithmetic, SafeFloat, SafeRounding, check_simd_bounds};
 
 // Re-export SIMD operations when platform feature is enabled
 #[cfg(feature = "platform")]

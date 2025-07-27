@@ -1,3 +1,4 @@
+
 // WRT - wrt-math
 // Module: Math Operations
 // SW-REQ-ID: REQ_018 (Wasm numeric operations)
@@ -1679,7 +1680,7 @@ pub fn i32_trunc_sat_f32_s(val: FloatBits32) -> i32 {
         // A more precise range check:
         if trunc >= (i32::MIN as f32) && trunc <= (i32::MAX as f32) {
             // Check if it's precisely representable or within the range for direct cast
-            if trunc >= -2_147_483_648.0_f32 && trunc < 2_147_483_648.0_f32 {
+            if (-2_147_483_648.0_f32..2_147_483_648.0_f32).contains(&trunc) {
                 // Wasm spec Table 15
                 trunc as i32
             } else if trunc == -2_147_483_648.0_f32 {
@@ -1768,7 +1769,7 @@ pub fn i64_trunc_sat_f32_s(val: FloatBits32) -> i64 {
         // If f > i64::MAX as f32 (approx 9.223372E18), saturate to i64::MAX.
         // If f < i64::MIN as f32 (approx -9.223372E18), saturate to i64::MIN.
 
-        if trunc >= I64_MIN_AS_F32 && trunc < I64_MAX_AS_F32 {
+        if (I64_MIN_AS_F32..I64_MAX_AS_F32).contains(&trunc) {
             trunc as i64
         } else if trunc == I64_MIN_AS_F32 {
             // Check exact bound for MIN
@@ -1832,7 +1833,7 @@ pub fn i32_trunc_sat_f64_s(val: FloatBits64) -> i32 {
     } else {
         let trunc = f64_trunc_compat(f);
         // Wasm spec Table 15 range: (-2147483648.0, 2147483648.0)
-        if trunc >= -2_147_483_648.0_f64 && trunc < 2_147_483_648.0_f64 {
+        if (-2_147_483_648.0_f64..2_147_483_648.0_f64).contains(&trunc) {
             trunc as i32
         } else if trunc == -2_147_483_648.0_f64 {
             // Exactly i32::MIN
@@ -1982,7 +1983,7 @@ pub fn i32_trunc_f32_s(val: FloatBits32) -> Result<i32> {
     // This means f_trunc must be >= -2147483648.0 AND < 2147483648.0
     // Or more simply, if f_trunc < i32::MIN as f32 or f_trunc > i32::MAX as f32
     // (roughly)
-    if f_trunc < -2_147_483_648.0_f32 || f_trunc >= 2_147_483_648.0_f32 {
+    if !(-2_147_483_648.0_f32..2_147_483_648.0_f32).contains(&f_trunc) {
         // Special case for i32::MIN: -2147483648.0f32 as i32 is i32::MIN
         if f_trunc == -2_147_483_648.0_f32 {
             // This is valid
@@ -2011,7 +2012,7 @@ pub fn i32_trunc_f32_u(val: FloatBits32) -> Result<u32> {
     // Wasm spec table range for f32->u32: not in (0.0, 4294967296.0) then trap
     // This means f_trunc must be >= 0.0 AND < 4294967296.0
     // (Note: -0.0 should also be handled as in range, converting to 0)
-    if f_trunc < 0.0_f32 || f_trunc >= 4_294_967_296.0_f32 {
+    if !(0.0_f32..4_294_967_296.0_f32).contains(&f_trunc) {
         // Check for -0.0 case explicitly, as (f_trunc < 0.0) would be true
         if f_trunc == 0.0 && f_trunc.is_sign_negative() {
             // -0.0 is fine, becomes 0u32
@@ -2036,7 +2037,7 @@ pub fn i32_trunc_f64_s(val: FloatBits64) -> Result<i32> {
     }
     let d_trunc = f64_trunc_compat(d);
     // Wasm spec table range: not in (-2147483648.0, 2147483648.0) for f64->i32
-    if d_trunc < -2_147_483_648.0_f64 || d_trunc >= 2_147_483_648.0_f64 {
+    if !(-2_147_483_648.0_f64..2_147_483_648.0_f64).contains(&d_trunc) {
         if d_trunc == -2_147_483_648.0_f64 {
             // valid
         } else {
@@ -2061,7 +2062,7 @@ pub fn i32_trunc_f64_u(val: FloatBits64) -> Result<u32> {
     }
     let d_trunc = f64_trunc_compat(d);
     // Wasm spec table range: not in (0.0, 4294967296.0) for f64->u32
-    if d_trunc < 0.0_f64 || d_trunc >= 4_294_967_296.0_f64 {
+    if !(0.0_f64..4_294_967_296.0_f64).contains(&d_trunc) {
         if d_trunc == 0.0 && d_trunc.is_sign_negative() {
             // -0.0 is fine
         } else {
@@ -2090,7 +2091,7 @@ pub fn i64_trunc_f32_s(val: FloatBits32) -> Result<i64> {
     // i64::MIN as f32 is approx -9.223372E18
     // i64::MAX as f32 is approx  9.223372E18
 
-    if f_trunc < I64_MIN_AS_F32 || f_trunc >= I64_MAX_AS_F32 {
+    if !(I64_MIN_AS_F32..I64_MAX_AS_F32).contains(&f_trunc) {
         if f_trunc == I64_MIN_AS_F32 { // Check for exact lower bound
              // This is okay, will become i64::MIN
         } else {
@@ -2116,7 +2117,7 @@ pub fn i64_trunc_f32_u(val: FloatBits32) -> Result<u64> {
     let f_trunc = f32_trunc_compat(f);
     // Wasm spec table range: not in (0.0, 18446744073709551616.0) for f32->u64
     const U64_MAX_AS_F32: f32 = 18_446_744_073_709_551_616.0_f32; // 2^64
-    if f_trunc < 0.0_f32 || f_trunc >= U64_MAX_AS_F32 {
+    if !(0.0_f32..U64_MAX_AS_F32).contains(&f_trunc) {
         if f_trunc == 0.0 && f_trunc.is_sign_negative() {
             // -0.0 is fine
         } else {
@@ -2147,7 +2148,7 @@ pub fn i64_trunc_f64_s(val: FloatBits64) -> Result<i64> {
         // Test: (i64::MAX as f64) is  9223372036854776000.0
         // The spec implies the range of representable values, not the casted bounds.
         // Let's use the numeric literals from spec's Table 15 for bounds check.
-        if d_trunc < -9_223_372_036_854_775_808.0_f64 || d_trunc >= 9_223_372_036_854_775_808.0_f64
+        if !(-9_223_372_036_854_775_808.0_f64..9_223_372_036_854_775_808.0_f64).contains(&d_trunc)
         {
             if d_trunc == -9_223_372_036_854_775_808.0_f64 { // i64::MIN
                  // okay
@@ -2175,7 +2176,7 @@ pub fn i64_trunc_f64_u(val: FloatBits64) -> Result<u64> {
     let d_trunc = f64_trunc_compat(d);
     // Wasm spec table range: not in (0.0, 18446744073709551616.0) for f64->u64
     // This is (0, 2^64).
-    if d_trunc < 0.0_f64 || d_trunc >= 18_446_744_073_709_551_616.0_f64 {
+    if !(0.0_f64..18_446_744_073_709_551_616.0_f64).contains(&d_trunc) {
         if d_trunc == 0.0 && d_trunc.is_sign_negative() {
             // -0.0 is fine
         } else {

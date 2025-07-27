@@ -190,9 +190,9 @@ Test on actual no_std targets::
 Verification Script
 ~~~~~~~~~~~~~~~~~~~
 
-Use the verification script to check all crates::
+Use the verification command to check all crates::
 
-    cargo xtask verify-no-std
+    cargo-wrt no-std
 
 This script:
 

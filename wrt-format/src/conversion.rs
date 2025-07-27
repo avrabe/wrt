@@ -5,16 +5,24 @@
 //! duplication and ensure consistency across crates.
 
 use core::fmt;
-
 #[cfg(feature = "std")]
 use std::format;
 
-use wrt_error::{Error, Result};
-use wrt_foundation::{BlockType, ValueType};
+use wrt_error::{
+    Error,
+    Result,
+};
+use wrt_foundation::{
+    BlockType,
+    ValueType,
+};
 
 use crate::{
     error::parse_error,
-    types::{FormatBlockType, Limits},
+    types::{
+        FormatBlockType,
+        Limits,
+    },
 };
 
 /// Convert from FormatBlockType to BlockType
@@ -25,6 +33,7 @@ pub fn format_block_type_to_block_type(format_block_type: &FormatBlockType) -> B
     match format_block_type {
         FormatBlockType::Empty => BlockType::Value(None),
         FormatBlockType::ValueType(value_type) => BlockType::Value(Some(*value_type)),
+        #[cfg(any(feature = "std", feature = "alloc"))]
         FormatBlockType::FuncType(_func_type) => BlockType::FuncType(0), // TODO: proper type
         // index mapping
         FormatBlockType::TypeIndex(idx) => BlockType::FuncType(*idx),
@@ -50,11 +59,9 @@ pub fn format_limits_to_wrt_limits(
     limits: &crate::types::Limits,
 ) -> Result<wrt_foundation::types::Limits> {
     if limits.memory64 {
-        return Err(Error::new(
-            wrt_error::ErrorCategory::Validation,
-            wrt_error::codes::VALIDATION_UNSUPPORTED_FEATURE,
+        return Err(Error::runtime_execution_error(
             "memory64 limits are not supported by the current runtime type system (u32 limits).",
-        ));
+        ;
     }
 
     let min_u32 = limits.min.try_into().map_err(|_| {
@@ -95,18 +102,21 @@ pub fn format_limits_to_wrt_limits(
                 return Err(crate::error::validation_error_dynamic(format!(
                     "Maximum limit ({}) cannot be less than minimum limit ({}).",
                     max_val, min_u32
-                )));
+                );
             }
             #[cfg(not(any(feature = "std")))]
             {
                 return Err(crate::error::validation_error(
                     "Maximum limit cannot be less than minimum limit.",
-                ));
+                ;
             }
         }
     }
 
-    Ok(wrt_foundation::types::Limits { min: min_u32, max: max_u32 })
+    Ok(wrt_foundation::types::Limits {
+        min: min_u32,
+        max: max_u32,
+    })
 }
 
 /// Convert from wrt_foundation::Limits to format-specific Limits
@@ -127,7 +137,12 @@ pub fn wrt_limits_to_format_limits(
     shared: bool,
     memory64: bool,
 ) -> Limits {
-    Limits { min: limits.min as u64, max: limits.max.map(|m| m as u64), shared, memory64 }
+    Limits {
+        min: limits.min as u64,
+        max: limits.max.map(|m| m as u64),
+        shared,
+        memory64,
+    }
 }
 
 /// A shorthand function for converting wrt_foundation::Limits to format Limits
@@ -229,11 +244,11 @@ where
             return Err(crate::error::validation_error_dynamic(format!(
                 "Value {} is too small, minimum is {}",
                 value, min
-            )));
+            );
         }
         #[cfg(not(any(feature = "std")))]
         {
-            return Err(crate::error::validation_error("Value is too small"));
+            return Err(crate::error::validation_error("Value is too small";
         }
     }
 
@@ -243,11 +258,11 @@ where
             return Err(crate::error::validation_error_dynamic(format!(
                 "Value {} is too large, maximum is {}",
                 value, max
-            )));
+            );
         }
         #[cfg(not(any(feature = "std")))]
         {
-            return Err(crate::error::validation_error("Value is too large"));
+            return Err(crate::error::validation_error("Value is too large";
         }
     }
 
@@ -264,66 +279,73 @@ mod tests {
     fn test_format_block_type_conversion() {
         // Test FormatBlockType -> BlockType
         let format_empty = FormatBlockType::Empty;
-        let format_value = FormatBlockType::ValueType(ValueType::I32);
-        let format_type_idx = FormatBlockType::TypeIndex(42);
+        let format_value = FormatBlockType::ValueType(ValueType::I32;
+        let format_type_idx = FormatBlockType::TypeIndex(42;
 
-        let block_empty = format_block_type_to_block_type(&format_empty);
-        let block_value = format_block_type_to_block_type(&format_value);
-        let block_type_idx = format_block_type_to_block_type(&format_type_idx);
+        let block_empty = format_block_type_to_block_type(&format_empty;
+        let block_value = format_block_type_to_block_type(&format_value;
+        let block_type_idx = format_block_type_to_block_type(&format_type_idx;
 
-        assert!(matches!(block_empty, BlockType::Value(None)));
-        // ValueType now requires generic parameter, so we'll check the general structure
-        assert!(matches!(block_value, BlockType::Value(_)));
-        assert!(matches!(block_type_idx, BlockType::FuncType(42)));
+        assert!(matches!(block_empty, BlockType::Value(None));
+        // ValueType now requires generic parameter, so we'll check the general
+        // structure
+        assert!(matches!(block_value, BlockType::Value(_));
+        assert!(matches!(block_type_idx, BlockType::FuncType(42));
 
         // Test BlockType -> FormatBlockType
-        let format_empty_2 = block_type_to_format_block_type(&block_empty);
-        let format_value_2 = block_type_to_format_block_type(&block_value);
-        let format_type_idx_2 = block_type_to_format_block_type(&block_type_idx);
+        let format_empty_2 = block_type_to_format_block_type(&block_empty;
+        let format_value_2 = block_type_to_format_block_type(&block_value;
+        let format_type_idx_2 = block_type_to_format_block_type(&block_type_idx;
 
-        assert!(matches!(format_empty_2, FormatBlockType::Empty));
-        assert!(matches!(format_value_2, FormatBlockType::ValueType(ValueType::I32)));
-        assert!(matches!(format_type_idx_2, FormatBlockType::TypeIndex(42)));
+        assert!(matches!(format_empty_2, FormatBlockType::Empty);
+        assert!(matches!(
+            format_value_2,
+            FormatBlockType::ValueType(ValueType::I32)
+        ;
+        assert!(matches!(format_type_idx_2, FormatBlockType::TypeIndex(42));
     }
 
     #[test]
     fn test_limits_conversion() {
         // Test wrt-foundation Limits -> FormatLimits
         let wrt_limits_min = wrt_foundation::types::Limits { min: 10, max: None };
-        let wrt_limits_both = wrt_foundation::types::Limits { min: 10, max: Some(20) };
+        let wrt_limits_both = wrt_foundation::types::Limits {
+            min: 10,
+            max: Some(20),
+        };
 
-        let format_limits_min = wrt_limits_to_format_limits(&wrt_limits_min, false, false);
-        let format_limits_both = wrt_limits_to_format_limits(&wrt_limits_both, false, false);
+        let format_limits_min = wrt_limits_to_format_limits(&wrt_limits_min, false, false;
+        let format_limits_both = wrt_limits_to_format_limits(&wrt_limits_both, false, false;
 
-        assert_eq!(format_limits_min.min, 10);
-        assert_eq!(format_limits_min.max, None);
-        assert_eq!(format_limits_min.shared, false);
-        assert_eq!(format_limits_min.memory64, false);
+        assert_eq!(format_limits_min.min, 10;
+        assert_eq!(format_limits_min.max, None;
+        assert_eq!(format_limits_min.shared, false;
+        assert_eq!(format_limits_min.memory64, false;
 
-        assert_eq!(format_limits_both.min, 10);
-        assert_eq!(format_limits_both.max, Some(20));
-        assert_eq!(format_limits_both.shared, false);
-        assert_eq!(format_limits_both.memory64, false);
+        assert_eq!(format_limits_both.min, 10;
+        assert_eq!(format_limits_both.max, Some(20;
+        assert_eq!(format_limits_both.shared, false;
+        assert_eq!(format_limits_both.memory64, false;
 
         // Test with shared memory
-        let format_limits_shared = wrt_limits_to_format_limits(&wrt_limits_min, true, false);
-        assert_eq!(format_limits_shared.shared, true);
-        assert_eq!(format_limits_shared.memory64, false);
+        let format_limits_shared = wrt_limits_to_format_limits(&wrt_limits_min, true, false;
+        assert_eq!(format_limits_shared.shared, true;
+        assert_eq!(format_limits_shared.memory64, false;
 
         // Test with memory64
-        let format_limits_mem64 = wrt_limits_to_format_limits(&wrt_limits_min, false, true);
-        assert_eq!(format_limits_mem64.shared, false);
-        assert_eq!(format_limits_mem64.memory64, true);
+        let format_limits_mem64 = wrt_limits_to_format_limits(&wrt_limits_min, false, true;
+        assert_eq!(format_limits_mem64.shared, false;
+        assert_eq!(format_limits_mem64.memory64, true;
 
         // Test FormatLimits -> wrt-foundation Limits
         let wrt_limits_min_2 = format_limits_to_wrt_limits(&format_limits_min).unwrap();
         let wrt_limits_both_2 = format_limits_to_wrt_limits(&format_limits_both).unwrap();
 
-        assert_eq!(wrt_limits_min_2.min, 10);
-        assert_eq!(wrt_limits_min_2.max, None);
+        assert_eq!(wrt_limits_min_2.min, 10;
+        assert_eq!(wrt_limits_min_2.max, None;
 
-        assert_eq!(wrt_limits_both_2.min, 10);
-        assert_eq!(wrt_limits_both_2.max, Some(20));
+        assert_eq!(wrt_limits_both_2.min, 10;
+        assert_eq!(wrt_limits_both_2.max, Some(20;
     }
 
     #[test]
@@ -334,10 +356,10 @@ mod tests {
         assert!(validate_format(10, 1, 10).is_ok());
 
         // Test error cases
-        let too_small = validate_format(0, 1, 10);
-        assert!(too_small.is_err());
+        let too_small = validate_format(0, 1, 10;
+        assert!(too_small.is_err();
 
-        let too_large = validate_format(11, 1, 10);
-        assert!(too_large.is_err());
+        let too_large = validate_format(11, 1, 10;
+        assert!(too_large.is_err();
     }
 }

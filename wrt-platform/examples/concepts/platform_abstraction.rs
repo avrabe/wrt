@@ -9,9 +9,9 @@ use core::time::Duration;
 fn main() {
     println!("=== WRT Platform Concepts ===\n");
     
-    show_platform_abstraction_concepts();
-    show_external_platform_strategy();
-    show_vxworks_integration_example();
+    show_platform_abstraction_concepts);
+    show_external_platform_strategy);
+    show_vxworks_integration_example);
 }
 
 fn show_platform_abstraction_concepts() {
@@ -93,14 +93,14 @@ fn show_vxworks_integration_example() {
     
     println!("\n   Configuration Example:");
     println!("   ```rust");
-    println!("   use wrt_platform_vxworks::{{VxWorksContext, VxWorksPlatform}};");
+    println!("   use wrt_platform_vxworks::{{VxWorksContext, VxWorksPlatform}};";
     println!("   ");
     println!("   // Auto-detect execution context");
     println!("   let context = if in_kernel_space() {{");
     println!("       VxWorksContext::Lkm");
     println!("   }} else {{");
     println!("       VxWorksContext::Rtp");
-    println!("   }};");
+    println!("   }};";
     println!("   ");
     println!("   // Create platform adapter");
     println!("   let platform = VxWorksPlatform::new(VxWorksConfig {{");
@@ -109,11 +109,11 @@ fn show_vxworks_integration_example() {
     println!("       use_memory_partitions: context == VxWorksContext::Lkm,");
     println!("       priority_inheritance: true,");
     println!("       ..Default::default()");
-    println!("   }});");
+    println!("   }});";
     println!("   ");
     println!("   // Create WRT components");
-    println!("   let allocator = platform.create_allocator_boxed()?;");
-    println!("   let futex = platform.create_futex_boxed()?;");
+    println!("   let allocator = platform.create_allocator_boxed()?;";
+    println!("   let futex = platform.create_futex_boxed()?;";
     println!("   ```");
     
     println!("\n   Integration with WRT:");
@@ -125,7 +125,7 @@ fn show_vxworks_integration_example() {
     println!("       // Generic WRT runtime code");
     println!("   }}");
     println!("   ");
-    println!("   use_with_wrt(allocator, futex);");
+    println!("   use_with_wrt(allocator, futex);";
     println!("   ```");
     
     println!("\n   Platform-Specific Features:");
@@ -148,7 +148,7 @@ fn show_vxworks_integration_example() {
     println!("   }}");
     println!("   ```");
     
-    demonstrate_trait_integration();
+    demonstrate_trait_integration);
 }
 
 fn demonstrate_trait_integration() {
@@ -160,13 +160,13 @@ fn demonstrate_trait_integration() {
     
     let futex = SpinFutexBuilder::new()
         .with_initial_value(0)
-        .build();
+        .build);
     
     println!("\n   Created SpinFutex example:");
     
     // Test basic operations
-    futex.set(42);
-    let value = futex.get();
+    futex.set(42;
+    let value = futex.get);
     println!("   ✓ Set and get value: {}", value);
     
     // Test wait (should return immediately since value doesn't match)
@@ -184,7 +184,7 @@ fn demonstrate_trait_integration() {
     println!("\n   This demonstrates how platform implementations");
     println!("   work with WRT's trait system!");
     
-    show_external_crate_template();
+    show_external_crate_template);
 }
 
 fn show_external_crate_template() {
@@ -222,18 +222,18 @@ fn show_external_crate_template() {
     
     println!("\n   Usage in Applications:");
     println!("   ```rust");
-    println!("   use wrt_platform_myos::MyOsPlatform;");
+    println!("   use wrt_platform_myos::MyOsPlatform;";
     println!("   ");
     println!("   fn main() -> Result<(), Box<dyn std::error::Error>> {{");
-    println!("       let platform = MyOsPlatform::detect()?;");
-    println!("       let allocator = platform.create_allocator_boxed()?;");
-    println!("       let futex = platform.create_futex_boxed()?;");
+    println!("       let platform = MyOsPlatform::detect()?;";
+    println!("       let allocator = platform.create_allocator_boxed()?;";
+    println!("       let futex = platform.create_futex_boxed()?;";
     println!("       ");
     println!("       // Use with WRT runtime");
     println!("       let runtime = wrt::Runtime::builder()");
     println!("           .with_allocator(allocator)");
     println!("           .with_futex(futex)");
-    println!("           .build()?;");
+    println!("           .build()?;";
     println!("       ");
     println!("       Ok(())");
     println!("   }}");

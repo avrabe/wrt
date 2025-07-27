@@ -31,7 +31,7 @@ The following configuration files define standards and tool behavior across the 
 Local Development Workflow & Checks
 -----------------------------------
 
-The `justfile` at the root of the workspace provides convenient recipes for common development tasks and running checks.
+The unified `cargo-wrt` build tool provides convenient commands for common development tasks and running checks.
 
 .. _dev-formatting:
 
@@ -41,8 +41,8 @@ Code Formatting
 *   **Tool**: `rustfmt`
 *   **Configuration**: `rustfmt.toml`
 *   **Usage**:
-    *   To format all code: ``just fmt``
-    *   To check if code is formatted: ``just fmt-check`` (run by CI)
+    *   To format and check all code: ``cargo-wrt check`` (includes formatting)
+    *   To check formatting only: ``cargo fmt --check`` (if needed separately)
 
 .. _dev-linting:
 
@@ -52,45 +52,37 @@ Linting with Clippy
 *   **Tool**: `clippy`
 *   **Configuration**: `[lints.clippy]` in `Cargo.toml` files.
 *   **Usage**:
-    *   Run clippy checks: ``just ci-clippy`` (all warnings treated as errors)
-    *   Clippy is also run as part of ``just ci-main``.
+    *   Run clippy checks: ``cargo-wrt check`` (all warnings treated as errors)
+    *   Clippy is also run as part of ``cargo-wrt ci``.
 
 .. _dev-file-checks:
 
 Project File & Header Checks
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-*   **Tool**: Custom `xtask` commands.
+*   **Tool**: Integrated into `cargo-wrt`.
 *   **Usage**:
-    *   Check for presence of essential project files (README, LICENSE, etc.): ``just ci-check-file-presence`` or ``cargo xtask ci-checks file-presence``
-    *   Check file headers (copyright, license, SPDX) and `#![forbid(unsafe_code)]`: ``just ci-check-headers`` or ``cargo xtask ci-checks headers``
-    *   These are also run as part of ``just ci-main``.
+    *   All file and header checks are integrated into: ``cargo-wrt ci``
+    *   Includes checking for essential project files, file headers, copyright, license, SPDX, and ``#![forbid(unsafe_code)]``
 
 .. _dev-dependency-checks:
 
 Dependency Management & Audit
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-*   **Dependency Policy (`cargo-deny`)**:
-    *   **Tool**: `cargo-deny`
+*   **Dependency Policy & Security**:
+    *   **Tools**: `cargo-deny`, `cargo-udeps`, `cargo-audit` (integrated into cargo-wrt)
     *   **Configuration**: `deny.toml`
-    *   **Usage**: ``just ci-deny`` (also part of ``just ci-main``)
-*   **Unused Dependencies (`cargo-udeps`)**:
-    *   **Tool**: `cargo-udeps` (requires installation: `cargo install cargo-udeps --locked`)
-    *   **Setup**: ``just setup-cargo-udeps`` (installs the tool)
-    *   **Usage**: ``just udeps``
-*   **Security Advisories (`cargo-audit`)**:
-    *   **Tool**: `cargo-audit` (requires installation: `cargo install cargo-audit --locked`)
-    *   **Setup**: ``just setup-cargo-audit`` (installs the tool)
-    *   **Usage**: ``just audit``
+    *   **Usage**: ``cargo-wrt ci`` (includes dependency policy, unused deps, and security audit)
+    *   **Strict checks**: ``cargo-wrt check --strict`` (additional dependency analysis)
 
 .. _dev-geiger:
 
 Unsafe Code Detection
 ~~~~~~~~~~~~~~~~~~~~~
 
-*   **Tool**: `cargo-geiger`
-*   **Usage**: ``just ci-geiger`` (also part of ``just ci-main``)
+*   **Tool**: `cargo-geiger` (integrated into cargo-wrt)
+*   **Usage**: ``cargo-wrt ci`` (includes unsafe code detection)
     This tool scans for `unsafe` Rust code usage and provides statistics.
 
 .. _dev-spell-check:
@@ -100,36 +92,38 @@ Spell Checking
 
 *   **Tool**: `cspell` (requires installation: `npm install -g cspell`)
 *   **Configuration**: `cspell.json`
-*   **Setup**: ``just setup-cspell`` (provides installation instructions)
-*   **Usage**: ``just spell-check``
+*   **Usage**: ``cargo-wrt ci`` (includes spell checking if cspell is available)
+*   **External setup**: Install cspell manually with `npm install -g cspell`
 
 .. _dev-testing:
 
 Running Tests
 ~~~~~~~~~~~~~
 
-*   **Unit & Integration Tests**: ``just test`` (runs `cargo test --all-targets --all-features --workspace`)
-*   **Main CI Check Suite**: ``just ci-main``
-    *   Includes: `default` (build), `ci-check-toolchain`, `fmt-check`, `ci-check-file-presence`, `ci-check-headers`, `ci-clippy`, `ci-deny`, `ci-geiger`, `ci-test`, `ci-doc-check`, `ci-fetch-locked`.
-*   **Full CI Check Suite**: ``just ci-full``
-    *   Includes everything in `ci-main` plus:
+*   **Unit & Integration Tests**: ``cargo-wrt test`` (runs comprehensive test suite)
+*   **Main CI Check Suite**: ``cargo-wrt ci``
+    *   Includes: build, toolchain checks, formatting, linting, file/header checks, dependency policy, unsafe code detection, tests, documentation, and more.
+*   **Additional Test Options**:
 
-        *   `ci-miri`: Runs tests under Miri to detect undefined behavior.
-        *   `ci-kani`: Runs Kani formal verification proofs.
-        *   `ci-coverage`: Generates code coverage reports.
-        *   (Other checks like `udeps`, `audit`, `spell-check` might be added here or to `ci-main` as per project decision - currently added to `ci.yml` jobs directly or via `ci-main` if they are part of it)
+        *   ``cargo-wrt test --miri``: Runs tests under Miri to detect undefined behavior.
+        *   ``cargo-wrt kani-verify``: Runs Kani formal verification proofs.
+        *   ``cargo-wrt coverage``: Generates code coverage reports.
+        *   ``cargo-wrt verify-matrix``: Comprehensive build matrix verification.
 
 CI Pipeline Overview
 --------------------
 
-The CI pipeline (defined in `.github/workflows/ci.yml`) automates most of these checks. Key jobs include:
+The CI pipeline (defined in `.github/workflows/ci.yml`) automates most of these checks using the unified `cargo-wrt` build system. Key jobs include:
 
-*   **Check**: Basic build checks.
-*   **Test Suite**: Runs `just test`.
-*   **Compliance Checks**: Runs `just ci-main` which covers formatting, headers, clippy, deny, geiger, file presence, tests, doc builds, and locked fetch. Also runs `just check-imports` separately.
-*   **Unused Dependencies**: Runs `just udeps`.
-*   **Security Audit**: Runs `just audit`.
-*   **Spell Check**: Runs `just spell-check`.
-*   **Docs Build Check**: Runs `just ci-doc-check`.
+*   **Build & Test**: Runs ``cargo-wrt build`` and ``cargo-wrt test``.
+*   **Comprehensive CI**: Runs ``cargo-wrt ci`` which covers:
+    *   Code formatting and linting
+    *   File and header validation
+    *   Dependency policy and security audits
+    *   Unsafe code detection
+    *   Documentation builds
+    *   Test execution
+*   **Formal Verification**: Runs ``cargo-wrt kani-verify`` for safety-critical verification.
+*   **Build Matrix**: Runs ``cargo-wrt verify-matrix`` for comprehensive configuration testing.
 
-This ensures that code merged into the main branch adheres to the defined quality and safety standards.
+This unified approach ensures that code merged into the main branch adheres to the defined quality and safety standards while providing a consistent development experience.

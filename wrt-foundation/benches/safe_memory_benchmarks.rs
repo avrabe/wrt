@@ -10,21 +10,33 @@
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{
+    black_box,
+    criterion_group,
+    criterion_main,
+    Criterion,
+};
 #[cfg(feature = "std")] // StdMemoryProvider is std-only
 use wrt_foundation::safe_memory::StdMemoryProvider;
-use wrt_foundation::{safe_memory::SafeMemoryHandler, verification::VerificationLevel};
+use wrt_foundation::{
+    safe_memory::SafeMemoryHandler,
+    verification::VerificationLevel,
+};
 
 const CAPACITY: usize = 65536; // 64KiB
 const CHUNK_SIZE: usize = 1024; // 1KiB
 const NUM_CHUNKS: usize = 10;
 
 fn safe_memory_store_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("SafeMemory Store");
+    let mut group = c.benchmark_group("SafeMemory Store";
 
     let data_to_store = vec![1u8; CHUNK_SIZE];
 
-    for &level in &[VerificationLevel::Off, VerificationLevel::Sampling, VerificationLevel::Full] {
+    for &level in &[
+        VerificationLevel::Off,
+        VerificationLevel::Sampling,
+        VerificationLevel::Full,
+    ] {
         group.bench_function(format!("verification_{:?}", level), |b| {
             b.iter(|| {
                 #[cfg(feature = "std")]
@@ -42,23 +54,27 @@ fn safe_memory_store_benchmark(c: &mut Criterion) {
                     }
                 }
             })
-        });
+        };
     }
-    group.finish();
+    group.finish);
 }
 
 fn safe_memory_load_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("SafeMemory Load");
+    let mut group = c.benchmark_group("SafeMemory Load";
 
     let mut initial_data_vec = vec![0u8; CAPACITY];
     for i in 0..CAPACITY {
         initial_data_vec[i] = (i % 256) as u8;
     }
 
-    for &level in &[VerificationLevel::Off, VerificationLevel::Sampling, VerificationLevel::Full] {
+    for &level in &[
+        VerificationLevel::Off,
+        VerificationLevel::Sampling,
+        VerificationLevel::Full,
+    ] {
         #[cfg(feature = "std")]
         let mut handler =
-            SafeMemoryHandler::new(StdMemoryProvider::new(initial_data_vec.clone()), level);
+            SafeMemoryHandler::new(StdMemoryProvider::new(initial_data_vec.clone()), level;
         #[cfg(not(feature = "std"))]
         let mut handler = {
             let mut provider = wrt_foundation::safe_memory::NoStdMemoryProvider::<CAPACITY>::new();
@@ -75,16 +91,20 @@ fn safe_memory_load_benchmark(c: &mut Criterion) {
                         let safe_slice = handler.get_slice(offset, CHUNK_SIZE).unwrap();
                         let data_segment = safe_slice.data().unwrap();
                         for val in data_segment.iter() {
-                            sum = sum.wrapping_add(*val);
+                            sum = sum.wrapping_add(*val;
                         }
                     }
                 }
-                black_box(sum);
+                black_box(sum;
             })
-        });
+        };
     }
-    group.finish();
+    group.finish);
 }
 
-criterion_group!(benches, safe_memory_store_benchmark, safe_memory_load_benchmark);
-criterion_main!(benches);
+criterion_group!(
+    benches,
+    safe_memory_store_benchmark,
+    safe_memory_load_benchmark
+;
+criterion_main!(benches;

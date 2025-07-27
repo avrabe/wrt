@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Platform Synchronization Primitives
 // SW-REQ-ID: REQ_PLATFORM_001
@@ -7,6 +8,8 @@
 // SPDX-License-Identifier: MIT
 
 //! Provides traits and implementations for platform-specific synchronization.
+
+extern crate alloc;
 
 use core::fmt::Debug;
 
@@ -20,8 +23,12 @@ pub use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 // Binary std/no_std choice
 #[cfg(feature = "std")]
-pub use std::sync::{Arc, Mutex, RwLock, MutexGuard, Condvar};
+pub use alloc::sync::Arc;
+#[cfg(feature = "std")]
+pub use std::sync::{Mutex, RwLock, MutexGuard, Condvar};
 
+#[cfg(not(feature = "std"))]
+pub use alloc::sync::Arc;
 #[cfg(not(feature = "std"))]
 pub use wrt_sync::{WrtMutex as Mutex, WrtRwLock as RwLock, WrtMutexGuard as MutexGuard};
 
@@ -41,11 +48,7 @@ impl Condvar {
     
     /// Wait on the condition variable (not supported in no_std)
     pub fn wait<'a, T>(&self, _guard: MutexGuard<'a, T>) -> Result<MutexGuard<'a, T>> {
-        Err(wrt_error::Error::new(
-            wrt_error::ErrorCategory::Runtime,
-            wrt_error::codes::NOT_IMPLEMENTED,
-            "Condvar not supported in no_std"
-        ))
+        Err(wrt_error::Error::runtime_not_implemented("Condvar not supported in no_std"))
     }
     
     /// Notify one waiting thread (no-op in no_std)

@@ -62,15 +62,15 @@ impl SizeClassBufferPool {
     /// Allocate a buffer of at least the specified size
     pub fn allocate(&mut self, size: usize) -> Vec<u8> {
         // Find the appropriate size class (next power of 2)
-        let class_size = size.next_power_of_two();
+        let class_size = size.next_power_of_two);
 
         // If the size is too small, use minimum 16 bytes
-        let class_size = std::cmp::max(class_size, 16);
+        let class_size = std::cmp::max(class_size, 16;
 
         if class_size <= 16384 {
             // Calculate the size class index: log2(size) - 4
             // 16 => 0, 32 => 1, 64 => 2, etc.
-            let class_idx = (class_size.trailing_zeros() as usize).saturating_sub(4);
+            let class_idx = (class_size.trailing_zeros() as usize).saturating_sub(4;
 
             // Try to get from size class pool
             if class_idx < self.size_classes.len() {
@@ -89,7 +89,7 @@ impl SizeClassBufferPool {
 
     /// Allocate a buffer from the overflow pool
     fn allocate_overflow(&mut self, size: usize) -> Vec<u8> {
-        let size = size.next_power_of_two();
+        let size = size.next_power_of_two);
 
         // Try to get a buffer from the overflow pool
         if let Some(buffers) = self.overflow_pools.get_mut(&size) {
@@ -104,7 +104,7 @@ impl SizeClassBufferPool {
 
     /// Return a buffer to the pool
     pub fn return_buffer(&mut self, mut buffer: Vec<u8>) {
-        let capacity = buffer.capacity();
+        let capacity = buffer.capacity);
 
         // Don't keep oversized buffers
         if capacity > self.max_buffer_size {
@@ -112,7 +112,7 @@ impl SizeClassBufferPool {
         }
 
         // Clear the buffer before returning it
-        buffer.clear();
+        buffer.clear);
 
         if capacity <= 16384 {
             // Find the right size class
@@ -133,7 +133,7 @@ impl SizeClassBufferPool {
             }
         } else {
             // Return to overflow pool
-            self.return_to_overflow(capacity, buffer);
+            self.return_to_overflow(capacity, buffer;
         }
     }
 
@@ -149,7 +149,7 @@ impl SizeClassBufferPool {
 
     /// Return a buffer to the overflow pool
     fn return_to_overflow(&mut self, capacity: usize, buffer: Vec<u8>) {
-        let buffers = self.overflow_pools.entry(capacity).or_insert_with(Vec::new);
+        let buffers = self.overflow_pools.entry(capacity).or_insert_with(Vec::new;
         if buffers.len() < self.max_buffers_per_class {
             buffers.push(buffer);
         }
@@ -158,9 +158,9 @@ impl SizeClassBufferPool {
     /// Reset the buffer pool, clearing all pooled buffers
     pub fn reset(&mut self) {
         for class in &mut self.size_classes {
-            class.clear();
+            class.clear);
         }
-        self.overflow_pools.clear();
+        self.overflow_pools.clear);
     }
 
     /// Get statistics about the buffer pool
@@ -171,14 +171,14 @@ impl SizeClassBufferPool {
         // Count buffers in size classes
         for (i, class) in self.size_classes.iter().enumerate() {
             let class_size = 16 << i; // 16, 32, 64, ...
-            total_buffers += class.len();
-            total_capacity += class_size * class.len();
+            total_buffers += class.len);
+            total_capacity += class_size * class.len);
         }
 
         // Count buffers in overflow pools
         for (size, buffers) in &self.overflow_pools {
-            total_buffers += buffers.len();
-            total_capacity += size * buffers.len();
+            total_buffers += buffers.len);
+            total_capacity += size * buffers.len);
         }
 
         BufferPoolStats {
@@ -198,17 +198,17 @@ mod tests {
         let mut pool = SizeClassBufferPool::new();
 
         // Allocate a buffer
-        let buffer = pool.allocate(100);
+        let buffer = pool.allocate(100;
         // Should round up to 128 bytes (next power of 2)
-        assert_eq!(buffer.capacity(), 128);
+        assert_eq!(buffer.capacity(), 128;
 
         // Return to pool
-        pool.return_buffer(buffer);
+        pool.return_buffer(buffer;
 
         // Allocate again
-        let buffer2 = pool.allocate(100);
+        let buffer2 = pool.allocate(100;
         // Should get the same buffer back
-        assert_eq!(buffer2.capacity(), 128);
+        assert_eq!(buffer2.capacity(), 128;
     }
 
     #[test]
@@ -220,47 +220,47 @@ mod tests {
         let expected = [16, 32, 64, 512, 2048, 4096, 32768];
 
         for (i, &size) in sizes.iter().enumerate() {
-            let buffer = pool.allocate(size);
+            let buffer = pool.allocate(size;
             assert_eq!(
                 buffer.capacity(),
                 expected[i],
                 "Expected size {} for request {}",
                 expected[i],
                 size
-            );
+            ;
         }
     }
 
     #[test]
     fn test_return_buffer_limit() {
-        let mut pool = SizeClassBufferPool::new_with_config(2, 1024);
+        let mut pool = SizeClassBufferPool::new_with_config(2, 1024;
 
         // Allocate and return 3 buffers of the same size
-        let buffer1 = pool.allocate(64);
-        let buffer2 = pool.allocate(64);
-        let buffer3 = pool.allocate(64);
+        let buffer1 = pool.allocate(64;
+        let buffer2 = pool.allocate(64;
+        let buffer3 = pool.allocate(64;
 
-        pool.return_buffer(buffer1);
-        pool.return_buffer(buffer2);
-        pool.return_buffer(buffer3);
+        pool.return_buffer(buffer1;
+        pool.return_buffer(buffer2;
+        pool.return_buffer(buffer3;
 
         // Pool should only have kept 2
-        let stats = pool.stats();
-        assert_eq!(stats.total_buffers, 2);
+        let stats = pool.stats);
+        assert_eq!(stats.total_buffers, 2;
     }
 
     #[test]
     fn test_max_buffer_size() {
-        let mut pool = SizeClassBufferPool::new_with_config(10, 1024);
+        let mut pool = SizeClassBufferPool::new_with_config(10, 1024;
 
         // Allocate a large buffer
-        let large_buffer = pool.allocate(2048);
+        let large_buffer = pool.allocate(2048;
 
         // Return it to the pool
-        pool.return_buffer(large_buffer);
+        pool.return_buffer(large_buffer;
 
         // Should not be kept because it's too large
-        let stats = pool.stats();
+        let stats = pool.stats);
         assert_eq!(stats.total_buffers, 0);
     }
 
@@ -269,19 +269,19 @@ mod tests {
         let mut pool = SizeClassBufferPool::new();
 
         // Allocate and return some buffers
-        pool.return_buffer(pool.allocate(64));
-        pool.return_buffer(pool.allocate(128));
-        pool.return_buffer(pool.allocate(4096));
+        pool.return_buffer(pool.allocate(64;
+        pool.return_buffer(pool.allocate(128;
+        pool.return_buffer(pool.allocate(4096;
 
         // Check stats before reset
-        let stats_before = pool.stats();
-        assert_eq!(stats_before.total_buffers, 3);
+        let stats_before = pool.stats);
+        assert_eq!(stats_before.total_buffers, 3;
 
         // Reset the pool
-        pool.reset();
+        pool.reset);
 
         // Check stats after reset
-        let stats_after = pool.stats();
+        let stats_after = pool.stats);
         assert_eq!(stats_after.total_buffers, 0);
     }
 }

@@ -158,7 +158,7 @@ impl<T: ?Sized> WrtRwLock<T> {
                         spin_loop();
                     }
                     // Continue loop regardless to retry compare_exchange
-                }
+                },
             }
         }
     }
@@ -208,6 +208,7 @@ impl<T: ?Sized> WrtRwLock<T> {
 
 impl<T: ?Sized> Deref for WrtRwLockReadGuard<'_, T> {
     type Target = T;
+
     #[inline]
     fn deref(&self) -> &Self::Target {
         // Safety: Guard ensures read lock is held.
@@ -234,6 +235,7 @@ impl<T: ?Sized> Drop for WrtRwLockReadGuard<'_, T> {
 
 impl<T: ?Sized> Deref for WrtRwLockWriteGuard<'_, T> {
     type Target = T;
+
     #[inline]
     fn deref(&self) -> &Self::Target {
         // Safety: Guard ensures write lock is held.
@@ -337,7 +339,10 @@ pub mod parking_impl {
 
     impl WaitQueue {
         fn new() -> Self {
-            Self { readers: StdRwLock::new(Vec::new()), writer: StdRwLock::new(None) }
+            Self {
+                readers: StdRwLock::new(Vec::new()),
+                writer: StdRwLock::new(None),
+            }
         }
 
         fn register_reader(&self) -> Result<()> {
@@ -536,7 +541,7 @@ pub mod parking_impl {
                 ) {
                     Ok(_) => {
                         return Ok(WrtParkingRwLockWriteGuard { lock: self });
-                    }
+                    },
                     Err(_current_state) => {
                         if !self.waiters.register_writer()? {
                             thread::park();
@@ -547,7 +552,7 @@ pub mod parking_impl {
                             continue;
                         }
                         thread::park();
-                    }
+                    },
                 }
             }
         }
@@ -589,6 +594,7 @@ pub mod parking_impl {
 
     impl<T: ?Sized> CoreDeref for WrtParkingRwLockReadGuard<'_, T> {
         type Target = T;
+
         #[inline]
         fn deref(&self) -> &Self::Target {
             // # Safety
@@ -612,6 +618,7 @@ pub mod parking_impl {
 
     impl<T: ?Sized> CoreDeref for WrtParkingRwLockWriteGuard<'_, T> {
         type Target = T;
+
         #[inline]
         fn deref(&self) -> &Self::Target {
             // # Safety
@@ -823,11 +830,17 @@ mod tests {
         assert_eq!(*lock.read(), 10);
 
         let r_guard = lock.read();
-        assert!(lock.try_write().is_none(), "try_write should fail when read lock is held");
+        assert!(
+            lock.try_write().is_none(),
+            "try_write should fail when read lock is held"
+        );
         drop(r_guard);
 
         let w_guard = lock.write();
-        assert!(lock.try_read().is_none(), "try_read should fail when write lock is held");
+        assert!(
+            lock.try_read().is_none(),
+            "try_read should fail when write lock is held"
+        );
         drop(w_guard);
     }
 }

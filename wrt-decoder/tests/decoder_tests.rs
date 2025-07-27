@@ -1,22 +1,25 @@
-use wrt_error::{codes, Error, ErrorCategory};
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+};
 
 // Custom Result type for our tests
 type Result<T> = wrt_error::Result<T>;
 
 // Helper function to convert wat::Error to wrt_error::Error
 fn wat_to_wrt_error(e: wat::Error) -> Error {
-    Error::new(ErrorCategory::Runtime, codes::EXECUTION_ERROR, e.to_string())
+    Error::runtime_execution_error(&format!("WAT parse error: {}", e))
 }
 
 #[test]
-#[ignore] // Temporarily ignore this test
 fn test_basic_module_decoding() -> Result<()> {
-    // Create a simple WebAssembly module using wat
+    // Create a basic WebAssembly module
     let wasm_bytes = wat::parse_str(
         r#"
         (module
           ;; Import a function
-          (import "env" "log" (func $log (param i32)))
+          (import "env" "imported_func" (func (param i32) (result i32)))
           
           ;; Define a memory
           (memory (export "memory") 1)
@@ -107,7 +110,7 @@ fn test_complex_module_decoding() -> Result<()> {
     assert_eq!(module.memories.len(), 1);
     assert_eq!(module.globals.len(), 1);
     assert_eq!(module.data.len(), 1);
-    assert!(module.start.is_some());
+    assert!(module.start.is_some();
 
     Ok(())
 }
@@ -119,8 +122,8 @@ fn test_invalid_module() {
     let invalid_bytes = vec![0x00, 0x61, 0x73];
 
     // Attempt to decode, should return an error
-    let result = wrt_decoder::wasm::decode(&invalid_bytes);
-    assert!(result.is_err());
+    let result = wrt_decoder::wasm::decode(&invalid_bytes;
+    assert!(result.is_err();
 
     // Test with truncated module
     let truncated = vec![
@@ -128,8 +131,8 @@ fn test_invalid_module() {
         0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00, // Truncated type section
         0x01, 0x05, 0x01, 0x60,
     ];
-    let result = wrt_decoder::wasm::decode(&truncated);
-    assert!(result.is_err());
+    let result = wrt_decoder::wasm::decode(&truncated;
+    assert!(result.is_err();
 }
 
 #[test]

@@ -1,3 +1,4 @@
+
 // WRT - wrt-math
 // Module: SIMD Operations
 // SW-REQ-ID: REQ_SIMD_001
@@ -462,11 +463,11 @@ mod tests {
         
         // Test with all zeros
         let zeros = [0u8; 16];
-        assert!(!simd_ops.v128_any_true(&zeros).unwrap());
+        assert!(!simd_ops.v128_any_true(&zeros).unwrap();
         
         // Test with one non-zero
         let mut one_set = [0u8; 16];
         one_set[7] = 1;
-        assert!(simd_ops.v128_any_true(&one_set).unwrap());
+        assert!(simd_ops.v128_any_true(&one_set).unwrap();
     }
 }

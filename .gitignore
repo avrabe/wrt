@@ -1,7 +1,11 @@
 target/
 docs/_build/
+docs/build/
 docs/source/wrt*
 docs/source/changelog.md
+
+# Documentation virtual environment
+.venv-docs/
 
 # Ignore all WASM files but keep WAT files which are the source format
 *.wasm
@@ -33,4 +37,13 @@ docs/source/implementation/source_requirements.rst
 docs_artifact_final/
 docs_output/
 
+# Development artifacts
 *.bak*
+*.orig
+*.backup
+*~
+*.tmp
+.DS_Store
+.cursor/
+.cursorignore
+*.rlib

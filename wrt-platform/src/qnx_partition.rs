@@ -6,6 +6,7 @@
 //! This module interfaces with QNX's partition APIs to enable multi-tenant
 //! WebAssembly execution with strong isolation guarantees.
 
+
 use core::{
     fmt::{self, Debug},
     sync::atomic::{AtomicU32, Ordering},
@@ -250,7 +251,7 @@ impl QnxMemoryPartitionBuilder {
     /// Set memory size configuration
     pub fn with_memory_size(mut self, min: usize, max: usize, reserved: usize) -> Self {
         self.config.memory_size =
-            Some(MemorySizeConfig { min_size: min, max_size: max, reserved_size: reserved });
+            Some(MemorySizeConfig { min_size: min, max_size: max, reserved_size: reserved };
         self
     }
 
@@ -289,11 +290,7 @@ impl QnxMemoryPartition {
         };
 
         if partition_id == 0 {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to create QNX memory partition",
-            ));
+            return Err(Error::runtime_execution_error("Failed to create QNX memory partition";
         }
 
         // Configure memory size if specified
@@ -310,14 +307,13 @@ impl QnxMemoryPartition {
             if result != 0 {
                 // Clean up the partition if configuration fails
                 unsafe {
-                    ffi::mem_partition_destroy(partition_id);
+                    ffi::mem_partition_destroy(partition_id;
                 }
 
                 return Err(Error::new(
                     ErrorCategory::Platform,
                     1,
-                    "Failed to configure QNX memory partition size",
-                ));
+                    "Failed to configure QNX partition memory size";
             }
         }
 
@@ -332,11 +328,7 @@ impl QnxMemoryPartition {
     /// Activate this partition for the current thread
     pub fn activate(&self) -> Result<()> {
         if !self.created {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Cannot activate destroyed partition",
-            ));
+            return Err(Error::runtime_execution_error("Cannot activate destroyed QNX partition";
         }
 
         let result =
@@ -346,8 +338,7 @@ impl QnxMemoryPartition {
             return Err(Error::new(
                 ErrorCategory::Platform,
                 1,
-                "Failed to activate QNX memory partition",
-            ));
+                "Failed to activate QNX memory partition";
         }
 
         Ok(())
@@ -358,11 +349,7 @@ impl QnxMemoryPartition {
         let result = unsafe { ffi::mem_partition_setcurrent(self.parent_id) };
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to restore parent partition",
-            ));
+            return Err(Error::runtime_execution_error("Failed to restore parent QNX partition";
         }
 
         Ok(())
@@ -374,8 +361,7 @@ impl QnxMemoryPartition {
             return Err(Error::new(
                 ErrorCategory::Platform,
                 1,
-                "Cannot attach to destroyed partition",
-            ));
+                "Cannot attach process to destroyed QNX partition";
         }
 
         let result = unsafe {
@@ -383,11 +369,7 @@ impl QnxMemoryPartition {
         };
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to attach process to QNX memory partition",
-            ));
+            return Err(Error::runtime_execution_error("Failed to attach process to QNX partition";
         }
 
         Ok(())
@@ -399,8 +381,7 @@ impl QnxMemoryPartition {
             return Err(Error::new(
                 ErrorCategory::Platform,
                 1,
-                "Cannot detach from destroyed partition",
-            ));
+                "Cannot detach process from destroyed QNX partition";
         }
 
         let result = unsafe {
@@ -408,11 +389,7 @@ impl QnxMemoryPartition {
         };
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to detach process from QNX memory partition",
-            ));
+            return Err(Error::runtime_execution_error("Failed to detach process from QNX partition";
         }
 
         Ok(())
@@ -427,7 +404,7 @@ impl QnxMemoryPartition {
         self.activate()?;
 
         // Execute the function
-        let result = f();
+        let result = f);
 
         // Restore the parent partition
         self.restore_parent()?;
@@ -438,17 +415,16 @@ impl QnxMemoryPartition {
 
     /// Manually destroy the partition
     pub fn destroy(&self) -> Result<()> {
-        let id = self.partition_id.load(Ordering::Acquire);
+        let id = self.partition_id.load(Ordering::Acquire;
         if id != 0 {
             let result = unsafe { ffi::mem_partition_destroy(id) };
             if result != 0 {
                 return Err(Error::new(
                     ErrorCategory::Platform,
                     1,
-                    "Failed to destroy QNX memory partition",
-                ));
+                    "Failed to destroy QNX memory partition";
             }
-            self.partition_id.store(0, Ordering::Release);
+            self.partition_id.store(0, Ordering::Release;
         }
         Ok(())
     }
@@ -457,10 +433,10 @@ impl QnxMemoryPartition {
 impl Drop for QnxMemoryPartition {
     fn drop(&mut self) {
         if self.created {
-            let id = self.partition_id.load(Ordering::Acquire);
+            let id = self.partition_id.load(Ordering::Acquire;
             if id != 0 {
                 unsafe {
-                    let _ = ffi::mem_partition_destroy(id);
+                    let _ = ffi::mem_partition_destroy(id;
                 }
             }
         }
@@ -495,7 +471,7 @@ impl<'a> PartitionGuard<'a> {
 impl<'a> Drop for PartitionGuard<'a> {
     fn drop(&mut self) {
         if self.active {
-            let _ = self.partition.restore_parent();
+            let _ = self.partition.restore_parent);
         }
     }
 }
@@ -515,22 +491,22 @@ mod tests {
         let partition = QnxMemoryPartitionBuilder::new()
             .with_name("test_partition")
             .build()
-            .expect("Failed to create partition");
+            .expect("Failed to create partition"));
 
         // Get partition ID
-        let id = partition.id();
+        let id = partition.id);
         assert!(id > 0);
 
         // Test activation
-        let result = partition.activate();
+        let result = partition.activate);
         assert!(result.is_ok());
 
         // Test restoration
-        let result = partition.restore_parent();
+        let result = partition.restore_parent);
         assert!(result.is_ok());
 
         // Clean up (handled by Drop, but can be done manually)
-        let result = partition.destroy();
+        let result = partition.destroy);
         assert!(result.is_ok());
     }
 
@@ -541,11 +517,11 @@ mod tests {
         let partition = QnxMemoryPartitionBuilder::new()
             .with_name("guard_test")
             .build()
-            .expect("Failed to create partition");
+            .expect("Failed to create partition"));
 
         // Use partition guard
         {
-            let guard = PartitionGuard::new(&partition).expect("Failed to create guard");
+            let guard = PartitionGuard::new(&partition).expect("Failed to create guard"));
 
             // Execute code inside the partition
             // ...
@@ -555,10 +531,10 @@ mod tests {
 
         // Test manual deactivation
         {
-            let mut guard = PartitionGuard::new(&partition).expect("Failed to create guard");
+            let mut guard = PartitionGuard::new(&partition).expect("Failed to create guard"));
 
             // Manually deactivate
-            let result = guard.deactivate();
+            let result = guard.deactivate);
             assert!(result.is_ok());
         }
     }
@@ -576,22 +552,18 @@ mod tests {
                 1 * 1024 * 1024,  // 1MB reserved
             )
             .build()
-            .expect("Failed to create partition");
+            .expect("Failed to create partition"));
 
         // Execute a closure within the partition
         let result = partition.with_partition(|| {
             // Binary std/no_std choice
             let ptr = unsafe { ffi::malloc(1024 * 1024) };
             if ptr.is_null() {
-                return Err(Error::new(
-                    ErrorCategory::Memory,
-                    1,
-                    "Allocation failed within partition",
-                ));
+                return Err(Error::memory_error("Allocation failed within partition";
             }
             unsafe { ffi::free(ptr) };
             Ok(())
-        });
+        };
 
         assert!(result.is_ok());
     }

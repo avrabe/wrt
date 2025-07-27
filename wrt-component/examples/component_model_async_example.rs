@@ -5,11 +5,25 @@
 
 use wrt_component::{
     async_canonical::AsyncCanonicalAbi,
-    async_types::{Future, FutureHandle, FutureState, Stream, StreamHandle, StreamState},
-    task_manager::{TaskManager, TaskState},
-    ComponentInstanceId, ValType,
+    async_types::{
+        Future,
+        FutureHandle,
+        FutureState,
+        Stream,
+        StreamHandle,
+        StreamState,
+    },
+    task_manager::{
+        TaskManager,
+        TaskState,
+    },
+    ComponentInstanceId,
+    ValType,
 };
-use wrt_foundation::{bounded_collections::BoundedVec, component_value::ComponentValue};
+use wrt_foundation::{
+    bounded_collections::BoundedVec,
+    component_value::ComponentValue,
+};
 
 fn main() {
     println!("=== WebAssembly Component Model Async Example ===\n");
@@ -17,19 +31,19 @@ fn main() {
     // Initialize the async infrastructure
     let mut task_manager = TaskManager::new();
     let mut async_abi = AsyncCanonicalAbi::new();
-    let component_id = ComponentInstanceId::new(1);
+    let component_id = ComponentInstanceId::new(1;
 
     // Example 1: Using Component Model Streams (no Rust futures needed!)
     println!("1. Stream Example:");
-    example_stream(&mut task_manager, &mut async_abi, component_id);
+    example_stream(&mut task_manager, &mut async_abi, component_id;
 
     // Example 2: Using Component Model Futures (no Rust futures needed!)
     println!("\n2. Future Example:");
-    example_future(&mut task_manager, &mut async_abi, component_id);
+    example_future(&mut task_manager, &mut async_abi, component_id;
 
     // Example 3: Task-based async execution
     println!("\n3. Task-based Async:");
-    example_task_async(&mut task_manager, component_id);
+    example_task_async(&mut task_manager, component_id;
 }
 
 fn example_stream(
@@ -64,11 +78,11 @@ fn example_stream(
             Ok(None) => {
                 println!("    Stream empty (would block)");
                 break;
-            }
+            },
             Err(e) => {
                 println!("    Error reading: {:?}", e);
                 break;
-            }
+            },
         }
     }
 
@@ -95,7 +109,7 @@ fn example_future(
     }
 
     // Complete the future with a value
-    let result = ComponentValue::I32(42);
+    let result = ComponentValue::I32(42;
     async_abi.future_write(future_handle, result.clone()).unwrap();
     println!("  Completed future with value: {:?}", result);
 
@@ -123,7 +137,7 @@ fn example_task_async(task_manager: &mut TaskManager, component_id: ComponentIns
 
     // Simulate task execution steps
     for step in 0..3 {
-        let result = task_manager.execute_task_step(task_id);
+        let result = task_manager.execute_task_step(task_id;
         match result {
             Ok(state) => println!("  Step {}: Task state = {:?}", step, state),
             Err(e) => println!("  Step {} error: {:?}", step, e),
@@ -148,12 +162,12 @@ fn manual_async_example() {
     println!("\n=== Manual Async Polling (No Tokio/async-std needed) ===");
 
     let mut task_manager = TaskManager::new();
-    let component_id = ComponentInstanceId::new(1);
+    let component_id = ComponentInstanceId::new(1;
 
     // Create multiple futures
-    let mut futures = Vec::new();
+    let mut futures = Vec::new());
     for i in 0..3 {
-        let future = Future::<i32>::new(FutureHandle(i), ValType::I32);
+        let future = Future::<i32>::new(FutureHandle(i), ValType::I32;
         futures.push(future);
     }
 

@@ -10,16 +10,16 @@ fn test_parse_encode_block() {
     
     match instruction {
         Instruction::Block(block_type, instructions) => {
-            assert_eq!(block_type, BlockType::Empty);
+            assert_eq!(block_type, BlockType::Empty;
             assert!(instructions.is_empty());
         }
         _ => panic!("Expected Block instruction"),
     }
     
-    assert_eq!(bytes_read, 3);
+    assert_eq!(bytes_read, 3;
     
     let encoded = encode_instruction(&instruction).unwrap();
-    assert_eq!(encoded, bytes);
+    assert_eq!(encoded, bytes;
 }
 
 #[test]
@@ -34,17 +34,17 @@ fn test_parse_encode_loop() {
     
     match instruction {
         Instruction::Loop(block_type, instructions) => {
-            assert_eq!(block_type, BlockType::Value(ValueType::I32));
+            assert_eq!(block_type, BlockType::Value(ValueType::I32;
             assert_eq!(instructions.len(), 1);
-            assert_eq!(instructions[0], Instruction::I32Const(1));
+            assert_eq!(instructions[0], Instruction::I32Const(1;
         }
         _ => panic!("Expected Loop instruction"),
     }
     
-    assert_eq!(bytes_read, 5);
+    assert_eq!(bytes_read, 5;
     
     let encoded = encode_instruction(&instruction).unwrap();
-    assert_eq!(encoded, bytes);
+    assert_eq!(encoded, bytes;
 }
 
 #[test]
@@ -61,19 +61,19 @@ fn test_parse_encode_if() {
     
     match instruction {
         Instruction::If(block_type, then_instructions, else_instructions) => {
-            assert_eq!(block_type, BlockType::Empty);
+            assert_eq!(block_type, BlockType::Empty;
             assert_eq!(then_instructions.len(), 1);
-            assert_eq!(then_instructions[0], Instruction::I32Const(1));
+            assert_eq!(then_instructions[0], Instruction::I32Const(1;
             assert_eq!(else_instructions.len(), 1);
-            assert_eq!(else_instructions[0], Instruction::I32Const(0));
+            assert_eq!(else_instructions[0], Instruction::I32Const(0;
         }
         _ => panic!("Expected If instruction"),
     }
     
-    assert_eq!(bytes_read, 8);
+    assert_eq!(bytes_read, 8;
     
     let encoded = encode_instruction(&instruction).unwrap();
-    assert_eq!(encoded, bytes);
+    assert_eq!(encoded, bytes;
 }
 
 #[test]
@@ -90,16 +90,16 @@ fn test_parse_encode_br_table() {
     
     match instruction {
         Instruction::BrTable(labels, default_label) => {
-            assert_eq!(labels, vec![0, 1]);
-            assert_eq!(default_label, 2);
+            assert_eq!(labels, vec![0, 1];
+            assert_eq!(default_label, 2;
         }
         _ => panic!("Expected BrTable instruction"),
     }
     
-    assert_eq!(bytes_read, 5);
+    assert_eq!(bytes_read, 5;
     
     let encoded = encode_instruction(&instruction).unwrap();
-    assert_eq!(encoded, bytes);
+    assert_eq!(encoded, bytes;
 }
 
 #[test]
@@ -115,12 +115,12 @@ fn test_nested_blocks() {
     
     match &instruction {
         Instruction::Block(block_type, instructions) => {
-            assert_eq!(*block_type, BlockType::Empty);
+            assert_eq!(*block_type, BlockType::Empty;
             assert_eq!(instructions.len(), 1);
             
             match &instructions[0] {
                 Instruction::Block(inner_block_type, inner_instructions) => {
-                    assert_eq!(*inner_block_type, BlockType::Empty);
+                    assert_eq!(*inner_block_type, BlockType::Empty;
                     assert!(inner_instructions.is_empty());
                 }
                 _ => panic!("Expected inner Block instruction"),
@@ -129,8 +129,8 @@ fn test_nested_blocks() {
         _ => panic!("Expected outer Block instruction"),
     }
     
-    assert_eq!(bytes_read, 6);
+    assert_eq!(bytes_read, 6;
     
     let encoded = encode_instruction(&instruction).unwrap();
-    assert_eq!(encoded, bytes);
+    assert_eq!(encoded, bytes;
 } 

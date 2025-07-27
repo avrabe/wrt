@@ -70,7 +70,7 @@ impl LinuxAllocator {
 
     /// Creates a new `LinuxAllocator`.
     pub fn new(maximum_pages: Option<u32>, use_guard_pages: bool) -> Self {
-        let max_pages_val = maximum_pages.unwrap_or(Self::DEFAULT_MAX_PAGES);
+        let max_pages_val = maximum_pages.unwrap_or(Self::DEFAULT_MAX_PAGES;
         let max_capacity_bytes = max_pages_val as usize * WASM_PAGE_SIZE;
         Self {
             base_ptr: None,
@@ -83,11 +83,7 @@ impl LinuxAllocator {
 
     fn pages_to_bytes(pages: u32) -> Result<usize> {
         pages.checked_mul(WASM_PAGE_SIZE as u32).map(|b| b as usize).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Page count results in byte overflow",
-            )
+            Error::memory_error("Page count results in byte overflow")
         })
     }
 
@@ -114,7 +110,7 @@ impl LinuxAllocator {
             in("r9") offset,
             out("rcx") _,
             out("r11") _,
-        );
+        ;
 
         #[cfg(target_arch = "aarch64")]
         core::arch::asm!(
@@ -126,7 +122,7 @@ impl LinuxAllocator {
             in("x3") flags,
             in("x4") fd,
             in("x5") offset,
-        );
+        ;
 
         // Linux syscalls return negative errno on error
         if result < 0 && result >= -4095 {
@@ -148,7 +144,7 @@ impl LinuxAllocator {
             in("rsi") len,
             out("rcx") _,
             out("r11") _,
-        );
+        ;
 
         #[cfg(target_arch = "aarch64")]
         core::arch::asm!(
@@ -156,7 +152,7 @@ impl LinuxAllocator {
             inout("x8") syscalls::MUNMAP => _,
             inout("x0") addr => result,
             in("x1") len,
-        );
+        ;
 
         result as i32
     }
@@ -174,7 +170,7 @@ impl LinuxAllocator {
             in("rdx") prot,
             out("rcx") _,
             out("r11") _,
-        );
+        ;
 
         #[cfg(target_arch = "aarch64")]
         core::arch::asm!(
@@ -183,7 +179,7 @@ impl LinuxAllocator {
             inout("x0") addr => result,
             in("x1") len,
             in("x2") prot,
-        );
+        ;
 
         result as i32
     }
@@ -191,19 +187,17 @@ impl LinuxAllocator {
     /// Binary std/no_std choice
     unsafe fn setup_guard_pages(&self, base_ptr: *mut u8, total_size: usize) -> Result<()> {
         if !self.use_guard_pages {
-            return Ok(());
+            return Ok();
         }
 
         // Binary std/no_std choice
-        let guard_page_addr = base_ptr.add(total_size - WASM_PAGE_SIZE);
-        let result = Self::mprotect(guard_page_addr, WASM_PAGE_SIZE, PROT_NONE);
+        let guard_page_addr = base_ptr.add(total_size - WASM_PAGE_SIZE;
+        let result = Self::mprotect(guard_page_addr, WASM_PAGE_SIZE, PROT_NONE;
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::System,
-                1,
-                "Failed to set up guard page protection",
-            ));
+            return Err(Error::runtime_execution_error(
+                "Failed to set up guard pages using mprotect",
+            ;
         }
 
         Ok(())
@@ -232,7 +226,7 @@ impl LinuxAllocatorBuilder {
     /// Sets the maximum number of WebAssembly pages (64 KiB) that can be
     /// Binary std/no_std choice
     pub fn with_maximum_pages(mut self, pages: u32) -> Self {
-        self.maximum_pages = Some(pages);
+        self.maximum_pages = Some(pages;
         self
     }
 
@@ -258,21 +252,17 @@ impl PageAllocator for LinuxAllocator {
             return Err(Error::new(
                 ErrorCategory::System,
                 1,
-                "Allocator has already allocated memory",
-            ));
+                "Memory allocator already initialized with allocated memory",
+            ;
         }
 
         if initial_pages == 0 {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Initial pages cannot be zero",
-            ));
+            return Err(Error::memory_error("Initial pages cannot be zero";
         }
 
         let initial_bytes = Self::pages_to_bytes(initial_pages)?;
-        let max_pages_hint = maximum_pages.unwrap_or(initial_pages).max(initial_pages);
-        let mut reserve_bytes = Self::pages_to_bytes(max_pages_hint)?.max(initial_bytes);
+        let max_pages_hint = maximum_pages.unwrap_or(initial_pages).max(initial_pages;
+        let mut reserve_bytes = Self::pages_to_bytes(max_pages_hint)?.max(initial_bytes;
 
         // Add space for guard pages if enabled
         if self.use_guard_pages {
@@ -282,11 +272,7 @@ impl PageAllocator for LinuxAllocator {
         }
 
         if reserve_bytes > self.max_capacity_bytes {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Requested reservation size exceeds allocator's maximum capacity",
-            ));
+            return Err(Error::memory_error("Requested reservation size exceeds allocator's maximum capacity";
         }
 
         // Direct syscall to mmap
@@ -305,11 +291,9 @@ impl PageAllocator for LinuxAllocator {
 
         // Check for mapping failure
         if ptr == MAP_FAILED {
-            return Err(Error::new(
-                ErrorCategory::System,
-                1,
-                "Memory mapping failed due to OS error",
-            ));
+            return Err(Error::runtime_execution_error(
+                "Failed to map memory using mmap syscall",
+            ;
         }
 
         // Convert raw pointer to NonNull
@@ -317,7 +301,7 @@ impl PageAllocator for LinuxAllocator {
             Error::new(
                 ErrorCategory::System,
                 1,
-                "Memory mapping returned null pointer",
+                "mmap returned null pointer",
             )
         })?;
 
@@ -326,7 +310,7 @@ impl PageAllocator for LinuxAllocator {
             self.setup_guard_pages(ptr, reserve_bytes)?;
         }
 
-        self.base_ptr = Some(base_ptr);
+        self.base_ptr = Some(base_ptr;
         self.total_reserved_bytes = reserve_bytes;
         self.current_committed_bytes = initial_bytes;
 
@@ -335,24 +319,18 @@ impl PageAllocator for LinuxAllocator {
 
     fn grow(&mut self, current_pages: u32, additional_pages: u32) -> Result<()> {
         let Some(base_ptr) = self.base_ptr else {
-            return Err(Error::new(
-                ErrorCategory::System,
-                1,
-                "No memory allocated to grow",
-            ));
+            return Err(Error::runtime_execution_error(
+                "Cannot grow memory: no memory has been allocated",
+            ;
         };
 
         if additional_pages == 0 {
-            return Ok(());
+            return Ok();
         }
 
         let current_bytes_from_arg = Self::pages_to_bytes(current_pages)?;
         if current_bytes_from_arg != self.current_committed_bytes {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Inconsistent current_pages argument for grow operation",
-            ));
+            return Err(Error::memory_error("Current page count does not match internal state";
         }
 
         let new_total_pages = current_pages
@@ -369,11 +347,7 @@ impl PageAllocator for LinuxAllocator {
         };
 
         if new_committed_bytes > available_space {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Grow request exceeds total reserved memory space",
-            ));
+            return Err(Error::memory_error("Grow request exceeds total reserved memory space";
         }
 
         // Since we've already mapped all the memory with PROT_READ | PROT_WRITE,
@@ -385,33 +359,21 @@ impl PageAllocator for LinuxAllocator {
     unsafe fn deallocate(&mut self, ptr: NonNull<u8>, size: usize) -> Result<()> {
         // Validate that ptr matches our base_ptr
         let Some(base_ptr) = self.base_ptr.take() else {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                1,
-                "No memory allocated to deallocate",
-            ));
+            return Err(Error::memory_error("No memory allocated to deallocate";
         };
 
         if ptr.as_ptr() != base_ptr.as_ptr() {
             self.base_ptr = Some(base_ptr); // Restore base_ptr
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Attempted to deallocate with mismatched pointer",
-            ));
+            return Err(Error::memory_error("Attempted to deallocate with mismatched pointer";
         }
 
         // SAFETY: ptr was obtained from our mmap call and is valid.
         // size is the total size we had reserved.
-        let result = Self::munmap(ptr.as_ptr(), size);
+        let result = Self::munmap(ptr.as_ptr(), size;
         if result != 0 {
             // munmap failed, need to restore base_ptr
-            self.base_ptr = Some(base_ptr);
-            return Err(Error::new(
-                ErrorCategory::System,
-                1,
-                "Memory unmapping failed due to OS error",
-            ));
+            self.base_ptr = Some(base_ptr;
+            return Err(Error::runtime_execution_error("Memory unmapping failed due to OS error";
         }
 
         // Reset internal state

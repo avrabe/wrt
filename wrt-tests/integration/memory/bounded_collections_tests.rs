@@ -21,9 +21,9 @@ mod bounded_vec_tests {
         let vec = BoundedVec::<i32, 10>::new();
         
         assert_eq!(vec.len(), 0);
-        assert_eq!(vec.capacity(), 10);
+        assert_eq!(vec.capacity(), 10;
         assert!(vec.is_empty());
-        assert!(!vec.is_full());
+        assert!(!vec.is_full();
         
         Ok(())
     }
@@ -35,15 +35,15 @@ mod bounded_vec_tests {
         // Push elements within capacity
         for i in 0..5 {
             assert!(vec.push(i).is_ok());
-            assert_eq!(vec.len(), i + 1);
+            assert_eq!(vec.len(), i + 1;
         }
         
-        assert!(vec.is_full());
+        assert!(vec.is_full();
         assert!(!vec.is_empty());
         
         // Try to push beyond capacity
         let overflow_result = vec.push(5);
-        assert!(overflow_result.is_err());
+        assert!(overflow_result.is_err();
         assert_eq!(vec.len(), 5); // Should remain unchanged
         
         Ok(())
@@ -59,9 +59,9 @@ mod bounded_vec_tests {
         }
         
         // Pop elements
-        assert_eq!(vec.pop()?, Some(2));
-        assert_eq!(vec.pop()?, Some(1));
-        assert_eq!(vec.pop()?, Some(0));
+        assert_eq!(vec.pop()?, Some(2;
+        assert_eq!(vec.pop()?, Some(1;
+        assert_eq!(vec.pop()?, Some(0;
         assert_eq!(vec.pop()?, None); // Empty
         
         assert!(vec.is_empty());
@@ -80,18 +80,18 @@ mod bounded_vec_tests {
         }
         
         // Test valid indexing
-        assert_eq!(vec.get(0)?, &0);
-        assert_eq!(vec.get(2)?, &20);
-        assert_eq!(vec.get(4)?, &40);
+        assert_eq!(vec.get(0)?, &0;
+        assert_eq!(vec.get(2)?, &20;
+        assert_eq!(vec.get(4)?, &40;
         
         // Test mutable indexing
         *vec.get_mut(1)? = 999;
-        assert_eq!(vec.get(1)?, &999);
+        assert_eq!(vec.get(1)?, &999;
         
         // Test out-of-bounds indexing
-        assert!(vec.get(5).is_err());
-        assert!(vec.get(10).is_err());
-        assert!(vec.get_mut(5).is_err());
+        assert!(vec.get(5).is_err();
+        assert!(vec.get(10).is_err();
+        assert!(vec.get_mut(5).is_err();
         
         Ok(())
     }
@@ -107,16 +107,16 @@ mod bounded_vec_tests {
         ];
         
         for level in &levels {
-            let mut vec = BoundedVec::<i32, 10>::with_verification_level(*level);
-            assert_eq!(vec.verification_level(), *level);
+            let mut vec = BoundedVec::<i32, 10>::with_verification_level(*level;
+            assert_eq!(vec.verification_level(), *level;
             
             // Basic operations should work at all levels
             vec.push(42)?;
-            assert_eq!(vec.get(0)?, &42);
-            assert_eq!(vec.pop()?, Some(42));
+            assert_eq!(vec.get(0)?, &42;
+            assert_eq!(vec.pop()?, Some(42;
             
             // Bounds checking should work at all levels
-            assert!(vec.get(10).is_err());
+            assert!(vec.get(10).is_err();
         }
         
         Ok(())
@@ -130,16 +130,16 @@ mod bounded_vec_tests {
         for i in 0..8 {
             vec.push(i)?;
         }
-        assert_eq!(vec.len(), 8);
+        assert_eq!(vec.len(), 8;
         
         // Test truncate
-        vec.truncate(5);
-        assert_eq!(vec.len(), 5);
-        assert_eq!(vec.get(4)?, &4);
-        assert!(vec.get(5).is_err());
+        vec.truncate(5;
+        assert_eq!(vec.len(), 5;
+        assert_eq!(vec.get(4)?, &4;
+        assert!(vec.get(5).is_err();
         
         // Test clear
-        vec.clear();
+        vec.clear);
         assert_eq!(vec.len(), 0);
         assert!(vec.is_empty());
         
@@ -159,9 +159,9 @@ mod bounded_stack_tests {
         let stack = BoundedStack::<i32, 10>::new();
         
         assert_eq!(stack.len(), 0);
-        assert_eq!(stack.capacity(), 10);
+        assert_eq!(stack.capacity(), 10;
         assert!(stack.is_empty());
-        assert!(!stack.is_full());
+        assert!(!stack.is_full();
         
         Ok(())
     }
@@ -173,21 +173,21 @@ mod bounded_stack_tests {
         // Push elements
         for i in 0..5 {
             assert!(stack.push(i).is_ok());
-            assert_eq!(stack.len(), i + 1);
+            assert_eq!(stack.len(), i + 1;
         }
         
-        assert!(stack.is_full());
+        assert!(stack.is_full();
         
         // Try to push beyond capacity
-        assert!(stack.push(5).is_err());
+        assert!(stack.push(5).is_err();
         
         // Pop elements (LIFO order)
         for i in (0..5).rev() {
-            assert_eq!(stack.pop()?, Some(i));
+            assert_eq!(stack.pop()?, Some(i;
         }
         
         assert!(stack.is_empty());
-        assert_eq!(stack.pop()?, None);
+        assert_eq!(stack.pop()?, None;
         
         Ok(())
     }
@@ -197,7 +197,7 @@ mod bounded_stack_tests {
         let mut stack = BoundedStack::<i32, 5>::new();
         
         // Empty stack peek
-        assert_eq!(stack.peek()?, None);
+        assert_eq!(stack.peek()?, None;
         
         // Push and peek
         stack.push(10)?;
@@ -209,7 +209,7 @@ mod bounded_stack_tests {
         
         // Pop and verify peek updates
         stack.pop()?;
-        assert_eq!(stack.peek()?, Some(&20));
+        assert_eq!(stack.peek()?, Some(&20;
         
         Ok(())
     }
@@ -225,19 +225,19 @@ mod bounded_stack_tests {
         ];
         
         for level in &levels {
-            let mut stack = BoundedStack::<i32, 10>::with_verification_level(*level);
-            assert_eq!(stack.verification_level(), *level);
+            let mut stack = BoundedStack::<i32, 10>::with_verification_level(*level;
+            assert_eq!(stack.verification_level(), *level;
             
             // Test operations work at all levels
             stack.push(42)?;
-            assert_eq!(stack.peek()?, Some(&42));
-            assert_eq!(stack.pop()?, Some(42));
+            assert_eq!(stack.peek()?, Some(&42;
+            assert_eq!(stack.pop()?, Some(42;
             
             // Capacity limits should be enforced at all levels
             for i in 0..10 {
                 stack.push(i)?;
             }
-            assert!(stack.push(10).is_err());
+            assert!(stack.push(10).is_err();
         }
         
         Ok(())
@@ -253,11 +253,11 @@ mod bounded_stack_tests {
         }
         
         // Iterator should go from top to bottom (LIFO)
-        let collected: Vec<i32> = stack.iter().copied().collect();
-        assert_eq!(collected, vec![50, 40, 30, 20, 10]);
+        let collected: Vec<i32> = stack.iter().copied().collect());
+        assert_eq!(collected, vec![50, 40, 30, 20, 10];
         
         // Length should remain unchanged after iteration
-        assert_eq!(stack.len(), 5);
+        assert_eq!(stack.len(), 5;
         
         Ok(())
     }
@@ -275,9 +275,9 @@ mod bounded_queue_tests {
         let queue = BoundedQueue::<i32, 10>::new();
         
         assert_eq!(queue.len(), 0);
-        assert_eq!(queue.capacity(), 10);
+        assert_eq!(queue.capacity(), 10;
         assert!(queue.is_empty());
-        assert!(!queue.is_full());
+        assert!(!queue.is_full();
         
         Ok(())
     }
@@ -289,21 +289,21 @@ mod bounded_queue_tests {
         // Enqueue elements
         for i in 0..5 {
             assert!(queue.enqueue(i).is_ok());
-            assert_eq!(queue.len(), i + 1);
+            assert_eq!(queue.len(), i + 1;
         }
         
-        assert!(queue.is_full());
+        assert!(queue.is_full();
         
         // Try to enqueue beyond capacity
-        assert!(queue.enqueue(5).is_err());
+        assert!(queue.enqueue(5).is_err();
         
         // Dequeue elements (FIFO order)
         for i in 0..5 {
-            assert_eq!(queue.dequeue()?, Some(i));
+            assert_eq!(queue.dequeue()?, Some(i;
         }
         
         assert!(queue.is_empty());
-        assert_eq!(queue.dequeue()?, None);
+        assert_eq!(queue.dequeue()?, None;
         
         Ok(())
     }
@@ -313,8 +313,8 @@ mod bounded_queue_tests {
         let mut queue = BoundedQueue::<i32, 5>::new();
         
         // Empty queue
-        assert_eq!(queue.front()?, None);
-        assert_eq!(queue.back()?, None);
+        assert_eq!(queue.front()?, None;
+        assert_eq!(queue.back()?, None;
         
         // Add elements
         queue.enqueue(10)?;
@@ -326,8 +326,8 @@ mod bounded_queue_tests {
         
         // Dequeue and verify front changes
         queue.dequeue()?;
-        assert_eq!(queue.front()?, Some(&20));
-        assert_eq!(queue.back()?, Some(&30));
+        assert_eq!(queue.front()?, Some(&20;
+        assert_eq!(queue.back()?, Some(&30;
         
         Ok(())
     }
@@ -342,15 +342,15 @@ mod bounded_queue_tests {
         queue.enqueue(3)?;
         
         // Dequeue one element
-        assert_eq!(queue.dequeue()?, Some(1));
+        assert_eq!(queue.dequeue()?, Some(1;
         
         // Should be able to enqueue again
         queue.enqueue(4)?;
         
         // Verify order is maintained
-        assert_eq!(queue.dequeue()?, Some(2));
-        assert_eq!(queue.dequeue()?, Some(3));
-        assert_eq!(queue.dequeue()?, Some(4));
+        assert_eq!(queue.dequeue()?, Some(2;
+        assert_eq!(queue.dequeue()?, Some(3;
+        assert_eq!(queue.dequeue()?, Some(4;
         
         Ok(())
     }
@@ -366,19 +366,19 @@ mod bounded_queue_tests {
         ];
         
         for level in &levels {
-            let mut queue = BoundedQueue::<i32, 10>::with_verification_level(*level);
-            assert_eq!(queue.verification_level(), *level);
+            let mut queue = BoundedQueue::<i32, 10>::with_verification_level(*level;
+            assert_eq!(queue.verification_level(), *level;
             
             // Test operations work at all levels
             queue.enqueue(42)?;
-            assert_eq!(queue.front()?, Some(&42));
-            assert_eq!(queue.dequeue()?, Some(42));
+            assert_eq!(queue.front()?, Some(&42;
+            assert_eq!(queue.dequeue()?, Some(42;
             
             // Capacity limits should be enforced at all levels
             for i in 0..10 {
                 queue.enqueue(i)?;
             }
-            assert!(queue.enqueue(10).is_err());
+            assert!(queue.enqueue(10).is_err();
         }
         
         Ok(())
@@ -408,9 +408,9 @@ mod collection_integration_tests {
         }
         
         // Verify they all have the same length
-        assert_eq!(vec.len(), 5);
-        assert_eq!(stack.len(), 5);
-        assert_eq!(queue.len(), 5);
+        assert_eq!(vec.len(), 5;
+        assert_eq!(stack.len(), 5;
+        assert_eq!(queue.len(), 5;
         
         // Verify different access patterns
         assert_eq!(vec.get(0)?, &1); // Index-based access
@@ -431,22 +431,22 @@ mod collection_integration_tests {
         vec.push(3)?;
         
         // Verify bounds checking
-        assert!(vec.get(3).is_err()); // Out of bounds
-        assert!(vec.push(4).is_err()); // Over capacity
+        assert!(vec.get(3).is_err())); // Out of bounds
+        assert!(vec.push(4).is_err())); // Over capacity
         
         // Same for stack
         let mut stack = BoundedStack::<i32, 3>::new();
         stack.push(1)?;
         stack.push(2)?;
         stack.push(3)?;
-        assert!(stack.push(4).is_err());
+        assert!(stack.push(4).is_err();
         
         // Same for queue
         let mut queue = BoundedQueue::<i32, 3>::new();
         queue.enqueue(1)?;
         queue.enqueue(2)?;
         queue.enqueue(3)?;
-        assert!(queue.enqueue(4).is_err());
+        assert!(queue.enqueue(4).is_err();
         
         Ok(())
     }
@@ -469,8 +469,8 @@ mod collection_integration_tests {
         vec.push(test_item.clone())?;
         
         let retrieved = vec.get(0)?;
-        assert_eq!(retrieved.id, 42);
-        assert_eq!(retrieved.data, vec![1, 2, 3, 4, 5]);
+        assert_eq!(retrieved.id, 42;
+        assert_eq!(retrieved.data, vec![1, 2, 3, 4, 5];
         
         Ok(())
     }
@@ -482,28 +482,28 @@ mod collection_integration_tests {
         const SIZE: usize = 1000;
         
         // Test vector performance
-        let start = Instant::now();
+        let start = Instant::now);
         let mut vec = BoundedVec::<i32, SIZE>::new();
         for i in 0..SIZE {
             vec.push(i as i32)?;
         }
-        let vec_time = start.elapsed();
+        let vec_time = start.elapsed);
         
         // Test stack performance
-        let start = Instant::now();
+        let start = Instant::now);
         let mut stack = BoundedStack::<i32, SIZE>::new();
         for i in 0..SIZE {
             stack.push(i as i32)?;
         }
-        let stack_time = start.elapsed();
+        let stack_time = start.elapsed);
         
         // Test queue performance
-        let start = Instant::now();
+        let start = Instant::now);
         let mut queue = BoundedQueue::<i32, SIZE>::new();
         for i in 0..SIZE {
             queue.enqueue(i as i32)?;
         }
-        let queue_time = start.elapsed();
+        let queue_time = start.elapsed);
         
         // All should be reasonably fast (under 10ms for 1000 operations)
         assert!(vec_time.as_millis() < 10);
@@ -531,17 +531,17 @@ mod collection_error_tests {
         vec.push(3)?;
         
         // Try operations that should fail
-        assert!(vec.push(4).is_err());
-        assert!(vec.get(5).is_err());
+        assert!(vec.push(4).is_err();
+        assert!(vec.get(5).is_err();
         
         // Verify collection is still usable after errors
-        assert_eq!(vec.len(), 3);
-        assert_eq!(vec.get(0)?, &1);
+        assert_eq!(vec.len(), 3;
+        assert_eq!(vec.get(0)?, &1;
         
         // Should be able to pop and push again
-        assert_eq!(vec.pop()?, Some(3));
+        assert_eq!(vec.pop()?, Some(3;
         vec.push(4)?;
-        assert_eq!(vec.get(2)?, &4);
+        assert_eq!(vec.get(2)?, &4;
         
         Ok(())
     }
@@ -550,7 +550,7 @@ mod collection_error_tests {
     fn test_collection_concurrent_safety() -> Result<()> {
         use std::sync::{Arc, Mutex};
         
-        let vec = Arc::new(Mutex::new(BoundedVec::<i32, 100>::new()));
+        let vec = Arc::new(Mutex::new(BoundedVec::<i32, 100>::new();
         
         let handles: Vec<_> = (0..4).map(|thread_id| {
             let vec_clone = Arc::clone(&vec);
@@ -564,7 +564,7 @@ mod collection_error_tests {
                 }
                 Ok(())
             })
-        }).collect();
+        }).collect());
         
         // Wait for all threads
         for handle in handles {
@@ -573,7 +573,7 @@ mod collection_error_tests {
         
         // Verify final state
         let final_vec = vec.lock().unwrap();
-        assert!(final_vec.len() <= 100); // Should not exceed capacity
+        assert!(final_vec.len() <= 100)); // Should not exceed capacity
         
         Ok(())
     }
@@ -590,14 +590,14 @@ mod collection_error_tests {
         ];
         
         for level in &levels {
-            let vec = BoundedVec::<i32, 10>::with_verification_level(*level);
-            let stack = BoundedStack::<i32, 10>::with_verification_level(*level);
-            let queue = BoundedQueue::<i32, 10>::with_verification_level(*level);
+            let vec = BoundedVec::<i32, 10>::with_verification_level(*level;
+            let stack = BoundedStack::<i32, 10>::with_verification_level(*level;
+            let queue = BoundedQueue::<i32, 10>::with_verification_level(*level;
             
             // All should report the same verification level
-            assert_eq!(vec.verification_level(), *level);
-            assert_eq!(stack.verification_level(), *level);
-            assert_eq!(queue.verification_level(), *level);
+            assert_eq!(vec.verification_level(), *level;
+            assert_eq!(stack.verification_level(), *level;
+            assert_eq!(queue.verification_level(), *level;
         }
         
         Ok(())

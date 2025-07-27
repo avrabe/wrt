@@ -9,7 +9,10 @@
 
 #[cfg(feature = "kani")]
 use kani;
-use wrt_sync::{prelude::*, *};
+use wrt_sync::{
+    prelude::*,
+    *,
+};
 
 // --- WrtMutex Harnesses ---
 
@@ -24,7 +27,7 @@ fn verify_mutex_new_lock_unlock() {
         // Test Debug impl while locked (indirectly)
         // Note: Kani might not fully verify the Debug output itself,
         // but checks that calling Debug doesn't panic or cause UB.
-        println!("Locked Mutex: {:?}", m);
+        println!("Locked Mutex: {:?}", m));
     } // guard drops here
 
     {
@@ -32,7 +35,7 @@ fn verify_mutex_new_lock_unlock() {
         assert_eq!(*guard, 15);
     } // guard drops here
       // Test Debug impl while unlocked
-    println!("Unlocked Mutex: {:?}", m);
+    println!("Unlocked Mutex: {:?}", m));
 }
 
 #[cfg_attr(feature = "kani", kani::proof)]
@@ -70,16 +73,16 @@ fn verify_rwlock_new_write_read() {
         *writer = 100;
         assert_eq!(*writer, 100);
         // Test Debug impl while write-locked
-        println!("Write Locked RwLock: {:?}", lock);
+        println!("Write Locked RwLock: {:?}", lock));
     } // writer drops
     {
         let data = lock.read();
         assert_eq!(*data, 100);
         // Test Debug impl while read-locked
-        println!("Read Locked RwLock: {:?}", lock);
+        println!("Read Locked RwLock: {:?}", lock));
     } // reader drops
       // Test Debug impl while unlocked
-    println!("Unlocked RwLock: {:?}", lock);
+    println!("Unlocked RwLock: {:?}", lock));
 }
 
 #[cfg_attr(feature = "kani", kani::proof)]

@@ -4,11 +4,12 @@
 //! that are different from Rust's async/await. This module provides optional bridges between them.
 
 use crate::{
-    async_types::{
-        Future as WasmFuture, FutureHandle, FutureState, Stream as WasmStream, StreamHandle,
-    },
-    task_manager::{TaskId, TaskManager, TaskState},
+    threading::task_manager::{TaskId, TaskManager, TaskState},
     ComponentInstanceId, ValType,
+};
+
+use super::async_types::{
+    Future as WasmFuture, FutureHandle, FutureState, Stream as WasmStream, StreamHandle,
 };
 use core::{
     pin::Pin,
@@ -44,7 +45,7 @@ pub mod rust_async_bridge {
     }
 
     impl<T: Clone + Send + 'static> RustFuture for ComponentFutureAdapter<T> {
-        type Output = Result<T, String>;
+        type Output = core::result::Result<T, String>;
 
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             let future = self.wasm_future.lock().unwrap();
@@ -63,7 +64,7 @@ pub mod rust_async_bridge {
                     // Register waker with task manager
                     // In a real implementation, this would notify the task manager
                     // to wake this future when the Component Model future completes
-                    cx.waker().wake_by_ref();
+                    cx.waker().wake_by_ref);
                     Poll::Pending
                 }
             }
@@ -75,7 +76,7 @@ pub mod rust_async_bridge {
         future: F,
         task_manager: &mut TaskManager,
         component_id: ComponentInstanceId,
-    ) -> Result<FutureHandle, String>
+    ) -> core::result::Result<FutureHandle, String>
     where
         F: RustFuture<Output = T> + Send + 'static,
         T: Into<ComponentValue>,
@@ -95,14 +96,14 @@ pub mod component_async {
     pub fn execute_async_operation(
         task_manager: &mut TaskManager,
         operation: AsyncOperation,
-    ) -> Result<TaskId, String> {
+    ) -> core::result::Result<TaskId, String> {
         // Create a task for the async operation
         let task_id = task_manager
             .create_task(operation.component_id, &operation.name)
-            .map_err(|e| "Component not found")?;
+            .map_err(|e| Error::runtime_execution_error("Component not found"))?;
 
         // Start the task
-        task_manager.start_task(task_id).map_err(|e| "Component not found")?;
+        task_manager.start_task(task_id).map_err(|e| Error::runtime_execution_error("Failed to start task"))?;
 
         Ok(task_id)
     }
@@ -191,22 +192,22 @@ mod tests {
     #[test]
     fn test_component_model_async_without_rust_futures() {
         let mut task_manager = TaskManager::new();
-        let component_id = ComponentInstanceId::new(1);
+        let component_id = ComponentInstanceId::new(1;
 
         // Create a Component Model future - no Rust Future trait needed!
-        let future_handle = FutureHandle(1);
-        let mut wasm_future = WasmFuture::<i32>::new(future_handle, ValType::I32);
+        let future_handle = FutureHandle(1;
+        let mut wasm_future = WasmFuture::<i32>::new(future_handle, ValType::I32;
 
         // Poll it manually
-        let result = poll_future(&mut wasm_future, &mut task_manager);
-        assert!(matches!(result, PollResult::Pending));
+        let result = poll_future(&mut wasm_future, &mut task_manager;
+        assert!(matches!(result, PollResult::Pending);
 
         // Complete the future
         wasm_future.set_value(42).unwrap();
 
         // Poll again
-        let result = poll_future(&mut wasm_future, &mut task_manager);
-        assert!(matches!(result, PollResult::Ready(42)));
+        let result = poll_future(&mut wasm_future, &mut task_manager;
+        assert!(matches!(result, PollResult::Ready(42));
     }
 
     #[test]
@@ -214,8 +215,8 @@ mod tests {
         let mut task_manager = TaskManager::new();
 
         // Create a Component Model stream - no Rust Stream trait needed!
-        let stream_handle = StreamHandle(1);
-        let mut wasm_stream = WasmStream::<String>::new(stream_handle, ValType::String);
+        let stream_handle = StreamHandle(1;
+        let mut wasm_stream = WasmStream::<String>::new(stream_handle, ValType::String;
 
         // Add some values
         #[cfg(feature = "std")]
@@ -225,15 +226,15 @@ mod tests {
         }
 
         // Poll values manually
-        let result1 = poll_stream(&mut wasm_stream, &mut task_manager);
-        assert!(matches!(result1, StreamPollResult::Item(ref s) if s == "Hello"));
+        let result1 = poll_stream(&mut wasm_stream, &mut task_manager;
+        assert!(matches!(result1, StreamPollResult::Item(ref s) if s == "Hello");
 
-        let result2 = poll_stream(&mut wasm_stream, &mut task_manager);
-        assert!(matches!(result2, StreamPollResult::Item(ref s) if s == "World"));
+        let result2 = poll_stream(&mut wasm_stream, &mut task_manager;
+        assert!(matches!(result2, StreamPollResult::Item(ref s) if s == "World");
 
         // Now empty
-        let result3 = poll_stream(&mut wasm_stream, &mut task_manager);
-        assert!(matches!(result3, StreamPollResult::Pending));
+        let result3 = poll_stream(&mut wasm_stream, &mut task_manager;
+        assert!(matches!(result3, StreamPollResult::Pending);
     }
 }
 

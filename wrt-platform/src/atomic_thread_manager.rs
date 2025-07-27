@@ -4,15 +4,16 @@
 //! the existing thread management infrastructure, enabling efficient
 //! implementation of memory.atomic.wait and memory.atomic.notify.
 
-use core::time::Duration;
-use std::{boxed::Box, collections::BTreeMap, sync::Arc, vec::Vec};
 
-use wrt_sync::{WrtMutex, WrtRwLock};
-use wrt_error::{Result, Error, ErrorCategory, codes};
+use core::time::Duration;
+use std::{collections::BTreeMap, sync::Arc};
+
+use wrt_sync::WrtRwLock;
+use wrt_error::{Result, ErrorCategory, ErrorSource, ToErrorCategory};
 
 use crate::threading::{
     ThreadSpawnRequest, ThreadPriority, WasmTask, ThreadHandle,
-    ThreadingLimits, ThreadPoolConfig, PlatformThreadPool,
+    ThreadingLimits, ThreadPoolConfig,
 };
 use crate::wasm_thread_manager::{WasmThreadManager, WasmModuleInfo};
 use crate::sync::FutexLike;
@@ -21,7 +22,6 @@ use crate::sync::FutexLike;
 use crate::linux_sync::{LinuxFutex, LinuxFutexBuilder};
 
 /// Atomic wait/notify coordinator that manages futex objects per memory address
-#[derive(Debug)]
 pub struct AtomicCoordinator {
     /// Map of memory addresses to futex objects
     futex_map: Arc<WrtRwLock<BTreeMap<u64, Arc<dyn FutexLike + Send + Sync>>>>,
@@ -55,10 +55,10 @@ impl AtomicCoordinator {
     
     /// Get or create a futex for a memory address
     fn get_or_create_futex(&self, addr: u64, initial_value: u32) -> Result<Arc<dyn FutexLike + Send + Sync>> {
-        let mut map = self.futex_map.write();
+        let mut map = self.futex_map.write);
         
         if let Some(futex) = map.get(&addr) {
-            return Ok(Arc::clone(futex));
+            return Ok(Arc::clone(futex);
         }
         
         // Create new futex based on platform
@@ -67,14 +67,14 @@ impl AtomicCoordinator {
             LinuxFutexBuilder::new()
                 .with_initial_value(initial_value)
                 .build()
-        );
+        ;
         
         #[cfg(not(target_os = "linux"))]
         let futex: Arc<dyn FutexLike + Send + Sync> = Arc::new(
             crate::sync::SpinFutex::new(initial_value)
-        );
+        ;
         
-        map.insert(addr, Arc::clone(&futex));
+        map.insert(addr, Arc::clone(&futex);
         Ok(futex)
     }
     
@@ -86,18 +86,18 @@ impl AtomicCoordinator {
         timeout_ns: Option<u64>,
     ) -> Result<i32> {
         let futex = self.get_or_create_futex(addr, expected)?;
-        let timeout = timeout_ns.map(|ns| Duration::from_nanos(ns));
+        let timeout = timeout_ns.map(|ns| Duration::from_nanos(ns);
         
         match futex.wait(expected, timeout) {
             Ok(()) => Ok(0), // Woken by notify
-            Err(e) if e.category() == ErrorCategory::System => Ok(2), // Timeout
+            Err(e) if e.to_category() == ErrorCategory::System => Ok(2), // Timeout
             Err(e) => Err(e),
         }
     }
     
     /// Implement atomic notify operation
     pub fn atomic_notify(&self, addr: u64, count: u32) -> Result<u32> {
-        let map = self.futex_map.read();
+        let map = self.futex_map.read);
         
         if let Some(futex) = map.get(&addr) {
             futex.wake(count)?;
@@ -118,11 +118,11 @@ impl AtomicCoordinator {
             module_id: self.atomic_module_id,
             function_id: 0xFFFF, // Special function ID for atomic operations
             args: {
-                let mut args = Vec::new();
-                args.extend_from_slice(&addr.to_le_bytes());
-                args.extend_from_slice(&expected.to_le_bytes());
+                let mut args = Vec::new());
+                args.extend_from_slice(&addr.to_le_bytes);
+                args.extend_from_slice(&expected.to_le_bytes);
                 if let Some(timeout) = timeout_ns {
-                    args.extend_from_slice(&timeout.to_le_bytes());
+                    args.extend_from_slice(&timeout.to_le_bytes);
                 }
                 args
             },
@@ -135,16 +135,16 @@ impl AtomicCoordinator {
     
     /// Clean up unused futexes (garbage collection)
     pub fn cleanup_futexes(&self) {
-        let mut map = self.futex_map.write();
+        let mut map = self.futex_map.write);
         
         // Remove futexes that are no longer referenced
         // In a real implementation, we'd track reference counts
-        map.retain(|_addr, futex| Arc::strong_count(futex) > 1);
+        map.retain(|_addr, futex| Arc::strong_count(futex) > 1;
     }
     
     /// Get statistics about atomic operations
     pub fn get_atomic_stats(&self) -> AtomicStats {
-        let map = self.futex_map.read();
+        let map = self.futex_map.read);
         AtomicStats {
             active_futexes: map.len(),
             thread_manager_stats: self.thread_manager.get_stats(),
@@ -176,7 +176,7 @@ impl AtomicAwareThreadManager {
         limits: ThreadingLimits,
         executor: Arc<dyn Fn(u32, Vec<u8>) -> Result<Vec<u8>> + Send + Sync>,
     ) -> Result<Self> {
-        let base_manager = Arc::new(WasmThreadManager::new(config, limits, executor)?);
+        let base_manager = Arc::new(WasmThreadManager::new(config, limits, executor)?;
         let atomic_coordinator = AtomicCoordinator::new(Arc::clone(&base_manager))?;
         
         Ok(Self {
@@ -219,9 +219,9 @@ impl AtomicAwareThreadManager {
     }
     
     /// Shutdown the manager
-    pub fn shutdown(&mut self, timeout: Duration) -> Result<()> {
+    pub fn shutdown(&mut self, _timeout: Duration) -> Result<()> {
         // Clean up atomic operations first
-        self.atomic_coordinator.cleanup_futexes();
+        self.atomic_coordinator.cleanup_futexes);
         
         // Shutdown base manager (this will unregister the atomic module)
         // Note: We need to work around the fact that base_manager is Arc
@@ -250,30 +250,30 @@ mod tests {
     
     #[test]
     fn test_atomic_coordinator_creation() {
-        let config = ThreadPoolConfig::default();
-        let limits = ThreadingLimits::default();
-        let executor = create_test_executor();
+        let config = ThreadPoolConfig::default());
+        let limits = ThreadingLimits::default());
+        let executor = create_test_executor);
         
-        let base_manager = Arc::new(WasmThreadManager::new(config, limits, executor).unwrap());
-        let coordinator = AtomicCoordinator::new(base_manager);
+        let base_manager = Arc::new(WasmThreadManager::new(config, limits, executor).unwrap();
+        let coordinator = AtomicCoordinator::new(base_manager;
         assert!(coordinator.is_ok());
     }
     
     #[test]
     fn test_atomic_aware_thread_manager() {
-        let config = ThreadPoolConfig::default();
-        let limits = ThreadingLimits::default();
-        let executor = create_test_executor();
+        let config = ThreadPoolConfig::default());
+        let limits = ThreadingLimits::default());
+        let executor = create_test_executor);
         
-        let manager = AtomicAwareThreadManager::new(config, limits, executor);
+        let manager = AtomicAwareThreadManager::new(config, limits, executor;
         assert!(manager.is_ok());
     }
     
     #[test]
     fn test_atomic_operations() {
-        let config = ThreadPoolConfig::default();
-        let limits = ThreadingLimits::default();
-        let executor = create_test_executor();
+        let config = ThreadPoolConfig::default());
+        let limits = ThreadingLimits::default());
+        let executor = create_test_executor);
         
         let manager = AtomicAwareThreadManager::new(config, limits, executor).unwrap();
         

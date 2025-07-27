@@ -7,7 +7,7 @@
 //! These operations support the WebAssembly branch hinting proposal
 //! and work across std, `no_std+alloc`, and pure `no_std` environments.
 
-use crate::prelude::{Debug, Eq, PartialEq, PureInstruction};
+use crate::prelude::{Debug, Eq, PartialEq};
 use wrt_error::{Error, Result};
 use wrt_foundation::{
     types::{LabelIdx, ValueType},
@@ -199,104 +199,104 @@ mod tests {
 
     #[test]
     fn test_br_on_null_with_null_funcref() {
-        let op = BrOnNull::new(0);
+        let op = BrOnNull::new(0;
         let result = op.execute(&Value::FuncRef(None)).unwrap();
-        assert!(result); // Branch should be taken
+        assert!(result)); // Branch should be taken
     }
 
     #[test]
     fn test_br_on_null_with_non_null_funcref() {
-        let op = BrOnNull::new(0);
+        let op = BrOnNull::new(0;
         let result = op.execute(&Value::FuncRef(Some(FuncRef { index: 42 }))).unwrap();
-        assert!(!result); // Branch should not be taken
+        assert!(!result)); // Branch should not be taken
     }
 
     #[test]
     fn test_br_on_null_with_null_externref() {
-        let op = BrOnNull::new(1);
+        let op = BrOnNull::new(1;
         let result = op.execute(&Value::ExternRef(None)).unwrap();
-        assert!(result); // Branch should be taken
+        assert!(result)); // Branch should be taken
     }
 
     #[test]
     fn test_br_on_null_with_non_null_externref() {
-        let op = BrOnNull::new(1);
+        let op = BrOnNull::new(1;
         let result = op.execute(&Value::ExternRef(Some(ExternRef { index: 123 }))).unwrap();
-        assert!(!result); // Branch should not be taken
+        assert!(!result)); // Branch should not be taken
     }
 
     #[test]
     fn test_br_on_null_with_non_reference() {
-        let op = BrOnNull::new(0);
-        let result = op.execute(&Value::I32(42));
-        assert!(result.is_err());
+        let op = BrOnNull::new(0;
+        let result = op.execute(&Value::I32(42;
+        assert!(result.is_err();
     }
 
     #[test]
     fn test_br_on_non_null_with_null_funcref() {
-        let op = BrOnNonNull::new(0);
+        let op = BrOnNonNull::new(0;
         let (branch_taken, value) = op.execute(&Value::FuncRef(None)).unwrap();
-        assert!(!branch_taken); // Branch should not be taken
-        assert!(value.is_none()); // No value kept on stack
+        assert!(!branch_taken)); // Branch should not be taken
+        assert!(value.is_none())); // No value kept on stack
     }
 
     #[test]
     fn test_br_on_non_null_with_non_null_funcref() {
-        let op = BrOnNonNull::new(0);
-        let ref_value = Value::FuncRef(Some(FuncRef { index: 42 }));
+        let op = BrOnNonNull::new(0;
+        let ref_value = Value::FuncRef(Some(FuncRef { index: 42 };
         let (branch_taken, value) = op.execute(&ref_value).unwrap();
-        assert!(branch_taken); // Branch should be taken
+        assert!(branch_taken)); // Branch should be taken
         assert_eq!(value, Some(ref_value)); // Reference stays on stack
     }
 
     #[test]
     fn test_br_on_non_null_with_null_externref() {
-        let op = BrOnNonNull::new(1);
+        let op = BrOnNonNull::new(1;
         let (branch_taken, value) = op.execute(&Value::ExternRef(None)).unwrap();
-        assert!(!branch_taken); // Branch should not be taken
-        assert!(value.is_none());
+        assert!(!branch_taken)); // Branch should not be taken
+        assert!(value.is_none();
     }
 
     #[test]
     fn test_br_on_non_null_with_non_null_externref() {
-        let op = BrOnNonNull::new(1);
-        let ref_value = Value::ExternRef(Some(ExternRef { index: 123 }));
+        let op = BrOnNonNull::new(1;
+        let ref_value = Value::ExternRef(Some(ExternRef { index: 123 };
         let (branch_taken, value) = op.execute(&ref_value).unwrap();
-        assert!(branch_taken); // Branch should be taken
+        assert!(branch_taken)); // Branch should be taken
         assert_eq!(value, Some(ref_value)); // Reference stays on stack
     }
 
     #[test]
     fn test_br_on_non_null_with_non_reference() {
-        let op = BrOnNonNull::new(0);
-        let result = op.execute(&Value::I32(42));
-        assert!(result.is_err());
+        let op = BrOnNonNull::new(0;
+        let result = op.execute(&Value::I32(42;
+        assert!(result.is_err();
     }
 
     #[test]
     fn test_branch_hint_op_enum() {
         // Test BrOnNull
-        let br_on_null = BranchHintOp::BrOnNull(BrOnNull::new(2));
+        let br_on_null = BranchHintOp::BrOnNull(BrOnNull::new(2;
         let (taken, label, value) = br_on_null.execute(&Value::FuncRef(None)).unwrap();
         assert!(taken);
-        assert_eq!(label, Some(2));
-        assert!(value.is_none());
+        assert_eq!(label, Some(2;
+        assert!(value.is_none();
 
         // Test BrOnNonNull with non-null ref
-        let br_on_non_null = BranchHintOp::BrOnNonNull(BrOnNonNull::new(3));
-        let ref_value = Value::FuncRef(Some(FuncRef { index: 10 }));
+        let br_on_non_null = BranchHintOp::BrOnNonNull(BrOnNonNull::new(3;
+        let ref_value = Value::FuncRef(Some(FuncRef { index: 10 };
         let (taken, label, value) = br_on_non_null.execute(&ref_value).unwrap();
         assert!(taken);
-        assert_eq!(label, Some(3));
-        assert_eq!(value, Some(ref_value));
+        assert_eq!(label, Some(3;
+        assert_eq!(value, Some(ref_value;
     }
 
     #[test]
     fn test_target_label() {
-        let op1 = BrOnNull::new(5);
-        assert_eq!(op1.target_label(), 5);
+        let op1 = BrOnNull::new(5;
+        assert_eq!(op1.target_label(), 5;
 
-        let op2 = BrOnNonNull::new(10);
-        assert_eq!(op2.target_label(), 10);
+        let op2 = BrOnNonNull::new(10;
+        assert_eq!(op2.target_label(), 10;
     }
 }

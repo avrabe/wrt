@@ -21,15 +21,15 @@ const MODULE_BYTES: &[u8] = &[
 /// Always available - basic debug info management
 #[no_mangle]
 pub extern "C" fn basic_debug_functionality() -> u32 {
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
 
     // Section registration always works
-    debug_info.add_section(".debug_line", 0x1000, 0x500);
-    debug_info.add_section(".debug_info", 0x1500, 0x800);
-    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200);
+    debug_info.add_section(".debug_line", 0x1000, 0x500;
+    debug_info.add_section(".debug_info", 0x1500, 0x800;
+    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200;
 
     // Basic query always works
-    let has_debug = debug_info.has_debug_info();
+    let has_debug = debug_info.has_debug_info);
 
     if has_debug {
         1
@@ -42,8 +42,8 @@ pub extern "C" fn basic_debug_functionality() -> u32 {
 #[cfg(feature = "line-info")]
 #[no_mangle]
 pub extern "C" fn line_info_functionality() -> u32 {
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
-    debug_info.add_section(".debug_line", 0x1000, 0x500);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
+    debug_info.add_section(".debug_line", 0x1000, 0x500;
 
     match debug_info.find_line_info(0x42) {
         Ok(Some(line_info)) => line_info.line,
@@ -56,9 +56,9 @@ pub extern "C" fn line_info_functionality() -> u32 {
 #[cfg(feature = "debug-info")]
 #[no_mangle]
 pub extern "C" fn debug_info_functionality() -> u32 {
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
-    debug_info.add_section(".debug_info", 0x1500, 0x800);
-    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
+    debug_info.add_section(".debug_info", 0x1500, 0x800;
+    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200;
 
     match debug_info.init_info_parser() {
         Ok(_) => 1,
@@ -70,9 +70,9 @@ pub extern "C" fn debug_info_functionality() -> u32 {
 #[cfg(feature = "function-info")]
 #[no_mangle]
 pub extern "C" fn function_info_functionality() -> u32 {
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
-    debug_info.add_section(".debug_info", 0x1500, 0x800);
-    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
+    debug_info.add_section(".debug_info", 0x1500, 0x800;
+    debug_info.add_section(".debug_abbrev", 0x1D00, 0x200;
 
     if debug_info.init_info_parser().is_ok() {
         if let Some(func_info) = debug_info.find_function_info(0x42) {
@@ -113,8 +113,8 @@ pub extern "C" fn get_enabled_features() -> u32 {
 /// Conditional feature usage pattern
 #[no_mangle]
 pub extern "C" fn conditional_debug_usage() -> u32 {
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
-    debug_info.add_section(".debug_line", 0x1000, 0x500);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
+    debug_info.add_section(".debug_line", 0x1000, 0x500;
 
     // Strategy 1: Use cfg attributes for different code paths
     #[cfg(feature = "line-info")]
@@ -136,14 +136,14 @@ pub extern "C" fn conditional_debug_usage() -> u32 {
 /// Example of graceful degradation
 #[no_mangle]
 pub extern "C" fn graceful_degradation_example() -> u32 {
-    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES);
-    debug_info.add_section(".debug_line", 0x1000, 0x500);
-    debug_info.add_section(".debug_info", 0x1500, 0x800);
+    let mut debug_info = DwarfDebugInfo::new(MODULE_BYTES;
+    debug_info.add_section(".debug_line", 0x1000, 0x500;
+    debug_info.add_section(".debug_info", 0x1500, 0x800;
 
     // Try to get the most detailed information available
     #[cfg(feature = "function-info")]
     {
-        debug_info.add_section(".debug_abbrev", 0x1D00, 0x200);
+        debug_info.add_section(".debug_abbrev", 0x1D00, 0x200;
         if debug_info.init_info_parser().is_ok() {
             if let Some(func_info) = debug_info.find_function_info(0x42) {
                 return 3; // Most detailed info available

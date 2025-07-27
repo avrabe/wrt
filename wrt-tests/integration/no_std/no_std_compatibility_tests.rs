@@ -6,26 +6,26 @@ use wrt_test_registry::prelude::*;
 
 /// Consolidated no_std compatibility test suite
 pub fn run_tests() -> TestResult {
-    let mut suite = TestSuite::new("No-std Compatibility");
+    let mut suite = TestSuite::new("No-std Compatibility";
     
     // Core crates
-    suite.add_test("wrt_error_no_std", test_wrt_error_no_std);
-    suite.add_test("wrt_sync_no_std", test_wrt_sync_no_std);
-    suite.add_test("wrt_foundation_no_std", test_wrt_foundation_no_std);
-    suite.add_test("wrt_format_no_std", test_wrt_format_no_std);
-    suite.add_test("wrt_decoder_no_std", test_wrt_decoder_no_std);
+    suite.add_test("wrt_error_no_std", test_wrt_error_no_std;
+    suite.add_test("wrt_sync_no_std", test_wrt_sync_no_std;
+    suite.add_test("wrt_foundation_no_std", test_wrt_foundation_no_std;
+    suite.add_test("wrt_format_no_std", test_wrt_format_no_std;
+    suite.add_test("wrt_decoder_no_std", test_wrt_decoder_no_std;
     
     // Higher-level crates
-    suite.add_test("wrt_component_no_std", test_wrt_component_no_std);
-    suite.add_test("wrt_host_no_std", test_wrt_host_no_std);
-    suite.add_test("wrt_instructions_no_std", test_wrt_instructions_no_std);
-    suite.add_test("wrt_platform_no_std", test_wrt_platform_no_std);
-    suite.add_test("wrt_runtime_no_std", test_wrt_runtime_no_std);
-    suite.add_test("wrt_intercept_no_std", test_wrt_intercept_no_std);
-    suite.add_test("wrt_logging_no_std", test_wrt_logging_no_std);
+    suite.add_test("wrt_component_no_std", test_wrt_component_no_std;
+    suite.add_test("wrt_host_no_std", test_wrt_host_no_std;
+    suite.add_test("wrt_instructions_no_std", test_wrt_instructions_no_std;
+    suite.add_test("wrt_platform_no_std", test_wrt_platform_no_std;
+    suite.add_test("wrt_runtime_no_std", test_wrt_runtime_no_std;
+    suite.add_test("wrt_intercept_no_std", test_wrt_intercept_no_std;
+    suite.add_test("wrt_logging_no_std", test_wrt_logging_no_std;
     
     // Test registry itself
-    suite.add_test("wrt_test_registry_no_std", test_wrt_test_registry_no_std);
+    suite.add_test("wrt_test_registry_no_std", test_wrt_test_registry_no_std;
     
     suite.run().into()
 }

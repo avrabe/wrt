@@ -1,11 +1,16 @@
 //! Comprehensive tests for different runtime modes in wrtd
 //!
-//! This test suite validates that wrtd correctly handles different runtime modes
-//! (std, alloc, no_std) and their respective capabilities and limitations.
+//! This test suite validates that wrtd correctly handles different runtime
+//! modes (std, alloc, no_std) and their respective capabilities and
+//! limitations.
 
 #[cfg(test)]
 mod tests {
-    use std::{env, path::PathBuf, process::Command};
+    use std::{
+        env,
+        path::PathBuf,
+        process::Command,
+    };
 
     /// Helper function to run wrtd with specified arguments
     fn run_wrtd_with_mode(
@@ -23,9 +28,7 @@ mod tests {
         let wrtd_path = project_root.join("target/debug/wrtd");
 
         let mut cmd = Command::new(wrtd_path);
-        cmd.arg(wasm_file)
-            .arg("--runtime-mode")
-            .arg(runtime_mode);
+        cmd.arg(wasm_file).arg("--runtime-mode").arg(runtime_mode);
 
         if let Some(function_name) = call {
             cmd.arg("--call").arg(function_name);
@@ -82,7 +85,7 @@ mod tests {
             .join("tests/fixtures/alloc-mode-example.wasm")
             .to_str()
             .unwrap()
-            .to_string();
+            .to_string());
 
         // Binary std/no_std choice
         let (success, stdout, stderr) = run_wrtd_with_mode(
@@ -93,8 +96,8 @@ mod tests {
             &["--stats", "--validate-mode"],
         );
 
-        println!("STDOUT: {}", stdout);
-        println!("STDERR: {}", stderr);
+        println!("STDOUT: {}", stdout));
+        println!("STDERR: {}", stderr));
 
         assert!(success, "alloc mode execution should succeed");
         assert!(stdout.contains("Runtime mode: Alloc"));
@@ -109,7 +112,7 @@ mod tests {
             .join("tests/fixtures/nostd-mode-example.wasm")
             .to_str()
             .unwrap()
-            .to_string();
+            .to_string());
 
         // Test basic arithmetic
         let (success, stdout, stderr) = run_wrtd_with_mode(
@@ -120,8 +123,8 @@ mod tests {
             &["--stats", "--validate-mode"],
         );
 
-        println!("STDOUT: {}", stdout);
-        println!("STDERR: {}", stderr);
+        println!("STDOUT: {}", stdout));
+        println!("STDERR: {}", stderr));
 
         assert!(success, "no_std mode execution should succeed");
         assert!(stdout.contains("Runtime mode: NoStd"));
@@ -136,7 +139,7 @@ mod tests {
             .join("tests/fixtures/nostd-mode-example.wasm")
             .to_str()
             .unwrap()
-            .to_string();
+            .to_string());
 
         let (success, stdout, stderr) = run_wrtd_with_mode(
             &test_wasm,
@@ -146,10 +149,13 @@ mod tests {
             &["--stats"],
         );
 
-        println!("STDOUT: {}", stdout);
-        println!("STDERR: {}", stderr);
+        println!("STDOUT: {}", stdout));
+        println!("STDERR: {}", stderr));
 
-        assert!(success, "fibonacci calculation should succeed in no_std mode");
+        assert!(
+            success,
+            "fibonacci calculation should succeed in no_std mode"
+        );
     }
 
     /// Test runtime mode validation catches incompatible configurations
@@ -160,7 +166,7 @@ mod tests {
             .join("tests/fixtures/nostd-mode-example.wasm")
             .to_str()
             .unwrap()
-            .to_string();
+            .to_string());
 
         // Try to use excessive fuel with no_std mode (should fail validation)
         let (success, stdout, stderr) = run_wrtd_with_mode(
@@ -171,11 +177,14 @@ mod tests {
             &["--validate-mode"],
         );
 
-        println!("STDOUT: {}", stdout);
-        println!("STDERR: {}", stderr);
+        println!("STDOUT: {}", stdout));
+        println!("STDERR: {}", stderr));
 
         // Should fail due to fuel limit validation
-        assert!(!success, "Should fail validation with excessive fuel for no_std mode");
+        assert!(
+            !success,
+            "Should fail validation with excessive fuel for no_std mode"
+        );
         assert!(stderr.contains("exceeds maximum") || stderr.contains("Fuel limit"));
     }
 
@@ -187,7 +196,7 @@ mod tests {
             .join("tests/fixtures/nostd-mode-example.wasm")
             .to_str()
             .unwrap()
-            .to_string();
+            .to_string());
 
         // Try to use large buffer with no_std mode (should fail validation)
         let (success, stdout, stderr) = run_wrtd_with_mode(
@@ -198,11 +207,14 @@ mod tests {
             &["--validate-mode", "--buffer-size", "2000000"], // 2MB > 1MB limit
         );
 
-        println!("STDOUT: {}", stdout);
-        println!("STDERR: {}", stderr);
+        println!("STDOUT: {}", stdout));
+        println!("STDERR: {}", stderr));
 
         // Should fail due to buffer size validation
-        assert!(!success, "Should fail validation with excessive buffer size for no_std mode");
+        assert!(
+            !success,
+            "Should fail validation with excessive buffer size for no_std mode"
+        );
         assert!(stderr.contains("exceeds maximum") || stderr.contains("Buffer size"));
     }
 
@@ -214,19 +226,14 @@ mod tests {
             .join("tests/fixtures/std-mode-example.wasm")
             .to_str()
             .unwrap()
-            .to_string();
+            .to_string());
 
         // Test std mode capabilities
-        let (success, stdout, stderr) = run_wrtd_with_mode(
-            &test_wasm,
-            "std",
-            None,
-            None,
-            &["--show-capabilities"],
-        );
+        let (success, stdout, stderr) =
+            run_wrtd_with_mode(&test_wasm, "std", None, None, &["--show-capabilities"]);
 
-        println!("STD Capabilities STDOUT: {}", stdout);
-        println!("STD Capabilities STDERR: {}", stderr);
+        println!("STD Capabilities STDOUT: {}", stdout));
+        println!("STD Capabilities STDERR: {}", stderr));
 
         assert!(success, "Showing std capabilities should succeed");
         assert!(stdout.contains("Runtime Capabilities for Std Mode"));
@@ -235,16 +242,11 @@ mod tests {
         assert!(stdout.contains("WASI support:         ✅ Yes"));
 
         // Test no_std mode capabilities
-        let (success, stdout, stderr) = run_wrtd_with_mode(
-            &test_wasm,
-            "no-std",
-            None,
-            None,
-            &["--show-capabilities"],
-        );
+        let (success, stdout, stderr) =
+            run_wrtd_with_mode(&test_wasm, "no-std", None, None, &["--show-capabilities"]);
 
-        println!("NoStd Capabilities STDOUT: {}", stdout);
-        println!("NoStd Capabilities STDERR: {}", stderr);
+        println!("NoStd Capabilities STDOUT: {}", stdout));
+        println!("NoStd Capabilities STDERR: {}", stderr));
 
         assert!(success, "Showing no_std capabilities should succeed");
         assert!(stdout.contains("Runtime Capabilities for NoStd Mode"));
@@ -263,7 +265,7 @@ mod tests {
             .join("tests/fixtures/nostd-mode-example.wasm")
             .to_str()
             .unwrap()
-            .to_string();
+            .to_string());
 
         // Test std mode
         let (success_std, stdout_std, _) = run_wrtd_with_mode(
@@ -274,7 +276,7 @@ mod tests {
             &["--stats"],
         );
 
-        // Test no_std mode  
+        // Test no_std mode
         let (success_nostd, stdout_nostd, _) = run_wrtd_with_mode(
             &test_wasm,
             "no-std",
@@ -299,7 +301,7 @@ mod tests {
             .join("tests/fixtures/alloc-mode-example.wasm")
             .to_str()
             .unwrap()
-            .to_string();
+            .to_string());
 
         // Binary std/no_std choice
         let strategies = ["zero-copy", "bounded-copy", "full-isolation"];
@@ -313,10 +315,14 @@ mod tests {
                 &["--memory-strategy", strategy, "--validate-mode"],
             );
 
-            println!("Strategy {} STDOUT: {}", strategy, stdout);
-            println!("Strategy {} STDERR: {}", strategy, stderr);
+            println!("Strategy {} STDOUT: {}", strategy, stdout));
+            println!("Strategy {} STDERR: {}", strategy, stderr));
 
-            assert!(success, "Memory strategy {} should work with alloc mode", strategy);
+            assert!(
+                success,
+                "Memory strategy {} should work with alloc mode",
+                strategy
+            );
             assert!(stdout.contains("Runtime mode: Alloc"));
         }
     }

@@ -11,7 +11,7 @@ pub mod platform_optimizations_tests;
 
 /// Run all platform integration tests
 pub fn run_tests() -> TestResult {
-    let mut runner = TestRunner::new("Platform Integration");
+    let mut runner = TestRunner::new("Platform Integration";
     
     runner.add_test_suite("Memory Platform", memory_platform_tests::run_tests)?;
     runner.add_test_suite("Sync Platform", sync_platform_tests::run_tests)?;
@@ -28,7 +28,7 @@ mod tests {
     
     #[test]
     fn platform_integration() {
-        let result = run_tests();
+        let result = run_tests);
         assert!(result.is_success(), "Platform integration tests failed: {:?}", result);
     }
 }

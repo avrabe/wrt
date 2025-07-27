@@ -9,14 +9,23 @@
 //! interceptors, and other configuration options.
 
 // Use the prelude for consistent imports
-use crate::prelude::{Any, BuiltinType, CallbackRegistry, CallbackType, Error, HashSet, HostFunctionHandler, Result, Value, str};
+use crate::prelude::{
+    str, Any, BuiltinType, CallbackRegistry, CallbackType, Error, HashSet, HostFunctionHandler,
+    Result, Value,
+};
+
+#[cfg(feature = "std")]
+use crate::prelude::{Arc, BuiltinHost, BuiltinInterceptor, LinkInterceptor};
 
 // Type aliases for no_std compatibility
 #[cfg(feature = "std")]
 type ValueVec = Vec<Value>;
 
-#[cfg(all(not(feature = "std"), not(feature = "std")))]
-type ValueVec = wrt_foundation::BoundedVec<Value, 16, wrt_foundation::NoStdProvider<512>>;
+#[cfg(not(feature = "std"))]
+use crate::bounded_host_infra::{HostProvider, HOST_MEMORY_SIZE};
+
+#[cfg(not(feature = "std"))]
+type ValueVec = wrt_foundation::BoundedVec<Value, 16, HostProvider>;
 
 /// Builder for configuring and creating instances of `CallbackRegistry` with
 /// built-in support.
@@ -31,10 +40,10 @@ pub struct HostBuilder {
     /// Built-in types that are required by the component
     #[cfg(feature = "std")]
     required_builtins: HashSet<BuiltinType>,
-    
+
     /// Built-in types that are required by the component (`no_std` version)
-    #[cfg(all(not(feature = "std"), not(feature = "std")))]
-    required_builtins: HashSet<BuiltinType, 32, wrt_foundation::NoStdProvider<1024>>,
+    #[cfg(not(feature = "std"))]
+    required_builtins: wrt_foundation::BoundedSet<BuiltinType, 32, HostProvider>,
 
     /// Built-in interceptor
     #[cfg(feature = "std")]
@@ -73,16 +82,23 @@ impl Default for HostBuilder {
                 strict_validation: false,
                 component_name: String::new(),
                 host_id: String::new(),
-                fallback_handlers: Vec::new(),
+                fallback_handlers: Vec::with_capacity(0),
             }
         }
-        
-        #[cfg(all(not(feature = "std"), not(feature = "std")))]
+
+        #[cfg(not(feature = "std"))]
         {
-            let provider = wrt_foundation::NoStdProvider::default();
+            use crate::bounded_host_infra::create_host_provider;
+
+            let provider = create_host_provider().expect("Failed to create host provider"));
             Self {
                 registry: CallbackRegistry::new(),
-                required_builtins: wrt_foundation::BoundedSet::new(provider).unwrap_or_else(|_| panic!("Failed to create builtins set")),
+                required_builtins: wrt_foundation::BoundedSet::new(provider).unwrap_or_else(|_| {
+                    let fallback_provider =
+                        create_host_provider().expect("Failed to create fallback host provider"));
+                    wrt_foundation::BoundedSet::new(fallback_provider)
+                        .expect("Failed to create bounded set")
+                }),
                 strict_validation: false,
             }
         }
@@ -102,7 +118,7 @@ impl HostBuilder {
     /// During validation, the builder will ensure that all required built-ins
     /// are properly implemented.
     pub fn require_builtin(mut self, builtin_type: BuiltinType) -> Self {
-        let _ = self.required_builtins.insert(builtin_type);
+        let _ = self.required_builtins.insert(builtin_type;
         self
     }
 
@@ -116,7 +132,7 @@ impl HostBuilder {
         function_name: &str,
         handler: HostFunctionHandler,
     ) -> Self {
-        self.registry.register_host_function(module_name, function_name, handler);
+        self.registry.register_host_function(module_name, function_name, handler;
         self
     }
 
@@ -128,7 +144,7 @@ impl HostBuilder {
         callback_type: CallbackType,
         callback: T,
     ) -> Self {
-        self.registry.register_callback(callback_type, callback);
+        self.registry.register_callback(callback_type, callback;
         self
     }
 
@@ -137,7 +153,7 @@ impl HostBuilder {
     /// This method sets an interceptor for built-in functions.
     #[cfg(feature = "std")]
     pub fn with_builtin_interceptor(mut self, interceptor: Arc<dyn BuiltinInterceptor>) -> Self {
-        self.builtin_interceptor = Some(interceptor);
+        self.builtin_interceptor = Some(interceptor;
         self
     }
 
@@ -146,8 +162,8 @@ impl HostBuilder {
     /// This method sets an interceptor for link-time function resolution.
     #[cfg(feature = "std")]
     pub fn with_link_interceptor(mut self, interceptor: Arc<LinkInterceptor>) -> Self {
-        self.link_interceptor = Some(interceptor.clone());
-        self.registry = self.registry.with_interceptor(interceptor);
+        self.link_interceptor = Some(interceptor.clone();
+        self.registry = self.registry.with_interceptor(interceptor;
         self
     }
 
@@ -170,11 +186,16 @@ impl HostBuilder {
     {
         let handler_fn = HostFunctionHandler::new(move |target| {
             #[cfg(feature = "std")]
-            let args = Vec::new();
-            #[cfg(all(not(feature = "std"), not(feature = "std")))]
-            let args = ValueVec::new(wrt_foundation::NoStdProvider::<512>::default()).expect("Failed to create ValueVec");
+            let args: ValueVec = Vec::with_capacity(0;
+            #[cfg(not(feature = "std"))]
+            let args: ValueVec = {
+                use crate::bounded_host_infra::create_host_provider;
+                let provider = create_host_provider().expect("Failed to create host provider"));
+                ValueVec::new(provider)
+                    .expect("ValueVec creation should never fail with valid provider")
+            };
             handler(target, args)
-        });
+        };
 
         // Register the handler with the special "wasi_builtin" module name
         // and the built-in type name as the function name
@@ -188,7 +209,7 @@ impl HostBuilder {
     /// built-ins are registered through other mechanisms.
     pub fn builtin_implemented(mut self, builtin_type: BuiltinType) -> Self {
         // Remove from required if it's there
-        let _ = self.required_builtins.remove(&builtin_type);
+        let _ = self.required_builtins.remove(&builtin_type;
         self
     }
 
@@ -199,8 +220,8 @@ impl HostBuilder {
         {
             self.required_builtins.contains(&builtin_type)
         }
-        
-        #[cfg(all(not(feature = "std"), not(feature = "std")))]
+
+        #[cfg(not(feature = "std"))]
         {
             self.required_builtins.contains(&builtin_type).unwrap_or(false)
         }
@@ -227,12 +248,12 @@ impl HostBuilder {
             {
                 for &builtin_type in &self.required_builtins {
                     if !self.is_builtin_implemented(builtin_type) {
-                        return Err(Error::runtime_error("Required built-in is not implemented"));
+                        return Err(Error::runtime_error("Required built-in is not implemented";
                     }
                 }
             }
-            
-            #[cfg(all(not(feature = "std"), not(feature = "std")))]
+
+            #[cfg(not(feature = "std"))]
             {
                 // In no_std mode, we can't easily iterate over BoundedSet
                 // For now, we'll skip validation since we can't store complex handlers anyway
@@ -262,7 +283,7 @@ impl HostBuilder {
     pub fn with_component_name(mut self, name: &str) -> Self {
         #[cfg(feature = "std")]
         {
-            self.component_name = String::from(name);
+            self.component_name = String::from(name;
         }
         #[cfg(all(not(feature = "std")))]
         {
@@ -278,7 +299,7 @@ impl HostBuilder {
     pub fn with_host_id(mut self, id: &str) -> Self {
         #[cfg(feature = "std")]
         {
-            self.host_id = String::from(id);
+            self.host_id = String::from(id;
         }
         #[cfg(all(not(feature = "std")))]
         {
@@ -298,13 +319,18 @@ impl HostBuilder {
     {
         let handler_fn = HostFunctionHandler::new(move |target| {
             #[cfg(feature = "std")]
-            let args = Vec::new();
-            #[cfg(all(not(feature = "std"), not(feature = "std")))]
-            let args = ValueVec::new(wrt_foundation::NoStdProvider::<512>::default()).expect("Failed to create ValueVec");
+            let args: ValueVec = Vec::with_capacity(0;
+            #[cfg(not(feature = "std"))]
+            let args: ValueVec = {
+                use crate::bounded_host_infra::create_host_provider;
+                let provider = create_host_provider().expect("Failed to create host provider"));
+                ValueVec::new(provider)
+                    .expect("ValueVec creation should never fail with valid provider")
+            };
             handler(target, args)
-        });
+        };
 
-        self.fallback_handlers.push((builtin_type, handler_fn));
+        self.fallback_handlers.push((builtin_type, handler_fn);
         self
     }
 
@@ -318,11 +344,11 @@ impl HostBuilder {
     /// A `BuiltinHost` instance ready for use
     #[cfg(feature = "std")]
     pub fn build_builtin_host(&self) -> BuiltinHost {
-        let mut host = BuiltinHost::new(&self.component_name, &self.host_id);
+        let mut host = BuiltinHost::new(&self.component_name, &self.host_id;
 
         // Set interceptor if available
         if let Some(interceptor) = &self.builtin_interceptor {
-            host.set_interceptor(interceptor.clone());
+            host.set_interceptor(interceptor.clone();
         }
 
         // Register all built-in handlers from the registry
@@ -337,14 +363,14 @@ impl HostBuilder {
         ];
 
         for builtin_type in &builtin_types {
-            let builtin_name = builtin_type.name();
+            let builtin_name = builtin_type.name);
             if self.registry.has_host_function("wasi_builtin", builtin_name) {
                 // We need a way to extract the handler function from the registry
                 // For now, we'll create a new function that calls through the registry
                 let registry_clone = self.registry.clone();
                 host.register_handler(*builtin_type, move |engine, args| {
                     registry_clone.call_host_function(engine, "wasi_builtin", builtin_name, args)
-                });
+                };
             }
         }
 
@@ -353,7 +379,7 @@ impl HostBuilder {
             let handler_clone = handler.clone();
             host.register_fallback(*builtin_type, move |engine, args| {
                 handler_clone.call(engine, args)
-            });
+            };
         }
 
         host
@@ -369,51 +395,55 @@ mod tests {
     #[test]
     fn test_builder_basics() {
         let builder = HostBuilder::new();
-        let registry = builder.build().expect("Failed to build registry");
+        let registry = builder.build().expect("Failed to build registry"));
 
-        assert!(!registry.has_host_function("test_module", "test_function"));
+        assert!(!registry.has_host_function("test_module", "test_function");
     }
 
     #[test]
     fn test_host_function_registration() {
-        let handler = HostFunctionHandler::new(|_| Ok(vec![Value::I32(42)]));
+        let handler = HostFunctionHandler::new(|_| Ok(vec![Value::I32(42)];
 
         let builder =
-            HostBuilder::new().with_host_function("test_module", "test_function", handler);
+            HostBuilder::new().with_host_function("test_module", "test_function", handler;
 
-        let registry = builder.build().expect("Failed to build registry");
+        let registry = builder.build().expect("Failed to build registry"));
 
-        assert!(registry.has_host_function("test_module", "test_function"));
+        assert!(registry.has_host_function("test_module", "test_function");
     }
 
     #[test]
     fn test_builtin_registration() {
         let builder = HostBuilder::new()
-            .with_builtin_handler(BuiltinType::ResourceCreate, |_, _| Ok(vec![Value::I64(123)]));
+            .with_builtin_handler(BuiltinType::ResourceCreate, |_, _| {
+                Ok(vec![Value::I64(123)])
+            };
 
-        let registry = builder.build().expect("Failed to build registry");
+        let registry = builder.build().expect("Failed to build registry"));
 
-        assert!(registry.has_host_function("wasi_builtin", "resource.create"));
+        assert!(registry.has_host_function("wasi_builtin", "resource.create");
     }
 
     #[test]
     fn test_required_builtin() {
         let builder = HostBuilder::new()
             .require_builtin(BuiltinType::ResourceCreate)
-            .with_strict_validation(true);
+            .with_strict_validation(true;
 
         // Should fail because ResourceCreate is required but not implemented
-        let result = builder.build();
-        assert!(result.is_err());
+        let result = builder.build);
+        assert!(result.is_err();
 
         // Now implement the required built-in
         let builder = HostBuilder::new()
             .require_builtin(BuiltinType::ResourceCreate)
             .with_strict_validation(true)
-            .with_builtin_handler(BuiltinType::ResourceCreate, |_, _| Ok(vec![Value::I64(123)]));
+            .with_builtin_handler(BuiltinType::ResourceCreate, |_, _| {
+                Ok(vec![Value::I64(123)])
+            };
 
         // Should succeed now
-        let result = builder.build();
+        let result = builder.build);
         assert!(result.is_ok());
     }
 
@@ -422,10 +452,10 @@ mod tests {
         let builder = HostBuilder::new()
             .require_builtin(BuiltinType::ResourceCreate)
             .with_strict_validation(true)
-            .builtin_implemented(BuiltinType::ResourceCreate);
+            .builtin_implemented(BuiltinType::ResourceCreate;
 
         // Should succeed because we manually marked ResourceCreate as implemented
-        let result = builder.build();
+        let result = builder.build);
         assert!(result.is_ok());
     }
 
@@ -469,15 +499,15 @@ mod tests {
         }
 
         // Create a LinkInterceptor with our mock strategy
-        let mut interceptor = LinkInterceptor::new("test-interceptor");
-        interceptor.add_strategy(Arc::new(MockStrategy));
-        let interceptor = Arc::new(interceptor);
+        let mut interceptor = LinkInterceptor::new("test-interceptor";
+        interceptor.add_strategy(Arc::new(MockStrategy;
+        let interceptor = Arc::new(interceptor;
 
-        let builder = HostBuilder::new().with_link_interceptor(interceptor);
+        let builder = HostBuilder::new().with_link_interceptor(interceptor;
 
-        let registry = builder.build().expect("Failed to build registry");
+        let registry = builder.build().expect("Failed to build registry"));
 
-        assert!(registry.get_interceptor().is_some());
+        assert!(registry.get_interceptor().is_some();
     }
 
     #[cfg(feature = "std")]
@@ -486,47 +516,47 @@ mod tests {
         let builder = HostBuilder::new()
             .with_component_name("test-component")
             .with_host_id("test-host")
-            .with_builtin_handler(BuiltinType::ResourceCreate, |_, _| Ok(vec![Value::I32(42)]));
+            .with_builtin_handler(BuiltinType::ResourceCreate, |_, _| Ok(vec![Value::I32(42)];
 
-        let builtin_host = builder.build_builtin_host();
+        let builtin_host = builder.build_builtin_host);
 
         // Check that the handler was registered
-        assert!(builtin_host.is_implemented(BuiltinType::ResourceCreate));
+        assert!(builtin_host.is_implemented(BuiltinType::ResourceCreate);
 
         // Test calling the built-in
-        let mut engine = ();
-        let result = builtin_host.call_builtin(&mut engine, BuiltinType::ResourceCreate, vec![]);
+        let mut engine = );
+        let result = builtin_host.call_builtin(&mut engine, BuiltinType::ResourceCreate, vec![];
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), vec![Value::I32(42)]);
+        assert_eq!(result.unwrap(), vec![Value::I32(42)];
     }
 
     #[cfg(feature = "std")]
     #[test]
     fn test_fallback_registration() {
         let builder = HostBuilder::new()
-            .with_fallback_handler(BuiltinType::ResourceCreate, |_, _| Ok(vec![Value::I32(99)]));
+            .with_fallback_handler(BuiltinType::ResourceCreate, |_, _| Ok(vec![Value::I32(99)];
 
-        let builtin_host = builder.build_builtin_host();
+        let builtin_host = builder.build_builtin_host);
 
         // Check that the fallback was registered
-        assert!(builtin_host.has_fallback(BuiltinType::ResourceCreate));
+        assert!(builtin_host.has_fallback(BuiltinType::ResourceCreate);
 
         // Test calling the built-in (should use fallback)
-        let mut engine = ();
-        let result = builtin_host.call_builtin(&mut engine, BuiltinType::ResourceCreate, vec![]);
+        let mut engine = );
+        let result = builtin_host.call_builtin(&mut engine, BuiltinType::ResourceCreate, vec![];
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), vec![Value::I32(99)]);
+        assert_eq!(result.unwrap(), vec![Value::I32(99)];
     }
 
     #[cfg(feature = "std")]
     #[test]
     fn test_builder_with_interceptor() {
-        use wrt_foundation::component_value::ComponentValue;
-        use wrt_intercept::{BeforeBuiltinResult, BuiltinInterceptor, InterceptContext};
         #[cfg(feature = "std")]
         use std::sync::Arc;
         #[cfg(all(not(feature = "std")))]
         use std::sync::Arc;
+        use wrt_foundation::component_value::ComponentValue;
+        use wrt_intercept::{BeforeBuiltinResult, BuiltinInterceptor, InterceptContext};
 
         struct TestInterceptor;
 
@@ -534,18 +564,36 @@ mod tests {
             fn before_builtin(
                 &self,
                 _context: &InterceptContext,
-                _args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
+                _args: &[wrt_foundation::component_value::ComponentValue<
+                    wrt_foundation::safe_memory::NoStdProvider<64>,
+                >],
             ) -> Result<BeforeBuiltinResult> {
                 // Bypass normal execution and return our own result
-                Ok(BeforeBuiltinResult::Bypass(vec![ComponentValue::s32(777)]))
+                Ok(BeforeBuiltinResult::Bypass(vec![
+                    wrt_foundation::component_value::ComponentValue::s32(777),
+                ]))
             }
 
             fn after_builtin(
                 &self,
                 _context: &InterceptContext,
-                _args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-                result: Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>,
-            ) -> Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>> {
+                _args: &[wrt_foundation::component_value::ComponentValue<
+                    wrt_foundation::safe_memory::NoStdProvider<64>,
+                >],
+                result: Result<
+                    Vec<
+                        wrt_foundation::component_value::ComponentValue<
+                            wrt_foundation::safe_memory::NoStdProvider<64>,
+                        >,
+                    >,
+                >,
+            ) -> Result<
+                Vec<
+                    wrt_foundation::component_value::ComponentValue<
+                        wrt_foundation::safe_memory::NoStdProvider<64>,
+                    >,
+                >,
+            > {
                 // Just pass through the result
                 result
             }
@@ -560,31 +608,33 @@ mod tests {
             .with_builtin_handler(BuiltinType::ResourceCreate, |_, _| {
                 // This should never be called because the interceptor bypasses it
                 Ok(vec![Value::I32(42)])
-            });
+            };
 
-        let builtin_host = builder.build_builtin_host();
+        let builtin_host = builder.build_builtin_host);
 
         // Test calling the built-in
-        let mut engine = ();
-        let result = builtin_host.call_builtin(&mut engine, BuiltinType::ResourceCreate, vec![]);
+        let mut engine = );
+        let result = builtin_host.call_builtin(&mut engine, BuiltinType::ResourceCreate, vec![];
 
         // The interceptor should have bypassed the handler and returned 777
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), vec![Value::I32(777)]);
+        assert_eq!(result.unwrap(), vec![Value::I32(777)];
     }
 }
 
 /// Create a runtime error with the specified message
 ///
 /// This function properly handles both std and `no_std` environments
-#[must_use] pub fn runtime_error(message: &'static str) -> Error {
+#[must_use]
+pub fn runtime_error(message: &'static str) -> Error {
     Error::runtime_error(message)
 }
 
 /// Create a runtime error with a context string
 ///
 /// This function properly handles both std and `no_std` environments
-#[must_use] pub fn runtime_error_with_context(_message: &str, _context: &str) -> Error {
+#[must_use]
+pub fn runtime_error_with_context(_message: &str, _context: &str) -> Error {
     // In no_std environments, we use a static error message
     Error::runtime_error("Runtime error with context")
 }

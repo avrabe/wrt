@@ -11,71 +11,58 @@ readme = "README.md"
 keywords = ["webassembly", "wasm", "math", "no_std"]
 categories = ["wasm", "no-std"]
 
+[lints]
+workspace = true
+
 [features]
 default = []
 # Binary choice: std OR no_std (no alloc middle ground)
 # Standard library support - enables use of std::f32/f64 math functions
-std = ["wrt-platform/std"]
+std = ["wrt-platform/std", "dynamic-allocation"]
 # Allocator support (implicitly enabled by std)
 # This crate is no_std by default, this feature is a no-op for compatibility
 no_std = []
+
+# Allocation support for no_std environments
+alloc = []
 # Platform feature enables SIMD operations
 platform = ["wrt-platform", "std"]
 
-# Disable panic handler for library builds to avoid conflicts
-disable-panic-handler = []
+# Core allocation strategies (aligned with wrt-foundation)
+dynamic-allocation = []
+static-allocation = []
+verified-static-allocation = ["static-allocation"]
+
+# Capability features
+compile-time-capacity-limits = []
+runtime-bounds-checking = []
+formal-verification-required = []
+
+# ASIL Safety Levels
+qm = ["dynamic-allocation"]
+asil-a = ["runtime-bounds-checking"]
+asil-b = ["asil-a", "compile-time-capacity-limits"]
+asil-c = ["asil-b", "static-allocation"]
+asil-d = ["asil-c", "verified-static-allocation", "formal-verification-required"]
+
+# Math-specific safety features
+checked-arithmetic = []
+saturating-arithmetic = []
+overflow-detection = []
+nan-propagation-checking = []
+
+# Legacy compatibility
+safety-asil-b = ["asil-b"]
+safety-asil-c = ["asil-c"]
+safety-asil-d = ["asil-d"]
+
 
 [dependencies]
 wrt-error = { workspace = true, default-features = false }
-wrt-platform = { workspace = true, default-features = false, optional = true, features = ["disable-panic-handler"] }
+wrt-platform = { workspace = true, optional = true }
+libm = { version = "0.2", default-features = false }
 
 # Note: alloc support is provided through cfg(feature = "std") in source code
 
 [dev-dependencies]
-# Add development dependencies here
-
-[lints.rust]
-unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)', 'cfg(kani)', 'cfg(coverage)', 'cfg(doc)'] }
-unsafe_code = "forbid"
-missing_docs = "deny"
-static_mut_refs = "deny"
-let_underscore_drop = "warn"
-# Invalid lint removed - pointer_cast doesn't exist
-# unreachable_code = "deny" # Covered by clippy::unreachable
-
-[lints.clippy]
-# Safety & Correctness
-inline_asm_x86_att_syntax = "deny"
-transmute_ptr_to_ref = "deny"
-# float_arithmetic = "deny" # Rule 1.7 - ALLOWED here because Wasm spec requires it
-ptr_offset_with_cast = "deny"
-unwrap_used = "deny"
-expect_used = "deny"
-panic = "deny"
-todo = "deny"
-unimplemented = "deny"
-result_unit_err = "deny"
-match_wildcard_for_single_variants = "deny"
-never_loop = "deny"
-unreachable = "deny"
-# Rule 5.2
-# static_mut_refs = "deny" # This is a rustc lint, covered in [lints.rust]
-# Rule 5.5
-arc_with_non_send_sync = "deny" # Check correct name
-# Rule 9.2
-debug_assert_with_mut_call = "warn"
-
-# Style & Maintainability
-pedantic = "warn" # Enable pedantic, adjust specific lints as needed
-must_use_candidate = "warn"
-must_use_unit = "warn"
-
-# Explicitly allow required for Wasm ops
-float_arithmetic = "warn" # Wasm requires float ops, so warn initially
-cast_possible_truncation = "allow" # Needed for conversions
-cast_sign_loss = "allow" # Needed for conversions/shifts
-cast_possible_wrap = "allow" # Needed for conversions/shifts/counts
-cast_precision_loss = "allow"
-manual_range_contains = "allow" # Used in float->int conversion checks
-float_cmp = "allow" # Float comparisons are inherent
-missing_const_for_fn = "allow" # Polyfills/float ops often cannot be const 
+# Add development dependencies here 

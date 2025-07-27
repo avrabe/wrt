@@ -74,7 +74,7 @@ impl<P: Provider> AtomicMemoryOps<P> {
     where
         P: Sized + Clone,
     {
-        let handler = SafeMemoryHandler::new(provider);
+        let handler = SafeMemoryHandler::new(provider)?;
         let verification_level = handler.verification_level();
         Ok(Self { handler: WrtMutex::new(handler), verification_level })
     }
@@ -264,13 +264,14 @@ impl<T: Provider> AtomicMemoryExt for T {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{safe_managed_alloc, budget_aware_provider::CrateId};
     use crate::safe_memory::NoStdProvider;
 
     // Basic test of atomic write operation
     #[test]
-    fn test_atomic_write() {
+    fn test_atomic_write() -> crate::Result<()> {
         // Create a NoStdProvider with a buffer of 1024 bytes
-        let provider = NoStdProvider::<1024>::new();
+        let provider = safe_managed_alloc!(1024, CrateId::Foundation)?;
 
         // Create an AtomicMemoryOps from the provider
         let atomic_ops = AtomicMemoryOps::from_provider(provider).unwrap();
@@ -284,7 +285,7 @@ mod tests {
         // Read back the data using appropriate method for the feature set
         #[cfg(feature = "std")]
         let read_data = atomic_ops.read_data(0, test_data.len()).unwrap();
-        
+
         #[cfg(not(feature = "std"))]
         let read_data = {
             let handler = atomic_ops.handler.lock();
@@ -294,13 +295,14 @@ mod tests {
 
         // Verify the data
         assert_eq!(read_data, &test_data);
+        Ok(())
     }
 
     // Test that ensures the checksum is correct after atomic write
     #[test]
-    fn test_checksum_integrity() {
+    fn test_checksum_integrity() -> crate::Result<()> {
         // Create a NoStdProvider with a buffer of 1024 bytes
-        let provider = NoStdProvider::<1024>::new();
+        let provider = safe_managed_alloc!(1024, CrateId::Foundation)?;
 
         // Create an AtomicMemoryOps from the provider
         let atomic_ops = AtomicMemoryOps::from_provider(provider).unwrap();
@@ -311,25 +313,23 @@ mod tests {
         // Perform an atomic write
         atomic_ops.atomic_write_with_checksum(0, &test_data).unwrap();
 
-        // Verify integrity explicitly
+        // Verify integrity explicitly at both provider and slice levels
         let handler = atomic_ops.handler.lock();
         assert!(handler.provider().verify_integrity().is_ok());
-
-        // Manually calculate expected checksum
-        let _expected_checksum = crate::verification::Checksum::compute(&test_data);
 
         // Access the internal slice to check its checksum
         let slice = handler.borrow_slice(0, test_data.len()).unwrap();
 
-        // Verify integrity of the slice, which checks the checksum
+        // Verify integrity of the slice, which internally compares checksums
         assert!(slice.verify_integrity().is_ok());
+        Ok(())
     }
 
     // Test atomic copy within operation
     #[test]
-    fn test_atomic_copy_within() {
+    fn test_atomic_copy_within() -> crate::Result<()> {
         // Create a NoStdProvider with a buffer of 1024 bytes
-        let provider = NoStdProvider::<1024>::new();
+        let provider = safe_managed_alloc!(1024, CrateId::Foundation)?;
 
         // Create an AtomicMemoryOps from the provider
         let atomic_ops = AtomicMemoryOps::from_provider(provider).unwrap();
@@ -346,7 +346,7 @@ mod tests {
         // Read back the copied data
         #[cfg(feature = "std")]
         let read_data = atomic_ops.read_data(20, 5).unwrap();
-        
+
         #[cfg(not(feature = "std"))]
         let read_data = {
             let handler = atomic_ops.handler.lock();
@@ -356,5 +356,6 @@ mod tests {
 
         // Verify the data was copied correctly
         assert_eq!(read_data, &[3, 4, 5, 6, 7]);
+        Ok(())
     }
 }

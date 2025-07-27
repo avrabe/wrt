@@ -46,11 +46,7 @@ pub fn val_type_to_ref_type(val_type: CoreValueType) -> Result<RefType> {
     match val_type {
         CoreValueType::FuncRef => Ok(RefType::Funcref),
         CoreValueType::ExternRef => Ok(RefType::Externref),
-        _ => Err(Error::new(
-            wrt_error::ErrorCategory::Type,
-            codes::CONVERSION_ERROR,
-            "Invalid reference type",
-        )),
+        _ => Err(Error::runtime_execution_error("Value type is not a reference type")),
     }
 }
 
@@ -124,8 +120,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        safe_memory::{NoStdProvider, DEFAULT_MEMORY_PROVIDER_CAPACITY},
-        types::{DEFAULT_FUNC_TYPE_PROVIDER_CAPACITY, RefType, ValueType as CoreValueType},
+        memory_sizing::TinyProvider,
+        safe_memory::DEFAULT_MEMORY_PROVIDER_CAPACITY,
+        types::{RefType, ValueType as CoreValueType},
         values::Value,
     };
 
@@ -171,7 +168,7 @@ mod tests {
         // Test valid function type creation using slices from arrays
         let params: [CoreValueType; 2] = [CoreValueType::I32, CoreValueType::I64];
         let results: [CoreValueType; 1] = [CoreValueType::F32];
-        let provider = NoStdProvider::<DEFAULT_FUNC_TYPE_PROVIDER_CAPACITY>::default();
+        let provider = TinyProvider::default();
         let func_type = func_type::create(provider.clone(), &params, &results).unwrap();
 
         assert_eq!(func_type.params(), &[CoreValueType::I32, CoreValueType::I64]);
@@ -194,6 +191,6 @@ mod tests {
         // assume it's small for demonstration if we wanted to test failure.
         // let too_many_params: [CoreValueType; 260] = [CoreValueType::I32;
         // 260]; // Example if MAX is 256 assert!(func_type::create(&
-        // too_many_params, &empty_results).is_err());
+        // too_many_params, &empty_results).is_err);
     }
 }

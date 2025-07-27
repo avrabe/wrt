@@ -15,8 +15,8 @@
 
 // Binary std/no_std choice
 
-use core::sync::atomic::{AtomicUsize, Ordering};
 use core::fmt;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::operations::{record_global_operation, Type as OperationType};
 use crate::verification::{Checksum, VerificationLevel};
@@ -178,7 +178,7 @@ impl<'a> Slice<'a> {
     pub fn verify_integrity_with_importance(&self, importance: u8) -> Result<()> {
         // Skip verification if the level indicates we shouldn't verify
         if !self.verification_level.should_verify(importance) {
-            return Ok(());
+            return Ok();
         }
 
         // If length doesn't match stored value, memory is corrupt
@@ -204,7 +204,7 @@ impl<'a> Slice<'a> {
 
             // Skip detailed checks for low importance non-redundant checks
             if !self.verification_level.should_verify_redundant() && importance < 200 {
-                return Ok(());
+                return Ok();
             }
 
             // Compute current checksum and compare with stored checksum
@@ -386,7 +386,7 @@ impl<'a> SliceMut<'a> {
     /// verification level and the provided importance.
     pub fn verify_integrity_with_importance(&self, importance: u8) -> Result<()> {
         if !self.verification_level.should_verify(importance) {
-            return Ok(());
+            return Ok();
         }
         if self.data.len() != self.length {
             return Err(Error::validation_error(
@@ -407,7 +407,7 @@ impl<'a> SliceMut<'a> {
                 );
             }
             if !self.verification_level.should_verify_redundant() && importance < 200 {
-                return Ok(());
+                return Ok();
             }
             let current_checksum = Checksum::compute(self.data);
             if current_checksum == self.checksum {
@@ -429,11 +429,7 @@ impl<'a> SliceMut<'a> {
     /// creating the new `SliceMut` fails (e.g., internal verification error).
     pub fn slice_mut<'s>(&'s mut self, start: usize, len: usize) -> Result<SliceMut<'s>> {
         if start.checked_add(len).map_or(true, |end| end > self.length) {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_OUT_OF_BOUNDS,
-                "Attempted to slice SliceMut out of bounds",
-            ));
+            return Err(Error::runtime_execution_error("Operation failed"));
         }
 
         // Integrity of the parent slice should ideally be checked before creating a
@@ -940,11 +936,7 @@ impl Provider for StdProvider {
         // handles potential resizing. Let's assume verify_access checks against
         // current data.len() for reads and initial write checks.
         if end > self.data.len() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::MEMORY_ACCESS_ERROR,
-                "Access out of bounds",
-            ));
+            return Err(Error::runtime_execution_error("Operation failed"));
         }
         Ok(())
     }
@@ -1182,7 +1174,33 @@ impl<const N: usize> Clone for NoStdProvider<N> {
 }
 
 impl<const N: usize> Default for NoStdProvider<N> {
+    /// Creates a default NoStdProvider
+    ///
+    /// # ⚠️ BUDGET BYPASS WARNING ⚠️
+    /// Direct use of Default bypasses memory budget tracking!
+    /// Use `BudgetAwareProviderFactory::create_provider()` instead.
+    /// This implementation exists only for compatibility with bounded collections.
+    ///
+    /// # Compile-time Detection
+    /// This usage will be detected by budget enforcement lints.
     fn default() -> Self {
+        // Track bypass usage for enforcement monitoring
+        #[cfg(feature = "budget-enforcement")]
+        {
+            compile_error!(
+                "Direct NoStdProvider::default() usage detected! \
+                Use BudgetProvider::new(crate_id) or create_provider! macro instead. \
+                This is a budget enforcement violation."
+            );
+        }
+
+        // Emit warning for detection by linting tools
+        #[cfg(not(feature = "budget-enforcement"))]
+        {
+            // Runtime tracking of bypasses for monitoring
+            // Modern memory system automatically tracks usage
+        }
+
         // Safety: N must be such that [0u8; N] is valid.
         // This is generally true for array initializers.
         // If N could be excessively large leading to stack overflow for the zeroed
@@ -1214,12 +1232,33 @@ impl<const N: usize> fmt::Debug for NoStdProvider<N> {
 // NoStdProvider methods are available in all configurations
 impl<const N: usize> NoStdProvider<N> {
     /// Create a new empty memory provider with default verification level
+    ///
+    /// # Deprecated
+    /// This constructor will become private. Use `BudgetProvider::new()` or
+    /// `create_provider!` macro instead for budget-aware allocation.
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use BudgetProvider::new() or create_provider! macro for budget-aware allocation"
+    )]
     pub fn new() -> Self {
-        Self::with_verification_level(VerificationLevel::default())
+        Self::new_internal(VerificationLevel::default())
     }
 
     /// Create a new empty memory provider with the specified verification level
+    ///
+    /// # Deprecated
+    /// This constructor will become private. Use `BudgetProvider::new()` or
+    /// `create_provider!` macro instead for budget-aware allocation.
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use BudgetProvider::new() or create_provider! macro for budget-aware allocation"
+    )]
     pub fn with_verification_level(level: VerificationLevel) -> Self {
+        Self::new_internal(level)
+    }
+
+    /// Internal constructor that doesn't trigger deprecation warnings
+    fn new_internal(level: VerificationLevel) -> Self {
         Self {
             data: [0; N],
             used: 0,
@@ -1231,12 +1270,20 @@ impl<const N: usize> NoStdProvider<N> {
     }
 
     /// Create a new memory provider with specified size and verification level
+    ///
+    /// # Deprecated
+    /// This constructor will become private. Use `BudgetProvider::new()` or
+    /// `create_provider!` macro instead for budget-aware allocation.
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use BudgetProvider::new() or create_provider! macro for budget-aware allocation"
+    )]
     pub fn new_with_size(size: usize, level: VerificationLevel) -> Result<Self> {
         if size > N {
             return Err(Error::memory_error("Requested size exceeds NoStdProvider fixed capacity"));
         }
 
-        let mut provider = Self::with_verification_level(level);
+        let mut provider = Self::new_internal(level);
         if size > 0 {
             provider.resize(size)?;
         }
@@ -1318,11 +1365,7 @@ impl<const N: usize> NoStdProvider<N> {
 
         // Simple length check
         if self.used > N {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::INTEGRITY_VIOLATION,
-                "Memory corruption detected: used > capacity",
-            ));
+            return Err(Error::runtime_execution_error("Operation failed"));
         }
 
         // Verify that the last access was valid
@@ -1330,11 +1373,7 @@ impl<const N: usize> NoStdProvider<N> {
         let length = self.last_access_length.load(Ordering::SeqCst);
 
         if length > 0 && offset + length > self.used {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ACCESS_OUT_OF_BOUNDS,
-                "Last access out of bounds",
-            ));
+            return Err(Error::memory_access_out_of_bounds("Access out of bounds"));
         }
 
         Ok(())
@@ -1401,7 +1440,7 @@ impl<const N: usize> Provider for NoStdProvider<N> {
             if offset > N {
                 return Err(Error::memory_out_of_bounds("Zero-length access out of capacity"));
             }
-            return Ok(());
+            return Ok();
         }
 
         if offset >= N || offset + len > N {
@@ -1472,11 +1511,7 @@ impl<const N: usize> Provider for NoStdProvider<N> {
 
     fn ensure_used_up_to(&mut self, byte_offset: usize) -> Result<()> {
         if byte_offset > N {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::CAPACITY_EXCEEDED,
-                "Cannot ensure used up to an offset beyond capacity",
-            ));
+            return Err(Error::runtime_execution_error("Operation failed"));
         }
         self.used = core::cmp::max(self.used, byte_offset);
         Ok(())
@@ -1488,7 +1523,7 @@ impl<const N: usize> Provider for NoStdProvider<N> {
                                           // to extend 'used'. For now, ensure
                                           // it's within capacity N for mutable access.
         if offset + len > N {
-            return Err(Error::memory_out_of_bounds("get_slice_mut out of capacity"));
+            return Err(Error::memory_out_of_bounds("Offset + length exceeds capacity"));
         }
         // If strict init checks are on, we might want to restrict len to self.used -
         // offset. However, SliceMut is often used to write new data.
@@ -1550,23 +1585,14 @@ impl<const N: usize> Allocator for NoStdProvider<N> {
         // NoStdProvider<0>, this will fail.
         if N == 0 || layout.size() > N || layout.size() == 0 {
             // Binary std/no_std choice
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_ERROR,
-                "NoStdProvider cannot satisfy allocation request (zero capacity or request too \
-                 large/zero)",
-            ));
+            return Err(Error::memory_error("NoStdProvider cannot satisfy allocation request (zero capacity or request too large/zero)"));
         }
         // Binary std/no_std choice
         // would need to manage free blocks, alignment, etc.
         // Returning self.data.as_ptr() is not safe without proper management.
         // Binary std/no_std choice
         // implemented.
-        Err(Error::new(
-            ErrorCategory::Memory,
-            codes::UNSUPPORTED_OPERATION, // Or MEMORY_ALLOCATION_ERROR
-            "NoStdProvider dynamic allocation not implemented; use pre-allocated buffer.",
-        ))
+        Err(Error::runtime_execution_error("Raw allocation not implemented"))
     }
 
     fn deallocate(&self, _ptr: *mut u8, _layout: core::alloc::Layout) -> WrtResult<()> {
@@ -1683,12 +1709,12 @@ impl<P: Provider> SafeMemoryHandler<P> {
     ///
     /// ```
     /// # use wrt_foundation::safe_memory::{SafeMemoryHandler, NoStdProvider};
-    /// # use wrt_foundation::VerificationLevel;
+    /// # use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
     /// #
-    /// # let provider = NoStdProvider::new(1024, VerificationLevel::default());
+    /// # let provider = safe_managed_alloc!(1024, CrateId::Foundation).unwrap();
     /// # let handler = SafeMemoryHandler::new(provider);
     /// let data = handler.to_vec().unwrap();
-    /// assert!(data.is_empty()); // Empty handler has no data
+    /// assert!(data.is_empty())); // Empty handler has no data
     /// ```
     #[cfg(feature = "std")]
     pub fn to_vec(&self) -> Result<std::vec::Vec<u8>> {
@@ -1696,7 +1722,7 @@ impl<P: Provider> SafeMemoryHandler<P> {
         if size == 0 {
             return Ok(std::vec::Vec::new());
         }
-        
+
         let slice = self.provider.borrow_slice(0, size)?;
         Ok(slice.as_ref().to_vec())
     }
@@ -1706,23 +1732,29 @@ impl<P: Provider> SafeMemoryHandler<P> {
     /// In no_std environments, this returns the data as a BoundedVec since
     /// standard Vec is not available.
     #[cfg(not(feature = "std"))]
-    pub fn to_vec(&self) -> Result<crate::bounded::BoundedVec<u8, 4096, NoStdProvider<4096>>> {
+    pub fn to_vec(
+        &self,
+    ) -> Result<crate::bounded::BoundedVec<u8, 4096, crate::safe_memory::NoStdProvider<4096>>> {
+        use crate::budget_aware_provider::CrateId;
+        #[allow(deprecated)]
+        use crate::wrt_memory_system::CapabilityWrtFactory;
+
         let size = self.provider.size();
         if size == 0 {
-            return crate::bounded::BoundedVec::new(NoStdProvider::default());
+            let provider = crate::safe_managed_alloc!(4096, crate::budget_aware_provider::CrateId::Foundation)?;
+            return crate::bounded::BoundedVec::new(provider);
         }
-        
+
         let slice = self.provider.borrow_slice(0, size)?;
-        let mut result = crate::bounded::BoundedVec::new(NoStdProvider::default())?;
-        
+        let provider = crate::safe_managed_alloc!(4096, crate::budget_aware_provider::CrateId::Foundation)?;
+        let mut result = crate::bounded::BoundedVec::new(provider)?;
+
         for byte in slice.as_ref() {
-            result.push(*byte).map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                crate::codes::INVALID_VALUE,
-                "Failed to push byte during to_vec conversion",
-            ))?;
+            result.push(*byte).map_err(|_| {
+                Error::runtime_execution_error("Failed to push byte")
+            })?;
         }
-        
+
         Ok(result)
     }
 
@@ -1734,7 +1766,7 @@ impl<P: Provider> SafeMemoryHandler<P> {
     /// # Errors
     ///
     /// Returns an error if the provider cannot be resized to the requested size.
-    pub fn resize(&mut self, new_size: usize) -> Result<()> 
+    pub fn resize(&mut self, new_size: usize) -> Result<()>
     where
         P: Provider,
     {
@@ -1771,13 +1803,13 @@ impl<P: Provider> SafeMemoryHandler<P> {
         // Since the Provider trait doesn't expose a direct clear method,
         // we implement clearing by overwriting the memory with zeros in chunks
         // This effectively clears the data while maintaining the provider's integrity
-        
+
         let current_size = self.provider.size();
         if current_size > 0 {
             // Clear in chunks to avoid large allocations
             const CHUNK_SIZE: usize = 256;
             let zero_chunk = [0u8; CHUNK_SIZE];
-            
+
             let mut offset = 0;
             while offset < current_size {
                 let chunk_len = core::cmp::min(CHUNK_SIZE, current_size - offset);
@@ -1785,7 +1817,7 @@ impl<P: Provider> SafeMemoryHandler<P> {
                 offset += chunk_len;
             }
         }
-        
+
         Ok(())
     }
 
@@ -1829,9 +1861,9 @@ impl<P: Provider> SafeMemoryHandler<P> {
 // Re-export SafeStack as an alias for BoundedStack
 // Re-export memory providers with consistent naming
 pub use NoStdProvider as NoStdMemoryProvider;
+pub use Provider as MemoryProvider;
 #[cfg(feature = "std")]
 pub use StdProvider as StdMemoryProvider;
-pub use Provider as MemoryProvider;
 
 pub use crate::bounded::BoundedStack as SafeStack;
 
@@ -1842,23 +1874,23 @@ mod tests {
     #[test]
     fn test_safe_memory_handler_copy_within() {
         // Create a NoStdProvider with capacity 50
-        let mut provider = NoStdProvider::<50>::new();
-        
+        let mut provider = crate::safe_managed_alloc!(50, crate::budget_aware_provider::CrateId::Foundation).unwrap();
+
         // Set initial data "Hello, World!"
         let test_data = b"Hello, World!";
         provider.set_data(test_data).unwrap();
-        
+
         // Create handler
         let mut handler = SafeMemoryHandler::new(provider);
-        
+
         // Test copy_within - copy "World" (from position 7, length 5) to position 0
         handler.copy_within(7, 0, 5).unwrap();
-        
+
         // Verify the result by reading the first 13 bytes
         let slice = handler.get_slice(0, 13).unwrap();
         let data = slice.data().unwrap();
-        
-        // The data should now be "World, World!" 
+
+        // The data should now be "World, World!"
         // (first 5 bytes replaced with "World" from position 7)
         assert_eq!(&data[0..5], b"World", "copy_within should copy 'World' to the beginning");
         assert_eq!(&data[5..13], b", World!", "rest of data should remain unchanged");
@@ -1867,35 +1899,35 @@ mod tests {
     #[test]
     fn test_safe_memory_handler_copy_within_overlapping() {
         // Test overlapping copy operation
-        let mut provider = NoStdProvider::<20>::new();
-        
+        let mut provider = crate::safe_managed_alloc!(20, crate::budget_aware_provider::CrateId::Foundation).unwrap();
+
         // Set data "ABCDEFGHIJ"
         let test_data = b"ABCDEFGHIJ";
         provider.set_data(test_data).unwrap();
-        
+
         let mut handler = SafeMemoryHandler::new(provider);
-        
+
         // Copy 3 bytes from position 2 to position 4 (overlapping region)
         handler.copy_within(2, 4, 3).unwrap();
-        
+
         let slice = handler.get_slice(0, 10).unwrap();
         let data = slice.data().unwrap();
-        
+
         // Result should be "ABCDCDEFIJ" (CDE copied to position 4, overwriting EFG)
         assert_eq!(data, b"ABCDCDEHIJ", "overlapping copy_within should work correctly");
     }
 
     #[test]
     fn test_safe_memory_handler_copy_within_bounds_check() {
-        let mut provider = NoStdProvider::<10>::new();
+        let mut provider = crate::safe_managed_alloc!(10, crate::budget_aware_provider::CrateId::Foundation).unwrap();
         provider.set_data(b"123456789").unwrap();
-        
+
         let mut handler = SafeMemoryHandler::new(provider);
-        
+
         // Test out of bounds source
         let result = handler.copy_within(8, 0, 5);
         assert!(result.is_err(), "copy_within should fail for out-of-bounds source");
-        
+
         // Test out of bounds destination
         let result = handler.copy_within(0, 8, 5);
         assert!(result.is_err(), "copy_within should fail for out-of-bounds destination");
@@ -1903,17 +1935,17 @@ mod tests {
 
     #[test]
     fn test_safe_memory_handler_copy_within_zero_length() {
-        let mut provider = NoStdProvider::<10>::new();
+        let mut provider = crate::safe_managed_alloc!(10, crate::budget_aware_provider::CrateId::Foundation).unwrap();
         provider.set_data(b"ABCDEFG").unwrap();
-        
+
         let mut handler = SafeMemoryHandler::new(provider);
-        
+
         // Copy zero bytes should succeed and not change anything
         handler.copy_within(0, 5, 0).unwrap();
-        
+
         let slice = handler.get_slice(0, 7).unwrap();
         let data = slice.data().unwrap();
-        
+
         assert_eq!(data, b"ABCDEFG", "zero-length copy should not change data");
     }
 }

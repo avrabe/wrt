@@ -4,6 +4,7 @@
 //! and hardware MPU isolation. This provides security-first memory
 //! allocation with compile-time guarantees.
 
+
 use core::{
     ptr::NonNull,
     sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
@@ -60,14 +61,14 @@ mod syscall {
                 in("r2") buffer,
                 in("r3") len,
                 options(nostack, preserves_flags)
-            );
+            ;
             result
         }
 
         #[cfg(not(target_arch = "arm"))]
         {
             // Placeholder for non-ARM targets
-            let _ = (driver_id, buffer_id, buffer, len);
+            let _ = (driver_id, buffer_id, buffer, len;
             -1 // Error: unsupported on this platform
         }
     }
@@ -84,14 +85,14 @@ mod syscall {
                 in("r2") arg1,
                 in("r3") arg2,
                 options(nostack, preserves_flags)
-            );
+            ;
             result
         }
 
         #[cfg(not(target_arch = "arm"))]
         {
             // Placeholder for non-ARM targets
-            let _ = (driver_id, command_id, arg1, arg2);
+            let _ = (driver_id, command_id, arg1, arg2;
             -1 // Error: unsupported on this platform
         }
     }
@@ -101,7 +102,7 @@ mod syscall {
     pub unsafe fn yield_for() {
         #[cfg(target_arch = "arm")]
         {
-            core::arch::asm!("svc #0", options(nostack, preserves_flags));
+            core::arch::asm!("svc #0", options(nostack, preserves_flags;
         }
 
         #[cfg(not(target_arch = "arm"))]
@@ -208,17 +209,17 @@ impl TockAllocator {
                 .ok_or_else(|| Error::validation_error("Static buffer is null"))?;
 
             let region =
-                GrantRegion::new(ptr, buffer.len(), syscall::PROT_READ | syscall::PROT_WRITE);
+                GrantRegion::new(ptr, buffer.len(), syscall::PROT_READ | syscall::PROT_WRITE;
 
             // Add region to the array
             if self.grant_regions_count >= MAX_GRANT_REGIONS {
-                return Err(Error::resource_error("Too many grant regions"));
+                return Err(Error::resource_error("Too many grant regions";
             }
 
-            self.grant_regions[self.grant_regions_count] = Some(region);
+            self.grant_regions[self.grant_regions_count] = Some(region;
             self.grant_regions_count += 1;
 
-            return Ok(());
+            return Ok();
         }
 
         // Binary std/no_std choice
@@ -235,7 +236,7 @@ impl TockAllocator {
         };
 
         if result < 0 {
-            return Err(Error::resource_error("Failed to allocate grant region"));
+            return Err(Error::resource_error("Failed to allocate grant region";
         }
 
         // The kernel would typically provide the granted memory pointer through
@@ -270,7 +271,7 @@ impl TockAllocator {
         for i in 0..self.grant_regions_count {
             if let Some(region) = &mut self.grant_regions[i] {
                 if let Some(ptr) = region.allocate(size) {
-                    return Some(ptr);
+                    return Some(ptr;
                 }
             }
         }
@@ -284,14 +285,14 @@ impl PageAllocator for TockAllocator {
         initial_pages: u32,
         maximum_pages: Option<u32>,
     ) -> Result<(NonNull<u8>, usize), Error> {
-        let max_pages = maximum_pages.unwrap_or(self.maximum_pages);
+        let max_pages = maximum_pages.unwrap_or(self.maximum_pages;
 
         if initial_pages > max_pages {
-            return Err(Error::validation_error("Initial pages exceed maximum"));
+            return Err(Error::validation_error("Initial pages exceed maximum";
         }
 
         if max_pages > self.maximum_pages {
-            return Err(Error::resource_error("Requested pages exceed allocator limit"));
+            return Err(Error::resource_error("Requested pages exceed allocator limit";
         }
 
         let allocation_size = (initial_pages as usize) * WASM_PAGE_SIZE;
@@ -309,8 +310,8 @@ impl PageAllocator for TockAllocator {
         )?;
 
         // Binary std/no_std choice
-        self.current_allocation.store(ptr.as_ptr(), Ordering::SeqCst);
-        self.current_size.store(allocation_size, Ordering::SeqCst);
+        self.current_allocation.store(ptr.as_ptr(), Ordering::SeqCst;
+        self.current_size.store(allocation_size, Ordering::SeqCst;
 
         // Verification based on level
         match self.verification_level {
@@ -318,21 +319,21 @@ impl PageAllocator for TockAllocator {
             VerificationLevel::Minimal => {
                 // Basic verification: check alignment
                 if ptr.as_ptr() as usize % WASM_PAGE_SIZE != 0 {
-                    return Err(Error::validation_error("Allocated memory not page-aligned"));
+                    return Err(Error::validation_error("Allocated memory not page-aligned";
                 }
             }
             VerificationLevel::Standard | VerificationLevel::Full | VerificationLevel::Critical => {
                 // Full verification: check alignment, bounds, and MPU configuration
                 if ptr.as_ptr() as usize % WASM_PAGE_SIZE != 0 {
-                    return Err(Error::validation_error("Allocated memory not page-aligned"));
+                    return Err(Error::validation_error("Allocated memory not page-aligned";
                 }
 
                 // Verify MPU configuration by attempting a test access
                 unsafe {
-                    core::ptr::write_volatile(ptr.as_ptr(), 0x42);
-                    let value = core::ptr::read_volatile(ptr.as_ptr());
+                    core::ptr::write_volatile(ptr.as_ptr(), 0x42;
+                    let value = core::ptr::read_volatile(ptr.as_ptr);
                     if value != 0x42 {
-                        return Err(Error::validation_error("Memory verification failed"));
+                        return Err(Error::validation_error("Memory verification failed";
                     }
                 }
             }
@@ -343,15 +344,15 @@ impl PageAllocator for TockAllocator {
 
     unsafe fn deallocate(&mut self, ptr: NonNull<u8>, size: usize) -> Result<(), Error> {
         // Binary std/no_std choice
-        let current_ptr = self.current_allocation.load(Ordering::SeqCst);
-        let current_size = self.current_size.load(Ordering::SeqCst);
+        let current_ptr = self.current_allocation.load(Ordering::SeqCst;
+        let current_size = self.current_size.load(Ordering::SeqCst;
 
         if ptr.as_ptr() != current_ptr {
-            return Err(Error::validation_error("Pointer does not match current allocation"));
+            return Err(Error::validation_error("Pointer does not match current allocation";
         }
 
         if size != current_size {
-            return Err(Error::validation_error("Size does not match current allocation"));
+            return Err(Error::validation_error("Size does not match current allocation";
         }
 
         // Clear MPU protection
@@ -361,15 +362,15 @@ impl PageAllocator for TockAllocator {
         for i in 0..self.grant_regions_count {
             if let Some(region) = &mut self.grant_regions[i] {
                 if region.ptr.as_ptr() == ptr.as_ptr() {
-                    region.deallocate();
+                    region.deallocate);
                     break;
                 }
             }
         }
 
         // Binary std/no_std choice
-        self.current_allocation.store(core::ptr::null_mut(), Ordering::SeqCst);
-        self.current_size.store(0, Ordering::SeqCst);
+        self.current_allocation.store(core::ptr::null_mut(), Ordering::SeqCst;
+        self.current_size.store(0, Ordering::SeqCst;
 
         Ok(())
     }
@@ -412,7 +413,7 @@ impl TockAllocatorBuilder {
 
     /// Binary std/no_std choice
     pub fn with_static_buffer(mut self, buffer: &'static mut [u8]) -> Self {
-        self.static_buffer = Some(buffer);
+        self.static_buffer = Some(buffer;
         self
     }
 
@@ -436,27 +437,27 @@ mod tests {
     fn test_grant_region_creation() {
         let mut buffer = [0u8; 4096];
         let ptr = NonNull::new(buffer.as_mut_ptr()).unwrap();
-        let region = GrantRegion::new(ptr, 4096, syscall::PROT_READ | syscall::PROT_WRITE);
+        let region = GrantRegion::new(ptr, 4096, syscall::PROT_READ | syscall::PROT_WRITE;
 
-        assert_eq!(region.size, 4096);
+        assert_eq!(region.size, 4096;
         assert!(!region.allocated);
-        assert!(region.can_satisfy(1024));
+        assert!(region.can_satisfy(1024);
     }
 
     #[test]
     fn test_grant_region_allocation() {
         let mut buffer = [0u8; 4096];
         let ptr = NonNull::new(buffer.as_mut_ptr()).unwrap();
-        let mut region = GrantRegion::new(ptr, 4096, syscall::PROT_READ | syscall::PROT_WRITE);
+        let mut region = GrantRegion::new(ptr, 4096, syscall::PROT_READ | syscall::PROT_WRITE;
 
-        let allocated_ptr = region.allocate(1024);
-        assert!(allocated_ptr.is_some());
+        let allocated_ptr = region.allocate(1024;
+        assert!(allocated_ptr.is_some();
         assert!(region.allocated);
-        assert!(!region.can_satisfy(1024)); // Binary std/no_std choice
+        assert!(!region.can_satisfy(1024))); // Binary std/no_std choice
 
-        region.deallocate();
+        region.deallocate);
         assert!(!region.allocated);
-        assert!(region.can_satisfy(1024)); // Available again
+        assert!(region.can_satisfy(1024))); // Available again
     }
 
     #[test]
@@ -466,12 +467,12 @@ mod tests {
         let builder = TockAllocatorBuilder::new()
             .with_maximum_pages(2)
             .with_verification_level(VerificationLevel::Basic)
-            .with_static_buffer(unsafe { &mut BUFFER });
+            .with_static_buffer(unsafe { &mut BUFFER };
 
         // Test that builder compiles and has correct settings
-        assert_eq!(builder.maximum_pages, 2);
-        assert_eq!(builder.verification_level, VerificationLevel::Basic);
-        assert!(builder.static_buffer.is_some());
+        assert_eq!(builder.maximum_pages, 2;
+        assert_eq!(builder.verification_level, VerificationLevel::Basic;
+        assert!(builder.static_buffer.is_some();
     }
 
     #[test]
@@ -481,12 +482,12 @@ mod tests {
         let result = TockAllocatorBuilder::new()
             .with_maximum_pages(1)
             .with_static_buffer(unsafe { &mut BUFFER })
-            .build();
+            .build);
 
         assert!(result.is_ok());
         let allocator = result.unwrap();
         assert_eq!(allocator.grant_regions_count, 1);
-        assert!(allocator.grant_regions[0].is_some());
-        assert_eq!(allocator.grant_regions[0].as_ref().unwrap().size, WASM_PAGE_SIZE);
+        assert!(allocator.grant_regions[0].is_some();
+        assert_eq!(allocator.grant_regions[0].as_ref().unwrap().size, WASM_PAGE_SIZE;
     }
 }

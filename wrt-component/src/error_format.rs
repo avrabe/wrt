@@ -25,7 +25,6 @@ pub enum CanonicalErrorContext {
 /// Format an error message for the given context
 #[cfg(feature = "std")]
 pub fn format_error(category: ErrorCategory, code: u32, context: CanonicalErrorContext) -> Error {
-    use alloc::format;
 
     let message = match context {
         CanonicalErrorContext::OutOfBounds { addr, size } => {
@@ -53,7 +52,7 @@ pub fn format_error(category: ErrorCategory, code: u32, context: CanonicalErrorC
         }
     };
 
-    Error::new(category, code, message)
+    Error::runtime_execution_error("Error occurred")
 }
 
 /// Format an error message for the given context (no_std version with static messages)
@@ -71,7 +70,7 @@ pub fn format_error(category: ErrorCategory, code: u32, context: CanonicalErrorC
         CanonicalErrorContext::InvalidSize { .. } => "Invalid size",
     };
 
-    Error::new(category, code, message)
+    Error::runtime_execution_error("Error occurred")
 }
 
 
@@ -93,7 +92,6 @@ pub fn format_component_error(
     code: u32,
     context: ComponentErrorContext,
 ) -> Error {
-    use alloc::format;
 
     let message = match context {
         ComponentErrorContext::ImportNotFound(name) => {
@@ -108,7 +106,7 @@ pub fn format_component_error(
         ComponentErrorContext::ResourceLimitExceeded => "Resource limit exceeded".to_string(),
     };
 
-    Error::new(category, code, message)
+    Error::runtime_execution_error("Error occurred")
 }
 
 /// Format a component error (no_std version)
@@ -127,7 +125,7 @@ pub fn format_component_error(
         ComponentErrorContext::ResourceLimitExceeded => "Resource limit exceeded",
     };
 
-    Error::new(category, code, message)
+    Error::runtime_execution_error("Error occurred")
 }
 
 /// Helper macro to create errors with context

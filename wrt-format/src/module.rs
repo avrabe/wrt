@@ -18,7 +18,7 @@ use std::{string::String, vec, vec::Vec};
 
 use wrt_error::{codes, Error, ErrorCategory, Result};
 
-use wrt_foundation::{RefType, ValueType};
+use wrt_foundation::{RefType, ValueType, types::{FuncType, TableType as WrtTableType, MemoryType as WrtMemoryType, Import as WrtImport, ImportDesc as WrtImportDesc}};
 
 #[cfg(not(any(feature = "std")))]
 use wrt_foundation::traits::BoundedCapacity;
@@ -29,77 +29,80 @@ use crate::{
     validation::Validatable,
 };
 
-/// WebAssembly function definition - Pure No_std Version
-#[cfg(not(any(feature = "std")))]
+/// WebAssembly function definition - Clean architecture version
+/// Uses clean types (Vec in std, internal factory for no_std) 
+#[cfg(not(feature = "std"))]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Function<
-    P: wrt_foundation::MemoryProvider + Clone + Default + Eq = wrt_foundation::NoStdProvider<1024>,
-> {
+pub struct Function {
     /// Type index referring to function signature
     pub type_idx: u32,
-    /// Local variables (types and counts)
-    pub locals: crate::WasmVec<ValueType, P>,
-    /// Function body (WebAssembly bytecode instructions)
-    pub code: crate::WasmVec<u8, P>,
+    /// Local variables (types and counts) - clean type
+    pub locals: alloc::vec::Vec<ValueType>,
+    /// Function body (WebAssembly bytecode instructions) - clean type  
+    pub code: alloc::vec::Vec<u8>,
 }
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> Function<P> {
-    fn new() -> wrt_foundation::Result<Self> {
-        Ok(Function { 
+#[cfg(not(feature = "std"))]
+impl Function {
+    fn new() -> Self {
+        Function { 
             type_idx: 0, 
-            locals: crate::WasmVec::new(P::default())?, 
-            code: crate::WasmVec::new(P::default())? 
-        })
+            locals: alloc::vec::Vec::new(), 
+            code: alloc::vec::Vec::new() 
+        }
     }
 }
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> Default for Function<P> {
+#[cfg(not(feature = "std"))]
+impl Default for Function {
     fn default() -> Self {
         Function { 
             type_idx: 0, 
-            locals: Default::default(),
-            code: Default::default(),
+            locals: alloc::vec::Vec::new(),
+            code: alloc::vec::Vec::new(),
         }
     }
 }
 
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::traits::Checksummable
-    for Function<P>
-{
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::Checksummable for Function {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        checksum.update_slice(&self.type_idx.to_le_bytes());
-        self.locals.update_checksum(checksum);
-        self.code.update_checksum(checksum);
+        checksum.update_slice(&self.type_idx.to_le_bytes);
+        // For Vec<ValueType>, we need to checksum each element  
+        for local in &self.locals {
+            local.update_checksum(checksum;
+        }
+        // For Vec<u8>, checksum the slice
+        checksum.update_slice(&self.code;
     }
 }
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::traits::ToBytes
-    for Function<P>
-{
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::ToBytes for Function {
     fn to_bytes_with_provider<PStream>(
         &self,
         stream: &mut wrt_foundation::traits::WriteStream,
-        provider: &PStream,
+        _provider: &PStream,
     ) -> Result<()>
     where
         PStream: wrt_foundation::MemoryProvider,
     {
         stream.write_all(&self.type_idx.to_le_bytes())?;
-        self.locals.to_bytes_with_provider(stream, provider)?;
-        self.code.to_bytes_with_provider(stream, provider)?;
+        // Write locals count and then each local
+        stream.write_all(&(self.locals.len() as u32).to_le_bytes())?;
+        for local in &self.locals {
+            local.to_bytes_with_provider(stream, _provider)?;
+        }
+        // Write code length and then code
+        stream.write_all(&(self.code.len() as u32).to_le_bytes())?;
+        stream.write_all(&self.code)?;
         Ok(())
     }
 }
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::traits::FromBytes
-    for Function<P>
-{
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::FromBytes for Function {
     fn from_bytes_with_provider<PStream>(
         stream: &mut wrt_foundation::traits::ReadStream,
         provider: &PStream,
@@ -109,9 +112,24 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::t
     {
         let mut idx_bytes = [0u8; 4];
         stream.read_exact(&mut idx_bytes)?;
-        let type_idx = u32::from_le_bytes(idx_bytes);
-        let locals = crate::WasmVec::from_bytes_with_provider(stream, provider)?;
-        let code = crate::WasmVec::from_bytes_with_provider(stream, provider)?;
+        let type_idx = u32::from_le_bytes(idx_bytes;
+        
+        // Read locals count and locals
+        let mut count_bytes = [0u8; 4];
+        stream.read_exact(&mut count_bytes)?;
+        let locals_count = u32::from_le_bytes(count_bytes) as usize;
+        let mut locals = alloc::vec::Vec::with_capacity(locals_count;
+        for _ in 0..locals_count {
+            locals.push(ValueType::from_bytes_with_provider(stream, provider)?;
+        }
+        
+        // Read code length and code
+        let mut code_len_bytes = [0u8; 4];
+        stream.read_exact(&mut code_len_bytes)?;
+        let code_len = u32::from_le_bytes(code_len_bytes) as usize;
+        let mut code = alloc::vec::Vec::with_capacity(code_len;
+        code.resize(code_len, 0);
+        stream.read_exact(&mut code)?;
 
         Ok(Function { type_idx, locals, code })
     }
@@ -137,24 +155,10 @@ pub struct Function {
 ///
 /// WebAssembly 1.0 allows at most one memory per module.
 /// Memory64 extension allows memories with 64-bit addressing.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Memory {
-    /// Memory limits (minimum and optional maximum size in pages)
-    /// Each page is 64KiB (65536 bytes)
-    pub limits: Limits,
-    /// Whether this memory is shared between threads
-    /// Shared memory must have a maximum size specified
-    pub shared: bool,
-}
+pub type Memory = WrtMemoryType;
 
-/// WebAssembly table definition
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Table {
-    /// Element type
-    pub element_type: ValueType,
-    /// Table limits
-    pub limits: Limits,
-}
+/// WebAssembly table definition  
+pub type Table = WrtTableType;
 
 /// WebAssembly global definition - Pure No_std Version
 #[cfg(not(any(feature = "std")))]
@@ -193,8 +197,8 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::t
     for Global<P>
 {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.global_type.update_checksum(checksum);
-        self.init.update_checksum(checksum);
+        self.global_type.update_checksum(checksum;
+        self.init.update_checksum(checksum;
     }
 }
 
@@ -244,13 +248,28 @@ pub struct Global {
     pub init: Vec<u8>,
 }
 
-/// WebAssembly data segment types
+/// WebAssembly data segment types (DEPRECATED: Use pure_format_types::PureDataMode instead)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[deprecated(note = "Use pure_format_types::PureDataMode for clean separation")]
 pub enum DataMode {
     /// Active data segment (explicitly placed into a memory)
     Active,
     /// Passive data segment (used with memory.init)
     Passive,
+}
+
+/// Migration functions for data segments
+impl DataMode {
+    /// Convert to pure format representation
+    pub fn to_pure_mode(self, memory_idx: u32, offset_expr_len: u32) -> crate::pure_format_types::PureDataMode {
+        match self {
+            DataMode::Active => crate::pure_format_types::PureDataMode::Active {
+                memory_index: memory_idx,
+                offset_expr_len,
+            },
+            DataMode::Passive => crate::pure_format_types::PureDataMode::Passive,
+        }
+    }
 }
 
 /// WebAssembly data segment - Pure No_std Version
@@ -297,10 +316,10 @@ impl Default for Data {
 #[cfg(not(any(feature = "std")))]
 impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_foundation::traits::Checksummable for Data<P> {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.mode.update_checksum(checksum);
-        checksum.update_slice(&self.memory_idx.to_le_bytes());
-        self.offset.update_checksum(checksum);
-        self.init.update_checksum(checksum);
+        self.mode.update_checksum(checksum;
+        checksum.update_slice(&self.memory_idx.to_le_bytes);
+        self.offset.update_checksum(checksum;
+        self.init.update_checksum(checksum;
     }
 }
 
@@ -308,10 +327,10 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_f
 #[cfg(feature = "std")]
 impl wrt_foundation::traits::Checksummable for Data {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.mode.update_checksum(checksum);
-        checksum.update_slice(&self.memory_idx.to_le_bytes());
-        checksum.update_slice(&self.offset);
-        checksum.update_slice(&self.init);
+        self.mode.update_checksum(checksum;
+        checksum.update_slice(&self.memory_idx.to_le_bytes);
+        checksum.update_slice(&self.offset;
+        checksum.update_slice(&self.init;
     }
 }
 
@@ -375,16 +394,12 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_f
         let mode = match mode_byte {
             0 => DataMode::Active,
             1 => DataMode::Passive,
-            _ => return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Invalid DataMode discriminant",
-            )),
+            _ => return Err(wrt_error::Error::runtime_execution_error("Invalid data mode byte")),
         };
         
         let mut memory_idx_bytes = [0u8; 4];
         reader.read_exact(&mut memory_idx_bytes)?;
-        let memory_idx = u32::from_le_bytes(memory_idx_bytes);
+        let memory_idx = u32::from_le_bytes(memory_idx_bytes;
         
         let offset = crate::WasmVec::from_bytes_with_provider(reader, provider)?;
         let init = crate::WasmVec::from_bytes_with_provider(reader, provider)?;
@@ -409,16 +424,12 @@ impl wrt_foundation::traits::FromBytes for Data {
         let mode = match mode_byte {
             0 => DataMode::Active,
             1 => DataMode::Passive,
-            _ => return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Invalid DataMode discriminant",
-            )),
+            _ => return Err(wrt_error::Error::runtime_execution_error("Invalid data mode byte")),
         };
         
         let mut memory_idx_bytes = [0u8; 4];
         reader.read_exact(&mut memory_idx_bytes)?;
-        let memory_idx = u32::from_le_bytes(memory_idx_bytes);
+        let memory_idx = u32::from_le_bytes(memory_idx_bytes;
         
         // Read length-prefixed vectors
         let mut offset_len_bytes = [0u8; 4];
@@ -445,7 +456,7 @@ impl wrt_foundation::traits::FromBytes for Data {
 // Implement Checksummable for DataMode
 impl wrt_foundation::traits::Checksummable for DataMode {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        checksum.update_slice(&[*self as u8]);
+        checksum.update_slice(&[*self as u8];
     }
 }
 
@@ -475,18 +486,17 @@ impl wrt_foundation::traits::FromBytes for DataMode {
         match discriminant {
             0 => Ok(DataMode::Active),
             1 => Ok(DataMode::Passive),
-            _ => Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
+            _ => Err(wrt_error::Error::new(wrt_error::ErrorCategory::Validation,
                 wrt_error::codes::PARSE_ERROR,
-                "Invalid DataMode discriminant",
-            )),
+                "Invalid data mode discriminant")),
         }
     }
 }
 
-/// WebAssembly data segment - With Allocation
+/// WebAssembly data segment - With Allocation (DEPRECATED: Use pure_format_types::PureDataSegment)
 #[cfg(feature = "std")]
 #[derive(Debug, Clone)]
+#[deprecated(note = "Use pure_format_types::PureDataSegment for clean separation")]
 pub struct Data {
     /// Data mode (active or passive)
     pub mode: DataMode,
@@ -496,6 +506,41 @@ pub struct Data {
     pub offset: Vec<u8>,
     /// Initial data
     pub init: Vec<u8>,
+}
+
+/// Migration functions for Data (std version)
+#[cfg(feature = "std")]
+impl Data {
+    /// Convert to pure format representation (runtime concerns removed)
+    pub fn to_pure_segment(&self) -> crate::pure_format_types::PureDataSegment {
+        match self.mode {
+            DataMode::Active => crate::pure_format_types::PureDataSegment::new_active(
+                self.memory_idx,
+                self.offset.clone(),
+                self.init.clone(),
+            ),
+            DataMode::Passive => crate::pure_format_types::PureDataSegment::new_passive(
+                self.init.clone(),
+            ),
+        }
+    }
+    
+    /// Create from pure format representation (for compatibility)
+    pub fn from_pure_segment(pure: &crate::pure_format_types::PureDataSegment) -> Self {
+        let (mode, memory_idx) = match pure.mode {
+            crate::pure_format_types::PureDataMode::Active { memory_index, .. } => {
+                (DataMode::Active, memory_index)
+            },
+            crate::pure_format_types::PureDataMode::Passive => (DataMode::Passive, 0),
+        };
+        
+        Self {
+            mode,
+            memory_idx,
+            offset: pure.offset_expr_bytes.clone(),
+            init: pure.data_bytes.clone(),
+        }
+    }
 }
 
 /// Represents the initialization items for an element segment - Pure No_std
@@ -536,11 +581,11 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_f
         match self {
             Self::FuncIndices(indices) => {
                 checksum.update_slice(&[0u8]); // discriminant
-                indices.update_checksum(checksum);
+                indices.update_checksum(checksum;
             }
             Self::Expressions(exprs) => {
                 checksum.update_slice(&[1u8]); // discriminant
-                exprs.update_checksum(checksum);
+                exprs.update_checksum(checksum;
             }
         }
     }
@@ -554,13 +599,13 @@ impl wrt_foundation::traits::Checksummable for ElementInit {
             Self::FuncIndices(indices) => {
                 checksum.update_slice(&[0u8]); // discriminant
                 for idx in indices {
-                    checksum.update_slice(&idx.to_le_bytes());
+                    checksum.update_slice(&idx.to_le_bytes);
                 }
             }
             Self::Expressions(exprs) => {
                 checksum.update_slice(&[1u8]); // discriminant
                 for expr in exprs {
-                    checksum.update_slice(expr);
+                    checksum.update_slice(expr;
                 }
             }
         }
@@ -649,11 +694,7 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_f
                 let exprs = crate::WasmVec::from_bytes_with_provider(reader, provider)?;
                 Ok(Self::Expressions(exprs))
             }
-            _ => Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Invalid ElementInit discriminant",
-            )),
+            _ => Err(wrt_error::Error::runtime_execution_error("Invalid element init discriminant")),
         }
     }
 }
@@ -671,11 +712,11 @@ impl wrt_foundation::traits::FromBytes for ElementInit {
                 let mut len_bytes = [0u8; 4];
                 reader.read_exact(&mut len_bytes)?;
                 let len = u32::from_le_bytes(len_bytes) as usize;
-                let mut indices = Vec::with_capacity(len);
+                let mut indices = Vec::with_capacity(len;
                 for _ in 0..len {
                     let mut idx_bytes = [0u8; 4];
                     reader.read_exact(&mut idx_bytes)?;
-                    indices.push(u32::from_le_bytes(idx_bytes));
+                    indices.push(u32::from_le_bytes(idx_bytes);
                 }
                 Ok(Self::FuncIndices(indices))
             }
@@ -683,7 +724,7 @@ impl wrt_foundation::traits::FromBytes for ElementInit {
                 let mut len_bytes = [0u8; 4];
                 reader.read_exact(&mut len_bytes)?;
                 let len = u32::from_le_bytes(len_bytes) as usize;
-                let mut exprs = Vec::with_capacity(len);
+                let mut exprs = Vec::with_capacity(len;
                 for _ in 0..len {
                     let mut expr_len_bytes = [0u8; 4];
                     reader.read_exact(&mut expr_len_bytes)?;
@@ -694,11 +735,7 @@ impl wrt_foundation::traits::FromBytes for ElementInit {
                 }
                 Ok(Self::Expressions(exprs))
             }
-            _ => Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Invalid ElementInit discriminant",
-            )),
+            _ => Err(wrt_error::Error::runtime_execution_error("Invalid element init discriminant")),
         }
     }
 }
@@ -764,8 +801,8 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_f
         match self {
             Self::Active { table_index, offset_expr } => {
                 checksum.update_slice(&[0u8]); // discriminant
-                checksum.update_slice(&table_index.to_le_bytes());
-                offset_expr.update_checksum(checksum);
+                checksum.update_slice(&table_index.to_le_bytes);
+                offset_expr.update_checksum(checksum;
             }
             Self::Passive => {
                 checksum.update_slice(&[1u8]); // discriminant
@@ -784,8 +821,8 @@ impl wrt_foundation::traits::Checksummable for ElementMode {
         match self {
             Self::Active { table_index, offset_expr } => {
                 checksum.update_slice(&[0u8]); // discriminant
-                checksum.update_slice(&table_index.to_le_bytes());
-                checksum.update_slice(offset_expr);
+                checksum.update_slice(&table_index.to_le_bytes);
+                checksum.update_slice(offset_expr;
             }
             Self::Passive => {
                 checksum.update_slice(&[1u8]); // discriminant
@@ -842,25 +879,22 @@ impl wrt_foundation::traits::FromBytes for ElementMode {
             0 => {
                 let mut table_index_bytes = [0u8; 4];
                 reader.read_exact(&mut table_index_bytes)?;
-                let table_index = u32::from_le_bytes(table_index_bytes);
+                let table_index = u32::from_le_bytes(table_index_bytes;
                 let offset_expr = crate::WasmVec::from_bytes_with_provider(reader, provider)?;
                 Ok(Self::Active { table_index, offset_expr })
             }
             1 => Ok(Self::Passive),
             2 => Ok(Self::Declared),
-            _ => Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Invalid ElementMode discriminant",
-            )),
+            _ => Err(wrt_error::Error::runtime_execution_error("Invalid element mode discriminant")),
         }
     }
 }
 
 /// Mode for an element segment, determining how it's initialized - With
-/// Allocation
+/// Allocation (DEPRECATED: Use pure_format_types::PureElementMode)
 #[cfg(feature = "std")]
 #[derive(Debug, Clone)]
+#[deprecated(note = "Use pure_format_types::PureElementMode for clean separation")]
 pub enum ElementMode {
     /// Active segment: associated with a table and an offset.
     Active {
@@ -875,6 +909,24 @@ pub enum ElementMode {
     /// Declared segment: elements are declared but not available at runtime
     /// until explicitly instantiated. Useful for some linking scenarios.
     Declared,
+}
+
+/// Migration functions for ElementMode (std version)
+#[cfg(feature = "std")]
+impl ElementMode {
+    /// Convert to pure format representation (runtime concerns removed)
+    pub fn to_pure_mode(&self) -> crate::pure_format_types::PureElementMode {
+        match self {
+            ElementMode::Active { table_index, offset_expr } => {
+                crate::pure_format_types::PureElementMode::Active {
+                    table_index: *table_index,
+                    offset_expr_len: offset_expr.len() as u32,
+                }
+            },
+            ElementMode::Passive => crate::pure_format_types::PureElementMode::Passive,
+            ElementMode::Declared => crate::pure_format_types::PureElementMode::Declared,
+        }
+    }
 }
 
 /// WebAssembly element segment (Wasm 2.0 compatible) - Pure No_std Version
@@ -953,9 +1005,9 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_f
 #[cfg(not(any(feature = "std")))]
 impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_foundation::traits::Checksummable for Element<P> {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.element_type.update_checksum(checksum);
-        self.init.update_checksum(checksum);
-        self.mode.update_checksum(checksum);
+        self.element_type.update_checksum(checksum;
+        self.init.update_checksum(checksum;
+        self.mode.update_checksum(checksum;
     }
 }
 
@@ -1010,9 +1062,9 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::t
     for Export<P>
 {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.name.update_checksum(checksum);
-        checksum.update_slice(&[self.kind as u8]);
-        checksum.update_slice(&self.index.to_le_bytes());
+        self.name.update_checksum(checksum;
+        checksum.update_slice(&[self.kind as u8];
+        checksum.update_slice(&self.index.to_le_bytes);
     }
 }
 
@@ -1059,7 +1111,7 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::t
         };
         let mut idx_bytes = [0u8; 4];
         stream.read_exact(&mut idx_bytes)?;
-        let index = u32::from_le_bytes(idx_bytes);
+        let index = u32::from_le_bytes(idx_bytes;
 
         Ok(Export { name, kind, index })
     }
@@ -1159,19 +1211,19 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::t
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
         match self {
             ImportDesc::Function(idx, _) => {
-                checksum.update_slice(&idx.to_le_bytes());
+                checksum.update_slice(&idx.to_le_bytes);
             }
             ImportDesc::Table(_, _) => {
-                checksum.update_slice(&[0x01]);
+                checksum.update_slice(&[0x01];
             }
             ImportDesc::Memory(_, _) => {
-                checksum.update_slice(&[0x02]);
+                checksum.update_slice(&[0x02];
             }
             ImportDesc::Global(_, _) => {
-                checksum.update_slice(&[0x03]);
+                checksum.update_slice(&[0x03];
             }
             ImportDesc::Tag(idx, _) => {
-                checksum.update_slice(&idx.to_le_bytes());
+                checksum.update_slice(&idx.to_le_bytes);
             }
         }
     }
@@ -1182,9 +1234,9 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::t
     for Import<P>
 {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.module.update_checksum(checksum);
-        self.name.update_checksum(checksum);
-        self.desc.update_checksum(checksum);
+        self.module.update_checksum(checksum;
+        self.name.update_checksum(checksum;
+        self.desc.update_checksum(checksum;
     }
 }
 
@@ -1261,7 +1313,7 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::t
                 // Function
                 let mut idx_bytes = [0u8; 4];
                 stream.read_exact(&mut idx_bytes)?;
-                let idx = u32::from_le_bytes(idx_bytes);
+                let idx = u32::from_le_bytes(idx_bytes;
                 Ok(ImportDesc::Function(idx, core::marker::PhantomData))
             }
             0x01 => {
@@ -1280,14 +1332,10 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::t
                 // Tag
                 let mut idx_bytes = [0u8; 4];
                 stream.read_exact(&mut idx_bytes)?;
-                let idx = u32::from_le_bytes(idx_bytes);
+                let idx = u32::from_le_bytes(idx_bytes;
                 Ok(ImportDesc::Tag(idx, core::marker::PhantomData))
             }
-            _ => Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                0x1001,
-                "ImportDesc: Unknown type tag",
-            )),
+            _ => Err(wrt_error::Error::runtime_execution_error("Invalid import descriptor tag")),
         }
     }
 }
@@ -1350,8 +1398,8 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::t
     for TypeInformationEntry<P>
 {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        checksum.update_slice(&self.type_index.to_le_bytes());
-        self.name.update_checksum(checksum);
+        checksum.update_slice(&self.type_index.to_le_bytes);
+        self.name.update_checksum(checksum;
     }
 }
 
@@ -1386,7 +1434,7 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> wrt_foundation::t
     {
         let mut idx_bytes = [0u8; 4];
         stream.read_exact(&mut idx_bytes)?;
-        let type_index = u32::from_le_bytes(idx_bytes);
+        let type_index = u32::from_le_bytes(idx_bytes;
         let name = crate::WasmString::from_bytes_with_provider(stream, provider)?;
 
         Ok(TypeInformationEntry { type_index, name })
@@ -1427,19 +1475,19 @@ pub struct Module<
     P: wrt_foundation::MemoryProvider + Clone + Default + Eq = wrt_foundation::NoStdProvider<1024>,
 > {
     /// Function type signatures
-    pub types: crate::WasmVec<ValueType, P>,
+    pub types: crate::WasmVec<FuncType<P>, P>,
     /// Function definitions (code)
-    pub functions: crate::WasmVec<Function<P>, P>,
+    pub functions: crate::WasmVec<Function, P>,
     /// Table definitions
     pub tables: crate::WasmVec<Table, P>,
     /// Memory definitions  
     pub memories: crate::WasmVec<Memory, P>,
     /// Global definitions
     pub globals: crate::WasmVec<Global<P>, P>,
-    /// Element segments (table initializers)
-    pub elements: crate::WasmVec<Element<P>, P>,
-    /// Data segments (memory initializers)
-    pub data: crate::WasmVec<Data<P>, P>,
+    /// Element segments (table initializers) - using pure format internally
+    pub elements: crate::WasmVec<crate::pure_format_types::PureElementSegment, P>,
+    /// Data segments (memory initializers) - using pure format internally
+    pub data: crate::WasmVec<crate::pure_format_types::PureDataSegment, P>,
     /// Module exports (visible functions/globals/etc)
     pub exports: crate::WasmVec<Export<P>, P>,
     /// Module imports (external dependencies)
@@ -1447,7 +1495,7 @@ pub struct Module<
     /// Start function index (entry point)
     pub start: Option<u32>,
     /// Custom sections (metadata)
-    pub custom_sections: crate::WasmVec<CustomSection<P>, P>,
+    pub custom_sections: crate::WasmVec<CustomSection, P>,
     /// Original binary data (for round-trip preservation)
     pub binary: Option<crate::WasmVec<u8, P>>,
     /// WebAssembly core version
@@ -1501,7 +1549,7 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> Module<P> {
 #[derive(Debug, Clone)]
 pub struct Module {
     /// Function type signatures
-    pub types: Vec<ValueType>,
+    pub types: Vec<wrt_foundation::CleanCoreFuncType>,
     /// Function definitions (code)
     pub functions: Vec<Function>,
     /// Table definitions
@@ -1510,10 +1558,10 @@ pub struct Module {
     pub memories: Vec<Memory>,
     /// Global definitions
     pub globals: Vec<Global>,
-    /// Element segments (table initializers)
-    pub elements: Vec<Element>,
-    /// Data segments (memory initializers)
-    pub data: Vec<Data>,
+    /// Element segments (table initializers) - using pure format internally
+    pub elements: Vec<crate::pure_format_types::PureElementSegment>,
+    /// Data segments (memory initializers) - using pure format internally
+    pub data: Vec<crate::pure_format_types::PureDataSegment>,
     /// Module exports (visible functions/globals/etc)
     pub exports: Vec<Export>,
     /// Module imports (external dependencies)
@@ -1564,21 +1612,13 @@ impl Module {
     /// This is a convenience method that wraps Binary::from_bytes +
     /// Module::from_binary
     pub fn from_bytes(_wasm_bytes: &[u8]) -> Result<Self> {
-        Err(Error::new(
-            ErrorCategory::Validation,
-            codes::PARSE_ERROR,
-            "Module::from_bytes not yet implemented",
-        ))
+        Err(Error::validation_parse_error("Module::from_bytes not yet implemented"))
     }
 
     /// Convert a Module to a WebAssembly binary.
     #[cfg(feature = "std")]
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        Err(Error::new(
-            ErrorCategory::Validation,
-            codes::PARSE_ERROR,
-            "Module::to_bytes not yet implemented",
-        ))
+        Err(Error::validation_parse_error("Module::to_bytes not yet implemented"))
     }
 
     /// Find a custom section by name
@@ -1590,11 +1630,23 @@ impl Module {
     pub fn add_custom_section(&mut self, section: CustomSection) {
         self.custom_sections.push(section);
     }
-
-    /// Check if this module contains state sections
-    pub fn has_state_sections(&self) -> bool {
-        crate::state::has_state_sections(&self.custom_sections)
+    
+    /// Convert data segments to pure format representation (removes runtime concerns)
+    pub fn data_to_pure_segments(&self) -> Vec<crate::pure_format_types::PureDataSegment> {
+        self.data.iter().map(|data| {
+            // Direct conversion since Data is already PureDataSegment
+            data.clone()
+        }).collect()
     }
+    
+    /// Convert element segments to pure format representation (removes runtime concerns)  
+    pub fn elements_to_pure_segments(&self) -> Vec<crate::pure_format_types::PureElementSegment> {
+        self.elements.iter().map(|element| {
+            // Direct conversion since Element is already PureElementSegment
+            element.clone()
+        }).collect()
+    }
+
 }
 
 impl Validatable for Module {
@@ -1603,49 +1655,29 @@ impl Validatable for Module {
 
         // Check for reasonable number of types
         if self.types.len() > 10000 {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Module has too many types",
-            ));
+            return Err(Error::validation_error("Module has too many types";
         }
 
         // Check for reasonable number of functions
         if self.functions.len() > 10000 {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_ERROR,
-                "Module has too many functions",
-            ));
+            return Err(Error::validation_error("Module has too many functions";
         }
 
         // Check for empty exports
         for export in self.exports.iter() {
             if export.name.is_empty() {
-                return Err(Error::new(
-                    ErrorCategory::Validation,
-                    codes::VALIDATION_ERROR,
-                    "Export name cannot be empty",
-                ));
+                return Err(Error::validation_error("Export name cannot be empty";
             }
         }
 
         // Check for empty imports
         for import in self.imports.iter() {
             if import.module.is_empty() {
-                return Err(Error::new(
-                    ErrorCategory::Validation,
-                    codes::VALIDATION_ERROR,
-                    "Import module name cannot be empty",
-                ));
+                return Err(Error::validation_error("Import module name cannot be empty";
             }
 
             if import.name.is_empty() {
-                return Err(Error::new(
-                    ErrorCategory::Validation,
-                    codes::VALIDATION_ERROR,
-                    "Import name cannot be empty",
-                ));
+                return Err(Error::validation_error("Import name cannot be empty";
             }
         }
 
@@ -1653,140 +1685,9 @@ impl Validatable for Module {
     }
 }
 
-// Serialization helpers for Table
-impl Table {
-    /// Serialize to bytes
-    #[cfg(feature = "std")]
-    pub fn to_bytes(&self) -> wrt_foundation::Result<Vec<u8>> {
-        let mut bytes = Vec::new();
-        bytes.push(self.element_type.to_binary());
-        bytes.extend(self.limits.to_bytes()?);
-        Ok(bytes)
-    }
+// Table serialization methods are inherited from wrt_foundation::types::TableType
 
-    /// Deserialize from bytes
-    pub fn from_bytes(bytes: &[u8]) -> wrt_foundation::Result<Self> {
-        if bytes.len() < 2 {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Insufficient bytes for Table",
-            ));
-        }
-
-        let element_type = ValueType::from_binary(bytes[0]).map_err(|_| wrt_error::Error::new(
-            wrt_error::ErrorCategory::Validation,
-            wrt_error::codes::PARSE_ERROR,
-            "Invalid element type",
-        ))?;
-        let limits = Limits::from_bytes(&bytes[1..])?;
-
-        Ok(Self { element_type, limits })
-    }
-}
-
-// Implement Checksummable trait for Table
-impl wrt_foundation::traits::Checksummable for Table {
-    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.element_type.update_checksum(checksum);
-        self.limits.update_checksum(checksum);
-    }
-}
-
-// Implement ToBytes trait for Table
-impl wrt_foundation::traits::ToBytes for Table {
-    fn serialized_size(&self) -> usize {
-        self.element_type.serialized_size() + self.limits.serialized_size()
-    }
-
-    fn to_bytes_with_provider<PStream: wrt_foundation::MemoryProvider>(
-        &self,
-        stream: &mut wrt_foundation::traits::WriteStream,
-        provider: &PStream,
-    ) -> wrt_foundation::Result<()> {
-        self.element_type.to_bytes_with_provider(stream, provider)?;
-        self.limits.to_bytes_with_provider(stream, provider)?;
-        Ok(())
-    }
-}
-
-// Implement FromBytes trait for Table
-impl wrt_foundation::traits::FromBytes for Table {
-    fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
-        reader: &mut wrt_foundation::traits::ReadStream<'a>,
-        provider: &PStream,
-    ) -> wrt_foundation::Result<Self> {
-        let element_type = ValueType::from_bytes_with_provider(reader, provider)?;
-        let limits = Limits::from_bytes_with_provider(reader, provider)?;
-        Ok(Self { element_type, limits })
-    }
-}
-
-// Serialization helpers for Memory
-impl Memory {
-    /// Serialize to bytes
-    #[cfg(feature = "std")]
-    pub fn to_bytes(&self) -> wrt_foundation::Result<Vec<u8>> {
-        let mut bytes = Vec::new();
-        bytes.extend(self.limits.to_bytes()?);
-        bytes.push(self.shared as u8);
-        Ok(bytes)
-    }
-
-    /// Deserialize from bytes
-    pub fn from_bytes(bytes: &[u8]) -> wrt_foundation::Result<Self> {
-        if bytes.len() < 2 {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Insufficient bytes for Memory",
-            ));
-        }
-
-        let limits = Limits::from_bytes(&bytes[..bytes.len() - 1])?;
-        let shared = bytes[bytes.len() - 1] != 0;
-
-        Ok(Self { limits, shared })
-    }
-}
-
-// Implement Checksummable trait for Memory
-impl wrt_foundation::traits::Checksummable for Memory {
-    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.limits.update_checksum(checksum);
-        checksum.update_slice(&[self.shared as u8]);
-    }
-}
-
-// Implement ToBytes trait for Memory
-impl wrt_foundation::traits::ToBytes for Memory {
-    fn serialized_size(&self) -> usize {
-        self.limits.serialized_size() + 1  // +1 for shared flag
-    }
-
-    fn to_bytes_with_provider<PStream: wrt_foundation::MemoryProvider>(
-        &self,
-        stream: &mut wrt_foundation::traits::WriteStream,
-        provider: &PStream,
-    ) -> wrt_foundation::Result<()> {
-        self.limits.to_bytes_with_provider(stream, provider)?;
-        stream.write_u8(self.shared as u8)?;
-        Ok(())
-    }
-}
-
-// Implement FromBytes trait for Memory
-impl wrt_foundation::traits::FromBytes for Memory {
-    fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
-        reader: &mut wrt_foundation::traits::ReadStream<'a>,
-        provider: &PStream,
-    ) -> wrt_foundation::Result<Self> {
-        let limits = Limits::from_bytes_with_provider(reader, provider)?;
-        let shared_byte = reader.read_u8()?;
-        let shared = shared_byte != 0;
-        Ok(Self { limits, shared })
-    }
-}
+// Memory serialization methods are inherited from wrt_foundation::types::MemoryType
 
 #[cfg(test)]
 mod tests {

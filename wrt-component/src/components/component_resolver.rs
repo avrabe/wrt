@@ -3,14 +3,17 @@
 //! This module provides functionality for resolving imports and exports
 //! during component instantiation and linking.
 
-#[cfg(not(feature = "std"))]
-use std::{collections::BTreeMap, vec::Vec};
 #[cfg(feature = "std")]
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, vec::Vec};
+#[cfg(not(feature = "std"))]
+use alloc::{collections::BTreeMap, vec::Vec};
 
 use wrt_foundation::{
-    bounded_collections::{BoundedString, BoundedVec, MAX_GENERATIVE_TYPES},
+    bounded::{BoundedString, BoundedVec, MAX_GENERATIVE_TYPES},
     prelude::*,
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 use crate::{
@@ -106,7 +109,7 @@ pub enum ComponentValue {
     /// Option value
     Option(Option<Box<ComponentValue>>),
     /// Result value
-    Result(Result<Box<ComponentValue>, Box<ComponentValue>>),
+    Result(core::result::Result<Box<ComponentValue>, Box<ComponentValue>>),
 }
 
 /// Component resolver for import/export resolution
@@ -138,11 +141,11 @@ impl ComponentResolver {
         instance_id: ComponentInstanceId,
         import_name: BoundedString<64, NoStdProvider<65536>>,
         provided_value: ImportValue,
-    ) -> Result<ResolvedImport, ComponentError> {
+    ) -> core::result::Result<ResolvedImport, ComponentError> {
         // Check cache first
-        let cache_key = (instance_id, import_name.clone());
+        let cache_key = (instance_id, import_name.clone();
         if let Some(cached) = self.import_cache.get(&cache_key) {
-            return Ok(cached.clone());
+            return Ok(cached.clone();
         }
 
         // Validate import type compatibility
@@ -150,7 +153,7 @@ impl ComponentResolver {
 
         let resolved = ResolvedImport { name: import_name, value: provided_value, val_type };
 
-        self.import_cache.insert(cache_key, resolved.clone());
+        self.import_cache.insert(cache_key, resolved.clone();
         Ok(resolved)
     }
 
@@ -160,11 +163,11 @@ impl ComponentResolver {
         instance_id: ComponentInstanceId,
         export_name: BoundedString<64, NoStdProvider<65536>>,
         export_value: ExportValue,
-    ) -> Result<ResolvedExport, ComponentError> {
+    ) -> core::result::Result<ResolvedExport, ComponentError> {
         // Check cache first
-        let cache_key = (instance_id, export_name.clone());
+        let cache_key = (instance_id, export_name.clone();
         if let Some(cached) = self.export_cache.get(&cache_key) {
-            return Ok(cached.clone());
+            return Ok(cached.clone();
         }
 
         // Validate export type
@@ -172,7 +175,7 @@ impl ComponentResolver {
 
         let resolved = ResolvedExport { name: export_name, value: export_value, val_type };
 
-        self.export_cache.insert(cache_key, resolved.clone());
+        self.export_cache.insert(cache_key, resolved.clone();
         Ok(resolved)
     }
 
@@ -181,7 +184,7 @@ impl ComponentResolver {
         &mut self,
         import: &ResolvedImport,
         export: &ResolvedExport,
-    ) -> Result<bool, ComponentError> {
+    ) -> core::result::Result<bool, ComponentError> {
         match (&import.value, &export.value) {
             (
                 ImportValue::Function { type_id: import_type, .. },
@@ -222,13 +225,13 @@ impl ComponentResolver {
         &mut self,
         import_type: TypeId,
         export_type: TypeId,
-    ) -> Result<bool, ComponentError> {
+    ) -> core::result::Result<bool, ComponentError> {
         // Check if export type is a subtype of import type
         let result = self.bounds_checker.check_type_bound(
             export_type,
             import_type,
             crate::generative_types::BoundKind::Sub,
-        );
+        ;
 
         Ok(result == crate::type_bounds::RelationResult::Satisfied)
     }
@@ -261,7 +264,7 @@ impl ComponentResolver {
     }
 
     /// Get the type of an import value
-    fn get_import_type(&self, import: &ImportValue) -> Result<Option<ValType>, ComponentError> {
+    fn get_import_type(&self, import: &ImportValue) -> core::result::Result<Option<ValType>, ComponentError> {
         match import {
             ImportValue::Function { .. } => Ok(None), // Function types are handled separately
             ImportValue::Global { .. } => Ok(None),   // Global types are handled separately
@@ -273,7 +276,7 @@ impl ComponentResolver {
     }
 
     /// Get the type of an export value
-    fn get_export_type(&self, export: &ExportValue) -> Result<Option<ValType>, ComponentError> {
+    fn get_export_type(&self, export: &ExportValue) -> core::result::Result<Option<ValType>, ComponentError> {
         match export {
             ExportValue::Function { .. } => Ok(None), // Function types are handled separately
             ExportValue::Global { .. } => Ok(None),   // Global types are handled separately
@@ -286,8 +289,8 @@ impl ComponentResolver {
 
     /// Clear resolution caches
     pub fn clear_caches(&mut self) {
-        self.import_cache.clear();
-        self.export_cache.clear();
+        self.import_cache.clear);
+        self.export_cache.clear);
     }
 
     /// Get type registry reference
@@ -317,6 +320,28 @@ impl Default for ComponentResolver {
     }
 }
 
+/// Import resolution helper
+#[derive(Debug, Clone)]
+pub struct ImportResolution {
+    /// Import name
+    pub name: BoundedString<64, NoStdProvider<65536>>,
+    /// Instance ID
+    pub instance_id: ComponentInstanceId,
+    /// Resolved value
+    pub resolved_value: ComponentValue,
+}
+
+/// Export resolution helper
+#[derive(Debug, Clone)]
+pub struct ExportResolution {
+    /// Export name
+    pub name: BoundedString<64, NoStdProvider<65536>>,
+    /// Instance ID
+    pub instance_id: ComponentInstanceId,
+    /// Exported value
+    pub exported_value: ComponentValue,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,23 +356,23 @@ mod tests {
     #[test]
     fn test_import_resolution() {
         let mut resolver = ComponentResolver::new();
-        let instance_id = ComponentInstanceId(1);
+        let instance_id = ComponentInstanceId(1;
         let import_name = BoundedString::from_str("test_import").unwrap();
 
         let import_value =
             ImportValue::Value { val_type: ValType::U32, value: ComponentValue::U32(42) };
 
-        let result = resolver.resolve_import(instance_id, import_name.clone(), import_value);
+        let result = resolver.resolve_import(instance_id, import_name.clone(), import_value;
         assert!(result.is_ok());
 
         let resolved = result.unwrap();
-        assert_eq!(resolved.name, import_name);
+        assert_eq!(resolved.name, import_name;
     }
 
     #[test]
     fn test_export_resolution() {
         let mut resolver = ComponentResolver::new();
-        let instance_id = ComponentInstanceId(1);
+        let instance_id = ComponentInstanceId(1;
         let export_name = BoundedString::from_str("test_export").unwrap();
 
         let export_value = ExportValue::Value {
@@ -355,11 +380,11 @@ mod tests {
             value: ComponentValue::String(BoundedString::from_str("hello").unwrap()),
         };
 
-        let result = resolver.resolve_export(instance_id, export_name.clone(), export_value);
+        let result = resolver.resolve_export(instance_id, export_name.clone(), export_value;
         assert!(result.is_ok());
 
         let resolved = result.unwrap();
-        assert_eq!(resolved.name, export_name);
+        assert_eq!(resolved.name, export_name;
     }
 
     #[test]
@@ -379,9 +404,9 @@ mod tests {
             val_type: Some(ValType::U32),
         };
 
-        let result = resolver.can_satisfy_import(&import, &export);
+        let result = resolver.can_satisfy_import(&import, &export;
         assert!(result.is_ok());
-        assert!(result.unwrap());
+        assert!(result.unwrap();
     }
 
     #[test]
@@ -389,15 +414,15 @@ mod tests {
         let resolver = ComponentResolver::new();
 
         // Test primitive type compatibility
-        assert!(resolver.are_types_compatible(&ValType::Bool, &ValType::Bool));
-        assert!(resolver.are_types_compatible(&ValType::U32, &ValType::U32));
-        assert!(!resolver.are_types_compatible(&ValType::U32, &ValType::U64));
+        assert!(resolver.are_types_compatible(&ValType::Bool, &ValType::Bool);
+        assert!(resolver.are_types_compatible(&ValType::U32, &ValType::U32);
+        assert!(!resolver.are_types_compatible(&ValType::U32, &ValType::U64);
 
         // Test structural type compatibility
-        let list_u32 = ValType::List(Box::new(ValType::U32));
-        let list_u64 = ValType::List(Box::new(ValType::U64));
-        assert!(resolver.are_types_compatible(&list_u32, &list_u32));
-        assert!(!resolver.are_types_compatible(&list_u32, &list_u64));
+        let list_u32 = ValType::List(Box::new(ValType::U32;
+        let list_u64 = ValType::List(Box::new(ValType::U64;
+        assert!(resolver.are_types_compatible(&list_u32, &list_u32);
+        assert!(!resolver.are_types_compatible(&list_u32, &list_u64);
     }
 }
 
@@ -409,7 +434,7 @@ macro_rules! impl_basic_traits {
     ($type:ty, $default_val:expr) => {
         impl Checksummable for $type {
             fn update_checksum(&self, checksum: &mut wrt_foundation::traits::Checksum) {
-                0u32.update_checksum(checksum);
+                0u32.update_checksum(checksum;
             }
         }
 
@@ -441,27 +466,47 @@ impl Default for ComponentValue {
     }
 }
 
-impl Default for ImportResolution {
-    fn default() -> Self {
-        Self {
-            name: BoundedString::new(DefaultMemoryProvider::default()).unwrap(),
+impl ImportResolution {
+    pub fn new() -> Result<Self, ComponentError> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)
+            .map_err(|_| ComponentError::AllocationFailed)?;
+        let name = BoundedString::new(provider)
+            .map_err(|_| ComponentError::AllocationFailed)?;
+        
+        Ok(Self {
+            name,
             instance_id: ComponentInstanceId(0),
             resolved_value: ComponentValue::default(),
-        }
+        })
+    }
+}
+
+impl Default for ImportResolution {
+    fn default() -> Self {
+        Self::new().expect("ImportResolution allocation should not fail in default construction")
+    }
+}
+
+impl ExportResolution {
+    pub fn new() -> Result<Self, ComponentError> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)
+            .map_err(|_| ComponentError::AllocationFailed)?;
+        let name = BoundedString::new(provider)
+            .map_err(|_| ComponentError::AllocationFailed)?;
+        
+        Ok(Self {
+            name,
+            instance_id: ComponentInstanceId(0),
+            exported_value: ComponentValue::default(),
+        })
     }
 }
 
 impl Default for ExportResolution {
     fn default() -> Self {
-        Self {
-            name: BoundedString::new(DefaultMemoryProvider::default()).unwrap(),
-            instance_id: ComponentInstanceId(0),
-            exported_value: ComponentValue::default(),
-        }
+        Self::new().expect("ExportResolution allocation should not fail in default construction")
     }
 }
 
 // Apply macro to types that need traits
-impl_basic_traits!(ComponentValue, ComponentValue::default());
-impl_basic_traits!(ImportResolution, ImportResolution::default());
-impl_basic_traits!(ExportResolution, ExportResolution::default());
+// Note: ComponentValue traits are implemented in wrt-foundation

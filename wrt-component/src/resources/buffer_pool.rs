@@ -1,8 +1,10 @@
 // Use BTreeMap for all cases to ensure deterministic ordering and no_std compatibility
 #[cfg(feature = "std")]
 use std::{collections::BTreeMap, vec::Vec};
-#[cfg(all(not(feature = "std")))]
-use std::{collections::BTreeMap, vec::Vec};
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::{collections::BTreeMap, vec::Vec};
 
 /// Binary std/no_std choice
 #[cfg(feature = "std")]
@@ -16,7 +18,7 @@ pub struct BufferPool {
 }
 
 /// A simplified buffer pool for no_std environments
-#[cfg(not(any(feature = "std", )))]
+#[cfg(not(feature = "std"))]
 pub struct BufferPool {
     /// Simplified buffer management for no_std
     max_buffer_size: usize,
@@ -54,15 +56,15 @@ impl BufferPool {
 
     /// Return a buffer to the pool
     pub fn return_buffer(&mut self, mut buffer: Vec<u8>) {
-        let size = buffer.capacity();
+        let size = buffer.capacity);
 
         // Only keep reasonably sized buffers
         if size <= self.max_buffer_size {
             // Clear the buffer before returning it to the pool
-            buffer.clear();
+            buffer.clear);
 
             // Add to the pool if we have space
-            let buffers = self.pools.entry(size).or_insert_with(Vec::new);
+            let buffers = self.pools.entry(size).or_insert_with(Vec::new;
             if buffers.len() < self.max_buffers_per_size {
                 buffers.push(buffer);
             }
@@ -71,7 +73,7 @@ impl BufferPool {
 
     /// Reset the buffer pool, clearing all pooled buffers
     pub fn reset(&mut self) {
-        self.pools.clear();
+        self.pools.clear);
     }
 
     /// Get stats about the buffer pool
@@ -80,15 +82,15 @@ impl BufferPool {
         let mut total_capacity = 0;
 
         for (size, buffers) in &self.pools {
-            total_buffers += buffers.len();
-            total_capacity += size * buffers.len();
+            total_buffers += buffers.len);
+            total_capacity += size * buffers.len);
         }
 
         BufferPoolStats { total_buffers, total_capacity, size_count: self.pools.len() }
     }
 }
 
-#[cfg(not(any(feature = "std", )))]
+#[cfg(not(feature = "std"))]
 impl BufferPool {
     /// Create a new buffer pool with default settings
     pub fn new() -> Self {
@@ -143,15 +145,15 @@ mod tests {
         let mut pool = BufferPool::new();
 
         // Allocate a buffer
-        let buffer = pool.allocate(100);
-        assert_eq!(buffer.capacity(), 100);
+        let buffer = pool.allocate(100;
+        assert_eq!(buffer.capacity(), 100;
 
         // Return it to the pool
-        pool.return_buffer(buffer);
+        pool.return_buffer(buffer;
 
         // Allocate again, should reuse
-        let buffer2 = pool.allocate(100);
-        assert_eq!(buffer2.capacity(), 100);
+        let buffer2 = pool.allocate(100;
+        assert_eq!(buffer2.capacity(), 100;
     }
 
     #[test]
@@ -159,18 +161,18 @@ mod tests {
         let mut pool = BufferPool::new();
 
         // Allocate and return some buffers
-        pool.return_buffer(pool.allocate(100));
-        pool.return_buffer(pool.allocate(200));
+        pool.return_buffer(pool.allocate(100;
+        pool.return_buffer(pool.allocate(200;
 
         // Check stats
-        let stats_before = pool.stats();
-        assert_eq!(stats_before.total_buffers, 2);
+        let stats_before = pool.stats);
+        assert_eq!(stats_before.total_buffers, 2;
 
         // Reset the pool
-        pool.reset();
+        pool.reset);
 
         // Check stats again
-        let stats_after = pool.stats();
+        let stats_after = pool.stats);
         assert_eq!(stats_after.total_buffers, 0);
     }
 }

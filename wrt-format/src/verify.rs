@@ -18,11 +18,11 @@ pub mod kani_verification {
         let original = &[1, 1, 1, 2, 2, 3, 3, 3, 3];
 
         // Encode and then decode
-        let encoded = rle_encode(original);
-        let decoded = rle_decode(&encoded);
+        let encoded = rle_encode(original;
+        let decoded = rle_decode(&encoded;
 
         // Verify round-trip correctness
-        assert_eq!(original, decoded.as_slice());
+        assert_eq!(original, decoded.as_slice);
     }
 
     /// Verify binary module version detection
@@ -32,7 +32,7 @@ pub mod kani_verification {
         let version_bytes = [0, 0x61, 0x73, 0x6d, 1, 0, 0, 0];
 
         // Verify we can detect experimental features
-        let uses_experimental = uses_experimental_features(&version_bytes);
+        let uses_experimental = uses_experimental_features(&version_bytes;
 
         // Standard module shouldn't use experimental features
         assert!(!uses_experimental);
@@ -45,10 +45,10 @@ pub mod kani_verification {
         let state = StateSection::new();
 
         // Serialize to bytes
-        let state_bytes = create_state_section(&state);
+        let state_bytes = create_state_section(&state;
 
         // Extract back from bytes
-        let extracted_state = extract_state_section(&state_bytes);
+        let extracted_state = extract_state_section(&state_bytes;
 
         // Verify we can extract what we created
         assert!(extracted_state.is_ok());
@@ -68,10 +68,10 @@ pub mod kani_verification {
     #[cfg_attr(kani, kani::proof)]
     pub fn verify_feature_detection() {
         // Create version info for standard binary
-        let info = VersionInfo::default();
+        let info = VersionInfo::default());
 
         // Check core feature availability
-        let core_available = is_feature_available(&info, ComponentModelFeature::Core);
+        let core_available = is_feature_available(&info, ComponentModelFeature::Core;
 
         // Core feature should be available by default
         assert!(core_available);

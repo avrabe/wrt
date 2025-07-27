@@ -213,12 +213,12 @@ fn benchmark_simulated_execution(c: &mut Criterion) {
     c.bench_function("cfi_overhead_measurement", |b| {
         b.iter(|| {
             let start = std::time::Instant::now();
-            simulate_function_calls(black_box(100), false);
+            simulate_function_calls(black_box(100), false;
             let baseline_time = start.elapsed().as_nanos();
 
             let start = std::time::Instant::now();
-            simulate_function_calls(black_box(100), true);
-            let cfi_time = start.elapsed().as_nanos();
+            simulate_function_calls(black_box(100), true;
+            let cfi_time = start.elapsed().as_nanos);
 
             let overhead = if baseline_time > 0 {
                 ((cfi_time - baseline_time) as f64 / baseline_time as f64) * 100.0
@@ -236,7 +236,7 @@ fn benchmark_feature_matrix(c: &mut Criterion) {
     c.bench_function("complete_cfi_assessment", |b| {
         b.iter(|| {
             // Comprehensive CFI capability assessment
-            let mut features = Vec::new();
+            let mut features = Vec::new());
 
             if BranchTargetIdentification::is_available() {
                 let bti =

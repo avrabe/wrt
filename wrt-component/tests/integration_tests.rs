@@ -1,5 +1,11 @@
-use wrt_component::{parser, Error};
-use wrt_decoder::{Error as DecoderError, Parser};
+use wrt_component::{
+    parser,
+    Error,
+};
+use wrt_decoder::{
+    Error as DecoderError,
+    Parser,
+};
 
 /// Helper to create a complex test module with multiple section types
 fn create_complex_test_module() -> Vec<u8> {
@@ -20,7 +26,7 @@ fn create_complex_test_module() -> Vec<u8> {
         0x00, // No params
         0x01, // Number of results
         0x7F, // i32
-    ]);
+    ];
 
     // Import section with one function import
     module.extend_from_slice(&[
@@ -33,21 +39,21 @@ fn create_complex_test_module() -> Vec<u8> {
         // "add"
         0x61, 0x64, 0x64, 0x00, // Import kind (function)
         0x00, // Type index
-    ]);
+    ];
 
     // Function section with two function declarations
     module.extend_from_slice(&[
         0x03, 0x03, // Function section ID and size
         0x02, // Number of functions
         0x00, 0x01, // Type indices
-    ]);
+    ];
 
     // Memory section with one memory
     module.extend_from_slice(&[
         0x05, 0x03, // Memory section ID and size
         0x01, // Number of memories
         0x00, 0x01, // Min 0, max 1 pages
-    ]);
+    ];
 
     // Export section with two exports
     module.extend_from_slice(&[
@@ -61,7 +67,7 @@ fn create_complex_test_module() -> Vec<u8> {
         // "memory"
         0x6D, 0x65, 0x6D, 0x6F, 0x72, 0x79, 0x02, // Export kind (memory)
         0x00, // Memory index
-    ]);
+    ];
 
     // Code section with two function bodies
     module.extend_from_slice(&[
@@ -79,7 +85,7 @@ fn create_complex_test_module() -> Vec<u8> {
         0x00, // Local variable count
         0x41, 0x2A, // i32.const 42
         0x0B, // end
-    ]);
+    ];
 
     module
 }
@@ -96,7 +102,7 @@ fn create_invalid_section_size_module() -> Vec<u8> {
         0x60, // Function type
         0x00, // No params
         0x00, // No results
-    ]);
+    ];
 
     module
 }
@@ -111,7 +117,7 @@ fn create_truncated_module() -> Vec<u8> {
         0x01, 0x05, // Type section ID and size
         0x01, /* Number of types
                * Missing data here... */
-    ]);
+    ];
 
     module
 }
@@ -119,47 +125,47 @@ fn create_truncated_module() -> Vec<u8> {
 #[test]
 fn test_full_module_parsing() {
     // Create a test module with multiple section types
-    let module = create_complex_test_module();
+    let module = create_complex_test_module);
 
     // Verify parsing of the entire module works without errors
-    let parser = Parser::new(&module);
-    let payloads: Result<Vec<_>, _> = parser.collect();
+    let parser = Parser::new(&module;
+    let payloads: Result<Vec<_>, _> = parser.collect());
     assert!(payloads.is_ok());
 
     let payloads = payloads.unwrap();
 
     // Check that we have the expected number of sections
     // +1 for the Version payload
-    assert_eq!(payloads.len(), 6 + 1);
+    assert_eq!(payloads.len(), 6 + 1;
 
     // Test that built-in scanning works on the complex module
     let builtin_names = parser::scan_for_builtins(&module).unwrap();
     assert_eq!(builtin_names.len(), 1);
-    assert_eq!(builtin_names[0], "add");
+    assert_eq!(builtin_names[0], "add";
 }
 
 #[test]
 fn test_invalid_section_size() {
-    let module = create_invalid_section_size_module();
+    let module = create_invalid_section_size_module);
 
     // The parser should detect the invalid section size
-    let parser = Parser::new(&module);
-    let result: Result<Vec<_>, _> = parser.collect();
+    let parser = Parser::new(&module;
+    let result: Result<Vec<_>, _> = parser.collect());
 
     // We expect an error due to the invalid section size
-    assert!(result.is_err());
+    assert!(result.is_err();
 }
 
 #[test]
 fn test_truncated_module() {
-    let module = create_truncated_module();
+    let module = create_truncated_module);
 
     // The parser should detect the truncated module
-    let parser = Parser::new(&module);
-    let result: Result<Vec<_>, _> = parser.collect();
+    let parser = Parser::new(&module;
+    let result: Result<Vec<_>, _> = parser.collect());
 
     // We expect an error due to the truncated module
-    assert!(result.is_err());
+    assert!(result.is_err();
 }
 
 #[test]
@@ -168,11 +174,11 @@ fn test_invalid_wasm_header() {
     let invalid_module = vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
 
     // The parser should reject this as not a valid WebAssembly module
-    let parser = Parser::new(&invalid_module);
-    let result: Result<Vec<_>, _> = parser.collect();
+    let parser = Parser::new(&invalid_module;
+    let result: Result<Vec<_>, _> = parser.collect());
 
     // We expect an error due to invalid magic bytes
-    assert!(result.is_err());
+    assert!(result.is_err();
 }
 
 #[test]
@@ -181,8 +187,8 @@ fn test_empty_module() {
     let empty_module = vec![0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00];
 
     // The parser should handle an empty module without errors
-    let parser = Parser::new(&empty_module);
-    let result: Result<Vec<_>, _> = parser.collect();
+    let parser = Parser::new(&empty_module;
+    let result: Result<Vec<_>, _> = parser.collect());
 
     assert!(result.is_ok());
     let payloads = result.unwrap();
@@ -193,19 +199,19 @@ fn test_empty_module() {
 
 #[test]
 fn test_section_access_api() {
-    let module = create_complex_test_module();
+    let module = create_complex_test_module);
 
     // Test that we can find import sections directly
-    let import_section = wrt_decoder::find_import_section(&module);
+    let import_section = wrt_decoder::find_import_section(&module;
     assert!(import_section.is_ok());
 
     let import_section = import_section.unwrap();
-    assert!(import_section.is_some());
+    assert!(import_section.is_some();
 
     // Verify that the import section contains our expected builtin import
     let (offset, size) = import_section.unwrap();
     let import_data = &module[offset..offset + size];
 
     // Basic check that the import section data begins with correct count (0x01)
-    assert_eq!(import_data[0], 0x01);
+    assert_eq!(import_data[0], 0x01;
 }

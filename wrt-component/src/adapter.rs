@@ -12,11 +12,18 @@ use std::{fmt, mem};
 use std::{boxed::Box, string::String, vec::Vec};
 
 use wrt_foundation::{
-    bounded::BoundedVec, component::ComponentType, prelude::*,
+    bounded::BoundedVec, prelude::*,
 };
 
+use crate::execution_engine::ComponentExecutionEngine;
+
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedString, safe_memory::NoStdProvider};
+use wrt_foundation::{
+    BoundedString, 
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 #[cfg(feature = "std")]
 use wrt_foundation::component_value::ComponentValue;
@@ -74,7 +81,7 @@ pub struct FunctionAdapter {
     /// Core function index
     pub core_index: u32,
     /// Component function signature
-    pub component_signature: ComponentType,
+    pub component_signature: WrtComponentType,
     /// Core function signature (WebAssembly types)
     pub core_signature: CoreFunctionSignature,
     /// Adaptation mode
@@ -196,8 +203,8 @@ impl CoreModuleAdapter {
 
     /// Create a new core module adapter (no_std version)
     #[cfg(not(any(feature = "std", )))]
-    pub fn new(name: BoundedString<64, NoStdProvider<65536>>) -> Result<Self, Error> {
-        let provider = NoStdProvider::<65536>::default();
+    pub fn new(name: BoundedString<64, NoStdProvider<65536>>) -> core::result::Result<Self, Error> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
         Ok(Self {
             name,
             functions: BoundedVec::new(provider.clone())?,
@@ -214,10 +221,10 @@ impl CoreModuleAdapter {
             self.functions.push(adapter);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             self.functions.push(adapter).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many function adapters".into())
+                wrt_error::Error::resource_exhausted("Too many function adapters")
             })
         }
     }
@@ -229,10 +236,10 @@ impl CoreModuleAdapter {
             self.memories.push(adapter);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             self.memories.push(adapter).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many memory adapters".into())
+                wrt_error::Error::resource_exhausted("Too many memory adapters")
             })
         }
     }
@@ -244,10 +251,10 @@ impl CoreModuleAdapter {
             self.tables.push(adapter);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             self.tables.push(adapter).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many table adapters".into())
+                wrt_error::Error::resource_exhausted("Too many table adapters")
             })
         }
     }
@@ -259,10 +266,10 @@ impl CoreModuleAdapter {
             self.globals.push(adapter);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             self.globals.push(adapter).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many global adapters".into())
+                wrt_error::Error::resource_exhausted("Too many global adapters")
             })
         }
     }
@@ -324,15 +331,15 @@ impl CoreModuleAdapter {
     }
 
     /// Convert core type to component type
-    fn core_type_to_component_type(&self, core_type: CoreValType) -> ComponentType {
+    fn core_type_to_component_type(&self, core_type: CoreValType) -> WrtComponentType {
         match core_type {
-            CoreValType::I32 => ComponentType::Unit, // Simplified
-            CoreValType::I64 => ComponentType::Unit,
-            CoreValType::F32 => ComponentType::Unit,
-            CoreValType::F64 => ComponentType::Unit,
-            CoreValType::V128 => ComponentType::Unit,
-            CoreValType::FuncRef => ComponentType::Unit,
-            CoreValType::ExternRef => ComponentType::Unit,
+            CoreValType::I32 => WrtComponentType::Unit, // Simplified
+            CoreValType::I64 => WrtComponentType::Unit,
+            CoreValType::F32 => WrtComponentType::Unit,
+            CoreValType::F64 => WrtComponentType::Unit,
+            CoreValType::V128 => WrtComponentType::Unit,
+            CoreValType::FuncRef => WrtComponentType::Unit,
+            CoreValType::ExternRef => WrtComponentType::Unit,
         }
     }
 
@@ -345,7 +352,7 @@ impl CoreModuleAdapter {
     ) -> Result<Value> {
         let adapter = self
             .get_function(func_index)
-            .ok_or_else(|| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+            .ok_or_else(|| wrt_error::Error::runtime_function_not_found("Function adapter not found"))?;
 
         match adapter.mode {
             AdaptationMode::Direct => {
@@ -401,11 +408,11 @@ impl CoreModuleAdapter {
         {
             Ok(args.to_vec())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
-            let mut result = Vec::new();
+            let mut result = Vec::new());
             for arg in args {
-                result.push(arg.clone());
+                result.push(arg.clone();
             }
             Ok(result)
         }
@@ -415,7 +422,7 @@ impl CoreModuleAdapter {
     fn lift_result_to_component(
         &self,
         result: Value,
-        _component_signature: &ComponentType,
+        _component_signature: &WrtComponentType,
     ) -> Result<Value> {
         // Simplified lifting - in reality would use canonical ABI
         Ok(result)
@@ -426,7 +433,7 @@ impl FunctionAdapter {
     /// Create a new function adapter
     pub fn new(
         core_index: u32,
-        component_signature: ComponentType,
+        component_signature: WrtComponentType,
         core_signature: CoreFunctionSignature,
         mode: AdaptationMode,
     ) -> Self {
@@ -444,17 +451,23 @@ impl FunctionAdapter {
 
 impl CoreFunctionSignature {
     /// Create a new core function signature
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             params: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            params: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            params: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             #[cfg(feature = "std")]
             results: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            results: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            #[cfg(not(feature = "std"))]
+            results: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
+        })
     }
 
     /// Add a parameter type
@@ -464,10 +477,10 @@ impl CoreFunctionSignature {
             self.params.push(param_type);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             self.params.push(param_type).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many parameters".into())
+                wrt_error::Error::resource_exhausted("Too many parameters")
             })
         }
     }
@@ -479,18 +492,29 @@ impl CoreFunctionSignature {
             self.results.push(result_type);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             self.results
                 .push(result_type)
-                .map_err(|_| wrt_foundation::WrtError::ResourceExhausted("Too many results".into()))
+                .map_err(|_| wrt_error::Error::resource_exhausted("Too many results"))
         }
     }
 }
 
 impl Default for CoreFunctionSignature {
     fn default() -> Self {
-        Self::new()
+        Self::new().unwrap_or_else(|_| {
+            Self {
+                #[cfg(feature = "std")]
+                params: Vec::new(),
+                #[cfg(not(feature = "std"))]
+                params: BoundedVec::new_with_default_provider().unwrap(),
+                #[cfg(feature = "std")]
+                results: Vec::new(),
+                #[cfg(not(feature = "std"))]
+                results: BoundedVec::new_with_default_provider().unwrap(),
+            }
+        })
     }
 }
 
@@ -549,7 +573,7 @@ macro_rules! impl_basic_traits {
         impl Checksummable for $type {
             fn update_checksum(&self, checksum: &mut wrt_foundation::traits::Checksum) {
                 // Simple checksum without unsafe code
-                0u32.update_checksum(checksum);
+                0u32.update_checksum(checksum;
             }
         }
 
@@ -594,69 +618,69 @@ mod tests {
         #[cfg(feature = "std")]
         {
             let adapter = CoreModuleAdapter::new("test_module".to_string());
-            assert_eq!(adapter.name, "test_module");
+            assert_eq!(adapter.name, "test_module";
             assert_eq!(adapter.functions.len(), 0);
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             let name = BoundedString::from_str("test_module").unwrap();
-            let adapter = CoreModuleAdapter::new(name);
-            assert_eq!(adapter.name.as_str(), "test_module");
+            let adapter = CoreModuleAdapter::new(name).unwrap();
+            assert_eq!(adapter.name.as_str(), "test_module";
             assert_eq!(adapter.functions.len(), 0);
         }
     }
 
     #[test]
     fn test_function_adapter() {
-        let mut core_sig = CoreFunctionSignature::new();
+        let mut core_sig = CoreFunctionSignature::new().unwrap();
         core_sig.add_param(CoreValType::I32).unwrap();
         core_sig.add_result(CoreValType::I32).unwrap();
 
         let adapter =
-            FunctionAdapter::new(0, ComponentType::Unit, core_sig, AdaptationMode::Direct);
+            FunctionAdapter::new(0, WrtComponentType::Unit, core_sig, AdaptationMode::Direct;
 
         assert_eq!(adapter.core_index, 0);
-        assert_eq!(adapter.mode, AdaptationMode::Direct);
-        assert!(!adapter.needs_canonical_abi());
+        assert_eq!(adapter.mode, AdaptationMode::Direct;
+        assert!(!adapter.needs_canonical_abi();
     }
 
     #[test]
     fn test_core_val_type_display() {
-        assert_eq!(CoreValType::I32.to_string(), "i32");
-        assert_eq!(CoreValType::F64.to_string(), "f64");
-        assert_eq!(CoreValType::FuncRef.to_string(), "funcref");
+        assert_eq!(CoreValType::I32.to_string(), "i32";
+        assert_eq!(CoreValType::F64.to_string(), "f64";
+        assert_eq!(CoreValType::FuncRef.to_string(), "funcref";
     }
 
     #[test]
     fn test_adaptation_mode_display() {
-        assert_eq!(AdaptationMode::Direct.to_string(), "direct");
-        assert_eq!(AdaptationMode::Lift.to_string(), "lift");
-        assert_eq!(AdaptationMode::Bidirectional.to_string(), "bidirectional");
+        assert_eq!(AdaptationMode::Direct.to_string(), "direct";
+        assert_eq!(AdaptationMode::Lift.to_string(), "lift";
+        assert_eq!(AdaptationMode::Bidirectional.to_string(), "bidirectional";
     }
 
     #[test]
     fn test_memory_adapter() {
-        let adapter = MemoryAdapter::new(0, 1, Some(10), false);
+        let adapter = MemoryAdapter::new(0, 1, Some(10), false;
         assert_eq!(adapter.core_index, 0);
         assert_eq!(adapter.limits.min, 1);
-        assert_eq!(adapter.limits.max, Some(10));
+        assert_eq!(adapter.limits.max, Some(10;
         assert!(!adapter.shared);
     }
 
     #[test]
     fn test_table_adapter() {
-        let adapter = TableAdapter::new(0, CoreValType::FuncRef, 0, None);
+        let adapter = TableAdapter::new(0, CoreValType::FuncRef, 0, None;
         assert_eq!(adapter.core_index, 0);
-        assert_eq!(adapter.element_type, CoreValType::FuncRef);
+        assert_eq!(adapter.element_type, CoreValType::FuncRef;
         assert_eq!(adapter.limits.min, 0);
-        assert_eq!(adapter.limits.max, None);
+        assert_eq!(adapter.limits.max, None;
     }
 
     #[test]
     fn test_global_adapter() {
-        let adapter = GlobalAdapter::new(0, CoreValType::I32, true);
+        let adapter = GlobalAdapter::new(0, CoreValType::I32, true;
         assert_eq!(adapter.core_index, 0);
-        assert_eq!(adapter.global_type, CoreValType::I32);
+        assert_eq!(adapter.global_type, CoreValType::I32;
         assert!(adapter.mutable);
     }
 }

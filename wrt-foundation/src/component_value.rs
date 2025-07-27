@@ -29,12 +29,12 @@ use crate::{
 extern crate alloc; // Binary std/no_std choice
 
 // Binary std/no_std choice
-#[cfg(feature = "std")]
-use std::borrow::ToOwned;
 use core::{
     fmt,
     hash::{Hash, Hasher as CoreHasher},
 };
+#[cfg(feature = "std")]
+use std::borrow::ToOwned;
 
 // Use constants from bounded.rs
 use crate::bounded::{
@@ -840,18 +840,10 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for Compone
                     let len = u32::from_bytes_with_provider(reader, provider)? as usize;
                     let mut bytes = vec![0u8; len];
                     reader.read_exact(&mut bytes).map_err(|_e| {
-                        Error::new(
-                            ErrorCategory::Parse,
-                            codes::PARSE_ERROR,
-                            "Failed to read string bytes",
-                        )
+                        Error::parse_error("Failed to read string bytes")
                     })?;
                     let s = crate::prelude::String::from_utf8(bytes).map_err(|_e| {
-                        Error::new(
-                            ErrorCategory::Parse,
-                            codes::PARSE_ERROR,
-                            "Invalid UTF-8 in string",
-                        )
+                        Error::parse_error("Invalid UTF-8 in string")
                     })?;
                     Ok(ComponentValue::String(s))
                 }
@@ -974,11 +966,7 @@ pub fn serialize_component_values<
             }
             // Add more types as needed for intercept functionality
             _ => {
-                return Err(Error::new(
-                    ErrorCategory::Component,
-                    wrt_error::codes::ENCODING_ERROR,
-                    "Serialization not implemented for this type",
-                ));
+                return Err(Error::runtime_execution_error("Unsupported component value type for serialization"));
             }
         }
     }
@@ -995,11 +983,7 @@ where
     P: Default + Clone + PartialEq + Eq, // Added all required trait bounds
 {
     if types.is_empty() && !data.is_empty() {
-        return Err(Error::new(
-            ErrorCategory::Parse,         // Use Parse instead of Decode
-            codes::DESERIALIZATION_ERROR, // Use imported codes
-            "Data present but no types to deserialize into",
-        ));
+        return Err(Error::runtime_execution_error("Cannot deserialize values: data provided but no types specified"));
     }
 
     let mut values = BoundedVec::<ComponentValue<P>, MAX_DESERIALIZED_VALUES, P>::new(P::default())
@@ -1011,9 +995,7 @@ where
             // If we run out of data but still have types, it's an error (unless types are
             // all Void?) For simplicity, consider this an error. More nuanced
             // handling might be needed.
-            return Err(decoding_error(
-                "Unexpected end of data while deserializing component values",
-            ));
+            return Err(decoding_error("Insufficient data for all specified types"));
         }
 
         // Here we'd ideally use ValType to guide deserialization, especially for
@@ -1022,11 +1004,7 @@ where
         // For now, ComponentValue::from_bytes is somewhat self-describing via
         // discriminant.
         let slice = crate::safe_memory::Slice::new(&data[offset..]).map_err(|_e| {
-            Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ACCESS_ERROR,
-                "Failed to create slice from data",
-            )
+            Error::runtime_execution_error("Failed to create slice for deserialization")
         })?;
         let mut reader = crate::traits::ReadStream::new(slice);
         match ComponentValue::<P>::from_bytes_with_provider(&mut reader, &P::default()) {
@@ -1037,26 +1015,21 @@ where
                 // Temporarily commenting out until matches_type method is implemented
                 // if !cv.matches_type(value_type,
                 // &ComponentValueStore::new(P::default()).map_err(Error::from)?) {
-                //     return Err(decoding_error("Deserialized component value does not match
-                // expected type")); }
+                //     return Err(decoding_error("type mismatch")); }
 
                 values.push(cv).map_err(Error::from)?;
                 offset += bytes_read;
             }
             Err(e) => {
                 // Convert SerializationError to wrt_error::Error
-                return Err(Error::new(
-                    ErrorCategory::Parse,
-                    codes::DESERIALIZATION_ERROR,
-                    "Component decoding error",
-                ));
+                return Err(Error::runtime_execution_error("Failed to deserialize component value"));
             }
         }
     }
 
     if offset != data.len() {
         // If there's leftover data after deserializing all typed values
-        return Err(decoding_error("Extra data found after deserializing all component values"));
+        return Err(decoding_error("Unexpected extra data after deserializing all values"));
     }
 
     Ok(values)
@@ -1088,7 +1061,7 @@ pub fn encoding_error(_message: &str) -> Error {
 /// model.
 #[must_use]
 pub fn decoding_error(_message: &str) -> Error {
-    Error::new(ErrorCategory::Parse, wrt_error::codes::DECODING_ERROR, "Component decoding error")
+    Error::runtime_execution_error("Component decoding error")
 }
 
 #[cfg(test)]
@@ -1104,17 +1077,17 @@ mod tests {
         // For primitive types, the store might not be strictly necessary if
         // they don't involve ValueRef. However, matches_type now
         // requires the store. let provider =
-        // crate::NoStdProvider::<1024>::new().unwrap(); // Example provider
+        // crate::NoStdProvider::<1024>::new().unwrap()); // Example provider
         // let store = ComponentValueStore::new(provider).unwrap();
 
-        // let bool_value = ComponentValue::Bool(true);
-        // let int_value = ComponentValue::S32(42);
-        // let float_value = ComponentValue::F32(PI);
+        // let bool_value = ComponentValue::Bool(true;
+        // let int_value = ComponentValue::S32(42;
+        // let float_value = ComponentValue::F32(PI;
 
-        // assert!(bool_value.matches_type(&ValType::Bool, &store));
-        // assert!(!bool_value.matches_type(&ValType::S32, &store));
+        // assert!(bool_value.matches_type(&ValType::Bool, &store);
+        // assert!(!bool_value.matches_type(&ValType::S32, &store);
 
-        // assert!(int_value.matches_type(&ValType::S32, &store));
-        // assert!(!int_value.matches_type(&ValType::Bool, &store));
+        // assert!(int_value.matches_type(&ValType::S32, &store);
+        // assert!(!int_value.matches_type(&ValType::Bool, &store);
     }
 }

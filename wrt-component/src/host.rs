@@ -40,7 +40,7 @@ impl Host {
 
     /// Adds a host function
     pub fn add_function(&mut self, name: String, function: HostFunction) {
-        self.functions.insert(name, function);
+        self.functions.insert(name, function;
     }
 
     /// Gets a host function by name
@@ -57,11 +57,7 @@ impl Host {
         target: &mut dyn core::any::Any,
     ) -> Result<Vec<Value>> {
         let function = self.functions.get(name).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::EXECUTION_ERROR,
-                kinds::ExecutionError("Component not found"),
-            )
+            Error::runtime_execution_error("Host function not found")
         })?;
 
         match &function.implementation {
@@ -71,11 +67,7 @@ impl Host {
                 // Note: Registry access needs to be correctly implemented with the proper type
                 registry.call_host_function(target, "wrt_component", callback_name, args)
             }
-            HostFunctionImpl::Trap(message) => Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::EXECUTION_ERROR,
-                kinds::ExecutionError("Component not found"),
-            )),
+            HostFunctionImpl::Trap(message) => Err(Error::runtime_execution_error("Host function trap executed")),
         }
     }
 }
@@ -100,12 +92,12 @@ mod tests {
             implementation: HostFunctionImpl::Callback("add".to_string()),
         };
 
-        host.add_function("add".to_string(), function);
+        host.add_function("add".to_string(), function;
 
-        let retrieved = host.get_function("add");
-        assert!(retrieved.is_some());
+        let retrieved = host.get_function("add";
+        assert!(retrieved.is_some();
 
-        let not_found = host.get_function("non_existent");
-        assert!(not_found.is_none());
+        let not_found = host.get_function("non_existent";
+        assert!(not_found.is_none();
     }
 }

@@ -3,11 +3,15 @@
 //! This module provides facilities for intercepting built-in function calls
 //! in the WebAssembly Component Model implementation.
 
-use crate::prelude::{BuiltinType, Debug, str, Value};
-use wrt_error::{Error, Result};
+
+use crate::prelude::{BuiltinType, Debug, str};
+use wrt_error::Error;
 
 #[cfg(feature = "std")]
-use std::{sync::{Arc, RwLock}, collections::HashSet};
+use wrt_foundation::values::Value;
+
+#[cfg(feature = "std")]
+use std::sync::Arc;
 
 #[cfg(feature = "std")]
 use wrt_foundation::component_value::{ComponentValue, ValType};
@@ -69,7 +73,7 @@ impl InterceptContext {
     /// Add context data (only available with `std` feature)
     #[cfg(feature = "std")]
     pub fn add_data(&mut self, key: &str, value: Value) {
-        self.context_data.insert(key.to_string(), value);
+        self.context_data.insert(key.to_string(), value;
     }
 
     /// Get context data (only available with `std` feature)
@@ -99,9 +103,9 @@ impl BuiltinSerialization {
     /// A `Result` containing the serialized bytes or an error
     pub fn serialize(
         values: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<Vec<u8>> {
+    ) -> wrt_error::Result<Vec<u8>> {
         // Simple implementation for now - convert to bytes
-        let mut result = Vec::new();
+        let mut result = Vec::new());
         for value in values {
             let bytes = match value {
                 ComponentValue::S32(v) => v.to_le_bytes().to_vec(),
@@ -109,10 +113,7 @@ impl BuiltinSerialization {
                 ComponentValue::F32(v) => v.0.to_le_bytes().to_vec(),
                 ComponentValue::F64(v) => v.0.to_le_bytes().to_vec(),
                 _ => {
-                    return Err(Error::new(
-                        wrt_error::ErrorCategory::Type,
-                        wrt_error::codes::INVALID_TYPE,
-                        "Unsupported value type for serialization",
+                    return Err(Error::runtime_execution_error("unsupported component value type for serialization"
                     ))
                 }
             };
@@ -134,8 +135,8 @@ impl BuiltinSerialization {
     pub fn deserialize(
         bytes: &[u8],
         types: &[ValType<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>> {
-        let mut result = Vec::new();
+    ) -> wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>> {
+        let mut result = Vec::new());
         let mut offset = 0;
 
         for ty in types {
@@ -145,25 +146,21 @@ impl BuiltinSerialization {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Parse,
                             wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for i32",
-                        ));
+                            "insufficient bytes for S32 deserialization";
                     }
                     let mut buf = [0u8; 4];
-                    buf.copy_from_slice(&bytes[offset..offset + 4]);
-                    result.push(ComponentValue::S32(i32::from_le_bytes(buf)));
+                    buf.copy_from_slice(&bytes[offset..offset + 4];
+                    result.push(ComponentValue::S32(i32::from_le_bytes(buf);
                     offset += 4;
                 }
                 ValType::S64 => {
                     if offset + 8 > bytes.len() {
-                        return Err(Error::new(
-                            wrt_error::ErrorCategory::Parse,
-                            wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for i64",
-                        ));
+                        return Err(Error::runtime_execution_error("insufficient bytes for S64 deserialization"
+                        ;
                     }
                     let mut buf = [0u8; 8];
-                    buf.copy_from_slice(&bytes[offset..offset + 8]);
-                    result.push(ComponentValue::S64(i64::from_le_bytes(buf)));
+                    buf.copy_from_slice(&bytes[offset..offset + 8];
+                    result.push(ComponentValue::S64(i64::from_le_bytes(buf);
                     offset += 8;
                 }
                 ValType::F32 => {
@@ -171,37 +168,32 @@ impl BuiltinSerialization {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Parse,
                             wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for f32",
-                        ));
+                            "insufficient bytes for F32 deserialization";
                     }
                     let mut buf = [0u8; 4];
-                    buf.copy_from_slice(&bytes[offset..offset + 4]);
+                    buf.copy_from_slice(&bytes[offset..offset + 4];
                     result.push(ComponentValue::F32(wrt_foundation::FloatBits32(
                         f32::from_le_bytes(buf).to_bits(),
-                    )));
+                    );
                     offset += 4;
                 }
                 ValType::F64 => {
                     if offset + 8 > bytes.len() {
-                        return Err(Error::new(
-                            wrt_error::ErrorCategory::Parse,
-                            wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for f64",
-                        ));
+                        return Err(Error::runtime_execution_error("insufficient bytes for F64 deserialization"
+                        ;
                     }
                     let mut buf = [0u8; 8];
-                    buf.copy_from_slice(&bytes[offset..offset + 8]);
+                    buf.copy_from_slice(&bytes[offset..offset + 8];
                     result.push(ComponentValue::F64(wrt_foundation::FloatBits64(
                         f64::from_le_bytes(buf).to_bits(),
-                    )));
+                    );
                     offset += 8;
                 }
                 _ => {
                     return Err(Error::new(
                         wrt_error::ErrorCategory::Type,
                         wrt_error::codes::INVALID_TYPE,
-                        "Unsupported value type for deserialization",
-                    ))
+                        "unsupported value type for deserialization"))
                 }
             }
         }
@@ -220,35 +212,32 @@ impl BuiltinSerialization {
     // args: &[ComponentValue],
     // types: &[ValType],
     // ) -> Result<Vec<u8>> {
-    // let mut bytes = Vec::new();
+    // let mut bytes = Vec::new());
     // for (index, value) in args.iter().enumerate() {
     // match types.get(index) {
     // Some(ty) => match ty {
     // ValType::S32 => {
     // if let Some(ComponentValue::S32(val)) = args.get(index) {
-    // bytes.extend_from_slice(&val.to_le_bytes());
+    // bytes.extend_from_slice(&val.to_le_bytes);
     // }
     // }
     // ValType::S64 => {
     // if let Some(ComponentValue::S64(val)) = args.get(index) {
-    // bytes.extend_from_slice(&val.to_le_bytes());
+    // bytes.extend_from_slice(&val.to_le_bytes);
     // }
     // }
     // ValType::F32 => {
     // if let Some(ComponentValue::F32(val)) = args.get(index) {
-    // bytes.extend_from_slice(&val.to_le_bytes());
+    // bytes.extend_from_slice(&val.to_le_bytes);
     // }
     // }
     // ValType::F64 => {
     // if let Some(ComponentValue::F64(val)) = args.get(index) {
-    // bytes.extend_from_slice(&val.to_le_bytes());
+    // bytes.extend_from_slice(&val.to_le_bytes);
     // }
     // }
     // _ => {
-    // return Err(Error::new(
-    // wrt_error::ErrorCategory::Type,
-    // wrt_error::codes::INVALID_TYPE,
-    // "Unsupported value type for serialization",
+    // return Err(Error::runtime_execution_error("unsupported value type for argument serialization"
     // ))
     // }
     // },
@@ -256,8 +245,7 @@ impl BuiltinSerialization {
     // return Err(Error::new(
     // wrt_error::ErrorCategory::Type,
     // wrt_error::codes::INVALID_TYPE,
-    // "Index out of bounds for serialization",
-    // ))
+    // "missing type information for argument"))
     // }
     // }
     // }
@@ -295,7 +283,7 @@ pub trait BuiltinInterceptor: Send + Sync {
         &self,
         context: &InterceptContext,
         args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<BeforeBuiltinResult>;
+    ) -> wrt_error::Result<BeforeBuiltinResult>;
 
     /// Called after a built-in function has been invoked
     ///
@@ -312,8 +300,8 @@ pub trait BuiltinInterceptor: Send + Sync {
         &self,
         context: &InterceptContext,
         args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-        result: Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>,
-    ) -> Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>;
+        result: wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>,
+    ) -> wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>;
 
     /// Clone this interceptor
     ///
@@ -349,20 +337,20 @@ mod tests {
     fn test_intercept_context() {
         #[cfg(feature = "std")]
         let context =
-            InterceptContext::new("test-component", BuiltinType::ResourceCreate, "test-host");
+            InterceptContext::new("test-component", BuiltinType::ResourceCreate, "test-host";
 
         #[cfg(feature = "std")]
-        assert_eq!(context.component_name, "test-component");
-        assert_eq!(context.builtin_type, BuiltinType::ResourceCreate);
+        assert_eq!(context.component_name, "test-component";
+        assert_eq!(context.builtin_type, BuiltinType::ResourceCreate;
         #[cfg(feature = "std")]
-        assert_eq!(context.host_id, "test-host");
+        assert_eq!(context.host_id, "test-host";
 
         #[cfg(feature = "std")]
         {
             let mut context = context;
-            context.add_data("test-key", Value::I32(42));
-            assert_eq!(context.get_data("test-key"), Some(&Value::I32(42)));
-            assert_eq!(context.get_data("non-existent"), None);
+            context.add_data("test-key", Value::I32(42;
+            assert_eq!(context.get_data("test-key"), Some(&Value::I32(42);
+            assert_eq!(context.get_data("non-existent"), None;
         }
     }
 
@@ -383,23 +371,23 @@ mod tests {
         let deserialized_values =
             BuiltinSerialization::deserialize(&serialized_bytes, &types).unwrap();
 
-        assert_eq!(deserialized_values.len(), values.len());
-        assert_eq!(deserialized_values[0], values[0]);
-        assert_eq!(deserialized_values[1], values[1]);
+        assert_eq!(deserialized_values.len(), values.len);
+        assert_eq!(deserialized_values[0], values[0];
+        assert_eq!(deserialized_values[1], values[1];
         // For floating point, we need to handle potential rounding issues
         if let (ComponentValue::F32(a), ComponentValue::F32(b)) =
             (&deserialized_values[2], &values[2])
         {
             assert!((a - b).abs() < f32::EPSILON);
         } else {
-            panic!("Expected F32 values");
+            panic!("Expected F32 values";
         }
         if let (ComponentValue::F64(a), ComponentValue::F64(b)) =
             (&deserialized_values[3], &values[3])
         {
             assert!((a - b).abs() < f64::EPSILON);
         } else {
-            panic!("Expected F64 values");
+            panic!("Expected F64 values";
         }
     }
 }

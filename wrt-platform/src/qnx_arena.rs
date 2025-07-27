@@ -7,6 +7,7 @@
 //! This module interfaces with QNX's arena allocation system to provide
 //! WebAssembly memory that is both efficient and well-integrated with the OS.
 
+
 use core::{
     fmt::{self, Debug},
     ptr::NonNull,
@@ -73,7 +74,7 @@ mod ffi {
         pub fn malloc(size: qnx_size_t) -> *mut c_void;
         pub fn calloc(nmemb: qnx_size_t, size: qnx_size_t) -> *mut c_void;
         pub fn realloc(ptr: *mut c_void, size: qnx_size_t) -> *mut c_void;
-        pub fn free(ptr: *mut c_void);
+        pub fn free(ptr: *mut c_void;
 
         // Binary std/no_std choice
         pub fn mallopt(cmd: i32, value: i32) -> i32;
@@ -282,7 +283,7 @@ impl QnxArenaAllocatorBuilder {
         let page_size = 4 * 1024;
         let aligned_size = (size + page_size - 1) / page_size * page_size;
         // Cap at 256KB (QNX limit)
-        let capped_size = aligned_size.min(256 * 1024);
+        let capped_size = aligned_size.min(256 * 1024;
         self.config.arena_size = capped_size;
         self
     }
@@ -380,11 +381,7 @@ impl QnxArenaAllocator {
         let result =
             unsafe { ffi::mallopt(QnxMallocOption::ArenaSize as i32, config.arena_size as i32) };
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to configure arena size",
-            ));
+            return Err(Error::runtime_execution_error("Failed to set arena size";
         }
 
         // Set arena cache max blocks
@@ -398,8 +395,8 @@ impl QnxArenaAllocator {
             return Err(Error::new(
                 ErrorCategory::Platform,
                 1,
-                "Failed to configure arena cache max blocks",
-            ));
+                "Failed to set arena cache max blocks",
+            ;
         }
 
         // Set arena cache max size
@@ -410,11 +407,7 @@ impl QnxArenaAllocator {
             )
         };
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::Platform,
-                1,
-                "Failed to configure arena cache max size",
-            ));
+            return Err(Error::runtime_execution_error("Failed to set arena cache max size";
         }
 
         // Set LIFO free strategy if requested
@@ -429,8 +422,8 @@ impl QnxArenaAllocator {
                 return Err(Error::new(
                     ErrorCategory::Platform,
                     1,
-                    "Failed to configure LIFO free strategy",
-                ));
+                    "Failed to set LIFO free strategy",
+                ;
             }
         }
 
@@ -443,11 +436,7 @@ impl QnxArenaAllocator {
                 )
             };
             if result != 0 {
-                return Err(Error::new(
-                    ErrorCategory::Platform,
-                    1,
-                    "Failed to configure memory hold",
-                ));
+                return Err(Error::runtime_execution_error("Failed to set memory hold";
             }
         }
 
@@ -457,28 +446,16 @@ impl QnxArenaAllocator {
     /// Binary std/no_std choice
     fn calculate_total_size(&self, pages: u32) -> Result<usize> {
         let data_size = (pages as usize).checked_mul(WASM_PAGE_SIZE).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Memory size calculation overflow",
-            )
+            Error::memory_error("Data page size calculation overflow")
         })?;
 
         let guard_pages = if self.config.use_guard_pages { 2 } else { 0 };
         let guard_size = guard_pages.checked_mul(WASM_PAGE_SIZE).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Guard page size calculation overflow",
-            )
+            Error::memory_error("Guard page size calculation overflow")
         })?;
 
         data_size.checked_add(guard_size).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Total memory size calculation overflow",
-            )
+            Error::memory_error("Total memory size calculation overflow")
         })
     }
 
@@ -487,11 +464,11 @@ impl QnxArenaAllocator {
         if let Some(ptr) = self.current_allocation.take() {
             unsafe {
                 // Binary std/no_std choice
-                ffi::free(ptr.as_ptr() as *mut _);
+                ffi::free(ptr.as_ptr() as *mut _;
             }
 
-            self.current_size.store(0, Ordering::SeqCst);
-            self.current_pages.store(0, Ordering::SeqCst);
+            self.current_size.store(0, Ordering::SeqCst;
+            self.current_pages.store(0, Ordering::SeqCst;
         }
 
         Ok(())
@@ -506,7 +483,7 @@ impl QnxArenaAllocator {
 impl Drop for QnxArenaAllocator {
     fn drop(&mut self) {
         // Binary std/no_std choice
-        let _ = self.free_current_allocation();
+        let _ = self.free_current_allocation);
     }
 }
 
@@ -539,12 +516,12 @@ impl PageAllocator for QnxArenaAllocator {
                 ffi::mallopt(
                     QnxMallocOption::ArenaCacheMaxSize as i32,
                     (aligned_size / 2) as i32, // Binary std/no_std choice
-                );
+                ;
             }
         }
 
         // Allocate memory using arenas (posix_memalign for alignment)
-        let mut ptr: *mut core::ffi::c_void = core::ptr::null_mut();
+        let mut ptr: *mut core::ffi::c_void = core::ptr::null_mut);
         let alignment = if self.config.use_guard_pages {
             WASM_PAGE_SIZE // Align to WASM page size for guard pages
         } else {
@@ -566,22 +543,18 @@ impl PageAllocator for QnxArenaAllocator {
                     ffi::mallopt(
                         QnxMallocOption::ArenaCacheMaxSize as i32,
                         self.config.arena_cache_max_size as i32,
-                    );
+                    ;
                 }
             }
 
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Failed to allocate memory using arena allocator",
-            ));
+            return Err(Error::memory_error("Failed to allocate memory using arena allocator";
         }
 
         // Lock memory in physical RAM if this is a large, performance-critical
         // Binary std/no_std choice
         if initial_pages > 16 {
             unsafe {
-                ffi::mlock(ptr, total_size);
+                ffi::mlock(ptr, total_size;
             }
         }
 
@@ -608,14 +581,10 @@ impl PageAllocator for QnxArenaAllocator {
             if lower_result != 0 || upper_result != 0 {
                 // Binary std/no_std choice
                 unsafe {
-                    ffi::free(ptr);
+                    ffi::free(ptr;
                 }
 
-                return Err(Error::new(
-                    ErrorCategory::Memory,
-                    1,
-                    "Failed to set up guard pages",
-                ));
+                return Err(Error::memory_error("Failed to set up guard pages";
             }
         }
 
@@ -628,24 +597,16 @@ impl PageAllocator for QnxArenaAllocator {
 
         // Binary std/no_std choice
         let data_ptr_nonnull = NonNull::new(data_ptr).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Failed to allocate memory (null pointer)",
-            )
+            Error::memory_error("Failed to allocate memory (null pointer)")
         })?;
 
-        self.current_allocation = Some(data_ptr_nonnull);
-        self.current_size.store(total_size, Ordering::SeqCst);
-        self.current_pages.store(initial_pages as usize, Ordering::SeqCst);
+        self.current_allocation = Some(data_ptr_nonnull;
+        self.current_size.store(total_size, Ordering::SeqCst;
+        self.current_pages.store(initial_pages as usize, Ordering::SeqCst;
 
         // Return data pointer and size
         let data_size = (initial_pages as usize).checked_mul(WASM_PAGE_SIZE).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Memory size calculation overflow",
-            )
+            Error::memory_error("Memory size calculation overflow")
         })?;
 
         Ok((data_ptr_nonnull, data_size))
@@ -654,30 +615,18 @@ impl PageAllocator for QnxArenaAllocator {
     fn grow(&mut self, current_pages: u32, additional_pages: u32) -> Result<(NonNull<u8>, usize)> {
         // Binary std/no_std choice
         if self.current_allocation.is_none() {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                1,
-                "No current allocation to grow",
-            ));
+            return Err(Error::memory_error("No current allocation to grow";
         }
 
         // Calculate new size
         let new_pages = current_pages.checked_add(additional_pages).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Page count overflow when growing memory",
-            )
+            Error::memory_error("Page count overflow when growing memory")
         })?;
 
         // Check against maximum if set
         if let Some(max) = self.maximum_pages {
             if new_pages > max {
-                return Err(Error::new(
-                    ErrorCategory::Memory,
-                    1,
-                    "Cannot grow memory beyond maximum pages",
-                ));
+                return Err(Error::memory_error("Cannot grow memory beyond maximum pages";
             }
         }
 
@@ -686,14 +635,14 @@ impl PageAllocator for QnxArenaAllocator {
 
         // Pre-calculate the number of arenas needed for the additional memory
         // Binary std/no_std choice
-        let current_total_size = self.current_size.load(Ordering::SeqCst);
-        let additional_size = new_total_size.checked_sub(current_total_size).unwrap_or(0);
+        let current_total_size = self.current_size.load(Ordering::SeqCst;
+        let additional_size = new_total_size.checked_sub(current_total_size).unwrap_or(0;
         let additional_arenas_needed =
             (additional_size + self.config.arena_size - 1) / self.config.arena_size;
 
         // Binary std/no_std choice
         // Get the current base pointer (before guard page if any)
-        let current_ptr = self.current_allocation.unwrap().as_ptr();
+        let current_ptr = self.current_allocation.unwrap().as_ptr);
         let base_ptr = if self.config.use_guard_pages {
             unsafe { current_ptr.sub(WASM_PAGE_SIZE) }
         } else {
@@ -706,13 +655,13 @@ impl PageAllocator for QnxArenaAllocator {
             let cache_size = additional_arenas_needed * self.config.arena_size;
             unsafe {
                 // Temporarily increase arena cache size
-                ffi::mallopt(QnxMallocOption::ArenaCacheMaxSize as i32, cache_size as i32);
+                ffi::mallopt(QnxMallocOption::ArenaCacheMaxSize as i32, cache_size as i32;
 
                 // Temporarily increase arena cache max blocks
                 ffi::mallopt(
                     QnxMallocOption::ArenaCacheMaxBlocks as i32,
                     (additional_arenas_needed + 2) as i32,
-                );
+                ;
             }
         }
 
@@ -740,10 +689,10 @@ impl PageAllocator for QnxArenaAllocator {
                         base_ptr as *const u8,
                         new_ptr as *mut u8,
                         current_total_size,
-                    );
+                    ;
 
                     // Free the old buffer
-                    ffi::free(base_ptr as *mut _);
+                    ffi::free(base_ptr as *mut _;
                 }
             }
         }
@@ -755,30 +704,26 @@ impl PageAllocator for QnxArenaAllocator {
                 ffi::mallopt(
                     QnxMallocOption::ArenaCacheMaxSize as i32,
                     self.config.arena_cache_max_size as i32,
-                );
+                ;
 
                 ffi::mallopt(
                     QnxMallocOption::ArenaCacheMaxBlocks as i32,
                     self.config.arena_cache_max_blocks as i32,
-                );
+                ;
             }
         }
 
         if new_ptr.is_null() {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Failed to grow memory using arena allocator",
-            ));
+            return Err(Error::memory_error("Failed to grow memory using arena allocator";
         }
 
         // Binary std/no_std choice
         if additional_pages > 8 {
-            let current_size = self.current_size.load(Ordering::SeqCst);
+            let current_size = self.current_size.load(Ordering::SeqCst;
             if new_total_size > current_size {
                 unsafe {
-                    let additional_memory = (new_ptr as *mut u8).add(current_size);
-                    ffi::mlock(additional_memory as *const _, new_total_size - current_size);
+                    let additional_memory = (new_ptr as *mut u8).add(current_size;
+                    ffi::mlock(additional_memory as *const _, new_total_size - current_size;
                 }
             }
         }
@@ -813,37 +758,25 @@ impl PageAllocator for QnxArenaAllocator {
             if lower_result != 0 || upper_result != 0 {
                 // Try to restore the original size or at least keep it valid
                 unsafe {
-                    ffi::realloc(new_ptr, self.current_size.load(Ordering::SeqCst));
+                    ffi::realloc(new_ptr, self.current_size.load(Ordering::SeqCst;
                 }
 
-                return Err(Error::new(
-                    ErrorCategory::Memory,
-                    1,
-                    "Failed to set up guard pages after growth",
-                ));
+                return Err(Error::memory_error("Failed to set up guard pages after growth";
             }
         }
 
         // Binary std/no_std choice
         let new_data_ptr_nonnull = NonNull::new(new_data_ptr).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Failed to grow memory (null pointer)",
-            )
+            Error::memory_error("Failed to grow memory (null pointer)")
         })?;
 
-        self.current_allocation = Some(new_data_ptr_nonnull);
-        self.current_size.store(new_total_size, Ordering::SeqCst);
-        self.current_pages.store(new_pages as usize, Ordering::SeqCst);
+        self.current_allocation = Some(new_data_ptr_nonnull;
+        self.current_size.store(new_total_size, Ordering::SeqCst;
+        self.current_pages.store(new_pages as usize, Ordering::SeqCst;
 
         // Return data pointer and size
         let data_size = (new_pages as usize).checked_mul(WASM_PAGE_SIZE).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Memory size calculation overflow",
-            )
+            Error::memory_error("Memory size calculation overflow")
         })?;
 
         Ok((new_data_ptr_nonnull, data_size))
@@ -880,26 +813,14 @@ impl PageAllocator for QnxArenaAllocator {
             let data_size = self.current_pages.load(Ordering::SeqCst) * WASM_PAGE_SIZE;
 
             if addr_val < current_addr || addr_val >= current_addr + data_size {
-                return Err(Error::new(
-                    ErrorCategory::Memory,
-                    1,
-                    "Address to protect is outside allocated memory",
-                ));
+                return Err(Error::memory_error("Address to protect is outside allocated memory";
             }
 
             if addr_val + size > current_addr + data_size {
-                return Err(Error::new(
-                    ErrorCategory::Memory,
-                    1,
-                    "Protection region extends beyond allocated memory",
-                ));
+                return Err(Error::memory_error("Protection region extends beyond allocated memory";
             }
         } else {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                1,
-                "No current allocation to protect",
-            ));
+            return Err(Error::memory_error("No current allocation to protect";
         }
 
         // Determine protection flags
@@ -918,11 +839,7 @@ impl PageAllocator for QnxArenaAllocator {
         let result = unsafe { ffi::mprotect(addr.as_ptr() as *mut _, size, prot) };
 
         if result != 0 {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                1,
-                "Failed to apply memory protection",
-            ));
+            return Err(Error::memory_error("Failed to apply memory protection";
         }
 
         Ok(())
@@ -945,16 +862,16 @@ mod tests {
             .with_arena_size(64 * 1024) // 64KB arenas
             .with_guard_pages(true)
             .build()
-            .expect("Failed to create arena allocator");
+            .expect("Failed to create arena allocator"));
 
         // Allocate 2 pages
-        let result = allocator.allocate(2, Some(4));
+        let result = allocator.allocate(2, Some(4;
         assert!(result.is_ok());
 
         // Binary std/no_std choice
         let (ptr, size) = result.unwrap();
-        assert!(!ptr.as_ptr().is_null());
-        assert_eq!(size, 2 * WASM_PAGE_SIZE);
+        assert!(!ptr.as_ptr().is_null();
+        assert_eq!(size, 2 * WASM_PAGE_SIZE;
 
         // Get memory info
         let info = allocator.memory_info().unwrap();
@@ -962,7 +879,7 @@ mod tests {
         println!("Allocated space: {}", info.uordblks);
 
         // Clean up
-        let free_result = allocator.free();
+        let free_result = allocator.free);
         assert!(free_result.is_ok());
     }
 
@@ -974,17 +891,17 @@ mod tests {
             .with_arena_size(32 * 1024) // 32KB arenas
             .with_guard_pages(false) // No guard pages for simpler testing
             .build()
-            .expect("Failed to create arena allocator");
+            .expect("Failed to create arena allocator"));
 
         // Allocate 1 page
-        let result = allocator.allocate(1, Some(4));
+        let result = allocator.allocate(1, Some(4;
         assert!(result.is_ok());
 
         // Write a test pattern to verify data preservation after grow
         let (ptr, _) = result.unwrap();
         let test_pattern = [0xDE, 0xAD, 0xBE, 0xEF];
         unsafe {
-            core::ptr::copy_nonoverlapping(test_pattern.as_ptr(), ptr.as_ptr(), 4);
+            core::ptr::copy_nonoverlapping(test_pattern.as_ptr(), ptr.as_ptr(), 4;
         }
 
         // Grow by 1 page
@@ -993,17 +910,17 @@ mod tests {
 
         // Verify the data was preserved
         let (new_ptr, new_size) = grow_result.unwrap();
-        assert!(!new_ptr.as_ptr().is_null());
-        assert_eq!(new_size, 2 * WASM_PAGE_SIZE);
+        assert!(!new_ptr.as_ptr().is_null();
+        assert_eq!(new_size, 2 * WASM_PAGE_SIZE;
 
         let mut preserved_data = [0u8; 4];
         unsafe {
-            core::ptr::copy_nonoverlapping(new_ptr.as_ptr(), preserved_data.as_mut_ptr(), 4);
+            core::ptr::copy_nonoverlapping(new_ptr.as_ptr(), preserved_data.as_mut_ptr(), 4;
         }
-        assert_eq!(preserved_data, test_pattern);
+        assert_eq!(preserved_data, test_pattern;
 
         // Clean up
-        let free_result = allocator.free();
+        let free_result = allocator.free);
         assert!(free_result.is_ok());
     }
 
@@ -1015,21 +932,21 @@ mod tests {
             .with_guard_pages(true)
             .with_data_protection(QnxProtFlags::ReadWrite)
             .build()
-            .expect("Failed to create arena allocator");
+            .expect("Failed to create arena allocator"));
 
         // Allocate 2 pages
-        let result = allocator.allocate(2, None);
+        let result = allocator.allocate(2, None;
         assert!(result.is_ok());
 
         let (ptr, size) = result.unwrap();
 
         // Change protection on the second page to read-only
         let second_page_ptr = unsafe { NonNull::new_unchecked(ptr.as_ptr().add(WASM_PAGE_SIZE)) };
-        let protect_result = allocator.protect(second_page_ptr, WASM_PAGE_SIZE, true, false, false);
+        let protect_result = allocator.protect(second_page_ptr, WASM_PAGE_SIZE, true, false, false;
         assert!(protect_result.is_ok());
 
         // Clean up
-        let free_result = allocator.free();
+        let free_result = allocator.free);
         assert!(free_result.is_ok());
     }
 
@@ -1044,14 +961,14 @@ mod tests {
             .with_lifo_free(true)
             .with_memory_hold(true)
             .build()
-            .expect("Failed to create arena allocator");
+            .expect("Failed to create arena allocator"));
 
         // Binary std/no_std choice
-        let result1 = allocator.allocate(1, None);
+        let result1 = allocator.allocate(1, None;
         assert!(result1.is_ok());
         allocator.free().unwrap();
 
-        let result2 = allocator.allocate(2, None);
+        let result2 = allocator.allocate(2, None;
         assert!(result2.is_ok());
         allocator.free().unwrap();
 

@@ -1,6 +1,13 @@
 use wrt_foundation::{
-    bounded::{BoundedVec, MAX_DWARF_FILE_TABLE},
-    BoundedCapacity, NoStdProvider,
+    bounded::{
+        BoundedVec,
+        MAX_DWARF_FILE_TABLE,
+    },
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+    safe_memory::NoStdProvider,
+    BoundedCapacity,
+    Result,
 };
 
 /// File table support for resolving file indices to paths
@@ -11,19 +18,24 @@ use crate::strings::DebugString;
 #[derive(Debug, Clone)]
 pub struct FileEntry<'a> {
     /// File path (may be relative or absolute)
-    pub path: DebugString<'a>,
+    pub path:      DebugString<'a>,
     /// Directory index (0 = current directory)
     pub dir_index: u32,
     /// Last modification time (0 = unknown)
-    pub mod_time: u64,
+    pub mod_time:  u64,
     /// File size in bytes (0 = unknown)
-    pub size: u64,
+    pub size:      u64,
 }
 
 // Implement required traits for BoundedVec compatibility
 impl<'a> Default for FileEntry<'a> {
     fn default() -> Self {
-        Self { path: DebugString::default(), dir_index: 0, mod_time: 0, size: 0 }
+        Self {
+            path:      DebugString::default(),
+            dir_index: 0,
+            mod_time:  0,
+            size:      0,
+        }
     }
 }
 
@@ -40,10 +52,10 @@ impl<'a> Eq for FileEntry<'a> {}
 
 impl<'a> wrt_foundation::traits::Checksummable for FileEntry<'a> {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.path.update_checksum(checksum);
-        checksum.update_slice(&self.dir_index.to_le_bytes());
-        checksum.update_slice(&self.mod_time.to_le_bytes());
-        checksum.update_slice(&self.size.to_le_bytes());
+        self.path.update_checksum(checksum;
+        checksum.update_slice(&self.dir_index.to_le_bytes);
+        checksum.update_slice(&self.mod_time.to_le_bytes);
+        checksum.update_slice(&self.size.to_le_bytes);
     }
 }
 
@@ -67,10 +79,10 @@ impl<'a> wrt_foundation::traits::FromBytes for FileEntry<'a> {
         provider: &P,
     ) -> wrt_foundation::Result<Self> {
         Ok(Self {
-            path: DebugString::from_bytes_with_provider(reader, provider)?,
+            path:      DebugString::from_bytes_with_provider(reader, provider)?,
             dir_index: reader.read_u32_le()?,
-            mod_time: reader.read_u64_le()?,
-            size: reader.read_u64_le()?,
+            mod_time:  reader.read_u64_le()?,
+            size:      reader.read_u64_le()?,
         })
     }
 }
@@ -95,26 +107,38 @@ pub struct FileTable<'a> {
 impl<'a> FileTable<'a> {
     /// Create a new empty file table
     pub fn new() -> Self {
-        // BoundedVec::new returns a Result, so we need to handle it
-        let directories =
-            BoundedVec::new(NoStdProvider::<{ MAX_DWARF_FILE_TABLE * 32 }>::default())
-                .expect("Failed to create directories BoundedVec");
-        let files = BoundedVec::new(NoStdProvider::<{ MAX_DWARF_FILE_TABLE * 64 }>::default())
-            .expect("Failed to create files BoundedVec");
-        Self { directories, files }
+        // Create with proper error propagation
+        Self::try_new().expect("Failed to create FileTable")
+    }
+
+    /// Try to create a new FileTable with proper error handling
+    pub fn try_new() -> Result<Self> {
+        let directories = {
+            let provider = safe_managed_alloc!({ MAX_DWARF_FILE_TABLE * 32 }, CrateId::Debug)?;
+            BoundedVec::new(provider)?
+        };
+        let files = {
+            let provider = safe_managed_alloc!({ MAX_DWARF_FILE_TABLE * 64 }, CrateId::Debug)?;
+            BoundedVec::new(provider)?
+        };
+        Ok(Self { directories, files })
     }
 
     /// Add a directory entry
-    pub fn add_directory(&mut self, dir: DebugString<'a>) -> Result<u32, ()> {
+    pub fn add_directory(&mut self, dir: DebugString<'a>) -> Result<u32> {
         let index = self.directories.len() as u32;
-        self.directories.push(dir).map_err(|_| ())?;
+        self.directories
+            .push(dir)
+            .map_err(|_| wrt_error::Error::memory_error("Failed to add directory"))?;
         Ok(index)
     }
 
     /// Add a file entry
-    pub fn add_file(&mut self, file: FileEntry<'a>) -> Result<u32, ()> {
+    pub fn add_file(&mut self, file: FileEntry<'a>) -> Result<u32> {
         let index = self.files.len() as u32;
-        self.files.push(file).map_err(|_| ())?;
+        self.files
+            .push(file)
+            .map_err(|_| wrt_error::Error::memory_error("Failed to add file"))?;
         Ok(index)
     }
 
@@ -141,11 +165,17 @@ impl<'a> FileTable<'a> {
 
         if file.dir_index == 0 {
             // File is relative to compilation directory
-            Some(FilePath { directory: None, filename: file.path })
+            Some(FilePath {
+                directory: None,
+                filename:  file.path,
+            })
         } else {
             // File has explicit directory
             let directory = self.get_directory(file.dir_index)?;
-            Some(FilePath { directory: Some(directory), filename: file.path })
+            Some(FilePath {
+                directory: Some(directory),
+                filename:  file.path,
+            })
         }
     }
 
@@ -166,7 +196,7 @@ pub struct FilePath<'a> {
     /// Directory component (None = relative to compilation directory)
     pub directory: Option<DebugString<'a>>,
     /// Filename component
-    pub filename: DebugString<'a>,
+    pub filename:  DebugString<'a>,
 }
 
 impl<'a> FilePath<'a> {
@@ -205,7 +235,7 @@ mod tests {
     fn test_file_table() {
         // Create mock string data
         let string_data = b"\0src\0lib\0main.rs\0utils.rs\0tests\0";
-        let string_table = StringTable::new(string_data);
+        let string_table = StringTable::new(string_data;
 
         let mut file_table = FileTable::new();
 
@@ -214,59 +244,59 @@ mod tests {
         let lib_dir = string_table.get_string(5).unwrap();
         let tests_dir = string_table.get_string(25).unwrap();
 
-        assert_eq!(file_table.add_directory(src_dir), Ok(1));
-        assert_eq!(file_table.add_directory(lib_dir), Ok(2));
-        assert_eq!(file_table.add_directory(tests_dir), Ok(3));
+        assert_eq!(file_table.add_directory(src_dir), Ok(1;
+        assert_eq!(file_table.add_directory(lib_dir), Ok(2;
+        assert_eq!(file_table.add_directory(tests_dir), Ok(3;
 
         // Add files
         let main_rs = FileEntry {
-            path: string_table.get_string(9).unwrap(),
+            path:      string_table.get_string(9).unwrap(),
             dir_index: 1,
-            mod_time: 0,
-            size: 0,
+            mod_time:  0,
+            size:      0,
         };
 
         let utils_rs = FileEntry {
-            path: string_table.get_string(17).unwrap(),
+            path:      string_table.get_string(17).unwrap(),
             dir_index: 1,
-            mod_time: 0,
-            size: 0,
+            mod_time:  0,
+            size:      0,
         };
 
-        assert_eq!(file_table.add_file(main_rs), Ok(1));
-        assert_eq!(file_table.add_file(utils_rs), Ok(2));
+        assert_eq!(file_table.add_file(main_rs), Ok(1;
+        assert_eq!(file_table.add_file(utils_rs), Ok(2;
 
         // Test retrieval
-        assert_eq!(file_table.file_count(), 2);
-        assert_eq!(file_table.directory_count(), 3);
+        assert_eq!(file_table.file_count(), 2;
+        assert_eq!(file_table.directory_count(), 3;
 
         // Test full path resolution
         let path1 = file_table.get_full_path(1).unwrap();
-        assert_eq!(path1.filename(), "main.rs");
-        assert_eq!(path1.directory.unwrap().as_str(), "src");
+        assert_eq!(path1.filename(), "main.rs";
+        assert_eq!(path1.directory.unwrap().as_str(), "src";
 
         let path2 = file_table.get_full_path(2).unwrap();
-        assert_eq!(path2.filename(), "utils.rs");
-        assert_eq!(path2.directory.unwrap().as_str(), "src");
+        assert_eq!(path2.filename(), "utils.rs";
+        assert_eq!(path2.directory.unwrap().as_str(), "src";
     }
 
     #[test]
     fn test_file_path_display() {
         let string_data = b"\0src\0main.rs\0";
-        let string_table = StringTable::new(string_data);
+        let string_table = StringTable::new(string_data;
 
         let path = FilePath {
             directory: Some(string_table.get_string(1).unwrap()),
-            filename: string_table.get_string(5).unwrap(),
+            filename:  string_table.get_string(5).unwrap(),
         };
 
         let mut output = String::new();
         path.display(|s| {
-            output.push_str(s);
+            output.push_str(s;
             Ok(())
         })
         .unwrap();
 
-        assert_eq!(output, "src/main.rs");
+        assert_eq!(output, "src/main.rs";
     }
 }

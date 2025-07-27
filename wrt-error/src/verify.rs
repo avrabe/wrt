@@ -10,12 +10,22 @@
 #[cfg(any(doc, kani))]
 /// Kani verification proofs for error handling.
 pub mod kani_verification {
+    use core::fmt::{
+        self,
+        Debug,
+        Display,
+    };
     #[cfg(feature = "std")]
     use std::format;
-    use core::fmt::{self, Debug, Display};
 
     // Use crate::Error directly, remove ResultExt if it was here.
-    use crate::{codes, Error, ErrorCategory, ErrorSource, Result}; // Added Error, codes
+    use crate::{
+        codes,
+        Error,
+        ErrorCategory,
+        ErrorSource,
+        Result,
+    }; // Added Error, codes
 
     // A simple test error for verification
     #[derive(Debug, Clone, Copy)] // Made it Copy since it's just a &'static str
@@ -72,9 +82,9 @@ pub mod kani_verification {
         let error_str = format!("{}", error);
         // Example: "[Validation][E270F] verification test" if UNKNOWN is 9999 (0x270F)
         // For now, check for essential parts.
-        assert!(error_str.contains("[Validation]")); // Check category part
-        assert!(error_str.contains(&format!("[E{:04X}]", codes::UNKNOWN))); // Check code part
-        assert!(error_str.contains(" verification test")); // Check message part
+        assert!(error_str.contains("[Validation]"))); // Check category part
+        assert!(error_str.contains(&format!("[E{:04X}]", codes::UNKNOWN)))); // Check code part
+        assert!(error_str.contains(" verification test"))); // Check message part
     }
 
     // Removed verify_error_context and verify_multiple_contexts as ResultExt is
@@ -84,19 +94,19 @@ pub mod kani_verification {
     #[cfg_attr(kani, kani::proof)]
     pub fn verify_factory_methods() {
         // Test a few existing factory methods from errors.rs
-        let core_err = Error::core_error("test core error");
-        assert_eq!(core_err.category, ErrorCategory::Core);
-        assert_eq!(core_err.code, codes::EXECUTION_ERROR);
-        assert_eq!(core_err.message, "test core error");
+        let core_err = Error::core_error("test core error";
+        assert_eq!(core_err.category, ErrorCategory::Core;
+        assert_eq!(core_err.code, codes::EXECUTION_ERROR;
+        assert_eq!(core_err.message, "test core error";
 
-        let type_err = Error::type_error("test type error");
-        assert_eq!(type_err.category, ErrorCategory::Type);
-        assert_eq!(type_err.code, codes::TYPE_MISMATCH_ERROR);
-        assert_eq!(type_err.message, "test type error");
+        let type_err = Error::type_error("test type error";
+        assert_eq!(type_err.category, ErrorCategory::Type;
+        assert_eq!(type_err.code, codes::TYPE_MISMATCH_ERROR;
+        assert_eq!(type_err.message, "test type error";
 
         // Test conversion from a 'kind' error
-        let kind_validation_err = crate::kinds::validation_error("kind validation");
-        let error_from_kind = Error::from(kind_validation_err);
+        let kind_validation_err = crate::kinds::validation_error("kind validation";
+        let error_from_kind = Error::from(kind_validation_err;
         assert_eq!(error_from_kind.category, ErrorCategory::Validation);
         // The From<kinds::ValidationError> for Error impl uses codes::VALIDATION_ERROR
         assert_eq!(error_from_kind.code, codes::VALIDATION_ERROR);

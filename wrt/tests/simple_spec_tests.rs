@@ -1,9 +1,18 @@
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::{
+        Path,
+        PathBuf,
+    },
 };
 
-use wrt::{Error as WrtError, Module, Result, StacklessEngine, Value};
+use wrt::{
+    Error as WrtError,
+    Module,
+    Result,
+    StacklessEngine,
+    Value,
+};
 
 #[test]
 fn test_i32_add() -> Result<()> {
@@ -57,7 +66,7 @@ fn test_i32_add() -> Result<()> {
         (vec![Value::I32(-1), Value::I32(1)], vec![Value::I32(0)]),
     ];
 
-    println!("Running simple add test");
+    println!("Running simple add test"));
 
     for (idx, (inputs, expected)) in test_cases.iter().enumerate() {
         let result = engine.execute(0usize, 0, inputs.clone())?;
@@ -102,7 +111,7 @@ fn test_i32_add() -> Result<()> {
         }
     }
 
-    println!("All tests passed!");
+    println!("All tests passed!"));
     Ok(())
 }
 
@@ -125,7 +134,7 @@ fn test_simple_memory() -> Result<()> {
     )"#;
 
     // Convert WAT to binary WebAssembly
-    let wasm = wat::parse_str(wat).expect("Failed to parse WAT");
+    let wasm = wat::parse_str(wat).expect("Failed to parse WAT"));
 
     // Load the module from binary
     let mut empty_module = Module::new()?;
@@ -137,7 +146,7 @@ fn test_simple_memory() -> Result<()> {
     // Instantiate the module
     engine.instantiate(module)?;
 
-    println!("Running simple memory test");
+    println!("Running simple memory test"));
 
     // Test store/load with a few different values
     let test_values = [42, -10, 0x12345678, -1i32];
@@ -150,14 +159,14 @@ fn test_simple_memory() -> Result<()> {
         let result = engine.execute(0usize, 1, vec![Value::I32(0)])?;
 
         if result == vec![Value::I32(*value)] {
-            println!("✅ Test case {}: Store and load {}", idx, value);
+            println!("✅ Test case {}: Store and load {}", idx, value));
         } else {
-            println!("❌ Test case {}: Store {}, got {:?}", idx, value, result);
+            println!("❌ Test case {}: Store {}, got {:?}", idx, value, result));
             return Err(WrtError::Custom(format!("Test case {} failed", idx)));
         }
     }
 
-    println!("All memory tests passed!");
+    println!("All memory tests passed!"));
     Ok(())
 }
 
@@ -169,7 +178,10 @@ fn run_test_case(wasm_path: &Path) -> Result<()> {
     let _instance_idx = engine.instantiate(module)?;
 
     // TODO: Add actual test logic here to invoke functions and check results
-    println!("Successfully loaded and instantiated {:?}, but no tests run.", wasm_path);
+    println!(
+        "Successfully loaded and instantiated {:?}, but no tests run.",
+        wasm_path
+    );
 
     Ok(())
 }
@@ -191,7 +203,7 @@ fn test_simple_add() -> Result<()> {
     let mut engine = StacklessEngine::new(module);
 
     // TODO: Add execution logic here
-    println!("Successfully loaded and instantiated simple_add module, but no tests run.");
+    println!("Successfully loaded and instantiated simple_add module, but no tests run."));
 
     Ok(())
 }
@@ -199,18 +211,18 @@ fn test_simple_add() -> Result<()> {
 #[allow(dead_code)] // This test runner is not fully implemented yet
 fn test_run_all_spec_tests() -> Result<()> {
     let testsuite_path = PathBuf::from("./testsuite");
-    println!("Running spec tests from: {:?}", testsuite_path);
+    println!("Running spec tests from: {:?}", testsuite_path));
 
     if !testsuite_path.exists() {
-        println!("Test suite directory not found, skipping spec tests.");
-        return Ok(());
+        println!("Test suite directory not found, skipping spec tests."));
+        return Ok();
     }
 
     for entry in fs::read_dir(testsuite_path).map_err(|e| WrtError::IO(e.to_string()))? {
         let entry = entry.map_err(|e| WrtError::IO(e.to_string()))?;
         let path = entry.path();
         if path.is_file() && path.extension().map_or(false, |ext| ext == "wast") {
-            println!("Running test: {:?}", path);
+            println!("Running test: {:?}", path));
             // TODO: Implement wast parsing and execution logic here
             // For now, just print the file path
             run_test_case(&path)?;

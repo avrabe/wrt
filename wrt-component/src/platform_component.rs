@@ -1,5 +1,5 @@
 // Platform-aware Component Runtime Implementation
-// This is Agent C's implementation of the platform component runtime
+// This is the implementation of the platform component runtime
 
 use crate::foundation_stubs::{SmallVec, MediumVec, SafetyContext, AsilLevel};
 use crate::platform_stubs::{ComprehensivePlatformLimits, PlatformId};
@@ -38,14 +38,14 @@ pub struct ComponentMetadata {
 impl ComponentInstance {
     pub fn new(requirements: ComponentRequirements, limits: &ComprehensivePlatformLimits) -> Result<Self> {
         if requirements.memory_usage > limits.max_wasm_linear_memory {
-            return Err(Error::InsufficientMemory);
+            return Err(Error::InsufficientMemory;
         }
         
-        static NEXT_COMPONENT_ID: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(1);
-        static NEXT_INSTANCE_ID: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(1);
+        static NEXT_COMPONENT_ID: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(1;
+        static NEXT_INSTANCE_ID: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(1;
         
-        let component_id = ComponentId(NEXT_COMPONENT_ID.fetch_add(1, core::sync::atomic::Ordering::SeqCst));
-        let instance_id = InstanceId(NEXT_INSTANCE_ID.fetch_add(1, core::sync::atomic::Ordering::SeqCst));
+        let component_id = ComponentId(NEXT_COMPONENT_ID.fetch_add(1, core::sync::atomic::Ordering::SeqCst;
+        let instance_id = InstanceId(NEXT_INSTANCE_ID.fetch_add(1, core::sync::atomic::Ordering::SeqCst;
         
         Ok(Self {
             id: component_id,
@@ -157,7 +157,7 @@ impl ComponentMemoryBudget {
         let total_memory = limits.max_total_memory;
         let component_overhead = total_memory / 20; // 5% overhead
         let reserved_memory = total_memory / 10; // 10% reserved
-        let available_memory = total_memory.saturating_sub(component_overhead + reserved_memory);
+        let available_memory = total_memory.saturating_sub(component_overhead + reserved_memory;
         
         Ok(Self {
             total_memory,
@@ -170,7 +170,7 @@ impl ComponentMemoryBudget {
     
     pub fn allocate(&mut self, component_id: ComponentId, size: usize, allocation_type: AllocationType) -> Result<()> {
         if size > self.available_memory {
-            return Err(Error::InsufficientMemory);
+            return Err(Error::InsufficientMemory;
         }
         
         self.allocations.push(MemoryAllocation {
@@ -179,7 +179,7 @@ impl ComponentMemoryBudget {
             allocation_type,
         }).map_err(|_| Error::OUT_OF_MEMORY)?;
         
-        self.available_memory = self.available_memory.saturating_sub(size);
+        self.available_memory = self.available_memory.saturating_sub(size;
         Ok(())
     }
     
@@ -191,7 +191,7 @@ impl ComponentMemoryBudget {
         while i < self.allocations.len() {
             if self.allocations[i].component_id == component_id {
                 freed_memory += self.allocations[i].size;
-                self.allocations.remove(i);
+                self.allocations.remove(i;
             } else {
                 i += 1;
             }
@@ -214,7 +214,7 @@ pub struct PlatformComponentRuntime {
 impl PlatformComponentRuntime {
     pub fn new(limits: ComprehensivePlatformLimits) -> Result<Self> {
         let memory_budget = ComponentMemoryBudget::calculate(&limits)?;
-        let safety_context = SafetyContext::new(limits.asil_level);
+        let safety_context = SafetyContext::new(limits.asil_level;
         
         Ok(Self {
             limits,
@@ -244,7 +244,7 @@ impl PlatformComponentRuntime {
     pub fn analyze_component_requirements(&self, component_bytes: &[u8]) -> Result<ComponentRequirements> {
         // Stub implementation - real implementation would parse the component
         if component_bytes.is_empty() {
-            return Err(Error::invalid_input("Invalid input"));
+            return Err(Error::invalid_input("Error occurred";
         }
         
         // Basic analysis stub
@@ -263,19 +263,19 @@ impl PlatformComponentRuntime {
     pub fn instantiate_component(&mut self, component_bytes: &[u8]) -> Result<ComponentId> {
         // Check component limit
         if self.instances.len() >= self.limits.max_components {
-            return Err(Error::TOO_MANY_COMPONENTS);
+            return Err(Error::TOO_MANY_COMPONENTS;
         }
         
         // Validate component against platform limits
         let requirements = self.analyze_component_requirements(component_bytes)?;
         
         if requirements.memory_usage > self.memory_budget.available_memory {
-            return Err(Error::InsufficientMemory);
+            return Err(Error::InsufficientMemory;
         }
         
         // Create component instance with bounded resources
         let instance = ComponentInstance::new(requirements.clone(), &self.limits)?;
-        let component_id = instance.id();
+        let component_id = instance.id);
         
         // Reserve memory for this component
         self.memory_budget.allocate(
@@ -296,14 +296,14 @@ impl PlatformComponentRuntime {
         let mut found = false;
         for i in 0..self.instances.len() {
             if self.instances[i].id() == component_id {
-                self.instances.remove(i);
+                self.instances.remove(i;
                 found = true;
                 break;
             }
         }
         
         if !found {
-            return Err(Error::COMPONENT_NOT_FOUND);
+            return Err(Error::COMPONENT_NOT_FOUND;
         }
         
         // Free the component's memory
@@ -328,9 +328,9 @@ impl PlatformComponentRuntime {
             component_id,
             instance.instance_id(),
             self.safety_context.clone(),
-        );
+        ;
         
-        self.execution_context = Some(context.clone());
+        self.execution_context = Some(context.clone();
         Ok(context)
     }
     
@@ -340,7 +340,7 @@ impl PlatformComponentRuntime {
         
         // Validate ASIL level compatibility
         let component_asil = instance.metadata().safety_level;
-        let runtime_asil = self.safety_context.effective_asil();
+        let runtime_asil = self.safety_context.effective_asil);
         
         // Component can run if its ASIL level is <= runtime ASIL level
         Ok(component_asil as u8 <= runtime_asil as u8)
@@ -349,7 +349,7 @@ impl PlatformComponentRuntime {
     pub fn get_runtime_statistics(&self) -> RuntimeStatistics {
         let total_memory_used = self.memory_budget.allocations.iter()
             .map(|alloc| alloc.size)
-            .sum();
+            .sum);
         
         RuntimeStatistics {
             active_components: self.instances.len(),
@@ -384,7 +384,7 @@ pub trait ComponentResultExt<T> {
 impl<T> ComponentResultExt<T> for Result<T> {
     fn with_component_context(self, component_id: ComponentId) -> Result<T> {
         self.map_err(|e| {
-            Error::new(wrt_error::ErrorCategory::Component, wrt_error::codes::COMPONENT_INSTANTIATION_ERROR, "Component context error")
+            wrt_error::Error::component_instantiation_error("Error occurred")
         })
     }
 }
@@ -395,7 +395,7 @@ mod tests {
     
     #[test]
     fn test_component_runtime_creation() {
-        let limits = ComprehensivePlatformLimits::default();
+        let limits = ComprehensivePlatformLimits::default());
         let runtime = PlatformComponentRuntime::new(limits).unwrap();
         
         assert_eq!(runtime.instance_count(), 0);
@@ -404,19 +404,19 @@ mod tests {
     
     #[test]
     fn test_component_instantiation() {
-        let limits = ComprehensivePlatformLimits::default();
+        let limits = ComprehensivePlatformLimits::default());
         let mut runtime = PlatformComponentRuntime::new(limits).unwrap();
         
         let component_bytes = b"fake component";
         let component_id = runtime.instantiate_component(component_bytes).unwrap();
         
         assert_eq!(runtime.instance_count(), 1);
-        assert!(runtime.get_component(component_id).is_some());
+        assert!(runtime.get_component(component_id).is_some();
     }
     
     #[test]
     fn test_memory_budget_allocation() {
-        let limits = ComprehensivePlatformLimits::default();
+        let limits = ComprehensivePlatformLimits::default());
         let mut budget = ComponentMemoryBudget::calculate(&limits).unwrap();
         
         let initial_available = budget.available_memory;
@@ -424,13 +424,13 @@ mod tests {
         
         budget.allocate(ComponentId(1), allocation_size, AllocationType::LinearMemory).unwrap();
         
-        assert_eq!(budget.available_memory, initial_available - allocation_size);
+        assert_eq!(budget.available_memory, initial_available - allocation_size;
         assert_eq!(budget.allocations.len(), 1);
     }
     
     #[test]
     fn test_component_termination() {
-        let limits = ComprehensivePlatformLimits::default();
+        let limits = ComprehensivePlatformLimits::default());
         let mut runtime = PlatformComponentRuntime::new(limits).unwrap();
         
         let component_bytes = b"fake component";
@@ -441,6 +441,6 @@ mod tests {
         runtime.terminate_component(component_id).unwrap();
         
         assert_eq!(runtime.instance_count(), 0);
-        assert!(runtime.get_component(component_id).is_none());
+        assert!(runtime.get_component(component_id).is_none();
     }
 }

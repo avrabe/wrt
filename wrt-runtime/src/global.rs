@@ -3,19 +3,19 @@
 //! This module provides the implementation for WebAssembly globals.
 
 // Use WrtGlobalType directly from wrt_foundation, and WrtValueType, WrtValue
-extern crate alloc;
+// alloc is imported in lib.rs with proper feature gates
 
 use wrt_foundation::{
     types::{GlobalType as WrtGlobalType, ValueType as WrtValueType},
     values::Value as WrtValue,
 };
 
-use crate::prelude::{Debug, Eq, Error, ErrorCategory, PartialEq, Result, codes};
+use crate::prelude::{Debug, Eq, Error, ErrorCategory, PartialEq, Result};
 
 // Import format! macro for string formatting
 #[cfg(feature = "std")]
 use std::format;
-#[cfg(not(feature = "std"))]
+#[cfg(all(feature = "alloc", not(feature = "std")))]
 use alloc::format;
 
 /// Represents a WebAssembly global variable in the runtime
@@ -56,19 +56,11 @@ impl Global {
     /// mismatches.
     pub fn set(&mut self, new_value: &WrtValue) -> Result<()> {
         if !self.ty.mutable {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::VALIDATION_GLOBAL_TYPE_MISMATCH, // Attempting to modify immutable global
-                "Cannot modify immutable global",
-            ));
+            return Err(Error::runtime_execution_error("Cannot set immutable global variable";
         }
 
         if !new_value.matches_type(&self.ty.value_type) {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                codes::TYPE_MISMATCH,
-                "Value type doesn't match global type",
-            ));
+            return Err(Error::type_error("Value type does not match global variable type";
         }
 
         self.value = new_value.clone();
@@ -86,7 +78,10 @@ impl Default for Global {
     fn default() -> Self {
         use wrt_foundation::types::{GlobalType, ValueType};
         use wrt_foundation::values::Value;
-        Self::new(ValueType::I32, false, Value::I32(0)).unwrap()
+        Self::new(ValueType::I32, false, Value::I32(0)).unwrap_or_else(|e| {
+            // If we can't create default global, panic as this is a critical failure
+            panic!("Critical: Unable to create default global: {}", e)
+        })
     }
 }
 
@@ -107,8 +102,8 @@ fn value_type_to_u8(value_type: &WrtValueType) -> u8 {
 
 impl wrt_foundation::traits::Checksummable for Global {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        checksum.update_slice(&value_type_to_u8(&self.ty.value_type).to_le_bytes());
-        checksum.update_slice(&[u8::from(self.ty.mutable)]);
+        checksum.update_slice(&value_type_to_u8(&self.ty.value_type).to_le_bytes);
+        checksum.update_slice(&[u8::from(self.ty.mutable)];
     }
 }
 

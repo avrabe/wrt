@@ -58,11 +58,11 @@ pub fn string_byte_length(s: &str, encoding: StringEncoding) -> usize {
 
 /// Encode to UTF-16 Little Endian
 fn encode_utf16_le(s: &str) -> Result<Vec<u8>> {
-    let mut bytes = Vec::new();
+    let mut bytes = Vec::new());
 
     for code_unit in s.encode_utf16() {
-        bytes.push((code_unit & 0xFF) as u8);
-        bytes.push((code_unit >> 8) as u8);
+        bytes.push((code_unit & 0xFF) as u8;
+        bytes.push((code_unit >> 8) as u8;
     }
 
     Ok(bytes)
@@ -70,11 +70,11 @@ fn encode_utf16_le(s: &str) -> Result<Vec<u8>> {
 
 /// Encode to UTF-16 Big Endian
 fn encode_utf16_be(s: &str) -> Result<Vec<u8>> {
-    let mut bytes = Vec::new();
+    let mut bytes = Vec::new());
 
     for code_unit in s.encode_utf16() {
-        bytes.push((code_unit >> 8) as u8);
-        bytes.push((code_unit & 0xFF) as u8);
+        bytes.push((code_unit >> 8) as u8;
+        bytes.push((code_unit & 0xFF) as u8;
     }
 
     Ok(bytes)
@@ -82,16 +82,12 @@ fn encode_utf16_be(s: &str) -> Result<Vec<u8>> {
 
 /// Encode to Latin-1 (ISO-8859-1)
 fn encode_latin1(s: &str) -> Result<Vec<u8>> {
-    let mut bytes = Vec::new();
+    let mut bytes = Vec::new());
 
     for c in s.chars() {
         let code_point = c as u32;
         if code_point > 0xFF {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                "Component not found",
-            ));
+            return Err(Error::component_not_found("Error occurred";
         }
         bytes.push(code_point as u8);
     }
@@ -102,56 +98,48 @@ fn encode_latin1(s: &str) -> Result<Vec<u8>> {
 /// Decode from UTF-8
 fn decode_utf8(bytes: &[u8]) -> Result<String> {
     core::str::from_utf8(bytes).map(|s| s.to_string()).map_err(|e| {
-        Error::new(ErrorCategory::Runtime, codes::INVALID_TYPE, "Component not found")
+        Error::component_not_found("Error occurred")
     })
 }
 
 /// Decode from UTF-16 Little Endian
 fn decode_utf16_le(bytes: &[u8]) -> Result<String> {
     if bytes.len() % 2 != 0 {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::INVALID_TYPE,
-            "UTF-16 byte sequence must have even length",
-        ));
+        return Err(Error::runtime_execution_error("Error occurred";
     }
 
-    let mut code_units = Vec::new();
+    let mut code_units = Vec::new());
     for chunk in bytes.chunks_exact(2) {
-        let code_unit = u16::from_le_bytes([chunk[0], chunk[1]]);
+        let code_unit = u16::from_le_bytes([chunk[0], chunk[1]];
         code_units.push(code_unit);
     }
 
     String::from_utf16(&code_units).map_err(|e| {
-        Error::new(ErrorCategory::Runtime, codes::INVALID_TYPE, "Component not found")
+        Error::component_not_found("Unknown string encoding")
     })
 }
 
 /// Decode from UTF-16 Big Endian
 fn decode_utf16_be(bytes: &[u8]) -> Result<String> {
     if bytes.len() % 2 != 0 {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::INVALID_TYPE,
-            "UTF-16 byte sequence must have even length",
-        ));
+        return Err(Error::runtime_execution_error("Error occurred";
     }
 
-    let mut code_units = Vec::new();
+    let mut code_units = Vec::new());
     for chunk in bytes.chunks_exact(2) {
-        let code_unit = u16::from_be_bytes([chunk[0], chunk[1]]);
+        let code_unit = u16::from_be_bytes([chunk[0], chunk[1]];
         code_units.push(code_unit);
     }
 
     String::from_utf16(&code_units).map_err(|e| {
-        Error::new(ErrorCategory::Runtime, codes::INVALID_TYPE, "Component not found")
+        Error::component_not_found("Unknown string encoding")
     })
 }
 
 /// Decode from Latin-1 (ISO-8859-1)
 fn decode_latin1(bytes: &[u8]) -> Result<String> {
     // Latin-1 is a direct mapping from bytes to Unicode code points 0x00-0xFF
-    let chars: Vec<char> = bytes.iter().map(|&b| b as char).collect();
+    let chars: Vec<char> = bytes.iter().map(|&b| b as char).collect());
     Ok(chars.into_iter().collect())
 }
 
@@ -173,7 +161,7 @@ impl StringTranscoder {
     pub fn transcode(&self, input: &[u8]) -> Result<Vec<u8>> {
         if self.source_encoding == self.target_encoding {
             // No transcoding needed
-            return Ok(input.to_vec());
+            return Ok(input.to_vec);
         }
 
         // First decode from source encoding
@@ -240,11 +228,7 @@ pub fn lift_string_with_options(
 ) -> Result<String> {
     // Check bounds for length prefix
     if addr as usize + 4 > memory.len() {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::OUT_OF_BOUNDS_ERROR,
-            "String length prefix out of bounds",
-        ));
+        return Err(Error::runtime_out_of_bounds("Error occurred";
     }
 
     // Read length prefix
@@ -255,22 +239,14 @@ pub fn lift_string_with_options(
     // Check length limit
     if let Some(max_len) = options.max_length {
         if length > max_len {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                "Component not found",
-            ));
+            return Err(Error::component_not_found("Error occurred";
         }
     }
 
     // Check bounds for string data
     let data_start = addr as usize + 4;
     if data_start + length > memory.len() {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::OUT_OF_BOUNDS_ERROR,
-            "String data out of bounds",
-        ));
+        return Err(Error::runtime_out_of_bounds("Error occurred";
     }
 
     // Extract string bytes
@@ -305,30 +281,23 @@ pub fn lower_string_with_options(
     // Check length limit
     if let Some(max_len) = options.max_length {
         if encoded.len() > max_len {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                &format!("String too long: {} > {}", encoded.len(), max_len)
-            ));
+            return Err(Error::runtime_execution_error("Error occurred", encoded.len(), max_len)
+            ;
         }
     }
 
     // Check bounds
-    let total_size = 4 + encoded.len();
+    let total_size = 4 + encoded.len);
     if addr as usize + total_size > memory.len() {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::OUT_OF_BOUNDS_ERROR,
-            "Not enough memory for string",
-        ));
+        return Err(Error::runtime_out_of_bounds("String data exceeds memory bounds";
     }
 
     // Write length prefix
-    let len_bytes = (encoded.len() as u32).to_le_bytes();
-    memory[addr as usize..addr as usize + 4].copy_from_slice(&len_bytes);
+    let len_bytes = (encoded.len() as u32).to_le_bytes);
+    memory[addr as usize..addr as usize + 4].copy_from_slice(&len_bytes;
 
     // Write string data
-    memory[addr as usize + 4..addr as usize + 4 + encoded.len()].copy_from_slice(&encoded);
+    memory[addr as usize + 4..addr as usize + 4 + encoded.len()].copy_from_slice(&encoded;
 
     Ok(())
 }
@@ -338,11 +307,7 @@ fn validate_string(s: &str) -> Result<()> {
     // Check for isolated surrogates (not allowed in Component Model)
     for ch in s.chars() {
         if (0xD800..=0xDFFF).contains(&(ch as u32)) {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                "String contains isolated surrogate",
-            ));
+            return Err(Error::runtime_execution_error("Error occurred";
         }
     }
 
@@ -355,10 +320,10 @@ mod tests {
 
     #[test]
     fn test_utf8_encoding() {
-        let text = "Hello, 世界!";
+        let text = "Hello, world!";
         let encoded = encode_string(text, StringEncoding::Utf8).unwrap();
         let decoded = decode_string(&encoded, StringEncoding::Utf8).unwrap();
-        assert_eq!(text, decoded);
+        assert_eq!(text, decoded;
     }
 
     #[test]
@@ -366,7 +331,7 @@ mod tests {
         let text = "Hello, 世界!";
         let encoded = encode_string(text, StringEncoding::Utf16Le).unwrap();
         let decoded = decode_string(&encoded, StringEncoding::Utf16Le).unwrap();
-        assert_eq!(text, decoded);
+        assert_eq!(text, decoded;
     }
 
     #[test]
@@ -374,7 +339,7 @@ mod tests {
         let text = "Hello, 世界!";
         let encoded = encode_string(text, StringEncoding::Utf16Be).unwrap();
         let decoded = decode_string(&encoded, StringEncoding::Utf16Be).unwrap();
-        assert_eq!(text, decoded);
+        assert_eq!(text, decoded;
     }
 
     #[test]
@@ -382,44 +347,44 @@ mod tests {
         let text = "Hello, World!"; // ASCII subset
         let encoded = encode_string(text, StringEncoding::Latin1).unwrap();
         let decoded = decode_string(&encoded, StringEncoding::Latin1).unwrap();
-        assert_eq!(text, decoded);
+        assert_eq!(text, decoded;
 
         // Test extended Latin-1 characters
         let text = "Café résumé";
         let encoded = encode_string(text, StringEncoding::Latin1).unwrap();
         let decoded = decode_string(&encoded, StringEncoding::Latin1).unwrap();
-        assert_eq!(text, decoded);
+        assert_eq!(text, decoded;
     }
 
     #[test]
     fn test_latin1_encoding_error() {
         let text = "Hello, 世界!"; // Contains non-Latin-1 characters
-        let result = encode_string(text, StringEncoding::Latin1);
-        assert!(result.is_err());
+        let result = encode_string(text, StringEncoding::Latin1;
+        assert!(result.is_err();
     }
 
     #[test]
     fn test_transcoder() {
         let text = "Hello, World!";
-        let utf8_bytes = text.as_bytes();
+        let utf8_bytes = text.as_bytes);
 
         // UTF-8 to UTF-16LE
-        let transcoder = StringTranscoder::new(StringEncoding::Utf8, StringEncoding::Utf16Le);
+        let transcoder = StringTranscoder::new(StringEncoding::Utf8, StringEncoding::Utf16Le;
         let utf16_bytes = transcoder.transcode(utf8_bytes).unwrap();
 
         // UTF-16LE back to UTF-8
-        let transcoder = StringTranscoder::new(StringEncoding::Utf16Le, StringEncoding::Utf8);
+        let transcoder = StringTranscoder::new(StringEncoding::Utf16Le, StringEncoding::Utf8;
         let result_bytes = transcoder.transcode(&utf16_bytes).unwrap();
 
-        assert_eq!(utf8_bytes, &result_bytes[..]);
+        assert_eq!(utf8_bytes, &result_bytes[..];
     }
 
     #[test]
     fn test_string_byte_length() {
         let text = "Hello";
-        assert_eq!(string_byte_length(text, StringEncoding::Utf8), 5);
-        assert_eq!(string_byte_length(text, StringEncoding::Utf16Le), 10);
-        assert_eq!(string_byte_length(text, StringEncoding::Latin1), 5);
+        assert_eq!(string_byte_length(text, StringEncoding::Utf8), 5;
+        assert_eq!(string_byte_length(text, StringEncoding::Utf16Le), 10;
+        assert_eq!(string_byte_length(text, StringEncoding::Latin1), 5;
 
         let text = "世界";
         assert_eq!(string_byte_length(text, StringEncoding::Utf8), 6); // 3 bytes per char

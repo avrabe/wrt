@@ -1,4 +1,9 @@
-use wrt::{Error, ExportKind, Module, Result};
+use wrt::{
+    Error,
+    ExportKind,
+    Module,
+    Result,
+};
 
 #[test]
 fn test_memory_persistence() -> Result<()> {
@@ -19,10 +24,10 @@ fn test_memory_persistence() -> Result<()> {
     "#;
 
     // Convert WAT to binary WebAssembly
-    let wasm = wat::parse_str(wat).expect("Failed to parse WAT");
+    let wasm = wat::parse_str(wat).expect("Failed to parse WAT"));
 
     // Load the module
-    let module = Module::from_bytes(&wasm).expect("Failed to parse WASM");
+    let module = Module::from_bytes(&wasm).expect("Failed to parse WASM"));
 
     // Create a new engine with the StacklessEngine
     // This uses the correct implementation that initializes memory properly
@@ -50,7 +55,7 @@ fn test_memory_persistence() -> Result<()> {
 
     // Now load the value (should be 42)
     let results = engine.execute(instance_idx, load_fn_idx.try_into().unwrap(), vec![])?;
-    println!("Load results: {:?}", results);
+    println!("Load results: {:?}", results));
 
     assert_eq!(results[0].as_i32().unwrap_or(-1), 42);
 
@@ -76,10 +81,10 @@ fn test_memory_in_single_function() -> Result<()> {
     "#;
 
     // Convert WAT to binary WebAssembly
-    let wasm = wat::parse_str(wat).expect("Failed to parse WAT");
+    let wasm = wat::parse_str(wat).expect("Failed to parse WAT"));
 
     // Load the module
-    let module = Module::from_bytes(&wasm).expect("Failed to parse WASM");
+    let module = Module::from_bytes(&wasm).expect("Failed to parse WASM"));
 
     // Create a new engine with the StacklessEngine
     // This uses the correct implementation that initializes memory properly
@@ -104,11 +109,11 @@ fn test_memory_in_single_function() -> Result<()> {
 
     // Store 42 at address 100
     let store_results = engine.execute(instance_idx, store_fn_idx.try_into().unwrap(), vec![])?;
-    println!("Store results: {:?}", store_results);
+    println!("Store results: {:?}", store_results));
 
     // Load value from address 100 (should be 42)
     let load_results = engine.execute(instance_idx, load_fn_idx.try_into().unwrap(), vec![])?;
-    println!("Load results: {:?}", load_results);
+    println!("Load results: {:?}", load_results));
 
     assert_eq!(load_results[0].as_i32().unwrap_or(-1), 42);
 
@@ -134,10 +139,10 @@ fn test_memory_single_function_combined() -> Result<()> {
     "#;
 
     // Convert WAT to binary WebAssembly
-    let wasm = wat::parse_str(wat).expect("Failed to parse WAT");
+    let wasm = wat::parse_str(wat).expect("Failed to parse WAT"));
 
     // Load the module
-    let module = Module::from_bytes(&wasm).expect("Failed to parse WASM");
+    let module = Module::from_bytes(&wasm).expect("Failed to parse WASM"));
 
     // Create a new engine with the StacklessEngine
     let mut engine = wrt::new_stackless_engine();
@@ -153,7 +158,7 @@ fn test_memory_single_function_combined() -> Result<()> {
 
     // Call the combined function
     let results = engine.execute(instance_idx, func_idx.try_into().unwrap(), vec![])?;
-    println!("Store and load results: {:?}", results);
+    println!("Store and load results: {:?}", results));
 
     // This should work since it's within a single function
     assert_eq!(results[0].as_i32().unwrap_or(-1), 42);

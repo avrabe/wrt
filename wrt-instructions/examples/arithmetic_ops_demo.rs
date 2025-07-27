@@ -65,7 +65,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   15 + 7 = {}", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Subtract
     context.push_arithmetic_value(Value::I32(15))?;
@@ -74,7 +74,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   15 - 7 = {}", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Multiply
     context.push_arithmetic_value(Value::I32(15))?;
@@ -83,7 +83,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   15 * 7 = {}", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Divide (signed)
     context.push_arithmetic_value(Value::I32(15))?;
@@ -92,7 +92,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   15 / 7 = {} (signed)", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 2. Bitwise operations
     println!("\n2. Bitwise Operations (i32):");
@@ -104,7 +104,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   10 & 12 = {} (0b{:04b})", result, result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     context.push_arithmetic_value(Value::I32(0b1010))?;
     context.push_arithmetic_value(Value::I32(0b1100))?;
@@ -112,7 +112,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   10 | 12 = {} (0b{:04b})", result, result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     context.push_arithmetic_value(Value::I32(0b1010))?;
     context.push_arithmetic_value(Value::I32(0b1100))?;
@@ -120,7 +120,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   10 ^ 12 = {} (0b{:04b})", result, result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 3. Bit counting operations  
     println!("\n3. Bit Counting Operations:");
@@ -132,7 +132,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   Count leading zeros: {}", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Count trailing zeros
     context.push_arithmetic_value(Value::I32(0b00001000_00000000_00000000_00000000))?;  
@@ -141,7 +141,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   Count trailing zeros: {}", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Population count (count set bits)
     context.push_arithmetic_value(Value::I32(0b01010101_01010101_01010101_01010101))?;  
@@ -150,7 +150,7 @@ fn main() -> Result<()> {
     if let Some(Value::I32(result)) = context.peek() {
         println!("   Population count (set bits): {}", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 4. Float arithmetic (f32)
     println!("\n4. Float Arithmetic (f32):");
@@ -160,17 +160,17 @@ fn main() -> Result<()> {
     
     ArithmeticOp::F32Add.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   3.14 + 2.71 = {}", result.value());
+        println!("   3.14 + 2.71 = {}", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     context.push_arithmetic_value(Value::F32(FloatBits32::from_float(10.0)))?;
     context.push_arithmetic_value(Value::F32(FloatBits32::from_float(3.0)))?;
     ArithmeticOp::F32Div.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   10.0 / 3.0 = {}", result.value());
+        println!("   10.0 / 3.0 = {}", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 5. Float math operations
     println!("\n5. Float Math Operations:");
@@ -180,54 +180,54 @@ fn main() -> Result<()> {
     println!("   Input: 16.0");
     ArithmeticOp::F32Sqrt.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   sqrt(16.0) = {}", result.value());
+        println!("   sqrt(16.0) = {}", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Absolute value
     context.push_arithmetic_value(Value::F32(FloatBits32::from_float(-42.5)))?;
     println!("   Input: -42.5");
     ArithmeticOp::F32Abs.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   abs(-42.5) = {}", result.value());
+        println!("   abs(-42.5) = {}", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Ceiling
     context.push_arithmetic_value(Value::F32(FloatBits32::from_float(2.3)))?;
     println!("   Input: 2.3");
     ArithmeticOp::F32Ceil.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   ceil(2.3) = {}", result.value());
+        println!("   ceil(2.3) = {}", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Floor
     context.push_arithmetic_value(Value::F32(FloatBits32::from_float(2.8)))?;
     println!("   Input: 2.8");
     ArithmeticOp::F32Floor.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   floor(2.8) = {}", result.value());
+        println!("   floor(2.8) = {}", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Truncate
     context.push_arithmetic_value(Value::F32(FloatBits32::from_float(-2.8)))?;
     println!("   Input: -2.8");
     ArithmeticOp::F32Trunc.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   trunc(-2.8) = {} (towards zero)", result.value());
+        println!("   trunc(-2.8) = {} (towards zero)", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Nearest (round to even)
     context.push_arithmetic_value(Value::F32(FloatBits32::from_float(2.5)))?;
     println!("   Input: 2.5");
     ArithmeticOp::F32Nearest.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   nearest(2.5) = {} (round to even)", result.value());
+        println!("   nearest(2.5) = {} (round to even)", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 6. Min/Max operations
     println!("\n6. Min/Max Operations:");
@@ -237,17 +237,17 @@ fn main() -> Result<()> {
     
     ArithmeticOp::F32Min.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   min(5.7, 3.2) = {}", result.value());
+        println!("   min(5.7, 3.2) = {}", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     context.push_arithmetic_value(Value::F32(FloatBits32::from_float(5.7)))?;
     context.push_arithmetic_value(Value::F32(FloatBits32::from_float(3.2)))?;
     ArithmeticOp::F32Max.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   max(5.7, 3.2) = {}", result.value());
+        println!("   max(5.7, 3.2) = {}", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 7. Sign operations
     println!("\n7. Sign Operations:");
@@ -257,9 +257,9 @@ fn main() -> Result<()> {
     println!("   Input: 42.0");
     ArithmeticOp::F32Neg.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   neg(42.0) = {}", result.value());
+        println!("   neg(42.0) = {}", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // Copy sign
     context.push_arithmetic_value(Value::F32(FloatBits32::from_float(42.0)))?;
@@ -267,9 +267,9 @@ fn main() -> Result<()> {
     println!("   Input: 42.0, -1.0");
     ArithmeticOp::F32Copysign.execute(&mut context)?;
     if let Some(Value::F32(result)) = context.peek() {
-        println!("   copysign(42.0, -1.0) = {} (42.0 with sign of -1.0)", result.value());
+        println!("   copysign(42.0, -1.0) = {} (42.0 with sign of -1.0)", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 8. i64 operations example
     println!("\n8. 64-bit Integer Operations:");
@@ -281,7 +281,7 @@ fn main() -> Result<()> {
     if let Some(Value::I64(result)) = context.peek() {
         println!("   Add result: 0x{:016X}", result);
     }
-    context.stack.clear();
+    context.stack.clear);
     
     // 9. f64 operations example
     println!("\n9. 64-bit Float Operations:");
@@ -291,15 +291,15 @@ fn main() -> Result<()> {
     
     ArithmeticOp::F64Add.execute(&mut context)?;
     if let Some(Value::F64(result)) = context.peek() {
-        println!("   π + e = {}", result.value());
+        println!("   π + e = {}", result.value));
     }
-    context.stack.clear();
+    context.stack.clear);
     
     context.push_arithmetic_value(Value::F64(FloatBits64::from_float(2.0)))?;
     println!("   Input: 2.0");
     ArithmeticOp::F64Sqrt.execute(&mut context)?;
     if let Some(Value::F64(result)) = context.peek() {
-        println!("   sqrt(2.0) = {}", result.value());
+        println!("   sqrt(2.0) = {}", result.value));
     }
     
     println!("\n=== Demo Complete ===");
@@ -309,5 +309,5 @@ fn main() -> Result<()> {
 #[cfg(not(feature = "std"))]
 fn main() {
     // Binary std/no_std choice
-    panic!("This example requires std or alloc features");
+    eprintln!("This example requires std or alloc features"));
 }

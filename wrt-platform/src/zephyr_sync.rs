@@ -84,7 +84,7 @@ extern "C" {
     fn k_futex_wake(futex: *mut ZephyrFutexHandle, wake_all: bool) -> i32;
 
     /// Initialize a futex
-    fn k_futex_init(futex: *mut ZephyrFutexHandle);
+    fn k_futex_init(futex: *mut ZephyrFutexHandle;
 
     /// Get current kernel ticks
     fn k_uptime_ticks() -> i64;
@@ -118,7 +118,7 @@ impl ZephyrFutex {
         // Binary std/no_std choice
         // For demonstration, we'll simulate with null pointer (would need actual kernel
         // object)
-        let futex_obj = core::ptr::null_mut();
+        let futex_obj = core::ptr::null_mut);
 
         let futex = Self { value: AtomicU32::new(initial_value), futex_obj, _padding: [0; 56] };
 
@@ -126,7 +126,7 @@ impl ZephyrFutex {
         // SAFETY: In real usage, futex_obj would point to valid kernel object memory
         if !futex_obj.is_null() {
             unsafe {
-                k_futex_init(futex_obj);
+                k_futex_init(futex_obj;
             }
         }
 
@@ -138,7 +138,7 @@ impl ZephyrFutex {
         // In real implementation, would use the actual futex object
         if self.futex_obj.is_null() {
             // Fallback to busy-wait for demonstration
-            return self.busy_wait_fallback(expected, timeout);
+            return self.busy_wait_fallback(expected, timeout;
         }
 
         let timeout_val = match timeout {
@@ -153,7 +153,7 @@ impl ZephyrFutex {
         match result {
             0 => Ok(()), // Success - woken up
             ETIMEDOUT => {
-                Err(Error::new(ErrorCategory::System, 1, "Timeout expired"))
+                Err(Error::runtime_execution_error("))
             }
             EAGAIN => {
                 // Value changed before we could wait - this is success
@@ -166,36 +166,31 @@ impl ZephyrFutex {
             _ => Err(Error::new(
                 ErrorCategory::System,
                 1,
-                "Futex wait operation failed",
-            )),
+                ")),
         }
     }
 
     /// Fallback busy-wait implementation for when futex is not available
     fn busy_wait_fallback(&self, expected: u32, timeout: Option<ZephyrTimeout>) -> Result<()> {
         let start_time = unsafe { k_uptime_ticks() };
-        let timeout_ticks = timeout.map_or(i64::MAX, |t| t.ticks);
+        let timeout_ticks = timeout.map_or(i64::MAX, |t| t.ticks;
 
         loop {
             // Check if value has changed
             if self.value.load(core::sync::atomic::Ordering::Acquire) != expected {
-                return Ok(());
+                return Ok();
             }
 
             // Check timeout
             if timeout_ticks != i64::MAX {
                 let elapsed = unsafe { k_uptime_ticks() } - start_time;
                 if elapsed >= timeout_ticks {
-                    return Err(Error::new(
-                        ErrorCategory::System,
-                        1,
-                        "Futex wait timed out",
-                    ));
+                    return Err(Error::runtime_execution_error("Zephyr mutex lock timeout";
                 }
             }
 
             // Yield to other threads
-            core::hint::spin_loop();
+            core::hint::spin_loop);
         }
     }
 
@@ -204,7 +199,7 @@ impl ZephyrFutex {
         // In real implementation, would use the actual futex object
         if self.futex_obj.is_null() {
             // No actual waiters to wake in fallback mode
-            return Ok(0);
+            return Ok(0;
         }
 
         // Call Zephyr futex wake
@@ -217,7 +212,7 @@ impl ZephyrFutex {
             Err(Error::new(
                 ErrorCategory::System,
                 1,
-                "Futex wake operation failed",
+                "Failed to wake futex waiters",
             ))
         }
     }
@@ -311,31 +306,27 @@ impl FutexLike for ZephyrSemaphoreFutex {
     fn wait(&self, expected: u32, timeout: Option<Duration>) -> Result<()> {
         // Check value first
         if self.value.load(core::sync::atomic::Ordering::Acquire) != expected {
-            return Ok(());
+            return Ok();
         }
 
         // In real implementation, would use k_sem_take() with timeout
         // For now, use busy wait fallback
         let start_time = unsafe { k_uptime_ticks() };
-        let timeout_ticks = timeout.map_or(i64::MAX, |d| d.as_millis() as i64);
+        let timeout_ticks = timeout.map_or(i64::MAX, |d| d.as_millis() as i64;
 
         loop {
             if self.value.load(core::sync::atomic::Ordering::Acquire) != expected {
-                return Ok(());
+                return Ok();
             }
 
             if timeout_ticks != i64::MAX {
                 let elapsed = unsafe { k_uptime_ticks() } - start_time;
                 if elapsed >= timeout_ticks {
-                    return Err(Error::new(
-                        ErrorCategory::System,
-                        1,
-                        "Semaphore wait timed out",
-                    ));
+                    return Err(Error::runtime_execution_error("Zephyr semaphore wait timeout";
                 }
             }
 
-            core::hint::spin_loop();
+            core::hint::spin_loop);
         }
     }
 
@@ -350,7 +341,7 @@ impl fmt::Display for ZephyrSemaphoreFutex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "ZephyrSemaphoreFutex({})",
+            ")",
             self.value.load(core::sync::atomic::Ordering::Relaxed)
         )
     }

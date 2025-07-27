@@ -1,3 +1,4 @@
+
 // WRT - wrt-math
 // Module: Prelude
 // SW-REQ-ID: N/A
@@ -11,7 +12,7 @@
 // Re-export commonly used items from this crate
 // Binary std/no_std choice
 #[cfg(feature = "std")]
-pub use std::{
+pub use alloc::{
     boxed::Box,
     format,
     string::{String, ToString},
@@ -71,6 +72,7 @@ pub use crate as wrt_math;
 pub use crate::{
     float_bits::{FloatBits32, FloatBits64},
     ops, // Re-export the whole ops module
+    safety::{RoundingMode, SafeArithmetic, SafeFloat, SafeRounding},
     traits::LittleEndian, /* Re-export the trait from its new location
           * Add other re-exports specific to this crate's modules */
 };

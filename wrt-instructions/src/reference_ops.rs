@@ -9,7 +9,7 @@
 //! These operations support the WebAssembly reference types proposal
 //! and work across std, `no_std+alloc`, and pure `no_std` environments.
 
-use crate::prelude::{BoundedCapacity, Debug, Eq, PartialEq, PureInstruction};
+use crate::prelude::{Debug, Eq, PartialEq};
 use wrt_error::{Error, Result};
 use wrt_foundation::{
     types::{RefType, ValueType},
@@ -65,7 +65,7 @@ impl RefIsNull {
             _ => {
                 return Err(Error::type_error(
                     "ref.is_null requires a reference type"
-                ));
+                ;
             }
         };
         Ok(Value::I32(if is_null { 1 } else { 0 }))
@@ -176,7 +176,7 @@ impl RefEq {
             _ => {
                 return Err(Error::type_error(
                     "ref.eq requires two reference type values"
-                ));
+                ;
             }
         };
         
@@ -216,7 +216,7 @@ impl ReferenceOp {
             ReferenceOp::RefNull(op) => op.execute(),
             ReferenceOp::RefIsNull(op) => {
                 if operands.is_empty() {
-                    return Err(Error::runtime_error("ref.is_null requires one operand"));
+                    return Err(Error::runtime_error("ref.is_null requires one operand";
                 }
                 op.execute(operands[0].clone())
             }
@@ -227,13 +227,13 @@ impl ReferenceOp {
             }
             ReferenceOp::RefAsNonNull(op) => {
                 if operands.is_empty() {
-                    return Err(Error::runtime_error("ref.as_non_null requires one operand"));
+                    return Err(Error::runtime_error("ref.as_non_null requires one operand";
                 }
                 op.execute(operands[0].clone())
             }
             ReferenceOp::RefEq(op) => {
                 if operands.len() < 2 {
-                    return Err(Error::runtime_error("ref.eq requires two operands"));
+                    return Err(Error::runtime_error("ref.eq requires two operands";
                 }
                 op.execute(operands[0].clone(), operands[1].clone())
             }
@@ -269,95 +269,95 @@ mod tests {
 
     #[test]
     fn test_ref_null_funcref() {
-        let op = RefNull::new(RefType::Funcref);
+        let op = RefNull::new(RefType::Funcref;
         let result = op.execute().unwrap();
-        assert_eq!(result, Value::FuncRef(None));
+        assert_eq!(result, Value::FuncRef(None;
     }
 
     #[test]
     fn test_ref_null_externref() {
-        let op = RefNull::new(RefType::Externref);
+        let op = RefNull::new(RefType::Externref;
         let result = op.execute().unwrap();
-        assert_eq!(result, Value::ExternRef(None));
+        assert_eq!(result, Value::ExternRef(None;
     }
 
     #[test]
     fn test_ref_is_null_with_null_funcref() {
         let op = RefIsNull::new();
         let result = op.execute(Value::FuncRef(None)).unwrap();
-        assert_eq!(result, Value::I32(1));
+        assert_eq!(result, Value::I32(1;
     }
 
     #[test]
     fn test_ref_is_null_with_non_null_funcref() {
         let op = RefIsNull::new();
         let result = op.execute(Value::FuncRef(Some(FuncRef { index: 42 }))).unwrap();
-        assert_eq!(result, Value::I32(0));
+        assert_eq!(result, Value::I32(0;
     }
 
     #[test]
     fn test_ref_is_null_with_null_externref() {
         let op = RefIsNull::new();
         let result = op.execute(Value::ExternRef(None)).unwrap();
-        assert_eq!(result, Value::I32(1));
+        assert_eq!(result, Value::I32(1;
     }
 
     #[test]
     fn test_ref_is_null_with_non_null_externref() {
         let op = RefIsNull::new();
         let result = op.execute(Value::ExternRef(Some(ExternRef { index: 123 }))).unwrap();
-        assert_eq!(result, Value::I32(0));
+        assert_eq!(result, Value::I32(0;
     }
 
     #[test]
     fn test_ref_is_null_with_non_reference() {
         let op = RefIsNull::new();
-        let result = op.execute(Value::I32(42));
-        assert!(result.is_err());
+        let result = op.execute(Value::I32(42;
+        assert!(result.is_err();
     }
 
     #[test]
     fn test_ref_func_valid_index() {
-        let op = RefFunc::new(5);
+        let op = RefFunc::new(5;
         let result = op.execute().unwrap();
-        assert_eq!(result, Value::FuncRef(Some(FuncRef { index: 5 })));
+        assert_eq!(result, Value::FuncRef(Some(FuncRef { index: 5 });
     }
 
     #[test]
     fn test_ref_as_non_null_with_valid_funcref() {
         let op = RefAsNonNull::new();
-        let input = Value::FuncRef(Some(FuncRef { index: 42 }));
+        let input = Value::FuncRef(Some(FuncRef { index: 42 };
         let result = op.execute(input.clone()).unwrap();
-        assert_eq!(result, input);
+        assert_eq!(result, input;
     }
 
     #[test]
     fn test_ref_as_non_null_with_null_funcref() {
         let op = RefAsNonNull::new();
-        let result = op.execute(Value::FuncRef(None));
-        assert!(result.is_err());
+        let result = op.execute(Value::FuncRef(None;
+        assert!(result.is_err();
     }
 
     #[test]
     fn test_ref_as_non_null_with_valid_externref() {
         let op = RefAsNonNull::new();
-        let input = Value::ExternRef(Some(ExternRef { index: 123 }));
+        let input = Value::ExternRef(Some(ExternRef { index: 123 };
         let result = op.execute(input.clone()).unwrap();
-        assert_eq!(result, input);
+        assert_eq!(result, input;
     }
 
     #[test]
     fn test_ref_as_non_null_with_null_externref() {
         let op = RefAsNonNull::new();
-        let result = op.execute(Value::ExternRef(None));
-        assert!(result.is_err());
+        let result = op.execute(Value::ExternRef(None;
+        assert!(result.is_err();
     }
 
     #[test]
     fn test_ref_as_non_null_with_non_reference() {
         let op = RefAsNonNull::new();
-        let result = op.execute(Value::I32(42));
-        assert!(result.is_err());
+        let result = op.execute(Value::I32(42;
+        assert!(result.is_err();
     }
 
     #[test]
@@ -365,29 +365,29 @@ mod tests {
         let context = MockReferenceContext;
 
         // Test RefNull
-        let ref_null_op = ReferenceOp::RefNull(RefNull::new(RefType::Funcref));
+        let ref_null_op = ReferenceOp::RefNull(RefNull::new(RefType::Funcref;
         let result = ref_null_op.execute(&context, &[]).unwrap();
-        assert_eq!(result, Value::FuncRef(None));
+        assert_eq!(result, Value::FuncRef(None;
 
         // Test RefIsNull
-        let ref_is_null_op = ReferenceOp::RefIsNull(RefIsNull::new());
+        let ref_is_null_op = ReferenceOp::RefIsNull(RefIsNull::new();
         let result = ref_is_null_op.execute(&context, &[Value::FuncRef(None)]).unwrap();
-        assert_eq!(result, Value::I32(1));
+        assert_eq!(result, Value::I32(1;
 
         // Test RefFunc with valid index
-        let ref_func_op = ReferenceOp::RefFunc(RefFunc::new(3));
+        let ref_func_op = ReferenceOp::RefFunc(RefFunc::new(3;
         let result = ref_func_op.execute(&context, &[]).unwrap();
-        assert_eq!(result, Value::FuncRef(Some(FuncRef { index: 3 })));
+        assert_eq!(result, Value::FuncRef(Some(FuncRef { index: 3 });
 
         // Test RefFunc with invalid index
-        let ref_func_op = ReferenceOp::RefFunc(RefFunc::new(15));
-        let result = ref_func_op.execute(&context, &[]);
-        assert!(result.is_err());
+        let ref_func_op = ReferenceOp::RefFunc(RefFunc::new(15;
+        let result = ref_func_op.execute(&context, &[];
+        assert!(result.is_err();
 
         // Test RefAsNonNull
-        let ref_as_non_null_op = ReferenceOp::RefAsNonNull(RefAsNonNull::new());
+        let ref_as_non_null_op = ReferenceOp::RefAsNonNull(RefAsNonNull::new();
         let result = ref_as_non_null_op.execute(&context, &[Value::FuncRef(Some(FuncRef { index: 5 }))]).unwrap();
-        assert_eq!(result, Value::FuncRef(Some(FuncRef { index: 5 })));
+        assert_eq!(result, Value::FuncRef(Some(FuncRef { index: 5 });
     }
 
     #[test]
@@ -407,8 +407,8 @@ mod tests {
     #[test]
     fn test_ref_eq_same_funcref() {
         let op = RefEq::new();
-        let ref1 = Value::FuncRef(Some(FuncRef { index: 42 }));
-        let ref2 = Value::FuncRef(Some(FuncRef { index: 42 }));
+        let ref1 = Value::FuncRef(Some(FuncRef { index: 42 };
+        let ref2 = Value::FuncRef(Some(FuncRef { index: 42 };
         let result = op.execute(ref1, ref2).unwrap();
         assert_eq!(result, Value::I32(1)); // same index == equal
     }
@@ -416,8 +416,8 @@ mod tests {
     #[test]
     fn test_ref_eq_different_funcrefs() {
         let op = RefEq::new();
-        let ref1 = Value::FuncRef(Some(FuncRef { index: 42 }));
-        let ref2 = Value::FuncRef(Some(FuncRef { index: 43 }));
+        let ref1 = Value::FuncRef(Some(FuncRef { index: 42 };
+        let ref2 = Value::FuncRef(Some(FuncRef { index: 43 };
         let result = op.execute(ref1, ref2).unwrap();
         assert_eq!(result, Value::I32(0)); // different indices == not equal
     }
@@ -425,8 +425,8 @@ mod tests {
     #[test]
     fn test_ref_eq_null_vs_non_null() {
         let op = RefEq::new();
-        let ref1 = Value::FuncRef(None);
-        let ref2 = Value::FuncRef(Some(FuncRef { index: 42 }));
+        let ref1 = Value::FuncRef(None;
+        let ref2 = Value::FuncRef(Some(FuncRef { index: 42 };
         let result = op.execute(ref1, ref2).unwrap();
         assert_eq!(result, Value::I32(0)); // null != non-null
     }
@@ -434,8 +434,8 @@ mod tests {
     #[test]
     fn test_ref_eq_different_types() {
         let op = RefEq::new();
-        let ref1 = Value::FuncRef(None);
-        let ref2 = Value::ExternRef(None);
+        let ref1 = Value::FuncRef(None;
+        let ref2 = Value::ExternRef(None;
         let result = op.execute(ref1, ref2).unwrap();
         assert_eq!(result, Value::I32(0)); // funcref != externref even if both null
     }
@@ -443,24 +443,24 @@ mod tests {
     #[test]
     fn test_ref_eq_non_reference_types() {
         let op = RefEq::new();
-        let result = op.execute(Value::I32(42), Value::I32(42));
-        assert!(result.is_err()); // Non-reference types should error
+        let result = op.execute(Value::I32(42), Value::I32(42;
+        assert!(result.is_err())); // Non-reference types should error
     }
 
     #[test]
     fn test_ref_eq_in_enum() {
         let context = MockReferenceContext;
-        let ref_eq_op = ReferenceOp::RefEq(RefEq::new());
+        let ref_eq_op = ReferenceOp::RefEq(RefEq::new();
         
         // Test equal null refs
         let result = ref_eq_op.execute(&context, &[Value::FuncRef(None), Value::FuncRef(None)]).unwrap();
-        assert_eq!(result, Value::I32(1));
+        assert_eq!(result, Value::I32(1;
         
         // Test different refs
-        let ref1 = Value::FuncRef(Some(FuncRef { index: 1 }));
-        let ref2 = Value::FuncRef(Some(FuncRef { index: 2 }));
+        let ref1 = Value::FuncRef(Some(FuncRef { index: 1 };
+        let ref2 = Value::FuncRef(Some(FuncRef { index: 2 };
         let result = ref_eq_op.execute(&context, &[ref1, ref2]).unwrap();
-        assert_eq!(result, Value::I32(0));
+        assert_eq!(result, Value::I32(0;
     }
 }
 

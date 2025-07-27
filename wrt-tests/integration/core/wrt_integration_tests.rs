@@ -15,12 +15,12 @@ fn create_integration_test_registry() -> TestRegistry {
     let registry = TestRegistry::new();
     
     // Register all integration tests
-    registry.register(Box::new(CoreFeaturesTest));
-    registry.register(Box::new(ComponentModelTest));
-    registry.register(Box::new(StacklessEngineTest));
-    registry.register(Box::new(RuntimeFeaturesTest));
-    registry.register(Box::new(ErrorHandlingTest));
-    registry.register(Box::new(DecoderTest));
+    registry.register(Box::new(CoreFeaturesTest;
+    registry.register(Box::new(ComponentModelTest;
+    registry.register(Box::new(StacklessEngineTest;
+    registry.register(Box::new(RuntimeFeaturesTest;
+    registry.register(Box::new(ErrorHandlingTest;
+    registry.register(Box::new(DecoderTest;
     
     registry
 }
@@ -46,8 +46,8 @@ impl wrt_test_registry::TestCase for CoreFeaturesTest {
         let module = wrt::new_module().map_err(|e| e.to_string())?;
         
         // Test basic memory functionality
-        let mem_type = wrt::MemoryType::new(1, Some(2), false);
-        let memory = wrt::new_memory(mem_type);
+        let mem_type = wrt::MemoryType::new(1, Some(2), false;
+        let memory = wrt::new_memory(mem_type;
         
         // Verify memory operations
         let test_data = [1, 2, 3, 4];
@@ -56,13 +56,13 @@ impl wrt_test_registry::TestCase for CoreFeaturesTest {
         let mut read_buffer = [0; 4];
         memory.read(100, &mut read_buffer).map_err(|e| e.to_string())?;
         
-        assert_eq_test!(read_buffer, test_data, "Memory read/write should work correctly");
+        assert_eq_test!(read_buffer, test_data, "Memory read/write should work correctly";
         
         // Test table functionality
-        let table_type = wrt::TableType::new(wrt_foundation::reference::RefType::FuncRef, 10, Some(20));
-        let table = wrt::new_table(table_type);
+        let table_type = wrt::TableType::new(wrt_foundation::reference::RefType::FuncRef, 10, Some(20;
+        let table = wrt::new_table(table_type;
         
-        assert_eq_test!(table.size(), 10, "Initial table size should be 10");
+        assert_eq_test!(table.size(), 10, "Initial table size should be 10";
         
         Ok(())
     }
@@ -91,7 +91,7 @@ impl wrt_test_registry::TestCase for ComponentModelTest {
             let component = wrt::component::Component::new();
             
             // Verify component properties
-            assert_test!(!component.is_initialized(), "New component should not be initialized");
+            assert_test!(!component.is_initialized(), "New component should not be initialized";
             
             Ok(())
         }
@@ -121,10 +121,10 @@ impl wrt_test_registry::TestCase for StacklessEngineTest {
     
     fn run(&self) -> TestResult {
         // Create a stackless engine
-        let engine = wrt::new_stackless_engine();
+        let engine = wrt::new_stackless_engine);
         
         // Verify engine is initialized properly
-        assert_test!(!engine.is_executing(), "New engine should not be executing");
+        assert_test!(!engine.is_executing(), "New engine should not be executing";
         
         Ok(())
     }
@@ -148,10 +148,10 @@ impl wrt_test_registry::TestCase for RuntimeFeaturesTest {
     
     fn run(&self) -> TestResult {
         // Create an execution engine
-        let engine = wrt::new_engine();
+        let engine = wrt::new_engine);
         
         // Verify engine properties
-        assert_test!(!engine.has_started(), "New engine should not have started");
+        assert_test!(!engine.has_started(), "New engine should not have started";
         
         Ok(())
     }
@@ -177,11 +177,11 @@ impl wrt_test_registry::TestCase for ErrorHandlingTest {
         use wrt_error::{Error, kinds};
         
         // Test error creation and properties
-        let validation_error = Error::new(kinds::ErrorKind::Validation, 1, Some("test error"));
-        let memory_error = Error::new(kinds::ErrorKind::Memory, 2, Some("memory error"));
+        let validation_error = Error::runtime_execution_error(";
+        let memory_error = Error::new(kinds::ErrorKind::Memory, 2, Some(";
         
-        assert_eq_test!(validation_error.kind(), kinds::ErrorKind::Validation, "Error kind should be Validation");
-        assert_eq_test!(memory_error.kind(), kinds::ErrorKind::Memory, "Error kind should be Memory");
+        assert_eq_test!(validation_error.kind(), kinds::ErrorKind::Validation, "Error kind should be Validation";
+        assert_eq_test!(memory_error.kind(), kinds::ErrorKind::Memory, "Error kind should be Memory";
         
         Ok(())
     }
@@ -216,19 +216,19 @@ impl wrt_test_registry::TestCase for DecoderTest {
         ).unwrap();
         
         // Test decoding
-        let result = wrt_decoder::decode_module(&wasm_bytes);
-        assert_test!(result.is_ok(), "Should successfully decode valid WASM module");
+        let result = wrt_decoder::decode_module(&wasm_bytes;
+        assert_test!(result.is_ok(), "Should successfully decode valid WASM module";
         
         // Get decoded module
         let decoded_module = result.unwrap();
         
         // Verify structure
-        assert_test!(!decoded_module.functions.is_empty(), "Decoded module should have functions");
-        assert_test!(!decoded_module.exports.is_empty(), "Decoded module should have exports");
+        assert_test!(!decoded_module.functions.is_empty(), "Decoded module should have functions";
+        assert_test!(!decoded_module.exports.is_empty(), "Decoded module should have exports";
         
         // Verify exports
-        let add_export = decoded_module.exports.iter().find(|e| e.name == "add");
-        assert_test!(add_export.is_some(), "Module should export 'add' function");
+        let add_export = decoded_module.exports.iter().find(|e| e.name == "add";
+        assert_test!(add_export.is_some(), "Module should export 'add' function";
         
         Ok(())
     }
@@ -237,13 +237,13 @@ impl wrt_test_registry::TestCase for DecoderTest {
 #[test]
 fn run_integration_tests() {
     // Create the test registry
-    let registry = create_integration_test_registry();
+    let registry = create_integration_test_registry);
     
     // Run all tests
     #[cfg(feature = "std")]
     {
-        let failed_count = registry.run_all_tests();
-        assert_eq!(failed_count, 0, "All integration tests should pass");
+        let failed_count = registry.run_all_tests);
+        assert_eq!(failed_count, 0, "All integration tests should pass";
     }
     
     // In no_std, we just statically register the tests but can't run them all automatically

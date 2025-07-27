@@ -466,7 +466,7 @@ mod tests {
 
     #[test]
     fn test_memory_ordering_default() {
-        assert_eq!(MemoryOrdering::default(), MemoryOrdering::SeqCst);
+        assert_eq!(MemoryOrdering::default(), MemoryOrdering::SeqCst;
     }
 
     #[test]
@@ -493,7 +493,7 @@ mod tests {
         ];
 
         for (op, expected_opcode) in tests {
-            assert_eq!(op.opcode(), expected_opcode);
+            assert_eq!(op.opcode(), expected_opcode;
         }
     }
 
@@ -521,7 +521,7 @@ mod tests {
         ];
 
         for (op, expected_opcode) in tests {
-            assert_eq!(op.opcode(), expected_opcode);
+            assert_eq!(op.opcode(), expected_opcode;
         }
     }
 
@@ -557,7 +557,7 @@ mod tests {
         ];
 
         for (op, expected_opcode) in tests {
-            assert_eq!(op.opcode(), expected_opcode);
+            assert_eq!(op.opcode(), expected_opcode;
         }
     }
 
@@ -581,7 +581,7 @@ mod tests {
         ];
 
         for (op, expected_opcode) in tests {
-            assert_eq!(op.opcode(), expected_opcode);
+            assert_eq!(op.opcode(), expected_opcode;
         }
     }
 
@@ -605,7 +605,7 @@ mod tests {
         ];
 
         for (op, expected_opcode) in tests {
-            assert_eq!(op.opcode(), expected_opcode);
+            assert_eq!(op.opcode(), expected_opcode;
         }
     }
 
@@ -613,8 +613,8 @@ mod tests {
     fn test_fence_opcode() {
         let fence = AtomicOp::Fence(AtomicFence {
             ordering: MemoryOrdering::SeqCst,
-        });
-        assert_eq!(fence.opcode(), opcodes::ATOMIC_FENCE);
+        };
+        assert_eq!(fence.opcode(), opcodes::ATOMIC_FENCE;
     }
 
     #[test]
@@ -629,15 +629,15 @@ mod tests {
             AtomicRMWOp::Xchg,
         ];
         
-        assert_eq!(ops.len(), 6);
+        assert_eq!(ops.len(), 6;
         
         // Test that each variant is distinct
         for (i, op1) in ops.iter().enumerate() {
             for (j, op2) in ops.iter().enumerate() {
                 if i == j {
-                    assert_eq!(op1, op2);
+                    assert_eq!(op1, op2;
                 } else {
-                    assert_ne!(op1, op2);
+                    assert_ne!(op1, op2;
                 }
             }
         }

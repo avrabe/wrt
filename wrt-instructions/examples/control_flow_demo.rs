@@ -64,7 +64,7 @@ impl ControlContext for DemoContext {
     }
 
     fn branch(&mut self, target: wrt_instructions::BranchTarget) -> Result<()> {
-        self.branch_target = Some(target.label_idx);
+        self.branch_target = Some(target.label_idx;
         Ok(())
     }
 
@@ -74,12 +74,12 @@ impl ControlContext for DemoContext {
     }
 
     fn call_function(&mut self, func_idx: u32) -> Result<()> {
-        self.called_function = Some(func_idx);
+        self.called_function = Some(func_idx;
         Ok(())
     }
 
     fn call_indirect(&mut self, table_idx: u32, type_idx: u32) -> Result<()> {
-        self.indirect_call = Some((table_idx, type_idx));
+        self.indirect_call = Some((table_idx, type_idx;
         Ok(())
     }
 
@@ -102,11 +102,11 @@ impl ControlContext for DemoContext {
     
     fn execute_call_indirect(&mut self, table_idx: u32, type_idx: u32, func_idx: i32) -> Result<()> {
         if func_idx < 0 {
-            return Err(wrt_error::Error::runtime_error("Invalid function index"));
+            return Err(wrt_error::Error::runtime_error("Invalid function index";
         }
         
         // Validate and execute indirect call
-        self.indirect_call = Some((table_idx, type_idx));
+        self.indirect_call = Some((table_idx, type_idx;
         Ok(())
     }
     
@@ -117,7 +117,7 @@ impl ControlContext for DemoContext {
             default
         };
         
-        self.branch_target = Some(label_idx);
+        self.branch_target = Some(label_idx;
         Ok(())
     }
 }
@@ -144,29 +144,29 @@ impl FunctionOperations for DemoContext {
     }
     
     fn execute_function_call(&mut self, func_idx: u32) -> Result<()> {
-        self.called_function = Some(func_idx);
+        self.called_function = Some(func_idx;
         Ok(())
     }
 }
 
 #[cfg(feature = "std")]
 fn main() -> Result<()> {
-    println!("=== WebAssembly Control Flow Operations Demo ===\n");
+    println!("=== WebAssembly Control Flow Operations Demo ===\n"));
     
     let mut context = DemoContext::new();
     
     // 1. Demonstrate Return instruction
-    println!("1. Return Operation:");
+    println!("1. Return Operation:"));
     let return_op = Return::new();
     return_op.execute(&mut context)?;
-    println!("   Executed return instruction");
-    println!("   Function returned: {}", context.returned);
+    println!("   Executed return instruction"));
+    println!("   Function returned: {}", context.returned));
     
     // Reset context for next demo
     context.returned = false;
     
     // 2. Demonstrate CallIndirect instruction
-    println!("\n2. Call Indirect Operation:");
+    println!("\n2. Call Indirect Operation:"));
     // Push function index onto stack
     context.push_control_value(Value::I32(42))?;
     
@@ -255,5 +255,5 @@ fn main() -> Result<()> {
 #[cfg(not(feature = "std"))]
 fn main() {
     // Binary std/no_std choice
-    panic!("This example requires std or alloc features");
+    eprintln!("This example requires std or alloc features"));
 }

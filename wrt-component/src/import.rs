@@ -3,23 +3,23 @@
 //! This module provides the Import type for component imports.
 
 use wrt_format::component::ExternType;
-use wrt_foundation::{component::ComponentType, ExternType as RuntimeExternType};
+use wrt_foundation::{component::WrtComponentType, ExternType as RuntimeExternType};
 
 use crate::{
-    component::ExternValue, namespace::Namespace, prelude::*, type_conversion::bidirectional,
+    components::component::ExternValue, /* namespace::Namespace, */ prelude::*, type_conversion::bidirectional,
 };
 
 /// Type of import in the component model
 #[derive(Debug, Clone)]
 pub enum ImportType {
     /// Function import
-    Function(ComponentType),
+    Function(WrtComponentType),
     /// Value import (global, memory, table)
-    Value(ComponentType),
+    Value(WrtComponentType),
     /// Instance import
-    Instance(ComponentType),
+    Instance(WrtComponentType),
     /// Type import
-    Type(ComponentType),
+    Type(WrtComponentType),
 }
 
 /// Import to a component
@@ -41,7 +41,7 @@ impl Import {
     /// Creates a new import
     pub fn new(namespace: Namespace, name: String, ty: ExternType, value: ExternValue) -> Self {
         // Default import type based on ExternType - this is a simplified mapping
-        let import_type = ImportType::Function(ComponentType::Unit);
+        let import_type = ImportType::Function(WrtComponentType::Unit;
         Self { namespace, name, import_type, ty, value }
     }
 
@@ -58,11 +58,11 @@ impl Import {
 
     /// Creates an import identifier by combining namespace and name
     pub fn identifier(&self) -> String {
-        let ns_str = self.namespace.to_string();
+        let ns_str = self.namespace.to_string());
         if ns_str.is_empty() {
             self.name.clone()
         } else {
-            "Component not found"
+            format!("{}.{}", ns_str, self.name)
         }
     }
 
@@ -97,8 +97,8 @@ impl ImportCollection {
 
     /// Adds an import to the collection
     pub fn add(&mut self, import: Import) {
-        let id = import.identifier();
-        self.imports.insert(id, import);
+        let id = import.identifier);
+        self.imports.insert(id, import;
     }
 
     /// Gets an import by its identifier
@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_import_identifier() {
-        let namespace = Namespace::from_string("wasi.http");
+        let namespace = Namespace::from_string("wasi.http";
         let import = Import::new(
             namespace,
             "fetch".to_string(),
@@ -147,12 +147,12 @@ mod tests {
                 },
                 export_name: "fetch".to_string(),
             }),
-        );
+        ;
 
-        assert_eq!(import.identifier(), "wasi.http.fetch");
+        assert_eq!(import.identifier(), "wasi.http.fetch";
 
         // Test without namespace
-        let empty_ns = Namespace::from_string("");
+        let empty_ns = Namespace::from_string("";
         let import2 = Import::new(
             empty_ns,
             "print".to_string(),
@@ -167,9 +167,9 @@ mod tests {
                 },
                 export_name: "print".to_string(),
             }),
-        );
+        ;
 
-        assert_eq!(import2.identifier(), "print");
+        assert_eq!(import2.identifier(), "print";
     }
 
     #[test]
@@ -191,7 +191,7 @@ mod tests {
                 },
                 export_name: "fetch".to_string(),
             }),
-        );
+        ;
 
         let import2 = Import::new(
             Namespace::from_string("wasi.io"),
@@ -207,22 +207,22 @@ mod tests {
                 },
                 export_name: "read".to_string(),
             }),
-        );
+        ;
 
-        collection.add(import1);
-        collection.add(import2);
+        collection.add(import1;
+        collection.add(import2;
 
-        assert_eq!(collection.len(), 2);
+        assert_eq!(collection.len(), 2;
         assert!(!collection.is_empty());
 
-        let fetched = collection.get("wasi.http.fetch");
-        assert!(fetched.is_some());
-        assert_eq!(fetched.unwrap().name, "fetch");
+        let fetched = collection.get("wasi.http.fetch";
+        assert!(fetched.is_some();
+        assert_eq!(fetched.unwrap().name, "fetch";
 
-        let not_found = collection.get("unknown");
-        assert!(not_found.is_none());
+        let not_found = collection.get("unknown";
+        assert!(not_found.is_none();
 
-        let imports: Vec<&Import> = collection.iter().collect();
-        assert_eq!(imports.len(), 2);
+        let imports: Vec<&Import> = collection.iter().collect());
+        assert_eq!(imports.len(), 2;
     }
 }

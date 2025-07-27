@@ -7,7 +7,7 @@ Features and Capabilities
    :align: right
    :alt: Features Icon
 
-This page details the features and capabilities of the SentryPulse Engine (WRT Edition).
+This page details the features and capabilities of PulseEngine (WRT Edition).
 
 .. contents:: On this page
    :local:
@@ -19,22 +19,29 @@ Core Features
 WebAssembly Core Implementation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-SPE_wrt provides a complete implementation of the WebAssembly Core specification:
+PulseEngine provides WebAssembly Core infrastructure with the following features in development:
 
-- **Full specification compliance**: All WebAssembly Core features fully implemented
-- **Deterministic execution**: Predictable behavior for safety-critical applications
-- **Bounded execution**: Control over execution time and resource usage
-- **Memory safety**: Comprehensive bounds checking and memory isolation
+- **Memory operations**: Load/store infrastructure with bounds checking framework (execution engine in progress)
+- **Arithmetic instructions**: Arithmetic operation definitions (i32/i64/f32/f64 framework implemented)
+- **Type system**: WebAssembly value types and type validation infrastructure
+- **Safety infrastructure**: Deterministic compilation framework and bounded execution design
+
+.. note::
+   **Development Status**: Core WebAssembly instruction execution engine is currently under development. 
+   Control flow, function calls, and module instantiation are partially implemented.
 
 Component Model Support
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Full implementation of WebAssembly Component Model Preview 2:
+WebAssembly Component Model infrastructure in development:
 
-- **Interface types**: Defining clear boundaries between components
-- **Resource types**: Proper handling of resource ownership
-- **Canonical ABI**: Standard interface for cross-language compatibility
-- **Component instantiation**: Dynamic loading and linking of components
+- **Type definitions**: Component model type system and interface types
+- **Parsing framework**: Component format parsing (element/data segments in progress)
+- **Resource handling**: Basic resource type support
+- **ABI foundations**: Canonical ABI type mapping infrastructure
+
+.. note::
+   **Development Status**: Component Model parsing and instantiation are under active development.
 
 Platform Integration
 --------------------
@@ -59,16 +66,16 @@ Safety Features
 State Management
 ~~~~~~~~~~~~~~~~
 
-- **State migration**: Transfer execution state between instances
-- **Checkpointing**: Save and restore execution state
-- **State verification**: Validate execution state integrity
+- **State migration**: Framework for execution state transfer (in development)
+- **Checkpointing**: Infrastructure for state save/restore (planned)
+- **State verification**: Execution context validation
 
 Resource Constraints
 ~~~~~~~~~~~~~~~~~~~~
 
-- **Memory limits**: Control WebAssembly memory allocation
-- **Execution fuel**: Bounded execution with predictable cycles
-- **Stack bounds**: Prevent stack overflow conditions
+- **Memory limits**: Implemented WebAssembly memory allocation controls
+- **Execution fuel**: Gas metering infrastructure (execution engine in development)
+- **Stack bounds**: Function call depth limiting with overflow protection
 
 Application Domains
 -------------------
@@ -84,9 +91,9 @@ The runtime is particularly suitable for:
 Performance Characteristics
 ---------------------------
 
-- **Predictable execution time**: Consistent operation for real-time systems
-- **Minimal memory overhead**: Efficient resource usage
-- **Stackless design**: Reduced memory requirements
-- **Optimized interpreter**: Balance of performance and determinism
+- **Predictable execution time**: Design goal for real-time systems (interpreter in development)
+- **Minimal memory overhead**: Efficient no_std memory management implemented
+- **Stackless design**: Stackless execution framework in development
+- **Safety-first architecture**: ASIL compliance and formal verification infrastructure
 
-See :doc:`../architecture` for details on how these features are implemented. 
+For detailed implementation status of all PulseEngine features, see :doc:`implementation_status`.\n\nSee :doc:`../architecture` for details on how these features are implemented. 

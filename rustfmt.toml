@@ -1,20 +1,45 @@
-max_width = 100
+# Rustfmt configuration for PulseEngine consistency
+
+# Basic formatting
+edition = "2021"
 hard_tabs = false
 tab_spaces = 4
-newline_style = "Unix"
-use_small_heuristics = "Max"
-reorder_imports = true
-reorder_modules = true
-remove_nested_parens = true
-short_array_element_width_threshold = 10
-format_strings = true
-wrap_comments = true
-comment_width = 80
-normalize_comments = true
-normalize_doc_attributes = true
+
+# Import organization
 imports_granularity = "Crate"
 group_imports = "StdExternalCrate"
-# Enforce trailing commas where applicable
-trailing_comma = "Vertical"
-# Edition to use for formatting
-edition = "2021" 
+imports_layout = "Vertical"
+
+# Code formatting
+format_code_in_doc_comments = true
+format_macro_matchers = true
+format_macro_bodies = true
+format_strings = true
+
+# Line width
+max_width = 100
+comment_width = 80
+wrap_comments = true
+
+# Consistency settings
+normalize_comments = true
+normalize_doc_attributes = true
+reorder_impl_items = true
+use_field_init_shorthand = true
+use_try_shorthand = true
+
+# Match formatting
+match_block_trailing_comma = true
+match_arm_blocks = true
+
+# Function formatting  
+fn_single_line = false
+force_multiline_blocks = false
+
+# Struct/enum formatting
+struct_field_align_threshold = 20
+enum_discrim_align_threshold = 20
+
+# Chain formatting
+chain_width = 80
+single_line_if_else_max_width = 80

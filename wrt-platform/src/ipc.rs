@@ -4,12 +4,13 @@
 //! that can be specialized for different platforms (QNX message passing,
 //! Linux domain sockets, Windows named pipes, etc.).
 
+
 use core::{fmt::Debug, time::Duration};
 
 #[cfg(not(feature = "std"))]
-use std::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
 #[cfg(feature = "std")]
-use std::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use wrt_sync::WrtMutex;
 
 use wrt_error::{Error, ErrorCategory, Result};
@@ -126,30 +127,26 @@ impl IpcServerBuilder {
 pub fn create_platform_channel(_name: &str) -> Result<Box<dyn IpcChannel>> {
     #[cfg(target_os = "nto")]
     {
-        super::qnx_ipc::QnxChannel::create_server(name)
+        super::qnx_ipc::QnxChannel::create_server(_name)
             .map(|ch| Box::new(ch) as Box<dyn IpcChannel>)
     }
 
     #[cfg(target_os = "linux")]
     {
-        super::linux_ipc::LinuxDomainSocket::create_server(name)
+        super::linux_ipc::LinuxDomainSocket::create_server(_name)
             .map(|ch| Box::new(ch) as Box<dyn IpcChannel>)
     }
 
     #[cfg(target_os = "windows")]
     {
-        super::windows_ipc::WindowsNamedPipe::create_server(name)
+        super::windows_ipc::WindowsNamedPipe::create_server(_name)
             .map(|ch| Box::new(ch) as Box<dyn IpcChannel>)
     }
 
     #[cfg(not(any(target_os = "nto", target_os = "linux", target_os = "windows")))]
     {
         // Generic IPC implementation for platforms without native IPC
-        Err(Error::new(
-            ErrorCategory::System,
-            1,
-            "IPC not supported on this platform",
-        ))
+        Err(Error::runtime_execution_error("IPC not supported on this platform"))
     }
 }
 
@@ -236,7 +233,7 @@ impl IpcServer {
                 Err(e) => {
                     if *self.running.lock() {
                         // Only log error if we're still running
-                        eprintln!("IPC receive error: {e}");
+                        eprintln!("IPC server error: {e}");
                     }
                 }
             }

@@ -9,9 +9,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Print some basic information about the module
     // Version is not directly accessible in the Module struct
-    println!("Number of functions: {}", module.functions.len());
-    println!("Number of memories: {}", module.memories.len());
-    println!("Number of exports: {}", module.exports.len());
+    println!("Number of functions: {}", module.functions.len));
+    println!("Number of memories: {}", module.memories.len));
+    println!("Number of exports: {}", module.exports.len));
 
     Ok(())
 }

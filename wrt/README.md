@@ -1,31 +1,34 @@
-# WRT - WebAssembly Runtime
+# PulseEngine (WRT Edition)
 
-> Pure Rust WebAssembly runtime supporting Core and Component Model specifications
+> Safety-critical WebAssembly infrastructure implemented in pure Rust
 
-[![Crates.io](https://img.shields.io/crates/v/wrt.svg)](https://crates.io/crates/wrt)
-[![Documentation](https://docs.rs/wrt/badge.svg)](https://docs.rs/wrt)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> **⚠️ Source Installation Only**: PulseEngine is not published to crates.io yet. See the [Installation Guide](../docs/source/getting_started/installation.rst) for detailed setup instructions.
 
 ## Overview
 
-WRT is a comprehensive WebAssembly runtime implemented in pure Rust, designed for safety, performance, and portability. It supports both the WebAssembly Core specification and the Component Model, making it suitable for everything from embedded systems to server-side applications.
+PulseEngine (WRT Edition) provides WebAssembly infrastructure implemented in pure Rust, designed for safety-critical systems. It provides foundational components including memory management, type systems, and arithmetic operations, with the core execution engine under active development.
 
 ### Key Features
 
-- **📦 Complete WebAssembly Support**: Core specification + Component Model
+- **🛡️ Memory Safety**: Complete WebAssembly memory operations with bounds checking
 - **🦀 Pure Rust**: Memory-safe implementation with zero unsafe code by default
 - **🔄 Cross-Platform**: Runs on std, no_std+alloc, and pure no_std environments
-- **⚡ Stackless Engine**: Configurable execution for constrained environments
-- **🛡️ Safety-First**: ASIL-B compliance features and comprehensive error handling
-- **🔧 Modular Design**: Fine-grained control over features and dependencies
+- **⚙️ Type System**: Complete WebAssembly value types and validation infrastructure
+- **🧮 Arithmetic Operations**: Full implementation of WebAssembly numeric instructions
+- **🔧 Safety-Critical Design**: ASIL compliance framework and formal verification support
+- **🚧 Development Status**: Core execution engine and Component Model under development
 
 ## Quick Start
 
-Add WRT to your `Cargo.toml`:
+For comprehensive installation instructions, see the [Installation Guide](../docs/source/getting_started/installation.rst).
+
+### Add to Your Project
 
 ```toml
 [dependencies]
-wrt = "0.1"
+wrt = { path = "path/to/wrt" }  # Point to local clone
 ```
 
 ### Basic Usage
@@ -33,35 +36,23 @@ wrt = "0.1"
 ```rust
 use wrt::prelude::*;
 
-// Load a WebAssembly module
-let wasm_bytes = include_bytes!("module.wasm");
-let module = Module::from_bytes(wasm_bytes)?;
-
-// Create an instance with imports
-let imports = ImportMap::new();
-let mut instance = ModuleInstance::new(module, imports)?;
-
-// Invoke a function
-let args = vec![Value::I32(42)];
-let result = instance.invoke("exported_function", &args)?;
+// Current capabilities - memory and arithmetic operations
+let memory = WrtMemory::new(1024)?;
+let value = Value::I32(42);
+let result = ArithmeticOp::I32Add.execute(&[value, Value::I32(8)])?;
 println!("Result: {:?}", result);
+
+// Note: Module instantiation and function execution under development
 ```
 
 ### Component Model Usage
 
 ```rust
+// Component Model infrastructure (under development)
 use wrt::component::*;
 
-// Load a WebAssembly component
-let component_bytes = include_bytes!("component.wasm");
-let component = Component::from_bytes(component_bytes)?;
-
-// Instantiate with imports
-let imports = ComponentImports::new();
-let instance = component.instantiate(&imports)?;
-
-// Call component functions
-let result = instance.call("interface.function", &[ComponentValue::String("hello".into())])?;
+// Note: Component parsing and instantiation under development
+// See documentation for current implementation status
 ```
 
 ## Architecture
@@ -96,37 +87,37 @@ WRT provides fine-grained control over features and compilation targets:
 ### Environment Features
 ```toml
 # Standard library (default)
-wrt = { version = "0.1", features = ["std"] }
+wrt = { path = "path/to/wrt", features = ["std"] }
 
 # No standard library with allocation
-wrt = { version = "0.1", features = ["alloc"] }
+wrt = { path = "path/to/wrt", features = ["alloc"] }
 
 # Pure no_std (embedded/bare-metal)
-wrt = { version = "0.1", default-features = false }
+wrt = { path = "path/to/wrt", default-features = false }
 ```
 
 ### Capability Features
 ```toml
 # Minimal runtime only
-wrt = { version = "0.1", features = ["minimal"] }
+wrt = { path = "path/to/wrt", features = ["minimal"] }
 
-# Safety-critical features (ASIL-B compliance)
-wrt = { version = "0.1", features = ["safety"] }
+# Safety-critical features (ASIL compliance framework)
+wrt = { path = "path/to/wrt", features = ["safety"] }
 
 # Performance optimizations
-wrt = { version = "0.1", features = ["optimize"] }
+wrt = { path = "path/to/wrt", features = ["optimize"] }
 
 # Serialization support
-wrt = { version = "0.1", features = ["serialization"] }
+wrt = { path = "path/to/wrt", features = ["serialization"] }
 ```
 
 ### Platform Features
 ```toml
 # Platform-specific optimizations
-wrt = { version = "0.1", features = ["platform-macos"] }
+wrt = { path = "path/to/wrt", features = ["platform-macos"] }
 
 # Helper mode for platform integration
-wrt = { version = "0.1", features = ["helper-mode"] }
+wrt = { path = "path/to/wrt", features = ["helper-mode"] }
 ```
 
 ## no_std Support
@@ -243,7 +234,7 @@ WRT is designed for safety-critical applications:
 
 ### Safety Features
 ```toml
-wrt = { version = "0.1", features = ["safety"] }
+wrt = { path = "path/to/wrt", features = ["safety"] }
 ```
 
 Enables:
@@ -311,7 +302,7 @@ We welcome contributions! Please see our [Contributing Guide](../CONTRIBUTING.md
 
 ### Development Setup
 ```bash
-git clone https://github.com/your-org/wrt.git
+git clone https://github.com/pulseengine/wrt
 cd wrt
 cargo build --workspace
 cargo test --workspace
