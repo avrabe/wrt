@@ -8,21 +8,73 @@
 
 /// Re-export instruction types and traits from wrt-instructions
 pub use wrt_instructions::{
+    aggregate_ops::{
+        AggregateOp,
+        AggregateOperations,
+    },
     behavior::{
-        ControlFlow, ControlFlowBehavior, FrameBehavior, InstructionExecutor, StackBehavior,
+        ControlFlow,
+        ControlFlowBehavior,
+        FrameBehavior,
+        InstructionExecutor,
+        StackBehavior,
     },
     calls::CallInstruction,
     control::ControlInstruction,
-    execution::{ExecutionContext, ExecutionResult},
-    memory_ops::{MemoryArg, MemoryLoad, MemoryStore},
+    execution::{
+        ExecutionContext as InstructionExecutionContext,
+        PureExecutionContext,
+    },
+    memory_ops::{
+        MemoryArg,
+        MemoryLoad,
+        MemoryOperations,
+        MemoryStore,
+    },
     numeric::NumericInstruction,
-    simd_ops::{SimdContext, SimdExecutionContext, SimdInstruction, SimdOp},
-    aggregate_ops::{AggregateOperations, AggregateOp},
-    Instruction, InstructionExecutable,
+    simd_ops::{
+        SimdContext,
+        SimdExecutionContext,
+        SimdInstruction,
+        SimdOp,
+    },
+    Instruction,
+    InstructionExecutable,
 };
-use wrt_runtime::stackless::{StacklessEngine, StacklessFrame};
+use wrt_runtime::stackless::{
+    StacklessEngine,
+    StacklessFrame,
+};
 
 use crate::prelude::*;
+
+/// Comprehensive execution context trait that combines stack and memory
+/// operations
+///
+/// This trait provides the interface that the WRT execution adapter implements
+/// to bridge between the wrt runtime and the wrt-instructions implementations.
+pub trait ExecutionContext {
+    /// Push a value onto the stack
+    fn push_value(&mut self, value: Value) -> Result<()>;
+
+    /// Pop a value from the stack
+    fn pop_value(&mut self) -> Result<Value>;
+
+    /// Pop a value with type checking
+    fn pop_value_expected(&mut self, expected_type: ValueType) -> Result<Value>;
+
+    /// Get memory size in pages
+    fn memory_size(&mut self, memory_idx: u32) -> Result<u32>;
+
+    /// Grow memory by the specified number of pages
+    fn memory_grow(&mut self, memory_idx: u32, pages: u32) -> Result<u32>;
+
+    /// Read bytes from memory
+    fn memory_read(&mut self, memory_idx: u32, offset: u32, bytes: &mut [u8]) -> Result<()>;
+
+    /// Write bytes to memory
+    fn memory_write(&mut self, memory_idx: u32, offset: u32, bytes: &[u8]) -> Result<()>;
+}
 
 #[cfg(feature = "platform")]
 mod simd_runtime_impl;
@@ -37,11 +89,11 @@ use wrt_platform::simd::SimdRuntime;
 /// implementations.
 pub struct WrtExecutionContextAdapter<'a> {
     /// The stack used for execution
-    stack: &'a mut dyn StackLike,
+    stack:        &'a mut dyn StackLike,
     /// The current frame
-    frame: &'a mut StacklessFrame,
+    frame:        &'a mut StacklessFrame,
     /// The engine
-    engine: &'a mut StacklessEngine,
+    engine:       &'a mut StacklessEngine,
     /// SIMD runtime for SIMD operations
     #[cfg(feature = "platform")]
     simd_runtime: SimdRuntime,
@@ -89,77 +141,51 @@ pub trait StackLike {
     fn depth(&self) -> usize;
 }
 
-impl<'a> wrt_instructions::execution::ExecutionContext for WrtExecutionContextAdapter<'a> {
-    fn push_value(&mut self, value: Value) -> wrt_error::Result<()> {
-        self.stack.push(value).map_err(|e| wrt_error::Error::from(e))
+impl<'a> ExecutionContext for WrtExecutionContextAdapter<'a> {
+    fn push_value(&mut self, value: Value) -> Result<()> {
+        self.stack.push(value)
     }
 
-    fn pop_value(&mut self) -> wrt_error::Result<Value> {
-        self.stack.pop().map_err(|e| wrt_error::Error::from(e))
+    fn pop_value(&mut self) -> Result<Value> {
+        self.stack.pop()
     }
 
-    fn pop_value_expected(&mut self, expected_type: ValueType) -> wrt_error::Result<Value> {
+    fn pop_value_expected(&mut self, expected_type: ValueType) -> Result<Value> {
         let value = self.pop_value()?;
         if value.value_type() != expected_type {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                format!("Expected {:?}, got {:?}", expected_type, value.value_type()),
-            ));
+            return Err(Error::runtime_execution_error("Expected {:?}, got {:?}"));
         }
         Ok(value)
     }
 
-    fn memory_size(&mut self, memory_idx: u32) -> wrt_error::Result<u32> {
-        let memory = self
-            .frame
-            .get_memory(memory_idx, self.engine)
-            .map_err(|e| wrt_error::Error::from(e))?;
+    fn memory_size(&mut self, memory_idx: u32) -> Result<u32> {
+        let memory = self.frame.get_memory(memory_idx, self.engine)?;
 
-        memory.size().map_err(|e| wrt_error::Error::from(e))
+        memory.size()
     }
 
-    fn memory_grow(&mut self, memory_idx: u32, pages: u32) -> wrt_error::Result<u32> {
-        let memory = self
-            .frame
-            .get_memory(memory_idx, self.engine)
-            .map_err(|e| wrt_error::Error::from(e))?;
+    fn memory_grow(&mut self, memory_idx: u32, pages: u32) -> Result<u32> {
+        let memory = self.frame.get_memory(memory_idx, self.engine)?;
 
-        memory.grow(pages).map_err(|e| wrt_error::Error::from(e))
+        memory.grow(pages)
     }
 
-    fn memory_read(
-        &mut self,
-        memory_idx: u32,
-        offset: u32,
-        bytes: &mut [u8],
-    ) -> wrt_error::Result<()> {
-        let memory = self
-            .frame
-            .get_memory(memory_idx, self.engine)
-            .map_err(|e| wrt_error::Error::from(e))?;
+    fn memory_read(&mut self, memory_idx: u32, offset: u32, bytes: &mut [u8]) -> Result<()> {
+        let memory = self.frame.get_memory(memory_idx, self.engine)?;
 
-        memory.read(offset, bytes).map_err(|e| wrt_error::Error::from(e))
+        memory.read(offset, bytes)
     }
 
-    fn memory_write(
-        &mut self,
-        memory_idx: u32,
-        offset: u32,
-        bytes: &[u8],
-    ) -> wrt_error::Result<()> {
-        let memory = self
-            .frame
-            .get_memory(memory_idx, self.engine)
-            .map_err(|e| wrt_error::Error::from(e))?;
+    fn memory_write(&mut self, memory_idx: u32, offset: u32, bytes: &[u8]) -> Result<()> {
+        let memory = self.frame.get_memory(memory_idx, self.engine)?;
 
-        memory.write(offset, bytes).map_err(|e| wrt_error::Error::from(e))
+        memory.write(offset, bytes)
     }
 }
 
 #[cfg(feature = "platform")]
 impl<'a> SimdContext for WrtExecutionContextAdapter<'a> {
-    fn execute_simd_op(&mut self, op: SimdOp, inputs: &[Value]) -> wrt_error::Result<Value> {
+    fn execute_simd_op(&mut self, op: SimdOp, inputs: &[Value]) -> Result<Value> {
         // Use the comprehensive SIMD implementation
         let provider = self.simd_runtime.provider();
         simd_runtime_impl::execute_simd_operation(op, inputs, provider.as_ref())
@@ -168,27 +194,25 @@ impl<'a> SimdContext for WrtExecutionContextAdapter<'a> {
 
 /// Extract v128 bytes from a Value
 #[cfg(feature = "platform")]
-fn extract_v128_bytes(value: &Value) -> wrt_error::Result<[u8; 16]> {
+fn extract_v128_bytes(value: &Value) -> Result<[u8; 16]> {
     match value {
         Value::V128(bytes) => Ok(*bytes),
-        _ => Err(wrt_error::Error::new(
-            wrt_error::ErrorCategory::Type,
-            wrt_error::codes::TYPE_MISMATCH,
-            format!("Expected v128 value, got {:?}", value.value_type())
-        ))
+        _ => Err(Error::runtime_execution_error(
+            "Expected v128 value, got {:?}",
+        )),
     }
 }
 
 #[cfg(feature = "platform")]
 impl<'a> SimdExecutionContext for WrtExecutionContextAdapter<'a> {
-    fn pop_value(&mut self) -> wrt_error::Result<Value> {
-        self.stack.pop().map_err(|e| wrt_error::Error::from(e))
+    fn pop_value(&mut self) -> Result<Value> {
+        self.stack.pop()
     }
-    
-    fn push_value(&mut self, value: Value) -> wrt_error::Result<()> {
-        self.stack.push(value).map_err(|e| wrt_error::Error::from(e))
+
+    fn push_value(&mut self, value: Value) -> Result<()> {
+        self.stack.push(value)
     }
-    
+
     fn simd_context(&mut self) -> &mut dyn SimdContext {
         self as &mut dyn SimdContext
     }
@@ -196,7 +220,7 @@ impl<'a> SimdExecutionContext for WrtExecutionContextAdapter<'a> {
 
 /// Implementation of AggregateOperations for WrtExecutionContextAdapter
 impl<'a> AggregateOperations for WrtExecutionContextAdapter<'a> {
-    fn get_struct_type(&self, type_index: u32) -> wrt_error::Result<Option<u32>> {
+    fn get_struct_type(&self, type_index: u32) -> Result<Option<u32>> {
         // In a full implementation, this would query the module's type section
         // For now, we'll assume types 0-99 exist (mock implementation)
         if type_index < 100 {
@@ -205,8 +229,8 @@ impl<'a> AggregateOperations for WrtExecutionContextAdapter<'a> {
             Ok(None)
         }
     }
-    
-    fn get_array_type(&self, type_index: u32) -> wrt_error::Result<Option<u32>> {
+
+    fn get_array_type(&self, type_index: u32) -> Result<Option<u32>> {
         // In a full implementation, this would query the module's type section
         // For now, we'll assume types 0-99 exist (mock implementation)
         if type_index < 100 {
@@ -215,29 +239,27 @@ impl<'a> AggregateOperations for WrtExecutionContextAdapter<'a> {
             Ok(None)
         }
     }
-    
-    fn validate_struct_type(&self, type_index: u32) -> wrt_error::Result<()> {
-        // In a full implementation, this would validate against the module's type section
+
+    fn validate_struct_type(&self, type_index: u32) -> Result<()> {
+        // In a full implementation, this would validate against the module's type
+        // section
         if type_index < 100 {
             Ok(())
         } else {
-            Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::TYPE_MISMATCH,
-                format!("Invalid struct type index: {}", type_index)
+            Err(Error::runtime_execution_error(
+                "Invalid struct type index: {}",
             ))
         }
     }
-    
-    fn validate_array_type(&self, type_index: u32) -> wrt_error::Result<()> {
-        // In a full implementation, this would validate against the module's type section
+
+    fn validate_array_type(&self, type_index: u32) -> Result<()> {
+        // In a full implementation, this would validate against the module's type
+        // section
         if type_index < 100 {
             Ok(())
         } else {
-            Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::TYPE_MISMATCH,
-                format!("Invalid array type index: {}", type_index)
+            Err(Error::runtime_execution_error(
+                "Invalid array type index: {}",
             ))
         }
     }

@@ -17,15 +17,24 @@
 #[cfg(not(feature = "std"))]
 use core::fmt;
 #[cfg(not(feature = "std"))]
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{
+    AtomicU32,
+    Ordering,
+};
 #[cfg(feature = "std")]
 use std::fmt;
 #[cfg(feature = "std")]
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{
+    AtomicU32,
+    Ordering,
+};
 
-use crate::{
-    traits::{FromBytes, ReadStream, SerializationError, ToBytes, WriteStream},
-    WrtResult,
+use crate::traits::{
+    FromBytes,
+    ReadStream,
+    SerializationError,
+    ToBytes,
+    WriteStream,
 };
 
 /// Defines the level of verification to apply for checksums and other checks.
@@ -33,16 +42,16 @@ use crate::{
 #[repr(u8)]
 pub enum VerificationLevel {
     /// No verification checks are performed.
-    Off = 0,
+    Off       = 0,
     /// Basic verification checks (e.g., length checks).
-    Basic = 1,
+    Basic     = 1,
     /// Standard verification checks (reasonable default).
     #[default]
-    Standard = 2,
+    Standard  = 2,
     /// Full verification including checksums on every relevant operation.
-    Full = 3,
+    Full      = 3,
     /// Perform verification checks based on sampling.
-    Sampling = 4,
+    Sampling  = 4,
     /// Perform redundant checks in addition to sampling or full checks.
     Redundant = 5,
 }
@@ -73,7 +82,7 @@ impl VerificationLevel {
                 // Get the current counter value and increment it atomically
                 let current = COUNTER.fetch_add(1, Ordering::Relaxed);
                 (current % 256) < u32::from(operation_importance)
-            }
+            },
             Self::Full => true,
             Self::Redundant => true, // Redundant implies Full for standard verification checks
         }
@@ -108,7 +117,7 @@ impl ToBytes for VerificationLevel {
         &self,
         writer: &mut WriteStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         writer.write_u8(self.to_byte())
     }
 }
@@ -117,7 +126,7 @@ impl FromBytes for VerificationLevel {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let byte = reader.read_u8()?;
         match byte {
             0 => Ok(VerificationLevel::Off),
@@ -201,7 +210,10 @@ impl Checksum {
     /// Create a checksum from a u32 value
     #[must_use]
     pub fn from_value(value: u32) -> Self {
-        Self { a: value & 0xFFFF, b: value >> 16 }
+        Self {
+            a: value & 0xFFFF,
+            b: value >> 16,
+        }
     }
 }
 
@@ -216,7 +228,7 @@ impl ToBytes for Checksum {
         &self,
         writer: &mut WriteStream<'a>,
         _provider: &PStream, // Provider not directly used for u32
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         writer.write_u32_le(self.value())
     }
 }
@@ -225,7 +237,7 @@ impl FromBytes for Checksum {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         _provider: &PStream, // Provider not directly used for u32
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let value = reader.read_u32_le()?;
         Ok(Checksum::from_value(value))
     }

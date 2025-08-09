@@ -14,10 +14,10 @@
 #![cfg_attr(not(feature = "std"), allow(unused_imports))]
 
 // Standard imports
-#[cfg(all(not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 extern crate alloc;
 
-#[cfg(all(not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 #[cfg(not(feature = "std"))]
 use core::fmt;
@@ -27,22 +27,46 @@ use std::fmt;
 #[cfg(feature = "std")]
 use std::vec::Vec;
 
-use wrt_error::Result;
+// Result type alias
+type Result<T> = wrt_error::Result<T>;
 
 // Import error codes
 use crate::codes;
 #[cfg(feature = "std")]
-use crate::prelude::{String, ToString};
+use crate::prelude::{
+    String,
+    ToString,
+};
 // Crate-level imports
 use crate::{
-    bounded::{BoundedStack, BoundedString, BoundedVec, WasmName},
-    resource::{Resource, ResourceItem, ResourceRepr, ResourceType, MAX_RESOURCE_FIELD_NAME_LEN},
-    safe_memory::{
-        DefaultNoStdProvider, NoStdProvider, SafeMemoryHandler, DEFAULT_MEMORY_PROVIDER_CAPACITY,
+    bounded::{
+        BoundedStack,
+        BoundedString,
+        BoundedVec,
+        WasmName,
     },
-    traits::{Checksummable, FromBytes, ToBytes},
+    resource::{
+        Resource,
+        ResourceItem,
+        ResourceRepr,
+        ResourceType,
+        MAX_RESOURCE_FIELD_NAME_LEN,
+    },
+    safe_memory::{
+        DefaultNoStdProvider,
+        NoStdProvider,
+        SafeMemoryHandler,
+        DEFAULT_MEMORY_PROVIDER_CAPACITY,
+    },
+    traits::{
+        Checksummable,
+        FromBytes,
+        ToBytes,
+    },
     verification::VerificationLevel,
-    Error, ErrorCategory, MemoryProvider, WrtResult,
+    Error,
+    ErrorCategory,
+    MemoryProvider,
 };
 
 /// Generic builder for bounded collections.
@@ -51,10 +75,10 @@ use crate::{
 /// collections like `BoundedVec`, `BoundedStack`, etc. with proper resource
 /// Binary std/no_std choice
 pub struct BoundedBuilder<T, const N: usize, P: MemoryProvider + Default + Clone> {
-    provider: P,
+    provider:           P,
     verification_level: VerificationLevel,
-    initial_capacity: Option<usize>,
-    _phantom: PhantomData<T>,
+    initial_capacity:   Option<usize>,
+    _phantom:           PhantomData<T>,
 }
 
 impl<T, const N: usize, P: MemoryProvider + Default + Clone> Default for BoundedBuilder<T, N, P>
@@ -63,10 +87,10 @@ where
 {
     fn default() -> Self {
         Self {
-            provider: P::default(),
+            provider:           P::default(),
             verification_level: VerificationLevel::default(),
-            initial_capacity: None,
-            _phantom: PhantomData,
+            initial_capacity:   None,
+            _phantom:           PhantomData,
         }
     }
 }
@@ -99,7 +123,7 @@ where
     }
 
     /// Builds a `BoundedVec` with the configured settings.
-    pub fn build_vec(self) -> WrtResult<BoundedVec<T, N, P>>
+    pub fn build_vec(self) -> wrt_error::Result<BoundedVec<T, N, P>>
     where
         T: Clone + PartialEq + Eq,
         P: PartialEq + Eq,
@@ -110,21 +134,25 @@ where
     }
 
     /// Builds a BoundedStack with the configured settings.
-    pub fn build_stack(self) -> WrtResult<BoundedStack<T, N, P>> {
+    pub fn build_stack(self) -> wrt_error::Result<BoundedStack<T, N, P>> {
         BoundedStack::with_verification_level(self.provider, self.verification_level)
     }
 }
 
 /// Builder for `BoundedString` and `WasmName` types.
 pub struct StringBuilder<const N: usize, P: MemoryProvider + Default + Clone> {
-    provider: P,
-    initial_content: Option<&'static str>,
+    provider:           P,
+    initial_content:    Option<&'static str>,
     truncate_if_needed: bool,
 }
 
 impl<const N: usize, P: MemoryProvider + Default + Clone> Default for StringBuilder<N, P> {
     fn default() -> Self {
-        Self { provider: P::default(), initial_content: None, truncate_if_needed: false }
+        Self {
+            provider:           P::default(),
+            initial_content:    None,
+            truncate_if_needed: false,
+        }
     }
 }
 
@@ -153,27 +181,27 @@ impl<const N: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq> Strin
     }
 
     /// Builds a `BoundedString` with the configured settings.
-    pub fn build_string(self) -> WrtResult<BoundedString<N, P>> {
+    pub fn build_string(self) -> wrt_error::Result<BoundedString<N, P>> {
         match (self.initial_content, self.truncate_if_needed) {
             (Some(content), true) => {
                 BoundedString::from_str_truncate(content, self.provider).map_err(Error::from)
-            }
+            },
             (Some(content), false) => {
                 BoundedString::from_str(content, self.provider).map_err(Error::from)
-            }
+            },
             (None, _) => BoundedString::from_str_truncate("", self.provider).map_err(Error::from),
         }
     }
 
     /// Builds a WasmName with the configured settings.
-    pub fn build_wasm_name(self) -> WrtResult<WasmName<N, P>> {
+    pub fn build_wasm_name(self) -> wrt_error::Result<WasmName<N, P>> {
         match (self.initial_content, self.truncate_if_needed) {
             (Some(content), true) => {
                 WasmName::from_str_truncate(content, self.provider).map_err(Error::from)
-            }
+            },
             (Some(content), false) => {
                 WasmName::from_str(content, self.provider).map_err(Error::from)
-            }
+            },
             (None, _) => WasmName::new(self.provider).map_err(Error::from),
         }
     }
@@ -184,15 +212,20 @@ impl<const N: usize, P: MemoryProvider + Default + Clone + PartialEq + Eq> Strin
 /// This builder provides a fluent API for constructing Resource objects,
 /// which represent WebAssembly component model resources.
 pub struct ResourceBuilder<P: MemoryProvider + Default + Clone + Eq> {
-    id: Option<u32>,
-    repr: Option<ResourceRepr<P>>,
-    name: Option<&'static str>,
+    id:                 Option<u32>,
+    repr:               Option<ResourceRepr<P>>,
+    name:               Option<&'static str>,
     verification_level: VerificationLevel,
 }
 
 impl<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> Default for ResourceBuilder<P> {
     fn default() -> Self {
-        Self { id: None, repr: None, name: None, verification_level: VerificationLevel::default() }
+        Self {
+            id:                 None,
+            repr:               None,
+            name:               None,
+            verification_level: VerificationLevel::default(),
+        }
     }
 }
 
@@ -227,7 +260,7 @@ impl<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> ResourceBuilder<P> {
     }
 
     /// Builds a Resource with the configured settings.
-    pub fn build(self) -> WrtResult<Resource<P>> {
+    pub fn build(self) -> wrt_error::Result<Resource<P>> {
         let id = self.id.ok_or_else(|| {
             Error::new_static(
                 ErrorCategory::Validation,
@@ -249,7 +282,7 @@ impl<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> ResourceBuilder<P> {
                 let wasm_name =
                     WasmName::from_str_truncate(name_str, P::default()).map_err(Error::from)?;
                 Some(wasm_name)
-            }
+            },
             None => None,
         };
 
@@ -262,7 +295,7 @@ impl<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> ResourceBuilder<P> {
 /// This builder provides a fluent API for constructing ResourceType objects
 /// used in the WebAssembly component model.
 pub struct ResourceTypeBuilder<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> {
-    variant: Option<ResourceTypeVariant<P>>,
+    variant:  Option<ResourceTypeVariant<P>>,
     provider: P,
 }
 
@@ -286,7 +319,10 @@ enum ResourceTypeVariant<P: MemoryProvider + Default + Clone + Eq> {
 
 impl<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> Default for ResourceTypeBuilder<P> {
     fn default() -> Self {
-        Self { variant: None, provider: P::default() }
+        Self {
+            variant:  None,
+            provider: P::default(),
+        }
     }
 }
 
@@ -357,14 +393,14 @@ impl<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> ResourceTypeBuilder<
                     bounded_fields.push(bounded_name)?;
                 }
                 Ok(ResourceType::Record(bounded_fields))
-            }
+            },
             ResourceTypeVariant::Aggregate(ids) => {
                 let mut bounded_ids = BoundedVec::new(self.provider)?;
                 for id in ids {
                     bounded_ids.push(id)?;
                 }
                 Ok(ResourceType::Aggregate(bounded_ids))
-            }
+            },
         }
     }
 
@@ -384,12 +420,12 @@ impl<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> ResourceTypeBuilder<
                 let mut bounded_fields = BoundedVec::new(self.provider.clone())?;
                 bounded_fields.push(field)?;
                 Ok(ResourceType::Record(bounded_fields))
-            }
+            },
             ResourceTypeVariant::Aggregate(id) => {
                 let mut bounded_ids = BoundedVec::new(self.provider)?;
                 bounded_ids.push(id)?;
                 Ok(ResourceType::Aggregate(bounded_ids))
-            }
+            },
         }
     }
 }
@@ -399,15 +435,20 @@ impl<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> ResourceTypeBuilder<
 /// This builder provides a fluent API for constructing ResourceItem objects
 /// used in the WebAssembly component model.
 pub struct ResourceItemBuilder<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> {
-    id: Option<u32>,
-    type_: Option<ResourceType<P>>,
-    name: Option<&'static str>,
+    id:       Option<u32>,
+    type_:    Option<ResourceType<P>>,
+    name:     Option<&'static str>,
     provider: P,
 }
 
 impl<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> Default for ResourceItemBuilder<P> {
     fn default() -> Self {
-        Self { id: None, type_: None, name: None, provider: P::default() }
+        Self {
+            id:       None,
+            type_:    None,
+            name:     None,
+            provider: P::default(),
+        }
     }
 }
 
@@ -463,7 +504,7 @@ impl<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> ResourceItemBuilder<
             Some(name_str) => {
                 let wasm_name = WasmName::from_str_truncate(name_str, self.provider.clone())?;
                 Some(wasm_name)
-            }
+            },
             None => None,
         };
 
@@ -473,18 +514,18 @@ impl<P: MemoryProvider + Default + Clone + Eq + fmt::Debug> ResourceItemBuilder<
 
 /// Builder for memory providers and adapters.
 pub struct MemoryBuilder<P: MemoryProvider + Default + Clone> {
-    provider: P,
-    required_size: Option<usize>,
-    alignment: Option<usize>,
+    provider:           P,
+    required_size:      Option<usize>,
+    alignment:          Option<usize>,
     verification_level: VerificationLevel,
 }
 
 impl<P: MemoryProvider + Default + Clone> Default for MemoryBuilder<P> {
     fn default() -> Self {
         Self {
-            provider: P::default(),
-            required_size: None,
-            alignment: None,
+            provider:           P::default(),
+            required_size:      None,
+            alignment:          None,
             verification_level: VerificationLevel::default(),
         }
     }
@@ -521,7 +562,7 @@ impl<P: MemoryProvider + Default + Clone> MemoryBuilder<P> {
     }
 
     /// Builds a SafeMemoryHandler with the configured settings.
-    pub fn build_safe_memory_handler(self) -> WrtResult<SafeMemoryHandler<P>> {
+    pub fn build_safe_memory_handler(self) -> wrt_error::Result<SafeMemoryHandler<P>> {
         // First, configure the provider with the required verification level
         let mut provider = self.provider;
         provider.set_verification_level(self.verification_level);
@@ -548,106 +589,18 @@ impl<P: MemoryProvider + Default + Clone> MemoryBuilder<P> {
     }
 }
 
-/// Generic builder for NoStdProvider instances.
-///
-/// This builder allows creating a `NoStdProvider` with a specific capacity at
-/// compile time through the const generic parameter N.
-pub struct NoStdProviderBuilder<const N: usize> {
-    verification_level: VerificationLevel,
-    init_size: Option<usize>,
-}
-
-impl<const N: usize> Default for NoStdProviderBuilder<N> {
-    fn default() -> Self {
-        Self { verification_level: VerificationLevel::default(), init_size: None }
-    }
-}
-
-impl<const N: usize> NoStdProviderBuilder<N> {
-    /// Creates a new builder with default settings for NoStdProvider<N>.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Sets the initial size for the provider's internal buffer.
-    /// This size cannot exceed the fixed capacity N.
-    pub fn with_init_size(mut self, size: usize) -> Self {
-        self.init_size = Some(size.min(N));
-        self
-    }
-
-    /// Sets the verification level for memory operations.
-    pub fn with_verification_level(mut self, level: VerificationLevel) -> Self {
-        self.verification_level = level;
-        self
-    }
-
-    /// Builds a NoStdProvider with the configured settings.
-    pub fn build(self) -> WrtResult<NoStdProvider<N>> {
-        // Create the provider with the specified verification level
-        let mut provider = NoStdProvider::<N>::with_verification_level(self.verification_level);
-
-        // If an initial size was specified, resize the provider accordingly
-        if let Some(size) = self.init_size {
-            provider.resize(size)?;
-        }
-
-        Ok(provider)
-    }
-}
-
-/// Backwards compatibility type for code using the old non-generic
-/// NoStdProviderBuilder
-pub struct NoStdProviderBuilder1 {
-    size: usize,
-    verification_level: VerificationLevel,
-}
-
-impl Default for NoStdProviderBuilder1 {
-    fn default() -> Self {
-        Self {
-            size: DEFAULT_MEMORY_PROVIDER_CAPACITY,
-            verification_level: VerificationLevel::default(),
-        }
-    }
-}
-
-impl NoStdProviderBuilder1 {
-    /// Creates a new builder with default settings.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Sets the size for the provider's internal buffer.
-    pub fn with_size(mut self, size: usize) -> Self {
-        self.size = size;
-        self
-    }
-
-    /// Sets the verification level for memory operations.
-    pub fn with_verification_level(mut self, level: VerificationLevel) -> Self {
-        self.verification_level = level;
-        self
-    }
-
-    /// Builds a NoStdProvider with the configured settings.
-    pub fn build(self) -> WrtResult<DefaultNoStdProvider> {
-        let mut provider = DefaultNoStdProvider::with_verification_level(self.verification_level);
-        if self.size > 0 && self.size <= DEFAULT_MEMORY_PROVIDER_CAPACITY {
-            provider.resize(self.size)?;
-        }
-        Ok(provider)
-    }
-}
-
-/// Convenience type aliases for common NoStdProvider sizes
-pub type SmallNoStdProviderBuilder = NoStdProviderBuilder<512>;
-pub type MediumNoStdProviderBuilder = NoStdProviderBuilder<4096>;
-pub type LargeNoStdProviderBuilder = NoStdProviderBuilder<16_384>;
+// Note: NoStdProviderBuilder and NoStdProviderBuilder1 have been removed.
+// Use safe_managed_alloc!(size, crate_id) instead.
 
 #[cfg(test)]
 mod tests {
+    #[cfg(all(not(feature = "std"), feature = "alloc"))]
+    use alloc::format;
+    #[cfg(feature = "std")]
+    use std::format;
+
     use super::*;
+    use crate::traits::BoundedCapacity;
 
     #[test]
     fn test_bounded_builder() {
@@ -661,8 +614,9 @@ mod tests {
 
     #[test]
     fn test_string_builder() {
-        let builder =
-            StringBuilder::<256, NoStdProvider<1024>>::new().with_content("test").with_truncation(true);
+        let builder = StringBuilder::<256, NoStdProvider<1024>>::new()
+            .with_content("test")
+            .with_truncation(true);
 
         let string = builder.build_string().unwrap();
         assert_eq!(string.as_str().unwrap(), "test");
@@ -678,9 +632,9 @@ mod tests {
         match resource_type {
             ResourceType::Record(fields) => {
                 assert_eq!(fields.len(), 2);
-                assert_eq!(fields[0].as_str().unwrap(), "field1");
-                assert_eq!(fields[1].as_str().unwrap(), "field2");
-            }
+                assert_eq!(fields.get(0).unwrap().as_str().unwrap(), "field1");
+                assert_eq!(fields.get(1).unwrap().as_str().unwrap(), "field2");
+            },
             _ => panic!("Expected ResourceType::Record"),
         }
 
@@ -691,10 +645,10 @@ mod tests {
         match resource_type {
             ResourceType::Aggregate(ids) => {
                 assert_eq!(ids.len(), 3);
-                assert_eq!(ids[0], 1);
-                assert_eq!(ids[1], 2);
-                assert_eq!(ids[2], 3);
-            }
+                assert_eq!(ids.get(0).unwrap(), 1);
+                assert_eq!(ids.get(1).unwrap(), 2);
+                assert_eq!(ids.get(2).unwrap(), 3);
+            },
             _ => panic!("Expected ResourceType::Aggregate"),
         }
     }
@@ -718,60 +672,23 @@ mod tests {
         let resource_item = builder.build().unwrap();
 
         assert_eq!(resource_item.id, 42);
-        assert_eq!(resource_item.name.unwrap().as_str().unwrap(), "test_resource");
+        assert_eq!(
+            resource_item.name.unwrap().as_str().unwrap(),
+            "test_resource"
+        );
         match &resource_item.type_ {
             ResourceType::Record(fields) => {
                 assert_eq!(fields.len(), 2);
-                assert_eq!(fields[0].as_str().unwrap(), "field1");
-                assert_eq!(fields[1].as_str().unwrap(), "field2");
-            }
+                assert_eq!(fields.get(0).unwrap().as_str().unwrap(), "field1");
+                assert_eq!(fields.get(1).unwrap().as_str().unwrap(), "field2");
+            },
             _ => panic!("Expected ResourceType::Record"),
         }
     }
 
-    #[test]
-    fn test_no_std_provider_builder() {
-        // Test with small provider (512 bytes)
-        let builder = NoStdProviderBuilder::<512>::new()
-            .with_init_size(256)
-            .with_verification_level(VerificationLevel::Full);
+    // NOTE: NoStdProviderBuilder tests removed - use safe_managed_alloc!()
+    // macro instead
 
-        let provider = builder.build().unwrap();
-        assert_eq!(provider.capacity(), 512);
-        assert_eq!(provider.size(), 256);
-        assert_eq!(provider.verification_level(), VerificationLevel::Full);
-
-        // Test with medium provider using type alias
-        let builder =
-            MediumNoStdProviderBuilder::new().with_verification_level(VerificationLevel::Full);
-
-        let provider = builder.build().unwrap();
-        assert_eq!(provider.capacity(), 4096);
-        assert_eq!(provider.verification_level(), VerificationLevel::Full);
-
-        // Test that init_size is capped at capacity
-        let builder = SmallNoStdProviderBuilder::new().with_init_size(1000); // Larger than 512 capacity
-
-        let provider = builder.build().unwrap();
-        assert_eq!(provider.size(), 512); // Capped at 512
-    }
-
-    #[test]
-    fn test_no_std_provider_builder_legacy() {
-        // Test the legacy (non-generic) builder for backward compatibility
-        let builder = NoStdProviderBuilder1::new()
-            .with_size(1024)
-            .with_verification_level(VerificationLevel::Full);
-
-        let provider = builder.build().unwrap();
-        assert_eq!(provider.capacity(), DEFAULT_MEMORY_PROVIDER_CAPACITY);
-        assert_eq!(provider.size(), 1024);
-        assert_eq!(provider.verification_level(), VerificationLevel::Full);
-
-        // Test with default settings
-        let builder = NoStdProviderBuilder1::new();
-        let provider = builder.build().unwrap();
-        assert_eq!(provider.capacity(), DEFAULT_MEMORY_PROVIDER_CAPACITY);
-        assert_eq!(provider.verification_level(), VerificationLevel::default());
-    }
+    // NOTE: NoStdProviderBuilder1 tests removed - use safe_managed_alloc!()
+    // macro instead
 }

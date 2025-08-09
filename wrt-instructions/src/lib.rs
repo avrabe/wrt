@@ -42,6 +42,10 @@ extern crate alloc;
 // Import prelude for common type access
 pub mod prelude;
 
+// Bounded infrastructure for static memory allocation
+#[cfg(not(feature = "std"))]
+pub mod bounded_instruction_infra;
+
 pub mod arithmetic_ops;
 pub mod comparison_ops;
 pub mod const_expr;
@@ -60,7 +64,7 @@ pub mod validation;
 pub mod variable_ops;
 
 // CFI-enhanced control flow operations
-// pub mod cfi_control_ops; // Temporarily disabled due to ConfigurableProvider trait issues
+pub mod cfi_control_ops;
 
 // SIMD operations
 pub mod simd_ops;
@@ -76,65 +80,134 @@ pub mod branch_hinting;
 
 // Re-export commonly used types
 pub use control_ops::BranchTarget;
-
 // Test module for arithmetic operations
 #[cfg(test)]
-mod arithmetic_test;
+// arithmetic tests moved to arithmetic_ops.rs
 
 // Re-exports for convenience
 // Re-export prelude for convenience
 pub use prelude::*;
-pub use wrt_error::{Error, Result};
+pub use wrt_error::{
+    Error,
+    Result,
+};
 pub use wrt_foundation::{
-    types::ValueType, values::Value, BlockType, RefType, Result as TypesResult,
+    types::ValueType,
+    values::Value,
+    BlockType,
+    RefType,
 };
 
-// Re-export CFI control flow operations - temporarily disabled
-// pub use crate::cfi_control_ops::{
-//     CfiControlFlowOps, CfiControlFlowProtection, CfiExecutionContext, CfiLandingPad,
-//     CfiProtectedBranchTarget, CfiProtectionLevel, CfiTargetProtection, CfiTargetType,
-//     DefaultCfiControlFlowOps,
-// };
+// Re-export Aggregate operations
+pub use crate::aggregate_ops::{
+    AggregateOp,
+    AggregateOperations,
+    ArrayGet,
+    ArrayLen,
+    ArrayNew,
+    ArraySet,
+    StructGet,
+    StructNew,
+    StructSet,
+};
+// Re-export Atomic operations
+pub use crate::atomic_ops::{
+    AtomicCmpxchgInstr,
+    AtomicFence,
+    AtomicLoadOp,
+    AtomicOp,
+    AtomicRMWInstr,
+    AtomicRMWOp,
+    AtomicStoreOp,
+    AtomicWaitNotifyOp,
+};
+// Re-export Branch Hinting operations
+pub use crate::branch_hinting::{
+    BrOnNonNull,
+    BrOnNull,
+    BranchHintOp,
+    BranchHintingContext,
+};
+// Re-export CFI control flow operations
+pub use crate::cfi_control_ops::{
+    CfiControlFlowOps,
+    CfiControlFlowProtection,
+    CfiExecutionContext,
+    CfiLandingPad,
+    CfiProtectedBranchTarget,
+    CfiProtectionLevel,
+    CfiTargetProtection,
+    CfiTargetType,
+    DefaultCfiControlFlowOps,
+};
 pub use crate::control_ops::{
-    Block, ControlBlockType, ControlOp, Return, CallIndirect, BrTable,
-    FunctionOperations, ControlContext,
+    Block,
+    BrTable,
+    CallIndirect,
+    ControlBlockType,
+    ControlContext,
     // BranchTarget is already exported from control_ops above
+    ControlOp,
+    FunctionOperations,
+    Return,
 };
 // Re-export main execution trait and specific Op enums
 // pub use crate::execution::PureExecutionContext; // Temporarily disabled
 pub use crate::memory_ops::{
-    MemoryContext, MemoryGrow, MemoryLoad, MemoryOp, MemorySize, MemoryStore,
+    MemoryContext,
+    MemoryGrow,
+    MemoryLoad,
+    MemoryOp,
+    MemorySize,
+    MemoryStore,
 }; // Removed MemoryArg
-pub use crate::{
-    arithmetic_ops::{ArithmeticOp, ArithmeticContext}, comparison_ops::{ComparisonOp, ComparisonContext}, conversion_ops::{ConversionOp, ConversionContext},
-    instruction_traits::PureInstruction, parametric_ops::ParametricOp,
-    table_ops::{TableOp, TableGet, TableSet, TableSize, TableGrow, TableFill, TableCopy, TableInit, ElemDrop, TableOperations, ElementSegmentOperations, TableContext},
-    variable_ops::VariableOp,
-};
-
-// Re-export SIMD operations
-pub use crate::simd_ops::{SimdOp, SimdInstruction, SimdContext, SimdExecutionContext};
-
-// Re-export Aggregate operations
-pub use crate::aggregate_ops::{
-    AggregateOp, AggregateOperations, StructNew, StructGet, StructSet,
-    ArrayNew, ArrayGet, ArraySet, ArrayLen,
-};
-
-// Re-export Atomic operations
-pub use crate::atomic_ops::{
-    AtomicOp, AtomicLoadOp, AtomicStoreOp, AtomicRMWInstr, AtomicCmpxchgInstr,
-    AtomicWaitNotifyOp, AtomicFence, AtomicRMWOp,
-};
-
 // Re-export Reference operations
 pub use crate::reference_ops::{
-    ReferenceOp, ReferenceOperations, RefNull, RefIsNull, RefFunc, RefAsNonNull, RefEq,
+    RefAsNonNull,
+    RefEq,
+    RefFunc,
+    RefIsNull,
+    RefNull,
+    ReferenceOp,
+    ReferenceOperations,
 };
-
-// Re-export Branch Hinting operations
-pub use crate::branch_hinting::{
-    BranchHintOp, BranchHintingContext, BrOnNull, BrOnNonNull,
+// Re-export SIMD operations
+pub use crate::simd_ops::{
+    SimdContext,
+    SimdExecutionContext,
+    SimdInstruction,
+    SimdOp,
+};
+pub use crate::{
+    arithmetic_ops::{
+        ArithmeticContext,
+        ArithmeticOp,
+    },
+    comparison_ops::{
+        ComparisonContext,
+        ComparisonOp,
+    },
+    conversion_ops::{
+        ConversionContext,
+        ConversionOp,
+    },
+    instruction_traits::PureInstruction,
+    parametric_ops::ParametricOp,
+    table_ops::{
+        ElemDrop,
+        ElementSegmentOperations,
+        TableContext,
+        TableCopy,
+        TableFill,
+        TableGet,
+        TableGrow,
+        TableInit,
+        TableOp,
+        TableOperations,
+        TableSet,
+        TableSize,
+    },
+    variable_ops::VariableOp,
 };
 
 // If there's a combined Instruction enum, export it here. Otherwise, runtime
@@ -142,9 +215,9 @@ pub use crate::branch_hinting::{
 // Control(ControlOp), ... }
 
 // Panic handler disabled to avoid conflicts with other crates
-// // Provide a panic handler only when wrt-instructions is being tested in isolation
-// #[cfg(all(not(feature = "std"), not(test), not(feature = "disable-panic-handler")))]
-// #[panic_handler]
+// // Provide a panic handler only when wrt-instructions is being tested in
+// isolation #[cfg(all(not(feature = "std"), not(test), not(feature =
+// "disable-panic-handler")))] #[panic_handler]
 // fn panic(_info: &core::panic::PanicInfo) -> ! {
 //     loop {}
 // }

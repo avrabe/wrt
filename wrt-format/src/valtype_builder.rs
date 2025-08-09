@@ -55,11 +55,7 @@ pub fn build_record<P: MemoryProvider + Default + Clone + PartialEq + Eq>(
         
         // Push to bounded vec
         bounded_fields.push((wasm_name, type_ref)).map_err(|_| {
-            Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_ERROR,
-                "Failed to push to bounded fields"
-            )
+            Error::memory_error("Failed to push to bounded fields")
         })?;
     }
     
@@ -79,11 +75,7 @@ pub fn build_variant<P: MemoryProvider + Default + Clone + PartialEq + Eq>(
         let maybe_type_ref = maybe_val_type.map(|vt| type_store.store_type(vt));
         
         bounded_cases.push((wasm_name, maybe_type_ref)).map_err(|_| {
-            Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_ERROR,
-                "Failed to push to bounded cases"
-            )
+            Error::memory_error("Failed to push to bounded cases")
         })?;
     }
     
@@ -101,11 +93,7 @@ pub fn build_tuple<P: MemoryProvider + Default + Clone + PartialEq + Eq>(
     for val_type in types {
         let type_ref = type_store.store_type(val_type);
         bounded_types.push(type_ref).map_err(|_| {
-            Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_ERROR,
-                "Failed to push to bounded tuple"
-            )
+            Error::memory_error("Failed to push to bounded tuple")
         })?;
     }
     
@@ -122,11 +110,7 @@ pub fn build_flags<P: MemoryProvider + Default + Clone + PartialEq + Eq>(
     for name in names {
         let wasm_name = WasmName::from_str(&name, provider.clone())?;
         bounded_names.push(wasm_name).map_err(|_| {
-            Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_ERROR,
-                "Failed to push to bounded flags"
-            )
+            Error::memory_error("Failed to push to bounded flags")
         })?;
     }
     
@@ -143,11 +127,7 @@ pub fn build_enum<P: MemoryProvider + Default + Clone + PartialEq + Eq>(
     for name in names {
         let wasm_name = WasmName::from_str(&name, provider.clone())?;
         bounded_names.push(wasm_name).map_err(|_| {
-            Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_ERROR,
-                "Failed to push to bounded enum"
-            )
+            Error::memory_error("Failed to push to bounded enum")
         })?;
     }
     

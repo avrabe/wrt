@@ -13,6 +13,7 @@ path = "lib.rs"
 wrt = { workspace = true }
 wrt-component = { workspace = true }
 wrt-decoder = { workspace = true }
+wrt-error = { workspace = true }
 wrt-format = { workspace = true }
 wrt-foundation = { workspace = true }
 wrt-host = { workspace = true }
@@ -20,10 +21,30 @@ wrt-instructions = { workspace = true }
 wrt-platform = { workspace = true }
 wrt-runtime = { workspace = true }
 wrt-sync = { workspace = true }
-wrt-test-registry = { workspace = true }
 
 # Testing utilities
 tempfile = "3.0"
+
+# KANI formal verification (optional)
+kani-verifier = { version = "0.62.0", optional = true }
+
+[features]
+default = []
+# KANI formal verification support
+kani = [
+    "dep:kani-verifier",
+    "wrt-foundation/kani",
+    "wrt-component/kani",
+    "wrt-sync/kani",
+    "wrt-runtime/kani",
+    "wrt-error/kani"
+]
+# Alias for formal verification
+formal-verification = ["kani"]
+safety-asil-b = []
+safety-asil-c = ["safety-asil-b"]
+safety-asil-d = ["safety-asil-c"]
+
 
 [[test]]
 name = "component_model_tests"
@@ -44,4 +65,9 @@ path = "no_std/mod.rs"
 [[test]]
 name = "security_tests"
 path = "security/mod.rs"
+
+[[test]]
+name = "formal_verification_tests"
+path = "formal_verification/mod.rs"
+required-features = ["kani"]
 

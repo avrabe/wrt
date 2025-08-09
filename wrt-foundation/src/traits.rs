@@ -12,13 +12,25 @@ use core::fmt;
 #[cfg(feature = "std")]
 use std::fmt;
 
-use wrt_error::{codes, Error as WrtError, ErrorCategory};
+use wrt_error::{
+    codes,
+    Error as WrtError,
+    ErrorCategory,
+    Result,
+};
 
 use crate::{
     prelude::*,
-    safe_memory::{NoStdProvider, SafeMemoryHandler, Slice, SliceMut, Stats},
-    MemoryProvider as RootMemoryProvider, VerificationLevel, WrtResult,
-}; // Keep WrtResult, Added RootMemoryProvider etc. // Added WrtError,
+    safe_memory::{
+        NoStdProvider,
+        SafeMemoryHandler,
+        Slice,
+        SliceMut,
+        Stats,
+    },
+    MemoryProvider as RootMemoryProvider,
+    VerificationLevel,
+}; // Keep wrt_error::Result, Added RootMemoryProvider etc. // Added WrtError,
    // ErrorCategory, codes
 
 #[cfg(feature = "std")]
@@ -45,7 +57,7 @@ pub trait ToFormat<T>: Sized {
     /// # Errors
     ///
     /// Returns an error if the conversion fails.
-    fn to_format(&self) -> crate::WrtResult<T>;
+    fn to_format(&self) -> wrt_error::Result<T>;
 }
 
 /// Trait for types that can update a checksum.
@@ -65,10 +77,10 @@ pub trait Checksummable {
 /// representation
 pub trait LittleEndian: Sized {
     /// Convert from little-endian bytes
-    fn from_le_bytes(bytes: &[u8]) -> WrtResult<Self>;
+    fn from_le_bytes(bytes: &[u8]) -> wrt_error::Result<Self>;
 
     /// Writes the value as little-endian bytes to the provided writer.
-    fn write_le_bytes<W: BytesWriter>(&self, writer: &mut W) -> WrtResult<()>;
+    fn write_le_bytes<W: BytesWriter>(&self, writer: &mut W) -> wrt_error::Result<()>;
 }
 
 /// Trait for types that can be converted to WRT Value representation
@@ -78,7 +90,7 @@ pub trait ToWrtValue {
     /// # Errors
     ///
     /// Returns an error if the conversion fails.
-    fn to_wrt_value(&self) -> crate::WrtResult<crate::types::ValueType>;
+    fn to_wrt_value(&self) -> wrt_error::Result<crate::types::ValueType>;
 }
 
 // Implementations for primitive types
@@ -121,7 +133,7 @@ pub trait BytesWriter {
     /// # Errors
     ///
     /// Returns an error if the byte cannot be written (e.g., out of capacity).
-    fn write_byte(&mut self, byte: u8) -> WrtResult<()>;
+    fn write_byte(&mut self, byte: u8) -> wrt_error::Result<()>;
 
     /// Writes an entire slice of bytes.
     ///
@@ -130,7 +142,7 @@ pub trait BytesWriter {
     /// # Errors
     ///
     /// Returns an error if the bytes cannot be written (e.g., out of capacity).
-    fn write_all(&mut self, bytes: &[u8]) -> WrtResult<()>;
+    fn write_all(&mut self, bytes: &[u8]) -> wrt_error::Result<()>;
 }
 
 #[cfg(feature = "std")]
@@ -155,12 +167,12 @@ pub trait ToBytes: Sized {
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()>;
+    ) -> wrt_error::Result<()>;
 
     /// Serializes the type into a byte stream using the default memory
     /// provider. Requires `DefaultMemoryProvider` to be available.
     #[cfg(feature = "default-provider")]
-    fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> WrtResult<()> {
+    fn to_bytes<'a>(&self, writer: &mut WriteStream<'a>) -> wrt_error::Result<()> {
         let default_provider = DefaultMemoryProvider::default();
         self.to_bytes_with_provider(writer, &default_provider)
     }
@@ -173,13 +185,13 @@ pub trait FromBytes: Sized {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self>;
+    ) -> wrt_error::Result<Self>;
 
     /// Deserializes an instance of the type from a byte stream using the
     /// default memory provider. Requires `DefaultMemoryProvider` to be
     /// available.
     #[cfg(feature = "default-provider")]
-    fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> WrtResult<Self> {
+    fn from_bytes<'a>(reader: &mut ReadStream<'a>) -> wrt_error::Result<Self> {
         let default_provider = DefaultMemoryProvider::default();
         Self::from_bytes_with_provider(reader, &default_provider)
     }
@@ -210,27 +222,33 @@ impl fmt::Display for SerializationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SerializationError::IncorrectSize => {
-                write!(f, "Incorrect buffer or slice size for serialization/deserialization")
-            }
+                write!(
+                    f,
+                    "Incorrect buffer or slice size for serialization/deserialization"
+                )
+            },
             SerializationError::InvalidFormat => {
                 write!(f, "Invalid data format for deserialization")
-            }
+            },
             SerializationError::Custom(s) => write!(f, "Serialization error: {s}"),
             SerializationError::InvalidSliceLength => {
                 write!(f, "Invalid slice length for serialization/deserialization")
-            }
+            },
             SerializationError::NotEnoughData => {
                 write!(f, "Not enough data to deserialize the object")
-            }
+            },
             SerializationError::IoError => {
-                write!(f, "An I/O operation failed during serialization/deserialization")
-            }
+                write!(
+                    f,
+                    "An I/O operation failed during serialization/deserialization"
+                )
+            },
             SerializationError::UnexpectedEof => {
                 write!(f, "Unexpected end of input during deserialization")
-            }
+            },
             SerializationError::InvalidEnumValue => {
                 write!(f, "Invalid enum value during deserialization")
-            }
+            },
         }
     }
 }
@@ -238,7 +256,7 @@ impl fmt::Display for SerializationError {
 // Implement ToBytes/FromBytes for primitives
 
 macro_rules! impl_bytes_for_primitive {
-    ($($T:ty => $read_method:ident, $write_method:ident);* $(;)?) => {
+    ($($T:ty => $read_method:ident, $write_method:ident);*) => {
         $(
             impl ToBytes for $T {
                 fn serialized_size(&self) -> usize {
@@ -249,7 +267,7 @@ macro_rules! impl_bytes_for_primitive {
                     &self,
                     writer: &mut WriteStream<'a>,
                     _provider: &PStream, // Provider typically not needed for primitives
-                ) -> WrtResult<()> {
+                ) -> wrt_error::Result<()> {
                     writer.$write_method(*self)
                 }
                 // to_bytes method is provided by the trait with DefaultMemoryProvider
@@ -259,7 +277,7 @@ macro_rules! impl_bytes_for_primitive {
                 fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
                     reader: &mut ReadStream<'a>,
                     _provider: &PStream, // Provider typically not needed for primitives
-                ) -> WrtResult<Self> {
+                ) -> wrt_error::Result<Self> {
                     reader.$read_method()
                 }
                 // from_bytes method is provided by the trait with DefaultMemoryProvider
@@ -282,7 +300,7 @@ impl_bytes_for_primitive! {
     f32 => read_f32_le, write_f32_le;
     f64 => read_f64_le, write_f64_le;
     usize => read_usize_le, write_usize_le;
-    isize => read_isize_le, write_isize_le;
+    isize => read_isize_le, write_isize_le
 }
 
 // Corrected ToBytes for bool
@@ -295,7 +313,7 @@ impl ToBytes for bool {
         &self,
         writer: &mut WriteStream<'a>,
         _provider: &PStream, // provider not typically used for simple types like bool
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         writer.write_u8(*self as u8) // Use WriteStream's method
     }
     // to_bytes method is provided by the trait with DefaultMemoryProvider
@@ -306,15 +324,13 @@ impl FromBytes for bool {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         _provider: &PStream, // provider not typically used for simple types like bool
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let byte = reader.read_u8()?; // Use ReadStream's method
         match byte {
             0 => Ok(false),
             1 => Ok(true),
-            _ => Err(WrtError::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE, // Changed from INVALID_DATA
-                "Invalid boolean value during deserialization", // More specific message
+            _ => Err(WrtError::runtime_execution_error(
+                "Invalid boolean value - expected 0 or 1",
             )),
         }
     }
@@ -331,7 +347,7 @@ impl ToBytes for () {
         &self,
         _writer: &mut WriteStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         Ok(()) // Nothing to write for unit type
     }
     // to_bytes method is provided by the trait with DefaultMemoryProvider
@@ -342,7 +358,7 @@ impl FromBytes for () {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         _reader: &mut ReadStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         Ok(()) // Nothing to read for unit type
     }
     // from_bytes method is provided by the trait with DefaultMemoryProvider
@@ -417,20 +433,18 @@ impl LeBytesArray for i64 {
 macro_rules! impl_little_endian_for_primitive {
     ($($T:ty, $size:expr);*) => {
         $(impl LittleEndian for $T {
-            fn from_le_bytes(bytes: &[u8]) -> WrtResult<Self> {
+            fn from_le_bytes(bytes: &[u8]) -> wrt_error::Result<Self> {
                 if bytes.len() < $size {
-                    return Err(wrt_error::Error::new(
-                        wrt_error::ErrorCategory::Memory,
+                    return Err(wrt_error::Error::new(wrt_error::ErrorCategory::Memory,
                         wrt_error::codes::BUFFER_TOO_SMALL,
-                        "Buffer too small for primitive type conversion"
-                    ));
+                        "Insufficient bytes for little-endian conversion"));
                 }
                 let mut arr = [0u8; $size];
                 arr.copy_from_slice(&bytes[..$size]);
                 Ok(<$T>::from_le_bytes(arr))
             }
 
-            fn write_le_bytes<W: BytesWriter>(&self, writer: &mut W) -> WrtResult<()> {
+            fn write_le_bytes<W: BytesWriter>(&self, writer: &mut W) -> wrt_error::Result<()> {
                 writer.write_all(&self.to_le_bytes())
             }
         })*
@@ -451,71 +465,53 @@ impl_little_endian_for_primitive! {
 // it in values.rs or where V128 is.
 // use crate::values::V128; // Assuming this path
 // impl LittleEndian for V128 {
-// fn from_le_bytes(bytes: &[u8]) -> WrtResult<Self> {
+// fn from_le_bytes(bytes: &[u8]) -> wrt_error::Result<Self> {
 // if bytes.len() < 16 {
-// return Err(wrt_error::Error::new(
-// wrt_error::ErrorCategory::Memory,
-// wrt_error::codes::BUFFER_TOO_SMALL,
-// "Buffer too small for V128. Expected 16, got ".to_string() +
-// &bytes.len().to_string() ));
+// return Err(wrt_error::Error::runtime_execution_error("Insufficient bytes:
+// ".to_string() + &bytes.len().to_string() ;
 // }
 // let mut arr = [0u8; 16];
-// arr.copy_from_slice(&bytes[..16]);
+// arr.copy_from_slice(&bytes[..16];
 // Ok(V128::new(arr))
 // }
 //
-// fn write_le_bytes<W: BytesWriter>(&self, writer: &mut W) -> WrtResult<()> {
-// writer.write_all(&self.bytes)
+// fn write_le_bytes<W: BytesWriter>(&self, writer: &mut W) ->
+// wrt_error::Result<()> { writer.write_all(&self.bytes)
 // }
 // }
 
 // Adding Error conversion for SerializationError -> wrt_error::Error
-// This will be useful if functions returning WrtResult need to propagate
-// SerializationError.
+// This will be useful if functions returning wrt_error::Result need to
+// propagate SerializationError.
 
 impl From<SerializationError> for WrtError {
     fn from(e: SerializationError) -> Self {
         match e {
-            SerializationError::IncorrectSize => WrtError::new(
-                ErrorCategory::Validation,
-                codes::INVALID_BYTE_LENGTH,
-                "Incorrect buffer or slice size for serialization/deserialization",
+            SerializationError::IncorrectSize => WrtError::foundation_memory_provider_failed(
+                "Incorrect buffer size for serialization/deserialization",
             ),
-            SerializationError::InvalidFormat => WrtError::new(
-                ErrorCategory::Parse,
-                codes::SERIALIZATION_ERROR, // Or DECODING_ERROR if more appropriate contextually
-                "Invalid data format for deserialization",
+            SerializationError::InvalidFormat => WrtError::foundation_verification_failed(
+                "Foundation invalid data format for deserialization",
             ),
             SerializationError::Custom(s) => {
                 // Create a new static string if necessary, or ensure 's' is always suitable.
                 // For now, assuming 's' is appropriate as per original definition.
-                WrtError::new(ErrorCategory::Runtime, codes::RUNTIME_ERROR, s)
-            }
-            SerializationError::InvalidSliceLength => WrtError::new(
-                ErrorCategory::Validation,
-                codes::INVALID_BYTE_LENGTH,
-                "Invalid slice length for serialization/deserialization",
+                WrtError::foundation_verification_failed(s)
+            },
+            SerializationError::InvalidSliceLength => WrtError::foundation_memory_provider_failed(
+                "Foundation invalid slice length for serialization",
             ),
-            SerializationError::NotEnoughData => WrtError::new(
-                ErrorCategory::Parse,
-                codes::PARSE_UNEXPECTED_EOF,
-                "Not enough data to deserialize the object",
+            SerializationError::NotEnoughData => WrtError::foundation_memory_provider_failed(
+                "Foundation not enough data to deserialize object",
             ),
-            SerializationError::IoError => WrtError::new(
-                ErrorCategory::System,
-                codes::SYSTEM_IO_ERROR_CODE, /* Assuming this exists; otherwise, use
-                                              * codes::SYSTEM_ERROR */
-                "An I/O operation failed during serialization/deserialization",
+            SerializationError::IoError => WrtError::foundation_memory_provider_failed(
+                "Foundation I/O operation failed during serialization",
             ),
-            SerializationError::UnexpectedEof => WrtError::new(
-                ErrorCategory::Parse,
-                codes::PARSE_UNEXPECTED_EOF,
-                "Unexpected end of input during deserialization",
+            SerializationError::UnexpectedEof => WrtError::foundation_memory_provider_failed(
+                "Foundation unexpected end of input during deserialization",
             ),
-            SerializationError::InvalidEnumValue => WrtError::new(
-                ErrorCategory::Parse,       // Or Validation
-                codes::SERIALIZATION_ERROR, // Or specific like INVALID_VALUE if applicable
-                "Invalid enum value during deserialization",
+            SerializationError::InvalidEnumValue => WrtError::foundation_verification_failed(
+                "Foundation invalid enum value during deserialization",
             ),
         }
     }
@@ -529,9 +525,7 @@ impl From<SerializationError> for WrtError {
 
 // Assuming `codes::SERIALIZATION_ERROR` and `codes::DESERIALIZATION_ERROR`
 // exist or will be added. The user's summary said: "Added new error codes to
-// wrt-error/src/codes.rs" So these codes might already be there.
-
-// wrt-error/src/codes.rs" So these codes might already be there.
+// wrt-error/src/codes.rs". So these codes might already be there.
 
 // Implementations for fixed-size arrays of primitives have been added
 // by the impl_bytes_for_primitive macro for each primitive type T,
@@ -566,7 +560,7 @@ where
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.0.to_bytes_with_provider(writer, provider)?;
         self.1.to_bytes_with_provider(writer, provider)?;
         Ok(())
@@ -582,7 +576,7 @@ where
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let val_a = A::from_bytes_with_provider(reader, provider)?;
         let val_b = B::from_bytes_with_provider(reader, provider)?;
         Ok((val_a, val_b))
@@ -605,15 +599,15 @@ impl<T: ToBytes> ToBytes for Option<T> {
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream, // provider passed to T's methods
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         match self {
             Some(value) => {
                 writer.write_u8(1u8)?; // Tag for Some
                 value.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             None => {
                 writer.write_u8(0u8)?; // Tag for None
-            }
+            },
         }
         Ok(())
     }
@@ -624,18 +618,16 @@ impl<T: FromBytes> FromBytes for Option<T> {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream, // provider passed to T's methods
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let tag = reader.read_u8()?;
         match tag {
             0u8 => Ok(None),
             1u8 => {
                 let value = T::from_bytes_with_provider(reader, provider)?;
                 Ok(Some(value))
-            }
-            _ => Err(WrtError::new(
-                ErrorCategory::Parse,
-                codes::DECODING_ERROR, // Changed from INVALID_DATA
-                "Invalid tag for Option<T>",
+            },
+            _ => Err(WrtError::runtime_execution_error(
+                "Invalid Option tag value - expected 0 or 1",
             )),
         }
     }
@@ -653,7 +645,7 @@ impl ToBytes for char {
         &self,
         writer: &mut WriteStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         writer.write_u32_le(*self as u32)
     }
     // to_bytes is provided by the trait
@@ -663,13 +655,13 @@ impl FromBytes for char {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let u32_val = reader.read_u32_le()?;
         char::from_u32(u32_val).ok_or_else(|| {
             WrtError::new(
                 ErrorCategory::Parse,
                 codes::VALUE_OUT_OF_RANGE, // Changed from INVALID_DATA
-                "Invalid u32 value for char",
+                "Invalid unicode scalar value for char conversion",
             )
         })
     }
@@ -688,23 +680,25 @@ pub struct DefaultMemoryProvider(NoStdProvider<0>); // Use 0 for default capacit
 
 impl Default for DefaultMemoryProvider {
     fn default() -> Self {
+        // Note: Using NoStdProvider::<0>::default() here is legitimate as this is
+        // the default memory provider implementation for trait-level fallbacks
         Self(NoStdProvider::<0>::default())
     }
 }
 
 impl RootMemoryProvider for DefaultMemoryProvider {
-    type Allocator = NoStdProvider<0>; // Binary std/no_std choice
+    type Allocator = NoStdProvider<0>;
 
-    fn acquire_memory(&self, _layout: core::alloc::Layout) -> WrtResult<*mut u8> {
+    // Binary std/no_std choice
+
+    fn acquire_memory(&self, _layout: core::alloc::Layout) -> wrt_error::Result<*mut u8> {
         // Binary std/no_std choice
-        Err(WrtError::new(
-            ErrorCategory::Memory,
-            codes::UNSUPPORTED_OPERATION,
+        Err(WrtError::memory_error(
             "DefaultMemoryProvider (NoStdProvider<0>) cannot dynamically allocate memory.",
         ))
     }
 
-    fn release_memory(&self, _ptr: *mut u8, _layout: core::alloc::Layout) -> WrtResult<()> {
+    fn release_memory(&self, _ptr: *mut u8, _layout: core::alloc::Layout) -> wrt_error::Result<()> {
         // Binary std/no_std choice
         // Safety: This encapsulates unsafe operations internally
         Ok(())
@@ -714,7 +708,7 @@ impl RootMemoryProvider for DefaultMemoryProvider {
         &self.0
     }
 
-    fn new_handler(&self) -> WrtResult<SafeMemoryHandler<Self>>
+    fn new_handler(&self) -> wrt_error::Result<SafeMemoryHandler<Self>>
     where
         Self: Sized,
     {
@@ -722,15 +716,15 @@ impl RootMemoryProvider for DefaultMemoryProvider {
     }
 
     // Implement missing methods from crate::safe_memory::Provider
-    fn borrow_slice(&self, offset: usize, len: usize) -> WrtResult<Slice<'_>> {
+    fn borrow_slice(&self, offset: usize, len: usize) -> wrt_error::Result<Slice<'_>> {
         self.0.borrow_slice(offset, len) // Delegate to inner NoStdProvider
     }
 
-    fn write_data(&mut self, offset: usize, data: &[u8]) -> WrtResult<()> {
+    fn write_data(&mut self, offset: usize, data: &[u8]) -> wrt_error::Result<()> {
         self.0.write_data(offset, data)
     }
 
-    fn verify_access(&self, offset: usize, len: usize) -> WrtResult<()> {
+    fn verify_access(&self, offset: usize, len: usize) -> wrt_error::Result<()> {
         self.0.verify_access(offset, len)
     }
 
@@ -742,7 +736,7 @@ impl RootMemoryProvider for DefaultMemoryProvider {
         self.0.capacity()
     }
 
-    fn verify_integrity(&self) -> WrtResult<()> {
+    fn verify_integrity(&self) -> wrt_error::Result<()> {
         self.0.verify_integrity()
     }
 
@@ -758,15 +752,20 @@ impl RootMemoryProvider for DefaultMemoryProvider {
         self.0.memory_stats()
     }
 
-    fn get_slice_mut(&mut self, offset: usize, len: usize) -> WrtResult<SliceMut<'_>> {
+    fn get_slice_mut(&mut self, offset: usize, len: usize) -> wrt_error::Result<SliceMut<'_>> {
         self.0.get_slice_mut(offset, len)
     }
 
-    fn copy_within(&mut self, src_offset: usize, dst_offset: usize, len: usize) -> WrtResult<()> {
+    fn copy_within(
+        &mut self,
+        src_offset: usize,
+        dst_offset: usize,
+        len: usize,
+    ) -> wrt_error::Result<()> {
         self.0.copy_within(src_offset, dst_offset, len)
     }
 
-    fn ensure_used_up_to(&mut self, byte_offset: usize) -> WrtResult<()> {
+    fn ensure_used_up_to(&mut self, byte_offset: usize) -> wrt_error::Result<()> {
         self.0.ensure_used_up_to(byte_offset)
     }
 }
@@ -778,14 +777,17 @@ impl RootMemoryProvider for DefaultMemoryProvider {
 /// reading.
 #[derive(Debug)]
 pub struct ReadStream<'a> {
-    buffer: Slice<'a>,
+    buffer:   Slice<'a>,
     position: usize,
 }
 
 impl<'a> ReadStream<'a> {
     /// Creates a new `ReadStream` from a byte slice.
     pub fn new(slice: Slice<'a>) -> Self {
-        Self { buffer: slice, position: 0 }
+        Self {
+            buffer:   slice,
+            position: 0,
+        }
     }
 
     /// Current reading position in the stream.
@@ -798,7 +800,7 @@ impl<'a> ReadStream<'a> {
         self.buffer.len().saturating_sub(self.position)
     }
 
-    fn ensure_data(&self, len: usize) -> WrtResult<()> {
+    fn ensure_data(&self, len: usize) -> wrt_error::Result<()> {
         if self.position + len > self.buffer.len() {
             Err(WrtError::from(SerializationError::UnexpectedEof))
         } else {
@@ -806,19 +808,19 @@ impl<'a> ReadStream<'a> {
         }
     }
 
-    pub fn read_u8(&mut self) -> WrtResult<u8> {
+    pub fn read_u8(&mut self) -> wrt_error::Result<u8> {
         self.ensure_data(1)?;
         let val = self.buffer.data()?[self.position];
         self.position += 1;
         Ok(val)
     }
 
-    pub fn read_i8(&mut self) -> WrtResult<i8> {
+    pub fn read_i8(&mut self) -> wrt_error::Result<i8> {
         self.read_u8().map(|v| v as i8)
     }
 
     // Helper for reading little-endian integers
-    fn read_le_bytes_into_array<const N: usize>(&mut self) -> WrtResult<[u8; N]> {
+    fn read_le_bytes_into_array<const N: usize>(&mut self) -> wrt_error::Result<[u8; N]> {
         self.ensure_data(N)?;
         let mut arr = [0u8; N];
         arr.copy_from_slice(&self.buffer.data()?[self.position..self.position + N]);
@@ -826,67 +828,68 @@ impl<'a> ReadStream<'a> {
         Ok(arr)
     }
 
-    pub fn read_u16_le(&mut self) -> WrtResult<u16> {
+    pub fn read_u16_le(&mut self) -> wrt_error::Result<u16> {
         self.read_le_bytes_into_array::<2>().map(u16::from_le_bytes)
     }
-    pub fn read_i16_le(&mut self) -> WrtResult<i16> {
+
+    pub fn read_i16_le(&mut self) -> wrt_error::Result<i16> {
         self.read_le_bytes_into_array::<2>().map(i16::from_le_bytes)
     }
-    pub fn read_u32_le(&mut self) -> WrtResult<u32> {
+
+    pub fn read_u32_le(&mut self) -> wrt_error::Result<u32> {
         self.read_le_bytes_into_array::<4>().map(u32::from_le_bytes)
     }
-    pub fn read_i32_le(&mut self) -> WrtResult<i32> {
+
+    pub fn read_i32_le(&mut self) -> wrt_error::Result<i32> {
         self.read_le_bytes_into_array::<4>().map(i32::from_le_bytes)
     }
-    pub fn read_u64_le(&mut self) -> WrtResult<u64> {
+
+    pub fn read_u64_le(&mut self) -> wrt_error::Result<u64> {
         self.read_le_bytes_into_array::<8>().map(u64::from_le_bytes)
     }
-    pub fn read_i64_le(&mut self) -> WrtResult<i64> {
+
+    pub fn read_i64_le(&mut self) -> wrt_error::Result<i64> {
         self.read_le_bytes_into_array::<8>().map(i64::from_le_bytes)
     }
-    pub fn read_u128_le(&mut self) -> WrtResult<u128> {
+
+    pub fn read_u128_le(&mut self) -> wrt_error::Result<u128> {
         self.read_le_bytes_into_array::<16>().map(u128::from_le_bytes)
     }
-    pub fn read_i128_le(&mut self) -> WrtResult<i128> {
+
+    pub fn read_i128_le(&mut self) -> wrt_error::Result<i128> {
         self.read_le_bytes_into_array::<16>().map(i128::from_le_bytes)
     }
-    pub fn read_f32_le(&mut self) -> WrtResult<f32> {
+
+    pub fn read_f32_le(&mut self) -> wrt_error::Result<f32> {
         self.read_le_bytes_into_array::<4>().map(f32::from_le_bytes)
     }
-    pub fn read_f64_le(&mut self) -> WrtResult<f64> {
+
+    pub fn read_f64_le(&mut self) -> wrt_error::Result<f64> {
         self.read_le_bytes_into_array::<8>().map(f64::from_le_bytes)
     }
 
-    pub fn read_usize_le(&mut self) -> WrtResult<usize> {
+    pub fn read_usize_le(&mut self) -> wrt_error::Result<usize> {
         if core::mem::size_of::<usize>() == 4 {
             self.read_u32_le().map(|v| v as usize)
         } else if core::mem::size_of::<usize>() == 8 {
             self.read_u64_le().map(|v| v as usize)
         } else {
             // Fallback or error for unsupported usize size
-            Err(WrtError::new(
-                ErrorCategory::System,
-                codes::SYSTEM_ERROR,
-                "Unsupported usize size for LE read",
-            ))
+            Err(WrtError::system_error("Unsupported usize size for LE read"))
         }
     }
 
-    pub fn read_isize_le(&mut self) -> WrtResult<isize> {
+    pub fn read_isize_le(&mut self) -> wrt_error::Result<isize> {
         if core::mem::size_of::<isize>() == 4 {
             self.read_i32_le().map(|v| v as isize)
         } else if core::mem::size_of::<isize>() == 8 {
             self.read_i64_le().map(|v| v as isize)
         } else {
-            Err(WrtError::new(
-                ErrorCategory::System,
-                codes::SYSTEM_ERROR,
-                "Unsupported isize size for LE read",
-            ))
+            Err(WrtError::system_error("Unsupported isize size for LE read"))
         }
     }
 
-    pub fn read_bool(&mut self) -> WrtResult<bool> {
+    pub fn read_bool(&mut self) -> wrt_error::Result<bool> {
         match self.read_u8()? {
             0 => Ok(false),
             1 => Ok(true),
@@ -895,28 +898,24 @@ impl<'a> ReadStream<'a> {
     }
 
     /// Reads a slice of bytes from the stream.
-    pub fn read_exact(&mut self, buf: &mut [u8]) -> WrtResult<()> {
+    pub fn read_exact(&mut self, buf: &mut [u8]) -> wrt_error::Result<()> {
         self.ensure_data(buf.len())?;
         buf.copy_from_slice(&self.buffer.data()?[self.position..self.position + buf.len()]);
         self.position += buf.len();
         Ok(())
     }
 
-    /// Provides access to the underlying memory provider if the ReadStream
-    /// was constructed with one that is clonable or referenceable.
-    /// This method is a placeholder for how one might access a provider.
+    /// Attempts to provide access to the underlying memory provider.
+    /// Returns None if the ReadStream was not constructed with a provider
+    /// or if direct provider access is not supported in this design.
+    ///
     /// For this ReadStream<'a> which operates on a Slice<'a>, direct provider
-    /// access is not typical unless Slice itself carries provider info or
-    /// ReadStream is generic. For now, it will be assumed that if a
-    /// provider is needed for deserializing nested types, it's passed
-    /// explicitly to from_bytes_with_provider.
-    pub fn provider<P: crate::MemoryProvider>(&self, _provider_ref: &P) -> &P {
-        // This is tricky. ReadStream currently only has Slice<'a>.
-        // If P is needed by FromBytes, it must be passed in.
-        // This method is more relevant if ReadStream itself is generic over P and holds
-        // it. For now, let's assume this is for API compatibility if other
-        // stream types exist.
-        unimplemented!("ReadStream does not hold a direct MemoryProvider instance in this design");
+    /// access is not typical. It's recommended to pass providers explicitly
+    /// to methods that need them rather than relying on this method.
+    pub fn try_provider<P: crate::MemoryProvider>(&self, _provider_ref: &P) -> Option<&P> {
+        // ReadStream currently only has Slice<'a> and does not hold a direct
+        // MemoryProvider instance in this design.
+        None
     }
 }
 
@@ -924,7 +923,7 @@ impl<'a> ReadStream<'a> {
 /// It operates on a mutable slice, typically obtained from a `MemoryProvider`.
 #[derive(Debug)]
 pub struct WriteStream<'a> {
-    buffer: SliceMut<'a>,
+    buffer:   SliceMut<'a>,
     position: usize,
     // Provider is not stored directly to avoid lifetime complexities with SliceMut,
     // but can be passed to methods like to_bytes_with_provider if needed by nested types.
@@ -933,7 +932,10 @@ pub struct WriteStream<'a> {
 impl<'a> WriteStream<'a> {
     /// Creates a new `WriteStream` from a mutable byte slice.
     pub fn new(slice: SliceMut<'a>) -> Self {
-        Self { buffer: slice, position: 0 }
+        Self {
+            buffer:   slice,
+            position: 0,
+        }
     }
 
     /// Current writing position in the stream.
@@ -946,11 +948,10 @@ impl<'a> WriteStream<'a> {
         self.buffer.len().saturating_sub(self.position)
     }
 
-    fn ensure_capacity(&self, len: usize) -> WrtResult<()> {
+    fn ensure_capacity(&self, len: usize) -> wrt_error::Result<()> {
         if self.position + len > self.buffer.len() {
-            Err(WrtError::new(
-                ErrorCategory::Memory,
-                codes::BUFFER_TOO_SMALL, // Or a more specific serialization capacity error
+            Err(WrtError::memory_error(
+                // Or a more specific serialization capacity error
                 "Write operation exceeds buffer capacity",
             ))
         } else {
@@ -958,103 +959,113 @@ impl<'a> WriteStream<'a> {
         }
     }
 
-    pub fn write_u8(&mut self, value: u8) -> WrtResult<()> {
+    pub fn write_u8(&mut self, value: u8) -> wrt_error::Result<()> {
         self.ensure_capacity(1)?;
         self.buffer.data_mut()?[self.position] = value;
         self.position += 1;
         Ok(())
     }
 
-    pub fn write_i8(&mut self, value: i8) -> WrtResult<()> {
+    pub fn write_i8(&mut self, value: i8) -> wrt_error::Result<()> {
         self.write_u8(value as u8)
     }
 
     // Helper for writing little-endian integers
-    fn write_le_bytes_from_array<const N: usize>(&mut self, bytes: [u8; N]) -> WrtResult<()> {
+    fn write_le_bytes_from_array<const N: usize>(
+        &mut self,
+        bytes: [u8; N],
+    ) -> wrt_error::Result<()> {
         self.ensure_capacity(N)?;
         self.buffer.data_mut()?[self.position..self.position + N].copy_from_slice(&bytes);
         self.position += N;
         Ok(())
     }
 
-    pub fn write_u16_le(&mut self, value: u16) -> WrtResult<()> {
-        self.write_le_bytes_from_array(value.to_le_bytes())
-    }
-    pub fn write_i16_le(&mut self, value: i16) -> WrtResult<()> {
-        self.write_le_bytes_from_array(value.to_le_bytes())
-    }
-    pub fn write_u32_le(&mut self, value: u32) -> WrtResult<()> {
-        self.write_le_bytes_from_array(value.to_le_bytes())
-    }
-    pub fn write_i32_le(&mut self, value: i32) -> WrtResult<()> {
-        self.write_le_bytes_from_array(value.to_le_bytes())
-    }
-    pub fn write_u64_le(&mut self, value: u64) -> WrtResult<()> {
-        self.write_le_bytes_from_array(value.to_le_bytes())
-    }
-    pub fn write_i64_le(&mut self, value: i64) -> WrtResult<()> {
-        self.write_le_bytes_from_array(value.to_le_bytes())
-    }
-    pub fn write_u128_le(&mut self, value: u128) -> WrtResult<()> {
-        self.write_le_bytes_from_array(value.to_le_bytes())
-    }
-    pub fn write_i128_le(&mut self, value: i128) -> WrtResult<()> {
-        self.write_le_bytes_from_array(value.to_le_bytes())
-    }
-    pub fn write_f32_le(&mut self, value: f32) -> WrtResult<()> {
-        self.write_le_bytes_from_array(value.to_le_bytes())
-    }
-    pub fn write_f64_le(&mut self, value: f64) -> WrtResult<()> {
+    pub fn write_u16_le(&mut self, value: u16) -> wrt_error::Result<()> {
         self.write_le_bytes_from_array(value.to_le_bytes())
     }
 
-    pub fn write_usize_le(&mut self, value: usize) -> WrtResult<()> {
+    pub fn write_i16_le(&mut self, value: i16) -> wrt_error::Result<()> {
+        self.write_le_bytes_from_array(value.to_le_bytes())
+    }
+
+    pub fn write_u32_le(&mut self, value: u32) -> wrt_error::Result<()> {
+        self.write_le_bytes_from_array(value.to_le_bytes())
+    }
+
+    pub fn write_i32_le(&mut self, value: i32) -> wrt_error::Result<()> {
+        self.write_le_bytes_from_array(value.to_le_bytes())
+    }
+
+    pub fn write_u64_le(&mut self, value: u64) -> wrt_error::Result<()> {
+        self.write_le_bytes_from_array(value.to_le_bytes())
+    }
+
+    pub fn write_i64_le(&mut self, value: i64) -> wrt_error::Result<()> {
+        self.write_le_bytes_from_array(value.to_le_bytes())
+    }
+
+    pub fn write_u128_le(&mut self, value: u128) -> wrt_error::Result<()> {
+        self.write_le_bytes_from_array(value.to_le_bytes())
+    }
+
+    pub fn write_i128_le(&mut self, value: i128) -> wrt_error::Result<()> {
+        self.write_le_bytes_from_array(value.to_le_bytes())
+    }
+
+    pub fn write_f32_le(&mut self, value: f32) -> wrt_error::Result<()> {
+        self.write_le_bytes_from_array(value.to_le_bytes())
+    }
+
+    pub fn write_f64_le(&mut self, value: f64) -> wrt_error::Result<()> {
+        self.write_le_bytes_from_array(value.to_le_bytes())
+    }
+
+    pub fn write_usize_le(&mut self, value: usize) -> wrt_error::Result<()> {
         if core::mem::size_of::<usize>() == 4 {
             self.write_u32_le(value as u32)
         } else if core::mem::size_of::<usize>() == 8 {
             self.write_u64_le(value as u64)
         } else {
-            Err(WrtError::new(
-                ErrorCategory::System,
-                codes::SYSTEM_ERROR,
+            Err(WrtError::system_error(
                 "Unsupported usize size for LE write",
             ))
         }
     }
 
-    pub fn write_isize_le(&mut self, value: isize) -> WrtResult<()> {
+    pub fn write_isize_le(&mut self, value: isize) -> wrt_error::Result<()> {
         if core::mem::size_of::<isize>() == 4 {
             self.write_i32_le(value as i32)
         } else if core::mem::size_of::<isize>() == 8 {
             self.write_i64_le(value as i64)
         } else {
-            Err(WrtError::new(
-                ErrorCategory::System,
-                codes::SYSTEM_ERROR,
+            Err(WrtError::system_error(
                 "Unsupported isize size for LE write",
             ))
         }
     }
 
-    pub fn write_bool(&mut self, value: bool) -> WrtResult<()> {
+    pub fn write_bool(&mut self, value: bool) -> wrt_error::Result<()> {
         self.write_u8(if value { 1 } else { 0 })
     }
 
     /// Writes an entire slice of bytes into the stream.
-    pub fn write_all(&mut self, bytes: &[u8]) -> WrtResult<()> {
+    pub fn write_all(&mut self, bytes: &[u8]) -> wrt_error::Result<()> {
         self.ensure_capacity(bytes.len())?;
         self.buffer.data_mut()?[self.position..self.position + bytes.len()].copy_from_slice(bytes);
         self.position += bytes.len();
         Ok(())
     }
 
-    /// Provides access to the underlying memory provider if the WriteStream
-    /// was constructed with one that is clonable or referenceable.
-    /// Similar to ReadStream, direct provider access is not typical here.
-    /// It's assumed that if a provider is needed for serializing
-    /// nested types, it's passed explicitly to to_bytes_with_provider.
-    pub fn provider<P: crate::MemoryProvider>(&self, _provider_ref: &P) -> &P {
-        unimplemented!("WriteStream does not hold a direct MemoryProvider instance in this design");
+    /// Attempts to provide access to the underlying memory provider.
+    /// Returns None if the WriteStream was not constructed with a provider
+    /// or if direct provider access is not supported in this design.
+    ///
+    /// It's recommended to pass providers explicitly to methods that need them
+    /// rather than relying on this method.
+    pub fn try_provider<P: crate::MemoryProvider>(&self, _provider_ref: &P) -> Option<&P> {
+        // WriteStream does not hold a direct MemoryProvider instance in this design
+        None
     }
 }
 
@@ -1070,14 +1081,14 @@ impl<'a> WriteStream<'a> {
 // feature:         // #[cfg(feature = "std")]
 //         // {
 //         //     let cap = 256; // Default capacity
-//         //     let mut vec_buffer = Vec::with_capacity(cap);
+//         //     let mut vec_buffer = Vec::with_capacity(cap;
 //         //     // This is tricky because SliceMut needs a lifetime tied to
 // the Vec.         //     // This structure is not ideal for a Default impl
 // that returns an owned stream with an internal buffer.         //     // A
 // different WriteStream design might be needed for that (e.g.
 // WriteStream<Vec<u8>>).         // }
-//         // panic!("Default for WriteStream<P> is not generally constructible
-// Binary std/no_std choice
+//         // panic!("Default for WriteStream<P> is not generally
+// constructible") Binary std/no_std choice
 // implies an empty, unusable stream.         Self {
 //             buffer: SliceMut::empty(), // Creates an empty, unusable slice.
 //             position: 0,
@@ -1092,10 +1103,10 @@ impl<T: Checksummable> Checksummable for Option<T> {
             Some(val) => {
                 checksum.update(1u8); // Discriminant for Some
                 val.update_checksum(checksum);
-            }
+            },
             None => {
                 checksum.update(0u8); // Discriminant for None
-            }
+            },
         }
     }
 }
@@ -1112,15 +1123,11 @@ impl ToBytes for alloc::string::String {
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         let bytes = self.as_bytes();
         (bytes.len() as u32).to_bytes_with_provider(writer, provider)?;
         writer.write_all(bytes).map_err(|_e| {
-            WrtError::new(
-                ErrorCategory::Parse,
-                codes::SERIALIZATION_ERROR, // Changed from INVALID_DATA
-                "Failed to write String data to stream",
-            )
+            WrtError::runtime_execution_error("Failed to write String data to stream")
         })
     }
 }

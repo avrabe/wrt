@@ -28,10 +28,10 @@
 //!     .with_host_function("my_module", "my_function",
 //!         HostFunctionHandler::new(|_| Ok(vec![Value::I32(42)])))
 //!     .with_component_name("my_component")
-//!     .with_host_id("my_host");
+//!     .with_host_id("my_host";
 //!
 //! // Build the host
-//! let registry = builder.build().expect("Failed to build host");
+//! let registry = builder.build().expect(".expect("Failed to build host"));")
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -50,6 +50,14 @@ extern crate alloc;
 // Binary std/no_std choice
 // from wrt-foundation
 
+// Bounded infrastructure for static memory allocation
+#[cfg(not(feature = "std"))]
+pub mod bounded_host_infra;
+
+// Safety-critical memory limits
+#[cfg(feature = "safety-critical")]
+pub mod memory_limits;
+
 // Export modules
 pub mod builder;
 pub mod callback;
@@ -66,27 +74,41 @@ pub mod bounded_host_integration;
 pub mod verify;
 
 // Reexport types for convenience (use fully qualified paths)
+// Re-export Agent C deliverables
+pub use bounded_host_integration::{
+    create_echo_function,
+    create_memory_info_function,
+    create_safety_check_function,
+    BoundedCallContext,
+    BoundedCallResult,
+    BoundedHostFunction,
+    BoundedHostIntegrationManager,
+    ComponentInstanceId,
+    HostFunctionId,
+    HostIntegrationLimits,
+    HostIntegrationStatistics,
+    SimpleBoundedHostFunction,
+};
 pub use builder::HostBuilder;
-pub use callback::{CallbackRegistry, CallbackType};
-pub use function::{CloneableFn, HostFunctionHandler};
+pub use callback::{
+    CallbackRegistry,
+    CallbackType,
+};
+pub use function::{
+    CloneableFn,
+    HostFunctionHandler,
+};
 pub use host::BuiltinHost;
 // Re-export prelude for convenience
 pub use prelude::*;
 
-// Re-export Agent C deliverables
-pub use bounded_host_integration::{
-    BoundedCallContext, BoundedCallResult, BoundedHostFunction, BoundedHostIntegrationManager,
-    ComponentInstanceId, HostFunctionId, HostIntegrationLimits, HostIntegrationStatistics,
-    SimpleBoundedHostFunction, create_echo_function, create_memory_info_function, create_safety_check_function,
-};
-
-// Panic handler disabled in library crates to avoid conflicts during workspace builds
-// The main wrt crate or final binary should provide the panic handler
-// #[cfg(all(not(feature = "std"), not(test), not(feature = "disable-panic-handler")))]
-// #[panic_handler]
+// Panic handler disabled in library crates to avoid conflicts during workspace
+// builds The main wrt crate or final binary should provide the panic handler
+// #[cfg(all(not(feature = "std"), not(test), not(feature =
+// "disable-panic-handler")))] #[panic_handler]
 // fn panic(_info: &core::panic::PanicInfo) -> ! {
-//     // For safety-critical systems, enter infinite loop to maintain known safe state
-//     loop {
-//         core::hint::spin_loop();
+//     // For safety-critical systems, enter infinite loop to maintain known
+// safe state     loop {
+//         core::hint::spin_loop);
 //     }
 // }

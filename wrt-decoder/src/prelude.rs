@@ -14,109 +14,230 @@
 pub use core::result::Result as StdResult;
 pub use core::{
     any::Any,
-    cmp::{Eq, Ord, PartialEq, PartialOrd},
-    convert::{From, Into, TryFrom, TryInto},
+    cmp::{
+        Eq,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    },
+    convert::{
+        From,
+        Into,
+        TryFrom,
+        TryInto,
+    },
     fmt,
-    fmt::{Debug, Display},
+    fmt::{
+        Debug,
+        Display,
+    },
     marker::PhantomData,
     mem,
-    ops::{Deref, DerefMut},
-    slice, str,
+    ops::{
+        Deref,
+        DerefMut,
+    },
+    slice,
+    str,
 };
 // Re-export from std when the std feature is enabled
 #[cfg(feature = "std")]
 pub use std::{
     borrow::Cow,
     boxed::Box,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    format, io,
-    io::{Read, Write},
+    collections::{
+        BTreeMap,
+        BTreeSet,
+        HashMap,
+        HashSet,
+    },
+    format,
+    io,
+    io::{
+        Read,
+        Write,
+    },
     rc::Rc,
     result::Result as StdResult,
-    string::{String, ToString},
-    sync::{Arc, Mutex, RwLock},
+    string::{
+        String,
+        ToString,
+    },
+    sync::{
+        Arc,
+        Mutex,
+        RwLock,
+    },
     vec,
     vec::Vec,
 };
-
-// No_std equivalents - use wrt-foundation types (Vec and String defined below with specific providers)
-#[cfg(not(feature = "std"))]
-pub use wrt_foundation::{BoundedMap as HashMap};
 
 // Import synchronization primitives for no_std
 //#[cfg(not(feature = "std"))]
 // pub use wrt_sync::{Mutex, RwLock};
 
 // Re-export from wrt-error
-pub use wrt_error::{codes, kinds, Error, ErrorCategory, Result};
+pub use wrt_error::{
+    codes,
+    kinds,
+    Error,
+    ErrorCategory,
+    Result,
+};
 // Re-export format module for compatibility
 pub use wrt_format as wrt_format_module;
 // Re-export from wrt-format
 pub use wrt_format::{
     // Conversion utilities
     conversion::{
-        block_type_to_format_block_type, format_block_type_to_block_type,
-        format_value_type as value_type_to_byte, parse_value_type,
+        block_type_to_format_block_type,
+        format_block_type_to_block_type,
+        format_value_type as value_type_to_byte,
+        parse_value_type,
     },
     // Module types
     module::{
-        Data, DataMode, Element, Export, ExportKind, Function, Global, Import, ImportDesc, Memory,
+        Data,
+        Element,
+        Export,
+        ExportKind,
+        Function,
+        Global,
+        Import,
+        ImportDesc,
+        Memory,
         Table,
     },
+    // Pure format types (recommended over deprecated module types)
+    pure_format_types::{
+        PureDataMode,
+        PureDataSegment,
+        PureElementMode,
+        PureElementSegment,
+    },
     // Section types
-    section::{CustomSection, Section, SectionId},
+    section::{
+        CustomSection,
+        Section,
+        SectionId,
+    },
     // Format-specific types
-    types::{FormatBlockType, Limits, MemoryIndexType},
+    types::{
+        FormatBlockType,
+        Limits,
+        MemoryIndexType,
+    },
 };
-
 // Binary std/no_std choice
 #[cfg(feature = "std")]
-pub use wrt_format::state::{create_state_section, extract_state_section, StateSection};
+// pub use wrt_format::state::{create_state_section, extract_state_section, StateSection};
 // Binary std/no_std choice
 #[cfg(feature = "std")]
-pub use wrt_foundation::component_value::{ComponentValue, ValType};
+pub use wrt_foundation::component_value::{
+    ComponentValue,
+    ValType,
+};
 // Conversion utilities from wrt-foundation
 #[cfg(feature = "conversion")]
-pub use wrt_foundation::conversion::{ref_type_to_val_type, val_type_to_ref_type};
-// Re-export from wrt-foundation
+pub use wrt_foundation::conversion::{
+    ref_type_to_val_type,
+    val_type_to_ref_type,
+};
+// No_std equivalents - use wrt-foundation types (Vec and String defined below with specific
+// providers)
+#[cfg(not(feature = "std"))]
+pub use wrt_foundation::BoundedMap as HashMap;
+// Re-export clean types from wrt-foundation
 pub use wrt_foundation::{
     // SafeMemory types
-    safe_memory::{SafeMemoryHandler, SafeSlice, SafeStack},
-    // Types
-    types::{BlockType, FuncType, GlobalType, MemoryType, RefType, TableType, ValueType},
+    safe_memory::{
+        SafeMemoryHandler,
+        SafeSlice,
+        SafeStack,
+    },
+    // Legacy types for compatibility
+    types::{
+        BlockType,
+        RefType,
+        ValueType,
+    },
     values::Value,
+};
+// Use our unified memory management system
+#[cfg(not(feature = "std"))]
+pub use wrt_foundation::{
+    unified_types_simple::{
+        DefaultTypes,
+        EmbeddedTypes,
+    },
+    BoundedString,
+    BoundedVec,
+};
+// Re-export clean types only when allocation is available
+#[cfg(any(feature = "std", feature = "alloc"))]
+pub use wrt_foundation::{
+    CleanFuncType,
+    CleanGlobalType,
+    CleanMemoryType,
+    CleanTableType,
+    CleanValType,
+    CleanValue,
 };
 
 // Most re-exports temporarily disabled for demo
 
 // Binary std/no_std choice
 pub use crate::decoder_no_alloc;
+// For no_std mode, use explicit bounded types (no confusing aliases!)
+#[cfg(not(feature = "std"))]
+pub type DecoderVec<T> = BoundedVec<T, 256, wrt_foundation::NoStdProvider<4096>>;
+#[cfg(not(feature = "std"))]
+pub type DecoderString = BoundedString<256, wrt_foundation::NoStdProvider<4096>>;
 
-// Use our unified memory management system
-#[cfg(not(feature = "std"))]
-pub use wrt_foundation::{
-    BoundedString, BoundedVec,
-    unified_types_simple::{DefaultTypes, EmbeddedTypes},
-};
+// For std mode, provide the same types but using std collections
+#[cfg(feature = "std")]
+pub type DecoderVec<T> = Vec<T>;
+#[cfg(feature = "std")]
+pub type DecoderString = String;
 
-// For no_std mode, use concrete bounded types with fixed capacities
+// Factory function for creating providers using capability system
 #[cfg(not(feature = "std"))]
-pub type Vec<T> = wrt_foundation::BoundedVec<T, 256, wrt_foundation::NoStdProvider<4096>>;
-#[cfg(not(feature = "std"))]
-pub type String = wrt_foundation::BoundedString<256, wrt_foundation::NoStdProvider<4096>>;
+pub fn create_decoder_provider<const N: usize>(
+) -> wrt_foundation::WrtResult<wrt_foundation::NoStdProvider<N>> {
+    use wrt_foundation::{
+        capabilities::MemoryFactory,
+        CrateId,
+    };
+    MemoryFactory::create::<N>(CrateId::Decoder)
+}
+
+// For std mode, use the capability system as well
+#[cfg(feature = "std")]
+pub fn create_decoder_provider<const N: usize>(
+) -> wrt_foundation::WrtResult<wrt_foundation::NoStdProvider<N>> {
+    use wrt_foundation::{
+        capabilities::MemoryFactory,
+        CrateId,
+    };
+    MemoryFactory::create::<N>(CrateId::Decoder)
+}
 
 // For no_std mode, provide a minimal ToString trait
 /// Minimal ToString trait for no_std environments
 #[cfg(not(feature = "std"))]
 pub trait ToString {
     /// Convert to string
-    fn to_string(&self) -> String;
+    fn to_string(&self) -> DecoderString;
 }
 
 #[cfg(not(feature = "std"))]
 impl ToString for &str {
-    fn to_string(&self) -> String {
-        String::from_str(self, wrt_foundation::safe_memory::NoStdProvider::<4096>::new()).unwrap_or_default()
+    fn to_string(&self) -> DecoderString {
+        if let Ok(provider) = create_decoder_provider::<4096>() {
+            DecoderString::from_str(self, provider).unwrap_or_default()
+        } else {
+            DecoderString::default()
+        }
     }
 }
 
@@ -127,12 +248,16 @@ impl ToString for &str {
 macro_rules! format {
     ($($arg:tt)*) => {{
         // In pure no_std, return a simple bounded string
-        use wrt_foundation::{BoundedString, NoStdProvider};
-        BoundedString::<256, NoStdProvider<512>>::from_str(
-            "formatted_string",
-            NoStdProvider::<512>::default(),
-        )
-        .unwrap_or_default()
+        use wrt_foundation::{
+            BoundedString,
+            NoStdProvider,
+        };
+        if let Ok(provider) = $crate::prelude::create_decoder_provider::<512>() {
+            $crate::prelude::DecoderString::from_str("formatted_string", provider)
+                .unwrap_or_default()
+        } else {
+            $crate::prelude::DecoderString::default()
+        }
     }};
 }
 
@@ -152,54 +277,63 @@ pub mod binary {
 /// Binary utilities for no_std environments
 #[cfg(not(feature = "std"))]
 pub mod binary {
-    use wrt_foundation::{BoundedVec, NoStdProvider};
+    use wrt_foundation::{
+        BoundedVec,
+        NoStdProvider,
+    };
+
+    use super::create_decoder_provider;
 
     /// Write LEB128 u32 in no_std mode
     pub fn write_leb128_u32(value: u32) -> BoundedVec<u8, 10, NoStdProvider<64>> {
-        let mut result = BoundedVec::new(NoStdProvider::<64>::default())
-            .expect("Failed to create bounded vec for LEB128");
-        let mut buffer = [0u8; 10];
-        // Simple LEB128 encoding for no_std
-        let mut bytes_written = 0;
-        let mut val = value;
-        loop {
-            let mut byte = (val & 0x7F) as u8;
-            val >>= 7;
-            if val != 0 {
-                byte |= 0x80;
+        if let Ok(provider) = create_decoder_provider::<64>() {
+            let mut result =
+                BoundedVec::new(provider).expect("Failed to create bounded vec for LEB128");
+            let mut buffer = [0u8; 10];
+            // Simple LEB128 encoding for no_std
+            let mut bytes_written = 0;
+            let mut val = value;
+            loop {
+                let mut byte = (val & 0x7F) as u8;
+                val >>= 7;
+                if val != 0 {
+                    byte |= 0x80;
+                }
+                if bytes_written < buffer.len() {
+                    buffer[bytes_written] = byte;
+                    bytes_written += 1;
+                }
+                if val == 0 {
+                    break;
+                }
             }
-            if bytes_written < buffer.len() {
-                buffer[bytes_written] = byte;
-                bytes_written += 1;
-            }
-            if val == 0 {
-                break;
-            }
-        }
 
-        if bytes_written > 0 {
-            for i in 0..bytes_written {
-                let _ = result.push(buffer[i]);
+            if bytes_written > 0 {
+                for i in 0..bytes_written {
+                    let _ = result.push(buffer[i]);
+                }
             }
+            result
+        } else {
+            BoundedVec::default()
         }
-        result
     }
 
     /// Write string in no_std mode
     pub fn write_string(_s: &str) -> BoundedVec<u8, 256, NoStdProvider<512>> {
-        // Simplified no_std implementation
-        BoundedVec::new(NoStdProvider::<512>::default()).expect("Failed to create bounded vec for string")
+        if let Ok(provider) = create_decoder_provider::<512>() {
+            // Simplified no_std implementation
+            BoundedVec::new(provider).expect("Failed to create bounded vec for string")
+        } else {
+            BoundedVec::default()
+        }
     }
 
     /// Read LEB128 u32 from data with offset
     pub fn read_leb_u32(data: &[u8], offset: usize) -> wrt_error::Result<(u32, usize)> {
         // Simple implementation for no_std - just read from beginning
         if offset >= data.len() {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Parse,
-                wrt_error::codes::PARSE_ERROR,
-                "Offset out of bounds",
-            ));
+            return Err(wrt_error::Error::parse_error("Offset out of bounds"));
         }
         // For simplicity, just parse from the offset
         let mut value = 0u32;
@@ -208,11 +342,7 @@ pub mod binary {
 
         for &byte in &data[offset..] {
             if bytes_read >= 5 {
-                return Err(wrt_error::Error::new(
-                    wrt_error::ErrorCategory::Parse,
-                    wrt_error::codes::PARSE_ERROR,
-                    "LEB128 too long",
-                ));
+                return Err(wrt_error::Error::parse_error("LEB128 too long"));
             }
 
             value |= ((byte & 0x7F) as u32) << shift;
@@ -225,21 +355,13 @@ pub mod binary {
             shift += 7;
         }
 
-        Err(wrt_error::Error::new(
-            wrt_error::ErrorCategory::Parse,
-            wrt_error::codes::PARSE_ERROR,
-            "Incomplete LEB128",
-        ))
+        Err(wrt_error::Error::parse_error("Incomplete LEB128"))
     }
 
     /// Read name from binary data in no_std mode
     pub fn read_name(data: &[u8], offset: usize) -> wrt_error::Result<(&[u8], usize)> {
         if offset >= data.len() {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Parse,
-                wrt_error::codes::PARSE_ERROR,
-                "Offset out of bounds",
-            ));
+            return Err(wrt_error::Error::parse_error("Offset out of bounds"));
         }
 
         // Read length as LEB128
@@ -247,25 +369,33 @@ pub mod binary {
         let name_start = offset + new_offset;
 
         if name_start + length as usize > data.len() {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Parse,
-                wrt_error::codes::PARSE_ERROR,
-                "Name extends beyond data",
-            ));
+            return Err(wrt_error::Error::parse_error("Name extends beyond data"));
         }
 
-        Ok((&data[name_start..name_start + length as usize], name_start + length as usize))
+        Ok((
+            &data[name_start..name_start + length as usize],
+            name_start + length as usize,
+        ))
     }
 }
 
-// Make commonly used binary functions available at top level (now exported by wrt_format directly)
-pub use wrt_format::read_leb128_u32;
-#[cfg(feature = "std")]
-pub use wrt_format::{read_name, read_string, write_leb128_u32, write_string};
-
+// Make commonly used binary functions available at top level (now exported by
+// wrt_format directly)
 // For no_std mode, provide the missing functions locally
 #[cfg(not(feature = "std"))]
-pub use binary::{read_name, write_leb128_u32, write_string};
+pub use binary::{
+    read_name,
+    write_leb128_u32,
+    write_string,
+};
+pub use wrt_format::read_leb128_u32;
+#[cfg(feature = "std")]
+pub use wrt_format::{
+    read_name,
+    read_string,
+    write_leb128_u32,
+    write_string,
+};
 
 /// Extension trait to add missing methods to BoundedVec
 pub trait BoundedVecExt<T, const N: usize, P: wrt_foundation::MemoryProvider> {
@@ -277,26 +407,238 @@ pub trait BoundedVecExt<T, const N: usize, P: wrt_foundation::MemoryProvider> {
     fn is_empty(&self) -> bool;
 }
 
+#[cfg(not(feature = "std"))]
 impl<T, const N: usize, P> BoundedVecExt<T, N, P> for wrt_foundation::bounded::BoundedVec<T, N, P>
 where
-    T: wrt_foundation::traits::Checksummable + wrt_foundation::traits::ToBytes + wrt_foundation::traits::FromBytes + Default + Clone + PartialEq + Eq,
-    P: wrt_foundation::MemoryProvider + Clone + PartialEq + Eq + Default,
+    T: wrt_foundation::traits::Checksummable
+        + wrt_foundation::traits::ToBytes
+        + wrt_foundation::traits::FromBytes
+        + Default
+        + Clone
+        + PartialEq
+        + Eq,
+    P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq,
 {
     fn empty() -> Self {
         Self::new(P::default()).unwrap_or_default()
     }
-    
+
     fn try_push(&mut self, item: T) -> wrt_error::Result<()> {
-        self.push(item).map_err(|_e| wrt_error::Error::new(
-            wrt_error::ErrorCategory::Resource,
-            wrt_error::codes::CAPACITY_EXCEEDED,
-            "BoundedVec push failed: capacity exceeded"
-        ))
+        self.push(item).map_err(|_e| {
+            wrt_error::Error::runtime_execution_error("Failed to push item to bounded vector")
+        })
     }
-    
+
     fn is_empty(&self) -> bool {
         use wrt_foundation::traits::BoundedCapacity;
         self.len() == 0
+    }
+}
+
+// Extension trait to add missing methods to Vec in std mode
+pub trait DecoderVecExt<T> {
+    /// Create from bytes with provider (compatible with both std and no_std)
+    fn from_bytes_with_provider<'a, P: wrt_foundation::MemoryProvider>(
+        reader: &mut wrt_foundation::traits::ReadStream<'a>,
+        provider: &P,
+    ) -> wrt_foundation::Result<Self>
+    where
+        Self: Sized;
+
+    /// Update checksum (compatible with both std and no_std)
+    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum);
+
+    /// Serialized size (compatible with both std and no_std)
+    fn serialized_size(&self) -> usize;
+
+    /// To bytes with provider (compatible with both std and no_std)
+    fn to_bytes_with_provider<'a, P: wrt_foundation::MemoryProvider>(
+        &self,
+        writer: &mut wrt_foundation::traits::WriteStream<'a>,
+        provider: &P,
+    ) -> wrt_foundation::Result<()>;
+}
+
+#[cfg(feature = "std")]
+impl<T> DecoderVecExt<T> for Vec<T>
+where
+    T: wrt_foundation::traits::Checksummable
+        + wrt_foundation::traits::ToBytes
+        + wrt_foundation::traits::FromBytes
+        + Clone,
+{
+    fn from_bytes_with_provider<'a, P: wrt_foundation::MemoryProvider>(
+        reader: &mut wrt_foundation::traits::ReadStream<'a>,
+        _provider: &P,
+    ) -> wrt_foundation::Result<Self> {
+        // For std mode, read all items without provider
+        let mut result = Vec::new();
+        // Read count first (assuming LEB128 u32 count prefix)
+        let mut count_bytes = [0u8; 4];
+        reader.read_exact(&mut count_bytes)?;
+        let count = u32::from_le_bytes(count_bytes);
+
+        result.reserve(count as usize);
+        for _ in 0..count {
+            let item = T::from_bytes_with_provider(reader, _provider)?;
+            result.push(item);
+        }
+        Ok(result)
+    }
+
+    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
+        for item in self {
+            item.update_checksum(checksum);
+        }
+    }
+
+    fn serialized_size(&self) -> usize {
+        4 + self.iter().map(|item| item.serialized_size()).sum::<usize>() // 4 bytes for count + items
+    }
+
+    fn to_bytes_with_provider<'a, P: wrt_foundation::MemoryProvider>(
+        &self,
+        writer: &mut wrt_foundation::traits::WriteStream<'a>,
+        provider: &P,
+    ) -> wrt_foundation::Result<()> {
+        // Write count first
+        let count = self.len() as u32;
+        writer.write_all(&count.to_le_bytes())?;
+
+        // Write all items
+        for item in self {
+            item.to_bytes_with_provider(writer, provider)?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl<T, const N: usize, P> DecoderVecExt<T> for BoundedVec<T, N, P>
+where
+    T: wrt_foundation::traits::Checksummable
+        + wrt_foundation::traits::ToBytes
+        + wrt_foundation::traits::FromBytes
+        + Default
+        + Clone
+        + PartialEq
+        + Eq,
+    P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq,
+{
+    fn from_bytes_with_provider<'a, P2: wrt_foundation::MemoryProvider>(
+        reader: &mut wrt_foundation::traits::ReadStream<'a>,
+        provider: &P2,
+    ) -> wrt_foundation::Result<Self> {
+        // For no_std mode, use the provider directly
+        use wrt_foundation::traits::FromBytes;
+        FromBytes::from_bytes_with_provider(reader, provider)
+    }
+
+    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
+        use wrt_foundation::traits::Checksummable;
+        Checksummable::update_checksum(self, checksum);
+    }
+
+    fn serialized_size(&self) -> usize {
+        use wrt_foundation::traits::ToBytes;
+        ToBytes::serialized_size(self)
+    }
+
+    fn to_bytes_with_provider<'a, P2: wrt_foundation::MemoryProvider>(
+        &self,
+        writer: &mut wrt_foundation::traits::WriteStream<'a>,
+        provider: &P2,
+    ) -> wrt_foundation::Result<()> {
+        use wrt_foundation::traits::ToBytes;
+        ToBytes::to_bytes_with_provider(self, writer, provider)
+    }
+}
+
+// Extension trait to add missing methods to String in std mode
+pub trait DecoderStringExt {
+    /// Create from bytes with provider (compatible with both std and no_std)
+    fn from_bytes_with_provider<'a, P: wrt_foundation::MemoryProvider>(
+        reader: &mut wrt_foundation::traits::ReadStream<'a>,
+        provider: &P,
+    ) -> wrt_foundation::Result<Self>
+    where
+        Self: Sized;
+
+    /// Update checksum (compatible with both std and no_std)
+    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum);
+
+    /// Serialized size (compatible with both std and no_std)
+    fn serialized_size(&self) -> usize;
+
+    /// To bytes with provider (compatible with both std and no_std)
+    fn to_bytes_with_provider<'a, P: wrt_foundation::MemoryProvider>(
+        &self,
+        writer: &mut wrt_foundation::traits::WriteStream<'a>,
+        provider: &P,
+    ) -> wrt_foundation::Result<()>;
+}
+
+#[cfg(feature = "std")]
+impl DecoderStringExt for String {
+    fn from_bytes_with_provider<'a, P: wrt_foundation::MemoryProvider>(
+        reader: &mut wrt_foundation::traits::ReadStream<'a>,
+        _provider: &P,
+    ) -> wrt_foundation::Result<Self> {
+        // For std mode, read string using foundation traits
+        use wrt_foundation::traits::FromBytes;
+        String::from_bytes_with_provider(reader, _provider)
+    }
+
+    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
+        checksum.update_slice(self.as_bytes);
+    }
+
+    fn serialized_size(&self) -> usize {
+        self.len()
+    }
+
+    fn to_bytes_with_provider<'a, P: wrt_foundation::MemoryProvider>(
+        &self,
+        writer: &mut wrt_foundation::traits::WriteStream<'a>,
+        _provider: &P,
+    ) -> wrt_foundation::Result<()> {
+        writer.write_all(self.as_bytes())?;
+        Ok(())
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl<const N: usize, P> DecoderStringExt for BoundedString<N, P>
+where
+    P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq,
+{
+    fn from_bytes_with_provider<'a, P2: wrt_foundation::MemoryProvider>(
+        reader: &mut wrt_foundation::traits::ReadStream<'a>,
+        provider: &P2,
+    ) -> wrt_foundation::Result<Self> {
+        // For no_std mode, use the provider to create bounded string
+        let mut buffer = wrt_foundation::BoundedVec::<u8, N, P2>::new(provider.clone())?;
+        reader.read_to_end(&mut buffer)?;
+        Self::from_utf8_bytes(&buffer, provider.clone())
+    }
+
+    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
+        use wrt_foundation::traits::Checksummable;
+        Checksummable::update_checksum(self, checksum);
+    }
+
+    fn serialized_size(&self) -> usize {
+        use wrt_foundation::traits::ToBytes;
+        ToBytes::serialized_size(self)
+    }
+
+    fn to_bytes_with_provider<'a, P2: wrt_foundation::MemoryProvider>(
+        &self,
+        writer: &mut wrt_foundation::traits::WriteStream<'a>,
+        provider: &P2,
+    ) -> wrt_foundation::Result<()> {
+        use wrt_foundation::traits::ToBytes;
+        ToBytes::to_bytes_with_provider(self, writer, provider)
     }
 }
 
@@ -332,6 +674,9 @@ pub fn is_valid_wasm_header(data: &[u8]) -> bool {
 
 // read_leb128_u32 is now imported from wrt_format
 
-// Feature-gated function aliases - bring in functions from wrt_format that aren't already exported
+// Feature-gated function aliases - bring in functions from wrt_format that
+// aren't already exported
 #[cfg(feature = "std")]
 pub use wrt_format::binary::with_alloc::parse_block_type as parse_format_block_type;
+
+// Duplicate type aliases removed - using the ones defined earlier in the file

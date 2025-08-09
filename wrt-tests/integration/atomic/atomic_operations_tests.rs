@@ -36,7 +36,7 @@ mod tests {
         // Test i32 atomic load
         let load_op = AtomicOp::Load(AtomicLoadOp::I32AtomicLoad {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         
         let result = atomic_model.execute_atomic_operation(0, load_op, &[])?;
         assert_eq!(result.len(), 1);
@@ -45,10 +45,10 @@ mod tests {
         // Test i64 atomic load
         let load_op = AtomicOp::Load(AtomicLoadOp::I64AtomicLoad {
             memarg: MemArg { offset: 8, align: 3 }
-        });
+        };
         
         let result = atomic_model.execute_atomic_operation(0, load_op, &[])?;
-        assert_eq!(result.len(), 2);
+        assert_eq!(result.len(), 2;
         assert_eq!(result[0], 0);
         assert_eq!(result[1], 0);
         
@@ -70,18 +70,18 @@ mod tests {
         // Test i32 atomic store
         let store_op = AtomicOp::Store(AtomicStoreOp::I32AtomicStore {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         
         let result = atomic_model.execute_atomic_operation(0, store_op, &[42])?;
-        assert!(result.is_empty()); // Store returns no values
+        assert!(result.is_empty())); // Store returns no values
         
         // Verify the store worked by loading the value
         let load_op = AtomicOp::Load(AtomicLoadOp::I32AtomicLoad {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         
         let result = atomic_model.execute_atomic_operation(0, load_op, &[])?;
-        assert_eq!(result[0], 42);
+        assert_eq!(result[0], 42;
         
         Ok(())
     }
@@ -101,13 +101,13 @@ mod tests {
         // Initialize memory with a value
         let store_op = AtomicOp::Store(AtomicStoreOp::I32AtomicStore {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         atomic_model.execute_atomic_operation(0, store_op, &[10])?;
         
         // Test atomic add
         let rmw_op = AtomicOp::RMW(AtomicRMWInstr::I32AtomicRmwAdd {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         
         let result = atomic_model.execute_atomic_operation(0, rmw_op, &[5])?;
         assert_eq!(result[0], 10); // Returns old value
@@ -115,7 +115,7 @@ mod tests {
         // Verify the add worked
         let load_op = AtomicOp::Load(AtomicLoadOp::I32AtomicLoad {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         let result = atomic_model.execute_atomic_operation(0, load_op, &[])?;
         assert_eq!(result[0], 15); // 10 + 5
         
@@ -137,13 +137,13 @@ mod tests {
         // Initialize memory with a value
         let store_op = AtomicOp::Store(AtomicStoreOp::I32AtomicStore {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         atomic_model.execute_atomic_operation(0, store_op, &[42])?;
         
         // Test successful compare-exchange
         let cmpxchg_op = AtomicOp::Cmpxchg(AtomicCmpxchgInstr::I32AtomicRmwCmpxchg {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         
         let result = atomic_model.execute_atomic_operation(0, cmpxchg_op, &[42, 100])?;
         assert_eq!(result[0], 42); // Returns old value
@@ -151,14 +151,14 @@ mod tests {
         // Verify the exchange worked
         let load_op = AtomicOp::Load(AtomicLoadOp::I32AtomicLoad {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         let result = atomic_model.execute_atomic_operation(0, load_op, &[])?;
-        assert_eq!(result[0], 100);
+        assert_eq!(result[0], 100;
         
         // Test failed compare-exchange
         let cmpxchg_op = AtomicOp::Cmpxchg(AtomicCmpxchgInstr::I32AtomicRmwCmpxchg {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         
         let result = atomic_model.execute_atomic_operation(0, cmpxchg_op, &[42, 200])?;
         assert_eq!(result[0], 100); // Returns current value (not expected value)
@@ -185,10 +185,10 @@ mod tests {
         // Test atomic fence
         let fence_op = AtomicOp::Fence(AtomicFence {
             ordering: MemoryOrdering::SeqCst
-        });
+        };
         
         let result = atomic_model.execute_atomic_operation(0, fence_op, &[])?;
-        assert!(result.is_empty()); // Fence returns no values
+        assert!(result.is_empty())); // Fence returns no values
         
         Ok(())
     }
@@ -209,7 +209,7 @@ mod tests {
         
         let store_op = AtomicOp::Store(AtomicStoreOp::I32AtomicStore {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         atomic_model.execute_atomic_operation(0, store_op, &[42])?;
         
         // Test relaxed ordering
@@ -274,13 +274,13 @@ mod tests {
         // Execute some operations to generate metrics
         let store_op = AtomicOp::Store(AtomicStoreOp::I32AtomicStore {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         
         for i in 0..10 {
             atomic_model.execute_atomic_operation(0, store_op.clone(), &[i])?;
         }
         
-        let metrics = atomic_model.get_performance_metrics();
+        let metrics = atomic_model.get_performance_metrics);
         assert!(metrics.operations_per_second >= 0.0);
         assert!(metrics.average_operation_time >= 0.0);
         assert!(metrics.memory_utilization >= 0.0);
@@ -304,7 +304,7 @@ mod tests {
             memory.len(),
             thread_manager,
             MemoryOrderingPolicy::StrictSequential,
-        )?));
+        )?;
         
         let num_threads = 4;
         let operations_per_thread = 100;
@@ -332,7 +332,7 @@ mod tests {
                 }
                 
                 Ok(())
-            });
+            };
             
             handles.push(handle);
         }
@@ -377,10 +377,10 @@ mod tests {
         // Test notify operation
         let notify_op = AtomicOp::WaitNotify(AtomicWaitNotifyOp::MemoryAtomicNotify {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         
         let result = atomic_model.execute_atomic_operation(0, notify_op, &[])?;
-        assert!(result[0] >= 0); // Number of threads notified
+        assert!(result[0] >= 0)); // Number of threads notified
         
         Ok(())
     }
@@ -400,7 +400,7 @@ mod tests {
         // Execute some operations to create patterns
         let store_op = AtomicOp::Store(AtomicStoreOp::I32AtomicStore {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         
         for i in 0..20 {
             atomic_model.execute_atomic_operation(0, store_op.clone(), &[i])?;
@@ -408,7 +408,7 @@ mod tests {
         
         // Run optimization
         let optimization_result = atomic_model.optimize_memory_model()?;
-        assert!(optimization_result.total_optimizations <= 3); // Max 3 optimization types
+        assert!(optimization_result.total_optimizations <= 3)); // Max 3 optimization types
         
         Ok(())
     }
@@ -428,15 +428,15 @@ mod tests {
         // Test out-of-bounds access
         let load_op = AtomicOp::Load(AtomicLoadOp::I32AtomicLoad {
             memarg: MemArg { offset: 100, align: 2 } // Beyond memory size
-        });
+        };
         
-        let result = atomic_model.execute_atomic_operation(0, load_op, &[]);
-        assert!(result.is_err());
+        let result = atomic_model.execute_atomic_operation(0, load_op, &[];
+        assert!(result.is_err();
         
         // Test store without value
         let store_op = AtomicOp::Store(AtomicStoreOp::I32AtomicStore {
             memarg: MemArg { offset: 0, align: 2 }
-        });
+        };
         
         let result = atomic_model.execute_atomic_operation(0, store_op, &[]); // No operands
         assert!(result.is_err());

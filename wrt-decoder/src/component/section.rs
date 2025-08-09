@@ -9,10 +9,21 @@
 //! sections and common structures used in component binary parsing.
 
 use wrt_foundation::{
-    bounded::{BoundedString, MAX_WASM_NAME_LENGTH},
-    traits::{Checksummable, FromBytes, ReadStream, ToBytes, WriteStream},
+    bounded::{
+        BoundedString,
+        MAX_WASM_NAME_LENGTH,
+    },
+    traits::{
+        Checksummable,
+        FromBytes,
+        ReadStream,
+        ToBytes,
+        WriteStream,
+    },
     verification::Checksum,
-    MemoryProvider, NoStdProvider, WrtResult,
+    MemoryProvider,
+    NoStdProvider,
+    WrtResult,
 };
 
 /// Binary std/no_std choice
@@ -24,11 +35,11 @@ pub struct ComponentExport<
     P: MemoryProvider + Clone + PartialEq + Eq + Default = NoStdProvider<1024>,
 > {
     /// Export name
-    pub name: BoundedString<MAX_WASM_NAME_LENGTH, P>,
+    pub name:       BoundedString<MAX_WASM_NAME_LENGTH, P>,
     /// Export type index
     pub type_index: u32,
     /// Export kind
-    pub kind: u8,
+    pub kind:       u8,
 }
 
 /// Binary std/no_std choice
@@ -40,7 +51,7 @@ pub struct ComponentImport<
     P: MemoryProvider + Clone + PartialEq + Eq + Default = NoStdProvider<1024>,
 > {
     /// Import name
-    pub name: BoundedString<MAX_WASM_NAME_LENGTH, P>,
+    pub name:       BoundedString<MAX_WASM_NAME_LENGTH, P>,
     /// Import type index
     pub type_index: u32,
 }
@@ -51,9 +62,9 @@ pub struct ComponentImport<
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentSection {
     /// Section ID
-    pub id: u8,
+    pub id:     u8,
     /// Section size
-    pub size: u32,
+    pub size:   u32,
     /// Section payload offset
     pub offset: usize,
 }
@@ -66,7 +77,7 @@ pub enum ComponentValueType {
     /// Composite types
     Composite = 1,
     /// Resource types
-    Resource = 2,
+    Resource  = 2,
 }
 
 impl From<u8> for ComponentValueType {
@@ -122,9 +133,9 @@ impl<P: MemoryProvider + Clone + PartialEq + Eq + Default> FromBytes for Compone
         provider: &PStream,
     ) -> WrtResult<Self> {
         Ok(Self {
-            name: BoundedString::from_bytes_with_provider(reader, provider)?,
+            name:       BoundedString::from_bytes_with_provider(reader, provider)?,
             type_index: u32::from_bytes_with_provider(reader, provider)?,
-            kind: u8::from_bytes_with_provider(reader, provider)?,
+            kind:       u8::from_bytes_with_provider(reader, provider)?,
         })
     }
 }
@@ -155,7 +166,7 @@ impl<P: MemoryProvider + Clone + PartialEq + Eq + Default> FromBytes for Compone
         provider: &PStream,
     ) -> WrtResult<Self> {
         Ok(Self {
-            name: BoundedString::from_bytes_with_provider(reader, provider)?,
+            name:       BoundedString::from_bytes_with_provider(reader, provider)?,
             type_index: u32::from_bytes_with_provider(reader, provider)?,
         })
     }
@@ -189,8 +200,8 @@ impl FromBytes for ComponentSection {
         provider: &PStream,
     ) -> WrtResult<Self> {
         Ok(Self {
-            id: u8::from_bytes_with_provider(reader, provider)?,
-            size: u32::from_bytes_with_provider(reader, provider)?,
+            id:     u8::from_bytes_with_provider(reader, provider)?,
+            size:   u32::from_bytes_with_provider(reader, provider)?,
             offset: u32::from_bytes_with_provider(reader, provider)? as usize,
         })
     }
@@ -218,7 +229,9 @@ impl FromBytes for ComponentType {
         reader: &mut ReadStream<'a>,
         provider: &PStream,
     ) -> WrtResult<Self> {
-        Ok(Self { form: u8::from_bytes_with_provider(reader, provider)? })
+        Ok(Self {
+            form: u8::from_bytes_with_provider(reader, provider)?,
+        })
     }
 }
 
@@ -244,7 +257,9 @@ impl FromBytes for ComponentInstance {
         reader: &mut ReadStream<'a>,
         provider: &PStream,
     ) -> WrtResult<Self> {
-        Ok(Self { type_index: u32::from_bytes_with_provider(reader, provider)? })
+        Ok(Self {
+            type_index: u32::from_bytes_with_provider(reader, provider)?,
+        })
     }
 }
 

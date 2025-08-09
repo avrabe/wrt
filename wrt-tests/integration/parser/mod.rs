@@ -12,7 +12,7 @@ mod control_instruction_parser_tests;
 
 /// Run all parser integration tests
 pub fn run_tests() -> TestResult {
-    let mut runner = TestRunner::new("Parser Integration");
+    let mut runner = TestRunner::new("Parser Integration";
     
     runner.add_test_suite("Core Parser Tests", || {
         // The consolidated tests are run via standard test framework
@@ -43,7 +43,7 @@ mod tests {
     
     #[test]
     fn parser_integration() {
-        let result = run_tests();
+        let result = run_tests);
         assert!(result.is_success(), "Parser integration tests failed: {:?}", result);
     }
 }

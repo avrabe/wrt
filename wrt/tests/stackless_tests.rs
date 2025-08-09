@@ -1,6 +1,9 @@
 #[cfg(feature = "wat-parsing")]
 use wrt::execute_test_with_stackless;
-use wrt::{Error as WrtError, Result};
+use wrt::{
+    Error as WrtError,
+    Result,
+};
 
 #[test]
 #[cfg(feature = "wat-parsing")]
@@ -69,7 +72,10 @@ fn test_direct_memory_operations() -> Result<()> {
     let instance_idx = engine.instantiate(module.clone())?;
 
     // Check memory instance details before any operations
-    println!("Module has {} memory definitions", module.memories.read().unwrap().len());
+    println!(
+        "Module has {} memory definitions",
+        module.memories.read().unwrap().len()
+    );
 
     // Get the memory export
     let mem_export = module.get_export("memory").unwrap();
@@ -88,7 +94,11 @@ fn test_direct_memory_operations() -> Result<()> {
             println!("Memory data around address 100 before any operations:");
             let start = if 100 >= 4 { 96 } else { 0 };
             for i in start..start + 12 {
-                println!("  [{:3}]: {}", i, instance.memories[0].data.read().unwrap()[i as usize]);
+                println!(
+                    "  [{:3}]: {}",
+                    i,
+                    instance.memories[0].data.read().unwrap()[i as usize]
+                );
             }
         }
     }
@@ -115,12 +125,16 @@ fn test_direct_memory_operations() -> Result<()> {
             println!("Memory after:");
             for i in 96..108 {
                 // Add read lock
-                println!("  [{:3}]: {}", i, instance.memories[0].data.read().unwrap()[i as usize]);
+                println!(
+                    "  [{:3}]: {}",
+                    i,
+                    instance.memories[0].data.read().unwrap()[i as usize]
+                );
             }
             // Comment out stack assertion - Stackless model manages stack
             // differently assert_eq!(instance.stack.len(), 0);
             // assert!(result.is_ok());
-            // assert_eq!(result.unwrap(), vec![wrt::Value::I32(42)]);
+            // assert_eq!(result.unwrap(), vec![wrt::Value::I32(42)];
         }
     }
 
@@ -139,7 +153,9 @@ fn test_direct_memory_operations() -> Result<()> {
         }
         println!("Successfully loaded the correct value: {}", loaded_value);
     } else {
-        return Err(wrt::Error::Execution("Load did not return an i32 value".into()));
+        return Err(wrt::Error::Execution(
+            "Load did not return an i32 value".into(),
+        ));
     }
 
     // Return Ok if we got this far

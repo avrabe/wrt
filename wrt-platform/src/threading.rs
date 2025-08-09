@@ -3,6 +3,9 @@
 //! This module provides safe abstractions for mapping WebAssembly threads to
 //! native platform threads with proper resource controls and isolation.
 
+#[cfg(feature = "std")]
+extern crate alloc;
+
 use core::{
     fmt::Debug,
     sync::atomic::{AtomicUsize, Ordering},
@@ -10,7 +13,7 @@ use core::{
 };
 
 #[cfg(feature = "std")]
-use std::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 
 use wrt_error::Result;
 use wrt_sync::WrtRwLock;
@@ -175,6 +178,14 @@ impl core::fmt::Debug for ThreadHandle {
 }
 
 impl ThreadHandle {
+    /// Create a new thread handle
+    pub fn new(id: u64, platform_handle: Box<dyn PlatformThreadHandle>) -> Self {
+        Self {
+            id,
+            platform_handle,
+        }
+    }
+
     /// Get thread ID
     pub fn id(&self) -> u64 {
         self.id
@@ -440,6 +451,7 @@ impl ResourceTracker {
 }
 
 /// Create platform-specific thread pool
+#[cfg(feature = "threading")]
 pub fn create_thread_pool(_config: &ThreadPoolConfig) -> Result<Box<dyn PlatformThreadPool>> {
     #[cfg(target_os = "nto")]
     {
@@ -447,7 +459,7 @@ pub fn create_thread_pool(_config: &ThreadPoolConfig) -> Result<Box<dyn Platform
             .map(|pool| Box::new(pool) as Box<dyn PlatformThreadPool>)
     }
     
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "threading", target_os = "linux"))]
     {
         super::linux_threading::LinuxThreadPool::new(_config)
             .map(|pool| Box::new(pool) as Box<dyn PlatformThreadPool>)
@@ -455,17 +467,13 @@ pub fn create_thread_pool(_config: &ThreadPoolConfig) -> Result<Box<dyn Platform
     
     #[cfg(all(feature = "threading", not(target_os = "nto"), not(target_os = "linux")))]
     {
-        super::generic_threading::GenericThreadPool::new(_config)
+        super::generic_threading::GenericThreadPool::new(_config.clone())
             .map(|pool| Box::new(pool) as Box<dyn PlatformThreadPool>)
     }
     
     #[cfg(not(any(target_os = "nto", target_os = "linux", feature = "threading")))]   
     {
-        Err(wrt_error::Error::new(
-            wrt_error::ErrorCategory::System,
-            1,
-            "Thread pool creation requires threading feature",
-        ))
+        Err(wrt_error::Error::runtime_execution_error("Threading not supported on this platform"))
     }
 }
 
@@ -576,12 +584,8 @@ where
     };
     
     let _handle = builder.spawn(move || {
-        let _ = task();
-    }).map_err(|_e| wrt_error::Error::new(
-        wrt_error::ErrorCategory::Runtime,
-        wrt_error::codes::EXECUTION_ERROR,
-        "Failed to spawn thread"
-    ))?;
+        let _ = task;
+    }).map_err(|_e| wrt_error::Error::runtime_execution_error("Failed to spawn thread"))?;
     
     // Create a simplified thread handle
     // This is a minimal implementation for compilation purposes
@@ -619,10 +623,6 @@ where
     F: FnOnce() -> Result<()> + Send + 'static,
 {
     // For no_std, we can't create actual threads, so return an error immediately
-    Err(wrt_error::Error::new(
-        wrt_error::ErrorCategory::Runtime,
-        wrt_error::codes::NOT_IMPLEMENTED,
-        "Thread spawning not supported in no_std environment"
-    ))
+    Err(wrt_error::Error::runtime_not_implemented("Thread spawning not supported in no_std environment"))
 }
 

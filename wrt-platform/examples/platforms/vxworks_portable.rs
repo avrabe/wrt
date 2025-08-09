@@ -55,7 +55,7 @@ fn example_rtp_memory_allocation() {
         .build()
         .expect("Failed to create RTP allocator");
     
-    println!("Created RTP allocator with max {} pages", allocator.max_pages());
+    println!("Created RTP allocator with max {} pages", allocator.max_pages);
     
     let pages_to_allocate = 10;
     let ptr = allocator.allocate_pages(pages_to_allocate)
@@ -155,7 +155,7 @@ fn show_vxworks_concepts() {
     println!("       .context(VxWorksContext::Rtp)");
     println!("       .max_pages(1024)");
     println!("       .enable_guard_pages(true)");
-    println!("       .build()?;");
+    println!("       .build()?;";
     println!("   ```");
     
     println!("\n6. Platform Integration:");
@@ -179,21 +179,21 @@ fn show_vxworks_concepts() {
     println!("use wrt_platform::vxworks_sync::*;");
     println!("");
     println!("// Detect execution context");
-    println!("let context = detect_vxworks_context();");
+    println!("let context = detect_vxworks_context();";
     println!("");
     println!("// Create platform components");
     println!("let allocator = VxWorksAllocatorBuilder::new()");
     println!("    .context(context)");
-    println!("    .build()?;");
+    println!("    .build()?;";
     println!("");
     println!("let futex = VxWorksFutexBuilder::new(context)");
-    println!("    .build()?;");
+    println!("    .build()?;";
     println!("");
     println!("// Use with WRT runtime");
     println!("let runtime = wrt::Runtime::builder()");
     println!("    .with_allocator(Box::new(allocator))");
     println!("    .with_futex(Box::new(futex))");
-    println!("    .build()?;");
+    println!("    .build()?;";
     println!("```");
     
     // Demonstrate trait usage with mock implementations
@@ -219,10 +219,8 @@ fn demonstrate_trait_usage() {
     impl PageAllocator for MockVxWorksAllocator {
         fn allocate_pages(&mut self, pages: usize) -> Result<core::ptr::NonNull<u8>, wrt_error::Error> {
             if self.allocated_pages + pages > self.max_pages {
-                return Err(wrt_error::Error::new(
-                    wrt_error::ErrorKind::Memory,
-                    "Page limit exceeded"
-                ));
+                return Err(wrt_error::Error::runtime_execution_error("
+                ;
             }
             
             // Binary std/no_std choice
@@ -231,7 +229,7 @@ fn demonstrate_trait_usage() {
             self.allocated_pages += pages;
             
             core::ptr::NonNull::new(ptr).ok_or_else(|| 
-                wrt_error::Error::new(wrt_error::ErrorKind::Memory, "Null pointer"))
+                wrt_error::Error::new(ErrorKind::Memory, "Allocation failed"))
         }
         
         fn deallocate_pages(&mut self, ptr: core::ptr::NonNull<u8>, pages: usize) -> Result<(), wrt_error::Error> {
@@ -286,7 +284,7 @@ fn demonstrate_trait_usage() {
     impl FutexLike for MockVxWorksFutex {
         fn wait(&self, expected: u32, _timeout: Option<Duration>) -> Result<(), wrt_error::Error> {
             if self.value.load(Ordering::Acquire) != expected {
-                return Ok(());
+                return Ok();
             }
             // Mock wait - in real implementation would call VxWorks wait APIs
             Ok(())
@@ -331,13 +329,13 @@ fn demonstrate_trait_usage() {
     match allocator.allocate_pages(10) {
         Ok(ptr) => {
             println!("✓ Allocated 10 pages successfully");
-            println!("  Current allocated: {} pages", allocator.allocated_pages());
+            println!("  Current allocated: {} pages", allocator.allocated_pages);
             
             if let Err(e) = allocator.deallocate_pages(ptr, 10) {
                 println!("✗ Deallocation failed: {}", e);
             } else {
                 println!("✓ Deallocated successfully");
-                println!("  Final allocated: {} pages", allocator.allocated_pages());
+                println!("  Final allocated: {} pages", allocator.allocated_pages);
             }
         }
         Err(e) => println!("✗ Allocation failed: {}", e),

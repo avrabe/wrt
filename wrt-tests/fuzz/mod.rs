@@ -11,7 +11,7 @@ mod safe_memory_fuzz;
 
 /// Run all fuzz integration tests (in non-fuzz mode for CI)
 pub fn run_tests() -> TestResult {
-    let mut runner = TestRunner::new("Fuzz Testing Integration");
+    let mut runner = TestRunner::new("Fuzz Testing Integration";
     
     runner.add_test_suite("Bounded Collections Property Tests", || {
         // Property-based testing for bounded collections
@@ -37,7 +37,7 @@ mod tests {
     
     #[test]
     fn fuzz_integration() {
-        let result = run_tests();
+        let result = run_tests);
         assert!(result.is_success(), "Fuzz integration tests failed: {:?}", result);
     }
 }

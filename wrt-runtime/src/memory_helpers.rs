@@ -4,12 +4,18 @@
 //! instances, reducing the need for explicit dereferencing and borrowing.
 
 // Import Arc from appropriate source based on feature flags
-extern crate alloc;
+// alloc is imported in lib.rs with proper feature gates
 
 #[cfg(feature = "std")]
 use std::sync::Arc;
-#[cfg(not(feature = "std"))]
+#[cfg(all(feature = "alloc", not(feature = "std")))]
 use alloc::sync::Arc;
+
+// Import Vec
+#[cfg(feature = "std")]
+use std::vec::Vec;
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+use alloc::vec::Vec;
 
 use wrt_error::{Error, Result};
 use wrt_foundation::{safe_memory::SafeStack, values::Value};
@@ -19,7 +25,7 @@ use crate::{prelude::*, Memory};
 // Import format! macro for string formatting
 #[cfg(feature = "std")]
 use std::format;
-#[cfg(not(feature = "std"))]
+#[cfg(all(feature = "alloc", not(feature = "std")))]
 use alloc::format;
 
 /// Extension trait for `Arc<Memory>` to simplify access to memory operations
@@ -120,7 +126,7 @@ pub trait ArcMemoryExt {
     fn write_u64(&self, addr: u32, value: u64) -> Result<()>;
 
     /// Write a 128-bit vector to memory
-    fn write_v128(&self, addr: u32, value: [u8; 16]) -> Result<()>;
+    fn write_v128(&self, addr: u32, value: [u8); 16]) -> Result<()>;
 
     /// Check alignment for memory access
     fn check_alignment(&self, offset: u32, access_size: u32, align: u32) -> Result<()>;
@@ -194,7 +200,8 @@ impl ArcMemoryExt for Arc<Memory> {
     ) -> Result<wrt_foundation::safe_memory::SafeStack<u8, 1024, wrt_foundation::safe_memory::NoStdProvider<1024>>> {
         // Early return for zero-length reads
         if len == 0 {
-            return Ok(wrt_foundation::safe_memory::SafeStack::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default())?);
+            let provider = wrt_foundation::safe_managed_alloc!(1024, wrt_foundation::budget_aware_provider::CrateId::Runtime)?;
+            return Ok(wrt_foundation::safe_memory::SafeStack::new(provider)?;
         }
 
         // Get a memory-safe slice directly instead of creating a temporary buffer
@@ -202,26 +209,19 @@ impl ArcMemoryExt for Arc<Memory> {
 
         // Create a SafeStack from the verified slice data with appropriate verification
         // level
-        let provider = wrt_foundation::safe_memory::NoStdProvider::<1024>::default();
+        let provider = wrt_foundation::safe_managed_alloc!(1024, wrt_foundation::budget_aware_provider::CrateId::Runtime)?;
         let mut safe_stack = wrt_foundation::safe_memory::SafeStack::new(provider)?;
 
         // Set verification level to match memory's level
-        let verification_level = self.as_ref().verification_level();
-        safe_stack.set_verification_level(verification_level);
+        let verification_level = self.as_ref().verification_level);
+        safe_stack.set_verification_level(verification_level;
 
         // Get data from the safe slice with integrity verification built in
         let data = safe_slice.data()?;
 
-        // More efficiently add all bytes to the SafeStack using extend_from_slice
-        #[cfg(feature = "std")]
+        // Add all bytes to the SafeStack
         {
-            safe_stack.extend_from_slice(data)?;
-        }
-
-        // Fallback implementation if we need to populate item by item (for no_std)
-        #[cfg(not(feature = "std"))]
-        {
-            // Add all bytes to the SafeStack
+            // Use push for each byte since extend_from_slice is not available
             for &byte in data {
                 safe_stack.push(byte)?;
             }
@@ -241,10 +241,7 @@ impl ArcMemoryExt for Arc<Memory> {
     fn read_exact(&self, offset: u32, len: u32) -> Result<Vec<u8>> {
         // Early return for zero-length reads
         if len == 0 {
-            #[cfg(feature = "std")]
-            return Ok(Vec::new());
-            #[cfg(not(feature = "std"))]
-            return Ok(wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default())?);
+            return Ok(Vec::new();
         }
 
         // Get a memory-safe slice directly instead of creating a temporary buffer
@@ -253,24 +250,23 @@ impl ArcMemoryExt for Arc<Memory> {
         // Get data from the safe slice with integrity verification built in
         let data = safe_slice.data()?;
 
-        // Create a BoundedVec from the verified slice data
-        let mut buffer = wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default())?;
+        // Create a Vec from the verified slice data
+        let mut buffer = Vec::new();
         for &byte in data {
-            buffer.push(byte)?;
+            buffer.push(byte);
         }
-
-        // Return the verified buffer
         Ok(buffer)
     }
 
     fn write_all(&self, offset: u32, bytes: &[u8]) -> Result<()> {
-        // Use clone_and_mutate pattern to simplify thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write(offset, bytes))
+        // Use the new thread-safe write method
+        self.as_ref().write_shared(offset, bytes)
     }
 
     fn grow(&self, pages: u32) -> Result<u32> {
-        // Use clone_and_mutate pattern to simplify thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.grow(pages))
+        // TODO: This is a design issue - the trait expects &self but grow_shared needs &mut self
+        // For now, return an error indicating this operation is not supported with Arc
+        Err(Error::not_supported_unsupported_operation("Memory growth not supported for Arc<Memory>, use direct Memory instance"))
     }
 
     fn read_i32(&self, addr: u32) -> Result<i32> {
@@ -318,58 +314,58 @@ impl ArcMemoryExt for Arc<Memory> {
     }
 
     fn write_i32(&self, addr: u32, value: i32) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write_i32(addr, value))
+        // Use thread-safe write method
+        self.as_ref().write_shared(addr, &value.to_le_bytes())
     }
 
     fn write_i64(&self, addr: u32, value: i64) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write_i64(addr, value))
+        // Use thread-safe write method
+        self.as_ref().write_shared(addr, &value.to_le_bytes())
     }
 
     fn write_f32(&self, addr: u32, value: f32) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write_f32(addr, value))
+        // Use thread-safe write method
+        self.as_ref().write_shared(addr, &value.to_bits().to_le_bytes())
     }
 
     fn write_f64(&self, addr: u32, value: f64) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write_f64(addr, value))
+        // Use thread-safe write method
+        self.as_ref().write_shared(addr, &value.to_bits().to_le_bytes())
     }
 
     fn write_i8(&self, addr: u32, value: i8) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write_i8(addr, value))
+        // Use thread-safe write method
+        self.as_ref().write_shared(addr, &value.to_le_bytes())
     }
 
     fn write_u8(&self, addr: u32, value: u8) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write_u8(addr, value))
+        // Use thread-safe write method
+        self.as_ref().write_shared(addr, &value.to_le_bytes())
     }
 
     fn write_i16(&self, addr: u32, value: i16) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write_i16(addr, value))
+        // Use thread-safe write method
+        self.as_ref().write_shared(addr, &value.to_le_bytes())
     }
 
     fn write_u16(&self, addr: u32, value: u16) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write_u16(addr, value))
+        // Use thread-safe write method
+        self.as_ref().write_shared(addr, &value.to_le_bytes())
     }
 
     fn write_u32(&self, addr: u32, value: u32) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write_u32(addr, value))
+        // Use thread-safe write method
+        self.as_ref().write_shared(addr, &value.to_le_bytes())
     }
 
     fn write_u64(&self, addr: u32, value: u64) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write_u64(addr, value))
+        // Use thread-safe write method
+        self.as_ref().write_shared(addr, &value.to_le_bytes())
     }
 
-    fn write_v128(&self, addr: u32, value: [u8; 16]) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| mem.write_v128(addr, value))
+    fn write_v128(&self, addr: u32, value: [u8); 16]) -> Result<()> {
+        // Use thread-safe write method
+        self.as_ref().write_shared(addr, &value)
     }
 
     fn check_alignment(&self, offset: u32, access_size: u32, align: u32) -> Result<()> {
@@ -383,66 +379,53 @@ impl ArcMemoryExt for Arc<Memory> {
             wrt_foundation::types::ValueType::F32 => self.read_f32(addr).map(|f| Value::F32(wrt_foundation::values::FloatBits32::from_float(f))),
             wrt_foundation::types::ValueType::F64 => self.read_f64(addr).map(|f| Value::F64(wrt_foundation::values::FloatBits64::from_float(f))),
             // V128 doesn't exist in ValueType enum, so we'll handle it separately
-            _ => Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Type,
-                wrt_error::errors::codes::TYPE_MISMATCH_ERROR,
-                "Cannot read unsupported value type from memory",
-            )),
+            _ => Err(wrt_error::Error::runtime_execution_error("Unsupported value type")),
         }
     }
 
     fn write_value(&self, addr: u32, value: Value) -> Result<()> {
-        // Use clone_and_mutate pattern for thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| match value {
-            Value::I32(v) => mem.write_i32(addr, v),
-            Value::I64(v) => mem.write_i64(addr, v),
-            Value::F32(v) => mem.write_f32(addr, f32::from_bits(v.to_bits())),
-            Value::F64(v) => mem.write_f64(addr, f64::from_bits(v.to_bits())),
-            Value::V128(v) => mem.write_v128(addr, v.into()),
-            _ => Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Type,
-                wrt_error::errors::codes::TYPE_MISMATCH_ERROR,
-                "Runtime operation error",
-            )),
-        })
+        // Use thread-safe write method for different value types
+        match value {
+            Value::I32(v) => self.write_i32(addr, v),
+            Value::I64(v) => self.write_i64(addr, v),
+            Value::F32(v) => self.write_f32(addr, f32::from_bits(v.to_bits())),
+            Value::F64(v) => self.write_f64(addr, f64::from_bits(v.to_bits())),
+            Value::V128(v) => self.write_v128(addr, v.bytes),
+            _ => Err(wrt_error::Error::new(wrt_error::ErrorCategory::Type,
+                wrt_error::codes::TYPE_MISMATCH_ERROR,
+                "Unsupported value type for memory write")),
+        }
     }
 
     fn init(&self, dst: usize, data: &[u8], src: usize, size: usize) -> Result<()> {
-        // Use clone_and_mutate pattern to simplify thread-safe operations
-        self.as_ref().clone_and_mutate(|mem| {
-            // Create a safe slice of the source data for verification
-            let src_data = if src < data.len() {
-                let end = src.checked_add(size).ok_or_else(|| {
-                    wrt_error::Error::new(
-                        wrt_error::ErrorCategory::Memory,
-                        wrt_error::errors::codes::MEMORY_OUT_OF_BOUNDS,
-                        "Source range overflow in memory initialization",
-                    )
-                })?;
+        // Create a safe slice of the source data for verification
+        let src_data = if src < data.len() {
+            let end = src.checked_add(size).ok_or_else(|| {
+                wrt_error::Error::runtime_execution_error("Source bounds overflow")
+            })?;
 
-                if end <= data.len() {
-                    &data[src..end]
-                } else {
-                    return Err(wrt_error::Error::new(
-                        wrt_error::ErrorCategory::Memory,
-                        wrt_error::errors::codes::MEMORY_OUT_OF_BOUNDS,
-                        "Source range out of bounds in memory initialization",
-                    ));
-                }
-            } else if size == 0 {
-                // Zero-sized init is always valid
-                &[]
+            if end <= data.len() {
+                &data[src..end]
             } else {
-                return Err(wrt_error::Error::new(
-                    wrt_error::ErrorCategory::Memory,
-                    wrt_error::errors::codes::MEMORY_OUT_OF_BOUNDS,
-                    "Source offset out of bounds in memory initialization",
-                ));
-            };
+                return Err(wrt_error::Error::new(wrt_error::ErrorCategory::Memory,
+                    wrt_error::codes::MEMORY_OUT_OF_BOUNDS,
+                    "End bounds overflow";
+            }
+        } else if size == 0 {
+            // Zero-sized init is always valid
+            &[]
+        } else {
+            return Err(wrt_error::Error::runtime_execution_error("Invalid source offset";
+        };
 
-            // Use the memory's init method which already has safety checks
-            mem.init(dst, src_data, 0, src_data.len())
-        })
+        // Convert dst to u32 and write the data directly
+        let dst_u32 = u32::try_from(dst).map_err(|_| {
+            wrt_error::Error::new(wrt_error::ErrorCategory::Memory,
+                wrt_error::codes::MEMORY_OUT_OF_BOUNDS,
+                "Destination offset conversion failed")
+        })?;
+        
+        self.write_all(dst_u32, src_data)
     }
 
     /// Read multiple WebAssembly values into a SafeStack
@@ -470,11 +453,12 @@ impl ArcMemoryExt for Arc<Memory> {
         count: usize,
     ) -> Result<wrt_foundation::safe_memory::SafeStack<Value, 256, wrt_foundation::safe_memory::NoStdProvider<1024>>> {
         // Create a SafeStack to store the values
-        let mut result = wrt_foundation::safe_memory::SafeStack::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default())?;
+        let provider = wrt_foundation::safe_managed_alloc!(1024, wrt_foundation::budget_aware_provider::CrateId::Runtime)?;
+        let mut result = wrt_foundation::safe_memory::SafeStack::new(provider)?;
 
         // Set verification level to match memory's level
-        let verification_level = self.as_ref().verification_level();
-        result.set_verification_level(verification_level);
+        let verification_level = self.as_ref().verification_level);
+        result.set_verification_level(verification_level;
 
         // Calculate size of each value in bytes
         let value_size = match value_type {
@@ -483,22 +467,16 @@ impl ArcMemoryExt for Arc<Memory> {
             wrt_foundation::types::ValueType::F32 => 4,
             wrt_foundation::types::ValueType::F64 => 8,
             _ => {
-                return Err(wrt_error::Error::new(
-                    wrt_error::ErrorCategory::Type,
-                    wrt_error::errors::codes::TYPE_MISMATCH_ERROR,
-                    "Unsupported value type for reading from memory",
-                ))
+                return Err(wrt_error::Error::runtime_execution_error("Unsupported value type"))
             }
         };
 
         // Read each value safely
         for i in 0..count {
             let offset = addr.checked_add((i * value_size) as u32).ok_or_else(|| {
-                wrt_error::Error::new(
-                    wrt_error::ErrorCategory::Memory,
-                    wrt_error::errors::codes::MEMORY_OUT_OF_BOUNDS,
-                    "Memory address overflow when reading values",
-                )
+                wrt_error::Error::new(wrt_error::ErrorCategory::Memory,
+                    wrt_error::codes::MEMORY_OUT_OF_BOUNDS,
+                    "Address overflow in read_values")
             })?;
 
             let value = self.read_value(offset, value_type)?;
@@ -515,18 +493,16 @@ impl ArcMemoryExt for Arc<Memory> {
     }
 
     fn write_via_callback(&self, offset: u32, buffer: &[u8]) -> Result<()> {
-        // Use internal Mutex or RwLock to provide thread-safe mutation
-        // Clone and modify through interior mutability
-        let mut current_buffer = self.buffer()?;
-        let start = offset as usize;
-        let end = start + buffer.len();
+        #[cfg(feature = "std")]
+        {
+            // Use internal Mutex or RwLock to provide thread-safe mutation
+            // Clone and modify through interior mutability
+            let mut current_buffer = self.buffer()?;
+            let start = offset as usize;
+            let end = start + buffer.len();
 
-        if end > current_buffer.len() {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ACCESS_OUT_OF_BOUNDS,
-                "Memory access out of bounds",
-            ));
+            if end > current_buffer.len() {
+                return Err(Error::memory_error("Memory access out of bounds";
         }
 
         // Update the memory through the mutex/lock mechanism in the Memory
@@ -537,6 +513,13 @@ impl ArcMemoryExt for Arc<Memory> {
             }
             Ok(())
         })
+        }
+        
+        #[cfg(not(feature = "std"))]
+        {
+            // For no_std, Arc<Memory> cannot provide mutable access without interior mutability
+            Err(Error::runtime_execution_error("Arc<Memory> mutable access not available in no_std"))
+        }
     }
 
     fn grow_via_callback(&self, _pages: u32) -> Result<u32> {
@@ -545,9 +528,8 @@ impl ArcMemoryExt for Arc<Memory> {
         // or Arc::get_mut, which this trait signature doesn't allow.
         Err(Error::new(
             ErrorCategory::Runtime,
-            codes::UNSUPPORTED_OPERATION,
-            "grow_via_callback on Arc<Memory> is not supported without interior mutability in Memory for its data.",
-        ))
+            wrt_error::codes::UNSUPPORTED_OPERATION,
+            "Memory growth not supported for Arc<Memory>"))
     }
 }
 
@@ -563,20 +545,19 @@ mod tests {
         // Create a memory instance
         let mem_type = MemoryType { limits: Limits { min: 1, max: Some(2) } };
         let memory = Memory::new(mem_type)?;
-        let arc_memory = Arc::new(memory);
+        let arc_memory = Arc::new(memory;
 
         // Test basic properties
         assert_eq!(arc_memory.size(), 1);
-        assert_eq!(arc_memory.size_in_bytes(), 65536);
-        assert_eq!(arc_memory.debug_name(), None);
+        assert_eq!(arc_memory.size_in_bytes(), 65536;
+        assert_eq!(arc_memory.debug_name(), None;
 
-        // NOTE: When using ArcMemoryExt, clone_and_mutate pattern means changes don't
-        // affect the original Let's test the interface methods instead of
-        // actual data changes
+        // NOTE: ArcMemoryExt now uses thread-safe shared methods that properly
+        // affect the original memory through RwLock synchronization
 
         // Test reading initial zero data
         let initial_data = arc_memory.read_bytes_safe(0, 3)?;
-        assert_eq!(initial_data.len(), 3);
+        assert_eq!(initial_data.len(), 3;
         assert_eq!(initial_data.get(0)?, 0);
         assert_eq!(initial_data.get(1)?, 0);
         assert_eq!(initial_data.get(2)?, 0);
@@ -604,30 +585,30 @@ mod tests {
         // Initialize memory with some test data
         memory.write(0, &[10, 20, 30, 40, 50])?;
 
-        let arc_memory = Arc::new(memory);
+        let arc_memory = Arc::new(memory;
 
         // Test the safe read implementation
         let safe_data = arc_memory.read_bytes_safe(0, 5)?;
 
         // Verify the content
-        assert_eq!(safe_data.len(), 5);
-        assert_eq!(safe_data.get(0)?, 10);
-        assert_eq!(safe_data.get(1)?, 20);
-        assert_eq!(safe_data.get(2)?, 30);
-        assert_eq!(safe_data.get(3)?, 40);
-        assert_eq!(safe_data.get(4)?, 50);
+        assert_eq!(safe_data.len(), 5;
+        assert_eq!(safe_data.get(0)?, 10;
+        assert_eq!(safe_data.get(1)?, 20;
+        assert_eq!(safe_data.get(2)?, 30;
+        assert_eq!(safe_data.get(3)?, 40;
+        assert_eq!(safe_data.get(4)?, 50;
 
         // Test zero-length read
         let empty_data = arc_memory.read_bytes_safe(0, 0)?;
         assert_eq!(empty_data.len(), 0);
 
         // Test out of bounds read (should return error)
-        let result = arc_memory.read_bytes_safe(65536, 10);
-        assert!(result.is_err());
+        let result = arc_memory.read_bytes_safe(65536, 10;
+        assert!(result.is_err();
 
         // Test we can read data successfully
         let test_data = arc_memory.read_bytes_safe(0, 5)?;
-        assert_eq!(test_data.len(), 5);
+        assert_eq!(test_data.len(), 5;
 
         Ok(())
     }
@@ -643,17 +624,17 @@ mod tests {
         memory.write_i32(4, 2)?;
         memory.write_i32(8, 3)?;
 
-        let arc_memory = Arc::new(memory);
+        let arc_memory = Arc::new(memory;
 
         // Read array of 3 i32 values using SafeStack
         let values =
             arc_memory.read_values_as_safe_stack(0, wrt_foundation::types::ValueType::I32, 3)?;
 
         // Verify content
-        assert_eq!(values.len(), 3);
-        assert_eq!(values.get(0)?, Value::I32(1));
-        assert_eq!(values.get(1)?, Value::I32(2));
-        assert_eq!(values.get(2)?, Value::I32(3));
+        assert_eq!(values.len(), 3;
+        assert_eq!(values.get(0)?, Value::I32(1;
+        assert_eq!(values.get(1)?, Value::I32(2;
+        assert_eq!(values.get(2)?, Value::I32(3;
 
         Ok(())
     }
@@ -662,7 +643,7 @@ mod tests {
     fn test_write_via_callback() -> Result<()> {
         let memory_type = MemoryType { limits: Limits { min: 1, max: Some(2) } };
 
-        let memory = Arc::new(Memory::new(memory_type).unwrap());
+        let memory = Arc::new(Memory::new(memory_type).unwrap();
         let test_data = [1, 2, 3, 4, 5];
 
         // Write data
@@ -671,7 +652,7 @@ mod tests {
         // Read it back to verify
         let buffer = memory.buffer().unwrap();
         for (i, &byte) in test_data.iter().enumerate() {
-            assert_eq!(buffer[i], byte);
+            assert_eq!(buffer[i], byte;
         }
         Ok(())
     }
@@ -680,15 +661,15 @@ mod tests {
     fn test_grow_via_callback() -> Result<()> {
         let memory_type = MemoryType { limits: Limits { min: 1, max: Some(2) } };
 
-        let memory = Arc::new(Memory::new(memory_type).unwrap());
-        let initial_size = memory.size();
+        let memory = Arc::new(Memory::new(memory_type).unwrap();
+        let initial_size = memory.size);
 
         // Grow memory
         let previous_size = memory.grow_via_callback(1).unwrap();
 
         // Verify growth
-        assert_eq!(previous_size, initial_size);
-        assert_eq!(memory.size(), initial_size + 1);
+        assert_eq!(previous_size, initial_size;
+        assert_eq!(memory.size(), initial_size + 1;
 
         Ok(())
     }

@@ -5,7 +5,11 @@
 
 #[cfg(feature = "std")]
 fn main() {
-    use wrt_decoder::memory_optimized::{check_bounds_u32, safe_usize_conversion, MemoryPool};
+    use wrt_decoder::memory_optimized::{
+        check_bounds_u32,
+        safe_usize_conversion,
+        MemoryPool,
+    };
     use wrt_foundation::NoStdProvider;
 
     println!("=== WRT-Decoder Memory Optimization Demo ===\n");
@@ -25,15 +29,24 @@ fn main() {
     // Simulate a malicious WebAssembly file with excessive count
     let malicious_count = u32::MAX;
     match check_bounds_u32(malicious_count, max_allowed, "function count") {
-        Ok(()) => println!("✗ Malicious count {} incorrectly accepted!", malicious_count),
-        Err(e) => println!("✓ Malicious count {} properly rejected: {}", malicious_count, e),
+        Ok(()) => println!(
+            "✗ Malicious count {} incorrectly accepted!",
+            malicious_count
+        ),
+        Err(e) => println!(
+            "✓ Malicious count {} properly rejected: {}",
+            malicious_count, e
+        ),
     }
 
     // 2. Demonstrate safe usize conversion
     println!("\n2. Safe usize Conversion:");
 
     match safe_usize_conversion(reasonable_count, "allocation size") {
-        Ok(size) => println!("✓ Successfully converted {} to usize: {}", reasonable_count, size),
+        Ok(size) => println!(
+            "✓ Successfully converted {} to usize: {}",
+            reasonable_count, size
+        ),
         Err(e) => println!("✗ Conversion failed: {}", e),
     }
 
@@ -53,7 +66,11 @@ fn main() {
             instruction_vec.push((i * 10 + j) as u8);
         }
 
-        println!("  Function {}: processed {} instructions", i, instruction_vec.len());
+        println!(
+            "  Function {}: processed {} instructions",
+            i,
+            instruction_vec.len()
+        );
 
         // Return vector to pool for reuse
         pool.return_instruction_vector(instruction_vec);
@@ -73,7 +90,10 @@ fn main() {
 
         println!("  Declared count: {}", declared_count);
         println!("  Conservative allocation: {}", allocated_count);
-        println!("  Memory saved: {}x reduction", declared_count / allocated_count as u32);
+        println!(
+            "  Memory saved: {}x reduction",
+            declared_count / allocated_count as u32
+        );
     }
 
     println!("\n=== Memory Optimization Benefits ===");

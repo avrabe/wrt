@@ -8,57 +8,104 @@
 // Binary std/no_std choice
 pub use core::{
     any::Any,
-    cmp::{Eq, Ord, PartialEq, PartialOrd},
-    convert::{TryFrom, TryInto},
+    cmp::{
+        Eq,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    },
+    convert::{
+        TryFrom,
+        TryInto,
+    },
     fmt,
-    fmt::{Debug, Display},
+    fmt::{
+        Debug,
+        Display,
+    },
     marker::PhantomData,
     mem,
-    ops::{Deref, DerefMut},
-    slice, str,
+    ops::{
+        Deref,
+        DerefMut,
+    },
+    slice,
+    str,
 };
-
 // Re-export from std when the std feature is enabled
 #[cfg(feature = "std")]
 pub use std::{
     boxed::Box,
-    collections::{HashMap, HashSet},
+    collections::{
+        HashMap,
+        HashSet,
+    },
     format,
-    string::{String, ToString},
-    sync::{Arc, Mutex, RwLock},
+    string::{
+        String,
+        ToString,
+    },
+    sync::{
+        Arc,
+        Mutex,
+        RwLock,
+    },
     vec,
     vec::Vec,
 };
 
-// no_std alternatives using bounded collections
-#[cfg(not(feature = "std"))]
-pub use wrt_foundation::{BoundedVec, BoundedString};
-
 // Re-export from wrt-error
-pub use wrt_error::{codes, kinds, Error, ErrorCategory, Result};
+pub use wrt_error::{
+    codes,
+    kinds,
+    Error,
+    ErrorCategory,
+    Result,
+};
+#[cfg(feature = "std")]
+pub use wrt_foundation::component_value::ComponentValue;
 // Re-export from wrt-foundation (for component model)
 #[cfg(feature = "std")]
 pub use wrt_foundation::component_value::ValType;
+// Binary std/no_std choice
+// BoundedVec already imported above
+#[cfg(not(feature = "std"))]
+pub use wrt_foundation::BoundedMap as BoundedHashMap;
 // Re-export from wrt-foundation
 pub use wrt_foundation::{
     builtin::BuiltinType,
     resource::ResourceCanonicalOperation,
     // SafeMemory types
-    safe_memory::{SafeMemoryHandler, SafeSlice, SafeStack},
+    safe_memory::{
+        SafeMemoryHandler,
+        SafeSlice,
+        SafeStack,
+    },
     // Core types
     values::Value,
 };
-
-// Binary std/no_std choice
-// BoundedVec already imported above
+// no_std alternatives using bounded collections
 #[cfg(not(feature = "std"))]
-pub use wrt_foundation::BoundedMap as BoundedHashMap;
-#[cfg(feature = "std")]
-pub use wrt_foundation::component_value::ComponentValue;
+pub use wrt_foundation::{
+    BoundedCapacity,
+    BoundedString,
+    BoundedVec,
+};
 // Import synchronization primitives for no_std
 #[cfg(not(feature = "std"))]
-pub use wrt_sync::{Mutex, RwLock};
+pub use wrt_sync::{
+    Mutex,
+    RwLock,
+};
 
+// Export BeforeBuiltinResult for both std and no_std
+pub use crate::builtins::BeforeBuiltinResult;
+// Binary std/no_std choice
+#[cfg(feature = "std")]
+pub use crate::builtins::{
+    BuiltinInterceptor,
+    BuiltinSerialization,
+};
 // Conditional imports
 #[cfg(feature = "std")]
 pub use crate::strategies::StatisticsStrategy;
@@ -67,7 +114,12 @@ pub use crate::{
     // Builtin interceptors
     builtins::InterceptContext,
     // Strategies
-    strategies::{FirewallConfig, FirewallRule, FirewallStrategy, LoggingStrategy},
+    strategies::{
+        FirewallConfig,
+        FirewallRule,
+        FirewallStrategy,
+        LoggingStrategy,
+    },
     InterceptionResult,
 
     // Core interception types
@@ -75,10 +127,3 @@ pub use crate::{
     LinkInterceptorStrategy,
     Modification,
 };
-
-// Binary std/no_std choice
-#[cfg(feature = "std")]
-pub use crate::builtins::{BuiltinInterceptor, BuiltinSerialization};
-
-// Export BeforeBuiltinResult for both std and no_std
-pub use crate::builtins::BeforeBuiltinResult;

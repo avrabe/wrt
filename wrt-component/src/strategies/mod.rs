@@ -7,5 +7,8 @@ pub mod memory;
 
 // Re-export types for convenience
 pub use memory::{
-    BoundedCopyStrategy, FullIsolationStrategy, MemoryOptimizationStrategy, ZeroCopyStrategy,
+    BoundedCopyStrategy,
+    FullIsolationStrategy,
+    MemoryOptimizationStrategy,
+    ZeroCopyStrategy,
 };

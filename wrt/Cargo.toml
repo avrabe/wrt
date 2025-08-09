@@ -12,31 +12,30 @@ categories = ["wasm", "no-std", "embedded", "web-programming"]
 [dependencies]
 # Core allowed/necessary dependencies
 # Error handling
-wrt-error = { workspace = true }
+wrt-error = { workspace = true, default-features = false }
 # Core foundation library
-wrt-foundation = { workspace = true }
+wrt-foundation = { workspace = true, default-features = false }
 # Format specifications
-wrt-format = { workspace = true }
+wrt-format = { workspace = true, default-features = false }
 # Binary parsing
-wrt-decoder = { workspace = true }
+wrt-decoder = { workspace = true, default-features = false }
 # Instruction encoding/decoding
-wrt-instructions = { workspace = true }
+wrt-instructions = { workspace = true, default-features = false }
 # Synchronization primitives
-wrt-sync = { workspace = true }
+wrt-sync = { workspace = true, default-features = false }
 # Function interception
-wrt-intercept = { workspace = true }
-# Host interface
-wrt-host = { workspace = true }
-# Component model
-wrt-component = { workspace = true }
+wrt-intercept = { workspace = true, default-features = false }
+# Component model  
+wrt-component = { workspace = true, default-features = false }
 # Runtime execution
-wrt-runtime = { workspace = true }
-# Logging functionality
-wrt-logging = { workspace = true }
-# Platform abstraction layer
-wrt-platform = { workspace = true, features = ["disable-panic-handler"] }
+wrt-runtime = { workspace = true, default-features = false }
+
+# Integration layer components (optional)
+wrt-host = { workspace = true, default-features = false, optional = true }
+wrt-platform = { workspace = true, default-features = false, optional = true }
+wrt-logging = { workspace = true, default-features = false, optional = true }
 # Math operations
-wrt-math = { workspace = true }
+wrt-math = { workspace = true, default-features = false }
 
 [lib]
 name = "wrt"
@@ -74,7 +73,7 @@ unsafe_code = "forbid"
 # Rule 1: Language subset
 inline_asm_x86_att_syntax = "warn"
 transmute_ptr_to_ref = "deny"
-type_id = "deny"
+# type_id lint removed - not a valid clippy lint
 dyn_trait = "warn"
 float_arithmetic = "warn"
 # Rule 2: Unsafe usage
@@ -91,7 +90,7 @@ match_wildcard_for_single_variants = "warn"
 never_loop = "warn"
 unreachable = "warn" # Also related to Rule 4
 # Rule 5: Memory & concurrency safety
-static_mut_reference = "deny"
+# static_mut_reference renamed to static_mut_refs in newer Rust versions
 arc_mutate = "deny"
 # Rule 8: Static analysis gates (CI)
 pedantic = "warn"
@@ -105,11 +104,13 @@ default = ["no_std"]
 # Minimal feature set
 minimal = ["wrt-decoder/no_std"]
 # Full std feature
+# Integration layer features
+integration = ["dep:wrt-host", "dep:wrt-platform", "dep:wrt-logging"]
+
 std = [
+    # Core features
     "wrt-error/std",
-    "wrt-runtime/std",
-    "wrt-host/std",
-    "wrt-logging/std",
+    "wrt-runtime/std", 
     "wrt-foundation/std",
     "wrt-sync/std",
     "wrt-format/std",
@@ -118,41 +119,79 @@ std = [
     "wrt-component/std",
     "wrt-instructions/std",
     "wrt-intercept/std",
-    "wrt-platform/std"]
+    "wrt-foundation/wrt-allocator",
+    # Integration layer
+    "integration",
+    "wrt-host?/std",
+    "wrt-platform?/std", 
+    "wrt-logging?/std"]
 # no_std support
-no_std = ["wrt-format/no_std", 
+no_std = ["wrt-foundation/no_std",
+          "wrt-format/no_std", 
           "wrt-decoder/no_std", 
-          "wrt-runtime/no_std", 
-          "wrt-logging/no_std", 
+          "wrt-runtime/no_std",
           "wrt-instructions/no_std",
           "wrt-intercept/no_std",
-          "wrt-host/no_std",
-          "wrt-component/no_std"]
+          "wrt-component/no_std",
+          "wrt-sync/no_std"
+          ]
+
+# Allocation support for no_std environments
+alloc = [
+    "no_std", # Ensure no_std is enabled when alloc is requested
+    "wrt-error/alloc",
+    "wrt-foundation/alloc",
+    "wrt-format/alloc",
+    "wrt-decoder/alloc",
+    "wrt-runtime/alloc",
+    "wrt-logging/alloc",
+    "wrt-instructions/alloc",
+    "wrt-intercept/alloc",
+    "wrt-host/alloc",
+    "wrt-component/alloc",
+    "wrt-sync/alloc",
+    "wrt-math/alloc"
+]
 # Optimization for non-safety-critical paths
 optimize = ["wrt-foundation/optimize", 
             "wrt-decoder/optimize", 
             "wrt-format/optimize", 
-            "wrt-runtime/optimize", 
+            "wrt-runtime/optimize",
             "wrt-instructions/optimize",
             "wrt-intercept/optimize",
             "wrt-host/optimize",
-            "wrt-component/optimize"]
-# Safety features for ASIL-B compliance
-safety = ["wrt-foundation/safety", 
-          "wrt-decoder/safety", 
-          "wrt-format/safety", 
-          "wrt-runtime/safety", 
-          "wrt-instructions/safety",
-          "wrt-intercept/safety",
-          "wrt-host/safety",
-          "wrt-component/safety"]
+            "wrt-component/optimize"
+            ]
+# Safety level presets using capability-based features
+qm = ["wrt-foundation/dynamic-allocation"]
+asil-a = ["wrt-foundation/bounded-collections"]
+asil-b = ["wrt-foundation/bounded-collections"]
+asil-c = ["wrt-foundation/static-memory-safety"]
+asil-d = ["no_std", "wrt-foundation/asil-d"]
+
+# DO-178C equivalents
+dal-e = ["qm"]
+dal-d = ["asil-a"]
+dal-c = ["asil-b"]
+dal-b = ["asil-c"]
+dal-a = ["asil-d"]
+
+# IEC 61508 equivalents
+sil-1 = ["asil-a"]
+sil-2 = ["asil-b"]
+sil-3 = ["asil-c"]
+sil-4 = ["asil-d"]
+
+# Legacy compatibility features
+safety-asil-b = ["asil-b"]
+safety-asil-c = ["asil-c"]
+safety-asil-d = ["asil-d"]
+
 # Platform and Helper Mode Features
 helper-mode = ["wrt-platform/helper-mode"]
-# Disable panic handler for library usage
-disable-panic-handler = ["wrt-platform/disable-panic-handler"]
 platform-macos = ["wrt-platform/platform-macos"]
-# Platform feature enables SIMD operations
 platform = ["wrt-math/platform"]
+
 # Proposal features (mostly placeholders/unused for now)
 relaxed_simd = []
 gc = []
@@ -167,13 +206,14 @@ wide_arithmetic = []
 custom_page_sizes = []
 annotations = []
 
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [[test]]
 name = "test_rounding"
-path = "tests/rounding_test.rs"
+path = "tests/rounding_tests.rs"
 
 [[example]]
 name = "checkpoint"

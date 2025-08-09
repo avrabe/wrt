@@ -1,29 +1,40 @@
 use std::sync::Arc;
 
 use wrt::{
-    interface::{CanonicalABI, InterfaceValue},
-    resource::{ResourceData, ResourceRepresentation, ResourceTable, ResourceType},
+    interface::{
+        CanonicalABI,
+        InterfaceValue,
+    },
+    resource::{
+        ResourceData,
+        ResourceRepresentation,
+        ResourceTable,
+        ResourceType,
+    },
     types::*,
-    Component, Error, Result, ValueType,
+    Component,
+    Error,
+    Result,
+    ValueType,
 };
 
 #[test]
 fn test_component_instantiation() -> Result<()> {
     // Create a simple component with a basic component type
     let component_type = wrt::component::ComponentType {
-        imports: Vec::new(),
-        exports: vec![
+        imports:   Vec::new(),
+        exports:   vec![
             (
                 "add".to_string(),
                 ExternType::Function(FuncType {
-                    params: vec![ValueType::I32, ValueType::I32],
+                    params:  vec![ValueType::I32, ValueType::I32],
                     results: vec![ValueType::I32],
                 }),
             ),
             (
                 "hello".to_string(),
                 ExternType::Function(FuncType {
-                    params: Vec::new(),
+                    params:  Vec::new(),
                     results: vec![ValueType::I32],
                 }),
             ),
@@ -41,9 +52,9 @@ fn test_component_instantiation() -> Result<()> {
         ExternType::Function(func_type) => {
             assert_eq!(func_type.params.len(), 2);
             assert_eq!(func_type.results.len(), 1);
-        }
+        },
         _ => return Err(Error::Validation("Expected function type".into())),
-    };
+    }
 
     let hello_export = component.get_export("hello")?;
     assert_eq!(hello_export.name, "hello");
@@ -51,9 +62,9 @@ fn test_component_instantiation() -> Result<()> {
         ExternType::Function(func_type) => {
             assert_eq!(func_type.params.len(), 0);
             assert_eq!(func_type.results.len(), 1);
-        }
+        },
         _ => return Err(Error::Validation("Expected function type".into())),
-    };
+    }
 
     Ok(())
 }
@@ -80,10 +91,10 @@ fn test_resource_handling() -> Result<()> {
 
     // Define a resource type
     let resource_type = ResourceType {
-        name: "test:resource".to_string(),
+        name:           "test:resource".to_string(),
         representation: ResourceRepresentation::Handle32,
-        nullable: false,
-        borrowable: true,
+        nullable:       false,
+        borrowable:     true,
     };
 
     // Create some test resource data
@@ -105,7 +116,9 @@ fn test_resource_handling() -> Result<()> {
     }
 
     // Allocate a resource
-    let data = Arc::new(TestResourceData { value: "test value".to_string() });
+    let data = Arc::new(TestResourceData {
+        value: "test value".to_string(),
+    });
 
     let id = table.allocate(resource_type.clone(), data);
 
@@ -142,8 +155,14 @@ fn test_component_types() {
 
     // 1. Record type
     let record_type = ComponentType::Record(vec![
-        ("name".to_string(), Box::new(ComponentType::Primitive(ValueType::I32))),
-        ("age".to_string(), Box::new(ComponentType::Primitive(ValueType::I32))),
+        (
+            "name".to_string(),
+            Box::new(ComponentType::Primitive(ValueType::I32)),
+        ),
+        (
+            "age".to_string(),
+            Box::new(ComponentType::Primitive(ValueType::I32)),
+        ),
     ]);
 
     assert!(record_type.is_record());
@@ -155,7 +174,7 @@ fn test_component_types() {
 
     // 3. Result type with record as ok
     let result_type = ComponentType::Result {
-        ok: Some(Box::new(record_type)),
+        ok:  Some(Box::new(record_type)),
         err: Some(Box::new(ComponentType::Primitive(ValueType::I32))),
     };
 
@@ -230,15 +249,18 @@ fn test_component_validation() -> Result<()> {
 fn test_component_linking() -> Result<()> {
     // Create a parent component with imports
     let parent_component_type = wrt::component::ComponentType {
-        imports: vec![(
+        imports:   vec![(
             "log".to_string(),
             "wasi".to_string(),
-            ExternType::Function(FuncType { params: vec![ValueType::I32], results: vec![] }),
+            ExternType::Function(FuncType {
+                params:  vec![ValueType::I32],
+                results: vec![],
+            }),
         )],
-        exports: vec![(
+        exports:   vec![(
             "process".to_string(),
             ExternType::Function(FuncType {
-                params: vec![ValueType::I32],
+                params:  vec![ValueType::I32],
                 results: vec![ValueType::I32],
             }),
         )],
@@ -247,18 +269,18 @@ fn test_component_linking() -> Result<()> {
 
     // Create a child component with imports and exports
     let child_component_type = wrt::component::ComponentType {
-        imports: vec![(
+        imports:   vec![(
             "process".to_string(),
             "parent".to_string(),
             ExternType::Function(FuncType {
-                params: vec![ValueType::I32],
+                params:  vec![ValueType::I32],
                 results: vec![ValueType::I32],
             }),
         )],
-        exports: vec![(
+        exports:   vec![(
             "transform".to_string(),
             ExternType::Function(FuncType {
-                params: vec![ValueType::I32],
+                params:  vec![ValueType::I32],
                 results: vec![ValueType::I32],
             }),
         )],
@@ -268,10 +290,16 @@ fn test_component_linking() -> Result<()> {
     // Instantiate the parent component
     let mut parent = Component::new(parent_component_type);
     let parent_import = wrt::component::Import {
-        name: "log".to_string(),
-        ty: ExternType::Function(FuncType { params: vec![ValueType::I32], results: vec![] }),
+        name:  "log".to_string(),
+        ty:    ExternType::Function(FuncType {
+            params:  vec![ValueType::I32],
+            results: vec![],
+        }),
         value: wrt::component::ExternValue::Function(wrt::component::FunctionValue {
-            ty: FuncType { params: vec![ValueType::I32], results: vec![] },
+            ty:          FuncType {
+                params:  vec![ValueType::I32],
+                results: vec![],
+            },
             export_name: "log".to_string(),
         }),
     };
@@ -282,13 +310,16 @@ fn test_component_linking() -> Result<()> {
 
     // Create an import for the child that is linked to the parent's export
     let child_import = wrt::component::Import {
-        name: "process".to_string(),
-        ty: ExternType::Function(FuncType {
-            params: vec![ValueType::I32],
+        name:  "process".to_string(),
+        ty:    ExternType::Function(FuncType {
+            params:  vec![ValueType::I32],
             results: vec![ValueType::I32],
         }),
         value: wrt::component::ExternValue::Function(wrt::component::FunctionValue {
-            ty: FuncType { params: vec![ValueType::I32], results: vec![ValueType::I32] },
+            ty:          FuncType {
+                params:  vec![ValueType::I32],
+                results: vec![ValueType::I32],
+            },
             export_name: "process".to_string(),
         }),
     };
@@ -304,7 +335,7 @@ fn test_component_linking() -> Result<()> {
         ExternType::Function(func_type) => {
             assert_eq!(func_type.params.len(), 1);
             assert_eq!(func_type.results.len(), 1);
-        }
+        },
         _ => panic!("Expected function type"),
     }
 

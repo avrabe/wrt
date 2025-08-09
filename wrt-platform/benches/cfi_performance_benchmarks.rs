@@ -3,9 +3,18 @@
 //! Benchmarks to measure the performance impact of CFI features
 //! and validate that overhead is within acceptable limits.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{
+    black_box,
+    criterion_group,
+    criterion_main,
+    Criterion,
+};
 use wrt_platform::{
-    BranchTargetIdentification, BtiExceptionLevel, BtiMode, CfiExceptionMode, ControlFlowIntegrity,
+    BranchTargetIdentification,
+    BtiExceptionLevel,
+    BtiMode,
+    CfiExceptionMode,
+    ControlFlowIntegrity,
     HardwareOptimization,
 };
 
@@ -62,7 +71,10 @@ fn benchmark_riscv_cfi_operations(c: &mut Criterion) {
 fn benchmark_cfi_configuration(c: &mut Criterion) {
     c.bench_function("bti_creation", |b| {
         b.iter(|| {
-            black_box(BranchTargetIdentification::new(BtiMode::Standard, BtiExceptionLevel::El1));
+            black_box(BranchTargetIdentification::new(
+                BtiMode::Standard,
+                BtiExceptionLevel::El1,
+            ));
         });
     });
 
@@ -74,11 +86,18 @@ fn benchmark_cfi_configuration(c: &mut Criterion) {
 
     c.bench_function("bti_all_modes", |b| {
         b.iter(|| {
-            let modes =
-                [BtiMode::Standard, BtiMode::CallOnly, BtiMode::JumpOnly, BtiMode::CallAndJump];
+            let modes = [
+                BtiMode::Standard,
+                BtiMode::CallOnly,
+                BtiMode::JumpOnly,
+                BtiMode::CallAndJump,
+            ];
 
             for mode in modes {
-                black_box(BranchTargetIdentification::new(mode, BtiExceptionLevel::El1));
+                black_box(BranchTargetIdentification::new(
+                    mode,
+                    BtiExceptionLevel::El1,
+                ));
             }
         });
     });

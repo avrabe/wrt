@@ -2,9 +2,16 @@
 //!
 //! This module provides the instance types for component instances.
 
-use std::{string::String, vec::Vec};
+#[cfg(not(feature = "std"))]
+use alloc::{
+    string::String,
+    vec::Vec,
+};
 #[cfg(feature = "std")]
-use std::{string::String, vec::Vec};
+use std::{
+    string::String,
+    vec::Vec,
+};
 
 use wrt_format::component::ComponentTypeDefinition;
 
@@ -14,9 +21,9 @@ use crate::export::Export;
 #[derive(Debug)]
 pub struct InstanceValue {
     /// The name of the instance
-    pub name: String,
+    pub name:    String,
     /// Instance type
-    pub ty: ComponentTypeDefinition,
+    pub ty:      ComponentTypeDefinition,
     /// Instance exports
     pub exports: Vec<Export>,
 }
@@ -41,28 +48,40 @@ impl InstanceValue {
 #[cfg(test)]
 mod tests {
     use wrt::types::FuncType;
-    use wrt_format::component::{ExternType, ValType};
+    use wrt_format::component::{
+        ExternType,
+        ValType,
+    };
 
     use super::*;
-    use crate::component::{ExternValue, FunctionValue};
+    use crate::component::{
+        ExternValue,
+        FunctionValue,
+    };
 
     #[test]
     fn test_instance_value() {
         let func_type = FuncType {
-            params: vec![wrt::types::ValueType::I32, wrt::types::ValueType::I32],
+            params:  vec![wrt::types::ValueType::I32, wrt::types::ValueType::I32],
             results: vec![wrt::types::ValueType::I32],
         };
 
-        let func_value = FunctionValue { ty: func_type.clone(), export_name: "add".to_string() };
+        let func_value = FunctionValue {
+            ty:          func_type.clone(),
+            export_name: "add".to_string(),
+        };
 
         let component_func_type = ExternType::Function {
-            params: vec![("a".to_string(), ValType::S32), ("b".to_string(), ValType::S32)],
+            params:  vec![
+                ("a".to_string(), ValType::S32),
+                ("b".to_string(), ValType::S32),
+            ],
             results: vec![ValType::S32],
         };
 
         let export = Export {
-            name: "add".to_string(),
-            ty: component_func_type.clone(),
+            name:  "add".to_string(),
+            ty:    component_func_type.clone(),
             value: ExternValue::Function(func_value),
         };
 

@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Side-Channel Resistance Analysis and Implementation
 // SW-REQ-ID: REQ_PLATFORM_SIDECHANNEL_001
@@ -267,9 +268,8 @@ pub mod constant_time {
     /// Uses cache line alignment and prefetching for timing consistency.
     pub fn constant_time_copy(dst: &mut [u8], src: &[u8]) -> Result<(), wrt_error::Error> {
         if dst.len() != src.len() {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Memory, 1,
-                "Source and destination buffers must have the same length",
+            return Err(wrt_error::Error::runtime_execution_error(
+                "Source and destination lengths must match",
             ));
         }
 
@@ -405,11 +405,11 @@ pub mod cache_aware_allocation {
                         // Binary std/no_std choice
                         let block_ptr = &self.blocks[free_bit] as *const CacheBlock as *mut u8;
                         return NonNull::new(block_ptr);
-                    }
+                    },
                     Err(_) => {
                         attempts += 1;
                         // Continue retry loop
-                    }
+                    },
                 }
             }
 
@@ -440,7 +440,7 @@ pub mod cache_aware_allocation {
                         Ordering::Relaxed,
                     ) {
                         Ok(_) => break,
-                        Err(_) => {}
+                        Err(_) => {},
                     }
                 }
             }

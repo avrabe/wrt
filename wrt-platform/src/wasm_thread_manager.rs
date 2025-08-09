@@ -3,6 +3,7 @@
 //! This module provides a high-level thread management system that enforces
 //! safety constraints and resource limits for WebAssembly thread execution.
 
+
 use core::{
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
@@ -96,7 +97,7 @@ impl SimpleExecutionMonitor {
 impl ExecutionMonitor for SimpleExecutionMonitor {
     fn track_thread(&self, handle: &ThreadHandle) -> Result<()> {
         if !self.enabled {
-            return Ok(());
+            return Ok();
         }
 
         let info = ThreadMonitorInfo {
@@ -114,11 +115,7 @@ impl ExecutionMonitor for SimpleExecutionMonitor {
     fn check_thread_health(&self, id: u64) -> Result<ThreadHealth> {
         let threads = self.threads.read();
         let info = threads.get(&id).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Validation, 1,
-                ErrorCategory::Validation, 1,
-                "Thread not found in monitor",
-            )
+            Error::runtime_execution_error("Thread not found")
         })?;
 
         let now = std::time::Instant::now();
@@ -172,6 +169,18 @@ pub struct WasmThreadManager {
     executor: Arc<dyn Fn(u32, Vec<u8>) -> Result<Vec<u8>> + Send + Sync>,
 }
 
+impl core::fmt::Debug for WasmThreadManager {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("WasmThreadManager")
+            .field("resource_tracker", &self.resource_tracker)
+            .field("threads", &"<BTreeMap>")
+            .field("modules", &"<BTreeMap>")
+            .field("next_thread_id", &self.next_thread_id)
+            .field("shutdown", &self.shutdown)
+            .finish()
+    }
+}
+
 impl WasmThreadManager {
     /// Create new WebAssembly thread manager
     pub fn new(
@@ -181,7 +190,7 @@ impl WasmThreadManager {
             dyn Fn(u32, Vec<u8>) -> Result<Vec<u8>> + Send + Sync,
         >,
     ) -> Result<Self> {
-        let pool = create_thread_pool(config)?;
+        let pool = create_thread_pool(&config)?;
         let resource_tracker = Arc::new(ResourceTracker::new(limits));
         let monitor = Arc::new(SimpleExecutionMonitor::new());
 
@@ -217,11 +226,7 @@ impl WasmThreadManager {
     pub fn spawn_thread(&self, request: ThreadSpawnRequest) -> Result<u64> {
         // Check if shutting down
         if *self.shutdown.lock() {
-            return Err(Error::new(
-                ErrorCategory::Runtime, 1,
-                ErrorCategory::Runtime, 1,
-                "Thread manager is shutting down",
-            ));
+            return Err(Error::runtime_execution_error("Thread manager is shutting down"));
         }
 
         // Get module info
@@ -229,20 +234,16 @@ impl WasmThreadManager {
             let modules = self.modules.read();
             modules.get(&request.module_id).cloned().ok_or_else(|| {
                 Error::new(
-                    ErrorCategory::Validation, 1,
-                    ErrorCategory::Validation, 1,
-                    "Module not registered",
+                    ErrorCategory::Validation,
+                    1,
+                    "Module not found",
                 )
             })?
         };
 
         // Binary std/no_std choice
         if !self.resource_tracker.can_allocate_thread(&request)? {
-            return Err(Error::new(
-                ErrorCategory::Resource, 1,
-                ErrorCategory::Resource, 1,
-                "Cannot allocate thread: resource limits exceeded",
-            ));
+            return Err(Error::runtime_execution_error("Thread allocation limit exceeded"));
         }
 
         // Get thread ID
@@ -312,8 +313,8 @@ impl WasmThreadManager {
             let mut threads = self.threads.write();
             threads.remove(&thread_id).ok_or_else(|| {
                 Error::new(
-                    ErrorCategory::Validation, 1,
-                    ErrorCategory::Validation, 1,
+                    ErrorCategory::Validation,
+                    1,
                     "Thread not found",
                 )
             })?
@@ -341,11 +342,7 @@ impl WasmThreadManager {
     pub fn is_thread_running(&self, thread_id: u64) -> Result<bool> {
         let threads = self.threads.read();
         let thread_info = threads.get(&thread_id).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Validation, 1,
-                ErrorCategory::Validation, 1,
-                "Thread not found",
-            )
+            Error::runtime_execution_error("Thread not found")
         })?;
 
         Ok(thread_info.handle.is_running())
@@ -434,7 +431,7 @@ impl WasmThreadManager {
 
     /// Shutdown the thread manager
     pub fn shutdown(&mut self, timeout: Duration) -> Result<()> {
-        *self.shutdown.lock() = true;
+        *self.shutdown.lock().unwrap() = true;
 
         // Cancel all threads
         let thread_ids: Vec<u64> = self.threads.read().keys().cloned().collect();
@@ -521,18 +518,12 @@ mod tests {
 
         let manager = WasmThreadManager::new(config, limits, executor).unwrap();
 
-        let values = vec![
-            ComponentValue::U32(42),
-            ComponentValue::U64(12345),
-            ComponentValue::String("hello".to_string()),
-        ];
+        let test_data = vec![1, 2, 3, 4];
 
-        let serialized = manager.serialize_component_values(&values).unwrap();
+        let data = vec![1, 2, 3, 4];
+        let serialized = manager.serialize_component_values(&data).unwrap();
         let deserialized = manager.deserialize_component_values(&serialized).unwrap();
 
-        assert_eq!(values.len(), deserialized.len());
-        assert_eq!(values[0], deserialized[0]);
-        assert_eq!(values[1], deserialized[1]);
-        assert_eq!(values[2], deserialized[2]);
+        assert_eq!(data, deserialized);
     }
 }

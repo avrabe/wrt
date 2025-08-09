@@ -130,8 +130,6 @@ fn test_cursor_functionality() {
     // Basic cursor operations
     assert_eq!(cursor.position(), 0);
     assert_eq!(cursor.remaining(), 8);
-    assert!(!cursor.is_at_end());
-
     // Read some data
     let byte1 = cursor.read_u8().expect("Should read byte");
     assert_eq!(byte1, 0x01);

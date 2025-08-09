@@ -7,13 +7,13 @@ use wrt_test_registry::prelude::*;
 /// Test suite for CFI security functionality
 pub fn run_tests() -> TestResult {
     let mut suite = TestSuite::new("CFI Security");
-    
+
     suite.add_test("cfi_validation", test_cfi_validation);
     suite.add_test("shadow_stack_integrity", test_shadow_stack);
     suite.add_test("landing_pad_validation", test_landing_pads);
     suite.add_test("cfi_target_verification", test_cfi_targets);
     suite.add_test("cfi_enforcement", test_cfi_enforcement);
-    
+
     suite.run().into()
 }
 

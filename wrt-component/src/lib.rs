@@ -19,8 +19,8 @@
 #![cfg_attr(feature = "kani", feature(kani))]
 #![warn(clippy::missing_panics_doc)]
 
-// Binary std/no_std choice
-#[cfg(any(feature = "std", feature = "alloc"))]
+// extern crate declarations
+#[cfg(not(feature = "std"))]
 extern crate alloc;
 
 // Debug macro for both std and no_std environments
@@ -41,28 +41,48 @@ macro_rules! debug_println {
 // Export our prelude module for consistent imports
 pub mod prelude;
 
+// Bounded infrastructure for static memory allocation
+pub mod bounded_component_infra;
+
 // Core component modules
 pub mod adapter;
 pub mod agent_registry;
+pub mod async_;
+pub mod blast_zone;
 pub mod builtins;
 pub mod call_context;
 pub mod canonical_abi;
 pub mod components;
+pub mod cross_component_calls;
+pub mod cross_component_communication;
+pub mod cross_component_resource_sharing;
+pub mod resource_limits_loader;
+
+// Module aliases for compatibility with existing imports
+pub use components::component_instantiation;
+pub use cross_component_communication as component_communication;
 pub mod execution_engine;
 pub mod export;
+pub mod generative_types;
 pub mod import;
 pub mod instance;
 #[cfg(not(feature = "std"))]
 pub mod instance_no_std;
+pub mod instantiation;
 pub mod memory_layout;
+#[cfg(feature = "safety-critical")]
+pub mod memory_limits;
+pub mod parser;
 pub mod resource_management;
 pub mod resources;
 pub mod runtime;
-pub mod string_encoding;
 pub mod strategies;
+pub mod string_encoding;
+pub mod type_bounds;
 pub mod type_conversion;
 pub mod types;
 pub mod unified_execution_agent;
+pub mod unified_execution_agent_stubs;
 pub mod values;
 
 // Async support
@@ -78,25 +98,63 @@ pub mod threading;
 pub mod verify;
 
 // Essential re-exports only
-pub use builtins::{BuiltinHandler, BuiltinRegistry};
+pub use blast_zone::{
+    BlastZoneConfig,
+    BlastZoneManager,
+    ContainmentPolicy,
+    IsolationLevel,
+    ZoneHealth,
+};
+pub use builtins::{
+    BuiltinHandler,
+    BuiltinRegistry,
+};
 pub use canonical_abi::canonical::CanonicalABI;
-
+pub use components::component::ComponentType;
 // Component types based on feature flags
 #[cfg(feature = "std")]
-pub use components::component::{Component, ExternValue, FunctionValue, GlobalValue, MemoryValue, TableValue};
-
+pub use components::component::{
+    Component,
+    ExternValue,
+    FunctionValue,
+    GlobalValue,
+    MemoryValue,
+    TableValue,
+};
 #[cfg(not(feature = "std"))]
 pub use components::component_no_std::{
-    Component, ComponentBuilder, ExternValue, FunctionValue, GlobalValue,
-    MemoryValue, RuntimeInstance, TableValue, WrtComponentType, WrtComponentTypeBuilder,
+    Component,
+    ComponentBuilder,
+    ExternValue,
+    FunctionValue,
+    GlobalValue,
+    MemoryValue,
+    RuntimeInstance,
+    TableValue,
+    WrtComponentType,
+    WrtComponentTypeBuilder,
 };
-
 // Component registry based on feature flags
 #[cfg(feature = "std")]
 pub use components::component_registry::ComponentRegistry;
-
 #[cfg(not(feature = "std"))]
 pub use components::component_registry_no_std::ComponentRegistry;
+pub use resources::{
+    DynamicQuotaManager,
+    QuotaNode,
+    QuotaNodeType,
+    QuotaPolicy,
+    QuotaRequest,
+    QuotaResourceType,
+    QuotaResponse,
+    QuotaStatus,
+};
+// Canonical type definitions for ASIL-D compliance
+pub use types::{
+    ComponentInstance,
+    ComponentInstanceId,
+    ComponentInstanceState,
+};
 
 // Type alias for convenience
 pub type WrtResult<T> = wrt_error::Result<T>;

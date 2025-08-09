@@ -3,9 +3,34 @@
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-use wrt_foundation::bounded::BoundedVec;
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+    Result,
+};
+use wrt_foundation::{
+    bounded::BoundedVec,
+    budget_aware_provider::CrateId,
+    capabilities::CapabilityAwareProvider,
+    safe_memory::NoStdProvider,
+};
 
-use crate::prelude::*;
+/// Type alias for capability-aware buffer provider
+type BufferProvider = CapabilityAwareProvider<NoStdProvider<65536>>;
+
+/// Helper function to create buffer pool provider using capability-driven
+/// design
+fn create_buffer_provider() -> Result<BufferProvider> {
+    use wrt_foundation::memory_init::get_global_capability_context;
+
+    let context = get_global_capability_context()
+        .map_err(|_| Error::initialization_error("Global capability context not available"))?;
+
+    context
+        .create_provider(CrateId::Component, 65536)
+        .map_err(|_| Error::memory_out_of_bounds("Failed to create component buffer provider"))
+}
 
 /// Maximum number of buffer size classes
 pub const MAX_BUFFER_SIZE_CLASSES: usize = 8;
@@ -17,30 +42,38 @@ pub const MAX_BUFFERS_PER_CLASS: usize = 8;
 #[derive(Debug, Clone, Copy)]
 pub struct BoundedBufferStats {
     /// Total number of buffers in the pool
-    pub total_buffers: usize,
+    pub total_buffers:  usize,
     /// Total capacity of all buffers in bytes
     pub total_capacity: usize,
     /// Number of different buffer sizes
-    pub size_count: usize,
+    pub size_count:     usize,
 }
 
 /// A buffer size class entry containing buffers of similar size
 #[derive(Clone)]
 pub struct BufferSizeClass {
     /// Size of buffers in this class
-    pub size: usize,
+    pub size:    usize,
     /// Actual buffers
-    pub buffers: BoundedVec<u8, MAX_BUFFERS_PER_CLASS, NoStdProvider<65536>>,
+    pub buffers: BoundedVec<u8, MAX_BUFFERS_PER_CLASS, BufferProvider>,
 }
 
 impl BufferSizeClass {
     /// Create a new buffer size class
-    pub fn new(size: usize) -> Self {
-        Self { size, buffers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap() }
+    pub fn new(size: usize) -> Result<Self> {
+        let provider = create_buffer_provider()?;
+        Ok(Self {
+            size,
+            buffers: BoundedVec::new(provider).map_err(|_| {
+                Error::memory_error("Failed to create bounded vector for buffer pool")
+            })?,
+        })
     }
 
     /// Get a buffer from this size class if one is available
-    pub fn get_buffer(&mut self) -> Option<BoundedVec<u8, MAX_BUFFERS_PER_CLASS>, NoStdProvider<65536>> {
+    pub fn get_buffer(
+        &mut self,
+    ) -> Option<BoundedVec<u8, MAX_BUFFERS_PER_CLASS, BufferProvider>, BufferProvider> {
         if self.buffers.is_empty() {
             None
         } else {
@@ -52,19 +85,18 @@ impl BufferSizeClass {
     }
 
     /// Return a buffer to this size class
-    pub fn return_buffer(&mut self, buffer: BoundedVec<u8, MAX_BUFFERS_PER_CLASS>) -> Result<(), NoStdProvider<65536>> {
+    pub fn return_buffer(
+        &mut self,
+        buffer: BoundedVec<u8, MAX_BUFFERS_PER_CLASS, BufferProvider>,
+    ) -> core::result::Result<(), BufferProvider> {
         if self.buffers.len() >= MAX_BUFFERS_PER_CLASS {
             // Size class is full
-            return Ok(());
+            return Ok();
         }
 
-        self.buffers.push(buffer).map_err(|e| {
-            Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Component not found",
-            )
-        })
+        self.buffers
+            .push(buffer)
+            .map_err(|e| Error::resource_error("Buffer not found in pool"))
     }
 
     /// Number of buffers in this size class
@@ -86,7 +118,7 @@ impl BufferSizeClass {
 #[derive(Clone)]
 pub struct BoundedBufferPool {
     /// Size classes for different buffer sizes
-    size_classes: [Option<BufferSizeClass>; MAX_BUFFER_SIZE_CLASSES],
+    size_classes:   [Option<BufferSizeClass>; MAX_BUFFER_SIZE_CLASSES],
     /// Number of active size classes
     active_classes: usize,
 }
@@ -94,11 +126,18 @@ pub struct BoundedBufferPool {
 impl BoundedBufferPool {
     /// Create a new bounded buffer pool
     pub fn new() -> Self {
-        Self { size_classes: Default::default(), active_classes: 0 }
+        Self {
+            size_classes:   Default::default(),
+            active_classes: 0,
+        }
     }
 
     /// Allocate a buffer of at least the specified size
-    pub fn allocate(&mut self, size: usize) -> Result<BoundedVec<u8, MAX_BUFFERS_PER_CLASS>, NoStdProvider<65536>> {
+    pub fn allocate(
+        &mut self,
+        size: usize,
+    ) -> core::result::Result<BoundedVec<u8, MAX_BUFFERS_PER_CLASS, BufferProvider>, BufferProvider>
+    {
         // Find a size class that can fit this buffer
         let matching_class = self.find_size_class(size);
 
@@ -112,14 +151,13 @@ impl BoundedBufferPool {
         }
 
         // No suitable buffer found, create a new one
-        let mut buffer = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let provider = create_buffer_provider()
+            .map_err(|_| Error::memory_error("Failed to allocate memory provider for buffer"))?;
+        let mut buffer = BoundedVec::new(provider)
+            .map_err(|_| Error::memory_error("Failed to create bounded vector"))?;
         for _ in 0..size {
             buffer.push(0).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::RESOURCE_ERROR,
-                    "Component not found",
-                )
+                Error::resource_error("Buffer allocation failed: capacity exceeded")
             })?;
         }
 
@@ -127,7 +165,10 @@ impl BoundedBufferPool {
     }
 
     /// Return a buffer to the pool
-    pub fn return_buffer(&mut self, buffer: BoundedVec<u8, MAX_BUFFERS_PER_CLASS>) -> Result<(), NoStdProvider<65536>> {
+    pub fn return_buffer(
+        &mut self,
+        buffer: BoundedVec<u8, MAX_BUFFERS_PER_CLASS, BufferProvider>,
+    ) -> core::result::Result<(), BufferProvider> {
         let size = buffer.capacity();
 
         // Find the appropriate size class
@@ -169,7 +210,11 @@ impl BoundedBufferPool {
             }
         }
 
-        BoundedBufferStats { total_buffers, total_capacity, size_count }
+        BoundedBufferStats {
+            total_buffers,
+            total_capacity,
+            size_count,
+        }
     }
 
     /// Find a size class that can accommodate a buffer of the given size
@@ -193,9 +238,11 @@ impl BoundedBufferPool {
         // Find an empty slot
         for i in 0..MAX_BUFFER_SIZE_CLASSES {
             if self.size_classes[i].is_none() {
-                self.size_classes[i] = Some(BufferSizeClass::new(size));
-                self.active_classes += 1;
-                return Some(i);
+                if let Ok(size_class) = BufferSizeClass::new(size) {
+                    self.size_classes[i] = Some(size_class);
+                    self.active_classes += 1;
+                    return Some(i);
+                }
             }
         }
 

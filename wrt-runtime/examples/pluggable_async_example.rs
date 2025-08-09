@@ -46,7 +46,7 @@ fn main() {
     
     // 1. Check initial state - should be using fallback
     println!("1. Initial state:");
-    println!("   Using fallback executor: {}", is_using_fallback());
+    println!("   Using fallback executor: {}", is_using_fallback);
     
     // 2. Use the simple async runtime
     println!("\n2. Using AsyncRuntime:");
@@ -70,7 +70,7 @@ fn main() {
         };
         
         // Note: This requires the future to be Unpin, so we'll pin it
-        let pinned_future = Box::pin(async_block);
+        let pinned_future = Box::pin(async_block;
         match with_async(pinned_future) {
             Ok(result) => println!("   Result: {}", result),
             Err(e) => println!("   Error: {:?}", e),

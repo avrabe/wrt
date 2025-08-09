@@ -1,60 +1,63 @@
 //! Error formatting utilities for `no_std` compatibility
 
-use wrt_error::{Error, ErrorCategory};
+use wrt_error::{
+    Error,
+    ErrorCategory,
+};
 
 /// Error context for instruction operations
 #[derive(Debug, Clone, Copy)]
 pub enum InstructionErrorContext {
     /// Type mismatch in operation
-    TypeMismatch { 
+    TypeMismatch {
         /// Expected type
-        expected: &'static str, 
+        expected: &'static str,
         /// Actual type found
-        actual: &'static str 
+        actual:   &'static str,
     },
     /// Stack underflow
-    StackUnderflow { 
+    StackUnderflow {
         /// Required stack items
-        required: usize, 
+        required:  usize,
         /// Available stack items
-        available: usize 
+        available: usize,
     },
     /// Invalid memory access
-    InvalidMemoryAccess { 
+    InvalidMemoryAccess {
         /// Memory offset
-        offset: u32, 
+        offset: u32,
         /// Access size
-        size: u32 
+        size:   u32,
     },
     /// Division by zero
     DivisionByZero,
     /// Integer overflow
     IntegerOverflow,
     /// Invalid conversion
-    InvalidConversion { 
+    InvalidConversion {
         /// Source type
-        from: &'static str, 
+        from: &'static str,
         /// Target type
-        to: &'static str 
+        to:   &'static str,
     },
     /// Table out of bounds
-    TableOutOfBounds { 
+    TableOutOfBounds {
         /// Table index
-        index: u32, 
+        index: u32,
         /// Table size
-        size: u32 
+        size:  u32,
     },
     /// Invalid reference
     InvalidReference,
     /// Function not found
-    FunctionNotFound { 
+    FunctionNotFound {
         /// Function index
-        index: u32 
+        index: u32,
     },
     /// Invalid branch target
-    InvalidBranchTarget { 
+    InvalidBranchTarget {
         /// Branch depth
-        depth: u32 
+        depth: u32,
     },
 }
 
@@ -62,44 +65,47 @@ pub enum InstructionErrorContext {
 #[cfg(feature = "std")]
 pub fn format_error(category: ErrorCategory, code: u32, context: InstructionErrorContext) -> Error {
     use std::format;
-    
+
     let _message = match context {
         InstructionErrorContext::TypeMismatch { expected, actual } => {
             format!("Expected {}, got {}", expected, actual)
-        }
-        InstructionErrorContext::StackUnderflow { required, available } => {
-            format!("Stack underflow: required {}, available {}", required, available)
-        }
+        },
+        InstructionErrorContext::StackUnderflow {
+            required,
+            available,
+        } => {
+            format!(
+                "Stack underflow: required {}, available {}",
+                required, available
+            )
+        },
         InstructionErrorContext::InvalidMemoryAccess { offset, size } => {
-            format!("Invalid memory access at offset {} with size {}", offset, size)
-        }
-        InstructionErrorContext::DivisionByZero => {
-            "Division by zero".into()
-        }
-        InstructionErrorContext::IntegerOverflow => {
-            "Integer overflow".into()
-        }
+            format!(
+                "Invalid memory access at offset {} with size {}",
+                offset, size
+            )
+        },
+        InstructionErrorContext::DivisionByZero => "Division by zero".into(),
+        InstructionErrorContext::IntegerOverflow => "Integer overflow".into(),
         InstructionErrorContext::InvalidConversion { from, to } => {
             format!("Invalid conversion from {} to {}", from, to)
-        }
+        },
         InstructionErrorContext::TableOutOfBounds { index, size } => {
             format!("Table index {} out of bounds (size: {})", index, size)
-        }
-        InstructionErrorContext::InvalidReference => {
-            "Invalid reference".into()
-        }
+        },
+        InstructionErrorContext::InvalidReference => "Invalid reference".into(),
         InstructionErrorContext::FunctionNotFound { index } => {
             format!("Function {} not found", index)
-        }
+        },
         InstructionErrorContext::InvalidBranchTarget { depth } => {
             format!("Invalid branch target depth: {}", depth)
-        }
+        },
     };
-    
+
     // Use a static message since Error::new requires &'static str
     let static_message = match context {
         InstructionErrorContext::TypeMismatch { .. } => "Type mismatch",
-        InstructionErrorContext::StackUnderflow { .. } => "Stack underflow", 
+        InstructionErrorContext::StackUnderflow { .. } => "Stack underflow",
         InstructionErrorContext::InvalidMemoryAccess { .. } => "Invalid memory access",
         InstructionErrorContext::DivisionByZero => "Division by zero",
         InstructionErrorContext::IntegerOverflow => "Integer overflow",
@@ -114,7 +120,8 @@ pub fn format_error(category: ErrorCategory, code: u32, context: InstructionErro
 
 /// Binary `std/no_std` choice
 #[cfg(not(feature = "std"))]
-#[must_use] pub fn format_error(category: ErrorCategory, code: u32, context: InstructionErrorContext) -> Error {
+#[must_use]
+pub fn format_error(category: ErrorCategory, code: u32, context: InstructionErrorContext) -> Error {
     let _message = match context {
         InstructionErrorContext::TypeMismatch { expected, .. } => expected,
         InstructionErrorContext::StackUnderflow { .. } => "Stack underflow",
@@ -127,11 +134,11 @@ pub fn format_error(category: ErrorCategory, code: u32, context: InstructionErro
         InstructionErrorContext::FunctionNotFound { .. } => "Function not found",
         InstructionErrorContext::InvalidBranchTarget { .. } => "Invalid branch target",
     };
-    
+
     // Use a static message since Error::new requires &'static str
     let static_message = match context {
         InstructionErrorContext::TypeMismatch { .. } => "Type mismatch",
-        InstructionErrorContext::StackUnderflow { .. } => "Stack underflow", 
+        InstructionErrorContext::StackUnderflow { .. } => "Stack underflow",
         InstructionErrorContext::InvalidMemoryAccess { .. } => "Invalid memory access",
         InstructionErrorContext::DivisionByZero => "Division by zero",
         InstructionErrorContext::IntegerOverflow => "Integer overflow",

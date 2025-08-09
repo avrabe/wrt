@@ -1,5 +1,11 @@
-use wrt_component::{parser, Error};
-use wrt_decoder::{Error as DecoderError, Parser};
+use wrt_component::{
+    parser,
+    Error,
+};
+use wrt_decoder::{
+    Error as DecoderError,
+    Parser,
+};
 
 /// Helper to create a complex test module with multiple section types
 fn create_complex_test_module() -> Vec<u8> {

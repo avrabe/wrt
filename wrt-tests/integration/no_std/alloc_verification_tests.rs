@@ -7,7 +7,6 @@
 //! It's specifically designed to catch regressions in the alloc feature set.
 
 // Binary std/no_std choice
-#![cfg_attr(not(feature = "std"), no_std)]
 
 // External crate imports
 extern crate alloc;
@@ -46,52 +45,52 @@ mod tests {
     #[test]
     fn test_alloc_string_handling() {
         // Binary std/no_std choice
-        let string1 = String::from("Hello");
-        let string2 = String::from(" World");
+        let string1 = String::from("Hello";
+        let string2 = String::from(" World";
         
         // Test string concatenation
-        let result = format!("{}{}", string1, string2);
-        assert_eq!(result, "Hello World");
+        let result = format!("{}{}", string1, string2;
+        assert_eq!(result, "Hello World";
         
         // Test string capacity and manipulation
-        let mut growable = String::with_capacity(20);
-        growable.push_str("Growing string");
-        growable.push_str(" with alloc");
+        let mut growable = String::with_capacity(20;
+        growable.push_str("Growing string";
+        growable.push_str(" with alloc";
         
-        assert_eq!(growable, "Growing string with alloc");
+        assert_eq!(growable, "Growing string with alloc";
     }
     
     #[test]
     fn test_alloc_vec_operations() {
         // Binary std/no_std choice
-        let mut vec = Vec::<u32>::with_capacity(10);
+        let mut vec = Vec::<u32>::with_capacity(10;
         
         // Test vector operations
         for i in 0..10 {
             vec.push(i);
         }
         
-        assert_eq!(vec.len(), 10);
-        assert_eq!(vec[5], 5);
+        assert_eq!(vec.len(), 10;
+        assert_eq!(vec[5], 5;
         
         // Binary std/no_std choice
         let evens: Vec<u32> = vec.iter().filter(|&&x| x % 2 == 0).cloned().collect();
-        assert_eq!(evens, vec![0, 2, 4, 6, 8]);
+        assert_eq!(evens, vec![0, 2, 4, 6, 8];
         
         // Binary std/no_std choice
         let doubled: Vec<u32> = vec.iter().map(|&x| x * 2).collect();
-        assert_eq!(doubled[5], 10);
+        assert_eq!(doubled[5], 10;
     }
     
     #[test]
     fn test_boxed_values() {
         // Binary std/no_std choice
-        let boxed_value = Box::new(42);
-        assert_eq!(*boxed_value, 42);
+        let boxed_value = Box::new(42;
+        assert_eq!(*boxed_value, 42;
         
         // Test more complex boxed types
-        let boxed_vec = Box::new(vec![1, 2, 3, 4, 5]);
-        assert_eq!(boxed_vec.len(), 5);
+        let boxed_vec = Box::new(vec![1, 2, 3, 4, 5];
+        assert_eq!(boxed_vec.len(), 5;
         
         // Test Box<dyn Trait> if needed
         // (Assuming we have a trait that can be used here)
@@ -103,29 +102,26 @@ mod tests {
         let mut builder = ComponentValueStoreBuilder::new();
         
         // Binary std/no_std choice
-        let string_id = builder.add_string("hello world");
+        let string_id = builder.add_string("hello world";
         
         // Build the store
-        let store = builder.build();
+        let store = builder.build);
         
         // Test retrieving values
         let retrieved = store.get_string(string_id).unwrap();
-        assert_eq!(retrieved, "hello world");
+        assert_eq!(retrieved, "hello world";
     }
     
     #[test]
     fn test_error_with_context() {
         // Binary std/no_std choice
-        let error = Error::new(
-            ErrorCategory::Resource,
-            42,
-            "This is a test error with context".to_string(),
-        );
+        let error = Error::runtime_execution_error(".to_string(),
+        ;
         
         // Check the error message
-        assert_eq!(error.code(), 42);
-        assert_eq!(error.category(), ErrorCategory::Resource);
-        assert!(error.to_string().contains("test error with context"));
+        assert_eq!(error.code(), 42;
+        assert_eq!(error.category(), ErrorCategory::Resource;
+        assert!(error.to_string().contains(");
     }
     
     #[test]
@@ -139,11 +135,11 @@ mod tests {
         ).unwrap();
         
         // Verify resource exists
-        assert!(resource_manager.has_resource(&resource_id));
+        assert!(resource_manager.has_resource(&resource_id);
         
         // Test dropping resource
         resource_manager.drop_resource(&resource_id).unwrap();
-        assert!(!resource_manager.has_resource(&resource_id));
+        assert!(!resource_manager.has_resource(&resource_id);
     }
     
     #[test]
@@ -156,8 +152,8 @@ mod tests {
         assert!(vec.push("string2".to_string()).is_ok());
         
         // Verify contents
-        assert_eq!(vec.len(), 2);
-        assert_eq!(vec.get(0).unwrap(), "string1");
+        assert_eq!(vec.len(), 2;
+        assert_eq!(vec.get(0).unwrap(), "string1";
     }
     
     #[test]
@@ -166,11 +162,11 @@ mod tests {
         let mut builder = ComponentBuilder::new();
         
         // Binary std/no_std choice
-        let type_id = ComponentTypeId::Func(0);
-        builder.add_type(type_id);
+        let type_id = ComponentTypeId::Func(0;
+        builder.add_type(type_id;
         
         // Verify builder state
-        assert!(builder.has_type(&type_id));
+        assert!(builder.has_type(&type_id);
     }
     
     #[test]

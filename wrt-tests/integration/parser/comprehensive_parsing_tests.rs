@@ -158,13 +158,13 @@ pub fn create_edge_case_module() -> Vec<u8> {
 
 /// Create a module that tests parser limits
 pub fn create_stress_test_module() -> Vec<u8> {
-    let mut wat = String::from("(module\n");
+    let mut wat = String::from("(module\n";
     
     // Many type definitions
     for i in 0..50 {
         wat.push_str(&format!(
             "  (type $func_type_{} (func (param i32) (result i32)))\n", i
-        ));
+        ;
     }
     
     // Many imports
@@ -172,7 +172,7 @@ pub fn create_stress_test_module() -> Vec<u8> {
         wat.push_str(&format!(
             "  (import \"test_module_{}\" \"test_func_{}\" (func (param i32) (result i32)))\n", 
             i, i
-        ));
+        ;
     }
     
     // Many functions
@@ -180,17 +180,17 @@ pub fn create_stress_test_module() -> Vec<u8> {
         wat.push_str(&format!(
             "  (func $func_{} (param i32) (result i32)\n    local.get 0\n    i32.const {}\n    i32.add\n  )\n",
             i, i
-        ));
+        ;
     }
     
     // Many exports
     for i in 0..100 {
         wat.push_str(&format!(
             "  (export \"func_{}\" (func $func_{}))\n", i, i
-        ));
+        ;
     }
     
-    wat.push_str(")");
+    wat.push_str(")";
     
     wat::parse_str(&wat).expect("Failed to parse stress test WAT module")
 }
@@ -204,9 +204,9 @@ mod comprehensive_tests {
 
     #[test]
     fn test_full_featured_module_parsing() {
-        let module = create_full_featured_module();
+        let module = create_full_featured_module);
         
-        let mut parser = Parser::new(&module);
+        let mut parser = Parser::new(&module;
         let mut sections = HashMap::new();
         
         loop {
@@ -214,31 +214,31 @@ mod comprehensive_tests {
                 Ok(payload) => {
                     match payload {
                         Payload::TypeSection(reader) => {
-                            sections.insert("type", reader.get_count());
+                            sections.insert("type", reader.get_count);
                         }
                         Payload::ImportSection(reader) => {
-                            sections.insert("import", reader.get_count());
+                            sections.insert("import", reader.get_count);
                         }
                         Payload::FunctionSection(reader) => {
-                            sections.insert("function", reader.get_count());
+                            sections.insert("function", reader.get_count);
                         }
                         Payload::MemorySection(reader) => {
-                            sections.insert("memory", reader.get_count());
+                            sections.insert("memory", reader.get_count);
                         }
                         Payload::TableSection(reader) => {
-                            sections.insert("table", reader.get_count());
+                            sections.insert("table", reader.get_count);
                         }
                         Payload::GlobalSection(reader) => {
-                            sections.insert("global", reader.get_count());
+                            sections.insert("global", reader.get_count);
                         }
                         Payload::ExportSection(reader) => {
-                            sections.insert("export", reader.get_count());
+                            sections.insert("export", reader.get_count);
                         }
                         Payload::ElementSection(reader) => {
-                            sections.insert("element", reader.get_count());
+                            sections.insert("element", reader.get_count);
                         }
                         Payload::DataSection(reader) => {
-                            sections.insert("data", reader.get_count());
+                            sections.insert("data", reader.get_count);
                         }
                         Payload::StartSection { .. } => {
                             sections.insert("start", 1);
@@ -252,16 +252,16 @@ mod comprehensive_tests {
         }
         
         // Verify all expected sections were found
-        assert!(sections.contains_key("type"));
-        assert!(sections.contains_key("import"));
-        assert!(sections.contains_key("function"));
-        assert!(sections.contains_key("memory"));
-        assert!(sections.contains_key("table"));
-        assert!(sections.contains_key("global"));
-        assert!(sections.contains_key("export"));
-        assert!(sections.contains_key("element"));
-        assert!(sections.contains_key("data"));
-        assert!(sections.contains_key("start"));
+        assert!(sections.contains_key("type");
+        assert!(sections.contains_key("import");
+        assert!(sections.contains_key("function");
+        assert!(sections.contains_key("memory");
+        assert!(sections.contains_key("table");
+        assert!(sections.contains_key("global");
+        assert!(sections.contains_key("export");
+        assert!(sections.contains_key("element");
+        assert!(sections.contains_key("data");
+        assert!(sections.contains_key("start");
         
         // Verify section counts
         assert_eq!(sections["type"], 2); // Two type definitions
@@ -272,21 +272,21 @@ mod comprehensive_tests {
 
     #[test]
     fn test_builtin_detection_in_complex_module() {
-        let module = create_full_featured_module();
+        let module = create_full_featured_module);
         
         let builtins = parser::scan_for_builtins(&module).unwrap();
         
         // Should detect WASI builtin imports but not other imports
-        assert_eq!(builtins.len(), 2);
-        assert!(builtins.contains(&"resource.create".to_string()));
-        assert!(builtins.contains(&"resource.drop".to_string()));
+        assert_eq!(builtins.len(), 2;
+        assert!(builtins.contains(&"resource.create".to_string());
+        assert!(builtins.contains(&"resource.drop".to_string());
     }
 
     #[test]
     fn test_edge_case_module_parsing() {
-        let module = create_edge_case_module();
+        let module = create_edge_case_module);
         
-        let mut parser = Parser::new(&module);
+        let mut parser = Parser::new(&module;
         let mut function_count = 0;
         let mut export_count = 0;
         
@@ -295,10 +295,10 @@ mod comprehensive_tests {
                 Ok(payload) => {
                     match payload {
                         Payload::FunctionSection(reader) => {
-                            function_count = reader.get_count();
+                            function_count = reader.get_count);
                         }
                         Payload::ExportSection(reader) => {
-                            export_count = reader.get_count();
+                            export_count = reader.get_count);
                         }
                         Payload::End => break,
                         _ => {}
@@ -314,9 +314,9 @@ mod comprehensive_tests {
 
     #[test]
     fn test_stress_module_parsing() {
-        let module = create_stress_test_module();
+        let module = create_stress_test_module);
         
-        let mut parser = Parser::new(&module);
+        let mut parser = Parser::new(&module;
         let mut type_count = 0;
         let mut import_count = 0;
         let mut function_count = 0;
@@ -327,16 +327,16 @@ mod comprehensive_tests {
                 Ok(payload) => {
                     match payload {
                         Payload::TypeSection(reader) => {
-                            type_count = reader.get_count();
+                            type_count = reader.get_count);
                         }
                         Payload::ImportSection(reader) => {
-                            import_count = reader.get_count();
+                            import_count = reader.get_count);
                         }
                         Payload::FunctionSection(reader) => {
-                            function_count = reader.get_count();
+                            function_count = reader.get_count);
                         }
                         Payload::ExportSection(reader) => {
-                            export_count = reader.get_count();
+                            export_count = reader.get_count);
                         }
                         Payload::End => break,
                         _ => {}
@@ -346,10 +346,10 @@ mod comprehensive_tests {
             }
         }
         
-        assert_eq!(type_count, 50);
-        assert_eq!(import_count, 30);
-        assert_eq!(function_count, 100);
-        assert_eq!(export_count, 100);
+        assert_eq!(type_count, 50;
+        assert_eq!(import_count, 30;
+        assert_eq!(function_count, 100;
+        assert_eq!(export_count, 100;
     }
 }
 
@@ -376,7 +376,7 @@ mod validation_tests {
         let module = wat::parse_str(wat).unwrap();
         
         // Parser should handle sections regardless of order
-        let mut parser = Parser::new(&module);
+        let mut parser = Parser::new(&module;
         let mut sections_seen = Vec::new();
         
         loop {
@@ -394,16 +394,16 @@ mod validation_tests {
             }
         }
         
-        assert!(sections_seen.contains(&"type"));
-        assert!(sections_seen.contains(&"function"));
-        assert!(sections_seen.contains(&"export"));
+        assert!(sections_seen.contains(&"type");
+        assert!(sections_seen.contains(&"function");
+        assert!(sections_seen.contains(&"export");
     }
 
     #[test]
     fn test_import_validation_comprehensive() {
-        let module = create_full_featured_module();
+        let module = create_full_featured_module);
         
-        let mut parser = Parser::new(&module);
+        let mut parser = Parser::new(&module;
         let mut imports = Vec::new();
         
         loop {
@@ -412,7 +412,7 @@ mod validation_tests {
                     if let Payload::ImportSection(reader) = payload {
                         for import in reader {
                             let import = import.unwrap();
-                            imports.push((import.module.to_string(), import.name.to_string()));
+                            imports.push((import.module.to_string(), import.name.to_string());
                         }
                     } else if let Payload::End = payload {
                         break;
@@ -423,18 +423,18 @@ mod validation_tests {
         }
         
         // Validate specific imports
-        assert!(imports.contains(&("wasi_builtin".to_string(), "resource.create".to_string())));
-        assert!(imports.contains(&("wasi_builtin".to_string(), "resource.drop".to_string())));
-        assert!(imports.contains(&("env".to_string(), "external_memory".to_string())));
-        assert!(imports.contains(&("env".to_string(), "external_table".to_string())));
-        assert!(imports.contains(&("env".to_string(), "external_global".to_string())));
+        assert!(imports.contains(&("wasi_builtin".to_string(), "resource.create".to_string()));
+        assert!(imports.contains(&("wasi_builtin".to_string(), "resource.drop".to_string()));
+        assert!(imports.contains(&("env".to_string(), "external_memory".to_string()));
+        assert!(imports.contains(&("env".to_string(), "external_table".to_string()));
+        assert!(imports.contains(&("env".to_string(), "external_global".to_string()));
     }
 
     #[test]
     fn test_export_validation_comprehensive() {
-        let module = create_full_featured_module();
+        let module = create_full_featured_module);
         
-        let mut parser = Parser::new(&module);
+        let mut parser = Parser::new(&module;
         let mut exports = Vec::new();
         
         loop {
@@ -454,26 +454,26 @@ mod validation_tests {
         }
         
         // Validate specific exports
-        assert!(exports.contains(&"add".to_string()));
-        assert!(exports.contains(&"multiply".to_string()));
-        assert!(exports.contains(&"process".to_string()));
-        assert!(exports.contains(&"memory".to_string()));
-        assert!(exports.contains(&"table".to_string()));
-        assert!(exports.contains(&"config".to_string()));
+        assert!(exports.contains(&"add".to_string());
+        assert!(exports.contains(&"multiply".to_string());
+        assert!(exports.contains(&"process".to_string());
+        assert!(exports.contains(&"memory".to_string());
+        assert!(exports.contains(&"table".to_string());
+        assert!(exports.contains(&"config".to_string());
     }
 
     #[test]
     fn test_malformed_section_handling() {
         // Create a module and then corrupt it
-        let mut module = create_full_featured_module();
+        let mut module = create_full_featured_module);
         
         // Corrupt the module by changing a section size
         if module.len() > 20 {
             module[15] = 0xFF; // Invalid section size
         }
         
-        let mut parser = Parser::new(&module);
-        let mut parsing_result = Ok(());
+        let mut parser = Parser::new(&module;
+        let mut parsing_result = Ok();
         
         loop {
             match parser.parse() {
@@ -483,14 +483,14 @@ mod validation_tests {
                     }
                 }
                 Err(e) => {
-                    parsing_result = Err(e);
+                    parsing_result = Err(e;
                     break;
                 }
             }
         }
         
         // Should detect the corruption and fail gracefully
-        assert!(parsing_result.is_err());
+        assert!(parsing_result.is_err();
     }
 }
 
@@ -504,12 +504,12 @@ mod performance_tests {
 
     #[test]
     fn test_comprehensive_parsing_performance() {
-        let module = create_full_featured_module();
+        let module = create_full_featured_module);
         
-        let start = Instant::now();
+        let start = Instant::now);
         
         for _ in 0..1000 {
-            let mut parser = Parser::new(&module);
+            let mut parser = Parser::new(&module;
             loop {
                 match parser.parse() {
                     Ok(Payload::End) => break,
@@ -519,17 +519,17 @@ mod performance_tests {
             }
         }
         
-        let duration = start.elapsed();
+        let duration = start.elapsed);
         assert!(duration.as_secs() < 1, "Comprehensive parsing performance regression");
     }
 
     #[test]
     fn test_stress_parsing_performance() {
-        let module = create_stress_test_module();
+        let module = create_stress_test_module);
         
-        let start = Instant::now();
+        let start = Instant::now);
         
-        let mut parser = Parser::new(&module);
+        let mut parser = Parser::new(&module;
         loop {
             match parser.parse() {
                 Ok(Payload::End) => break,
@@ -538,32 +538,32 @@ mod performance_tests {
             }
         }
         
-        let duration = start.elapsed();
+        let duration = start.elapsed);
         assert!(duration.as_millis() < 500, "Stress test parsing too slow");
     }
 
     #[test]
     fn test_builtin_scanning_performance() {
-        let module = create_stress_test_module();
+        let module = create_stress_test_module);
         
-        let start = Instant::now();
+        let start = Instant::now);
         
         for _ in 0..100 {
             let _builtins = parser::scan_for_builtins(&module).unwrap();
         }
         
-        let duration = start.elapsed();
+        let duration = start.elapsed);
         assert!(duration.as_millis() < 100, "Builtin scanning performance regression");
     }
 
     #[test]
     fn test_memory_usage_scalability() {
         // This test ensures that parsing doesn't consume excessive memory
-        let module = create_stress_test_module();
+        let module = create_stress_test_module);
         
         // Parse the same module multiple times to check for memory leaks
         for _ in 0..100 {
-            let mut parser = Parser::new(&module);
+            let mut parser = Parser::new(&module;
             let mut section_count = 0;
             
             loop {
@@ -600,13 +600,13 @@ mod integration_tests {
 
     #[test]
     fn test_parser_consistency_across_crates() {
-        let module = create_full_featured_module();
+        let module = create_full_featured_module);
         
         // Test with wrt-component parser
         let component_builtins = parser::scan_for_builtins(&module).unwrap();
         
         // Test with wrt-decoder parser (count imports manually)
-        let mut decoder_parser = Parser::new(&module);
+        let mut decoder_parser = Parser::new(&module;
         let mut wasi_import_count = 0;
         
         loop {
@@ -628,15 +628,15 @@ mod integration_tests {
         }
         
         // Both parsers should detect the same WASI builtin imports
-        assert_eq!(component_builtins.len(), wasi_import_count);
+        assert_eq!(component_builtins.len(), wasi_import_count;
     }
 
     #[test]
     fn test_format_compatibility() {
-        let module = create_comprehensive_test_module();
+        let module = create_comprehensive_test_module);
         
         // Test that the module can be parsed by different parser implementations
-        let mut decoder_parser = Parser::new(&module);
+        let mut decoder_parser = Parser::new(&module;
         let mut sections_parsed = 0;
         
         loop {
@@ -667,15 +667,15 @@ mod integration_tests {
         module.extend_from_slice(&[0x01, 0xFF, 0x01]); // Invalid type section
         
         // Test component parser error handling
-        let component_result = parser::scan_for_builtins(&module);
+        let component_result = parser::scan_for_builtins(&module;
         
         // Test decoder parser error handling
-        let mut decoder_parser = Parser::new(&module);
-        let decoder_result = decoder_parser.parse();
+        let mut decoder_parser = Parser::new(&module;
+        let decoder_result = decoder_parser.parse);
         
         // Both should handle the error gracefully (may succeed or fail differently)
         // The key is that neither should panic or crash
-        assert!(component_result.is_ok() || component_result.is_err());
-        assert!(decoder_result.is_ok() || decoder_result.is_err());
+        assert!(component_result.is_ok() || component_result.is_err();
+        assert!(decoder_result.is_ok() || decoder_result.is_err();
     }
 }

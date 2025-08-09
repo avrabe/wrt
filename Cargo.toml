@@ -1,10 +1,7 @@
 [workspace]
 members = [
-    # "wrt-safety",    # TODO: Create wrt-safety crate
     "wrt",
     "wrtd",
-    "xtask",
-    "example",
     "wrt-sync",
     "wrt-error",
     "wrt-format",
@@ -14,17 +11,17 @@ members = [
     "wrt-component",
     "wrt-math",
     "wrt-host",
-    "wrt-helper",
     "wrt-logging",
     "wrt-runtime",
     "wrt-instructions",
     "wrt-intercept",
-    # "test-control-instructions",  # TODO: Remove after migration
-    "wrt-verification-tool",
-    "wrt-test-registry",
     "wrt-platform",
     "wrt-panic",
-    "wrt-tests/integration"]
+    "wrt-tests/integration", 
+    "wrt-build-core", 
+    "cargo-wrt", 
+    "wrt-dagger"]
+exclude = ["examples/wasi-nn/inference_module"]
 resolver = "2"  # Use edition 2021 resolver
 
 [workspace.package]
@@ -34,13 +31,13 @@ license = "MIT"
 repository = "https://github.com/pulseengine/wrt" # Updated repository URL
 version = "0.2.0" # Updated to 0.2.0 for consistency
 
+
 [workspace.dependencies]
 anyhow = "1.0"
 wit-bindgen = "0.41.0"
 dagger-sdk = { version = "0.18.9", features = ["codegen"] }
 
 # Internal crate versions
-# wrt-safety = { path = "wrt-safety", version = "0.2.0", default-features = false }
 wrt = { path = "wrt", version = "0.2.0", default-features = false }
 wrt-error = { path = "wrt-error", version = "0.2.0", default-features = false }
 wrt-error-ng = { path = "wrt-error-ng", version = "0.2.0", default-features = false }
@@ -48,19 +45,21 @@ wrt-sync = { path = "wrt-sync", version = "0.2.0", default-features = false }
 wrt-format = { path = "wrt-format", version = "0.2.0", default-features = false }
 wrt-foundation = { path = "wrt-foundation", version = "0.2.0", default-features = false }
 wrt-decoder = { path = "wrt-decoder", version = "0.2.0", default-features = false, features = ["std"] }
+wrt-parser = { path = "wrt-parser", version = "0.2.0", default-features = false }
 wrt-debug = { path = "wrt-debug", version = "0.2.0", default-features = false }
 wrt-runtime = { path = "wrt-runtime", version = "0.2.0", default-features = false }
 wrt-logging = { path = "wrt-logging", version = "0.2.0", default-features = false }
 wrt-instructions = { path = "wrt-instructions", version = "0.2.0", default-features = false }
 wrt-component = { path = "wrt-component", version = "0.2.0", default-features = false }
 wrt-host = { path = "wrt-host", version = "0.2.0", default-features = false }
-wrt-helper = { path = "wrt-helper", version = "0.2.0", default-features = false }
 wrt-intercept = { path = "wrt-intercept", version = "0.2.0", default-features = false }
-wrt-test-registry = { path = "wrt-test-registry", version = "0.2.0", default-features = false }
 wrt-math = { path = "wrt-math", version = "0.2.0", default-features = false }
 wrt-platform = { path = "wrt-platform", version = "0.2.0", default-features = false }
 wrt-panic = { path = "wrt-panic", version = "0.2.0", default-features = false }
-wrt-verification-tool = { path = "wrt-verification-tool", version = "0.2.0", default-features = false }
+wrt-wasi = { path = "wrt-wasi", version = "0.2.0", default-features = false }
+
+# Note: Safety level presets should be defined in individual crate Cargo.toml files
+# as workspace.features is not supported by Cargo
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(test)'] }
@@ -69,6 +68,40 @@ unused_variables = "allow"
 unused_mut = "allow"
 unused_macros = "allow"
 missing_docs = "allow"
+dead_code = "allow"
+unreachable_patterns = "allow"
+
+[workspace.lints.clippy]
+# Static memory enforcement - prevent dynamic allocation violations
+std_instead_of_core = "deny"
+std_instead_of_alloc = "deny"
+# Allow warnings that would require substantial refactoring
+needless_continue = "allow"
+if_not_else = "allow"
+needless_pass_by_value = "allow"
+manual_let_else = "allow"
+elidable_lifetime_names = "allow"
+unused_self = "allow"
+ptr_as_ptr = "allow"
+cast_possible_truncation = "allow"
+too_many_lines = "allow"
+similar_names = "allow"
+module_name_repetitions = "allow"
+inline_always = "allow"
+multiple_crate_versions = "allow"
+semicolon_if_nothing_returned = "allow"
+comparison_chain = "allow"
+ignored_unit_patterns = "allow"
+single_match_else = "allow"
+needless_range_loop = "allow"
+explicit_iter_loop = "allow"
+bool_to_int_with_if = "allow"
+match_same_arms = "allow"
+# pedantic group removed to avoid priority conflicts with individual lints
+# Warn about allocations that could be bounded
+vec_init_then_push = "warn"
+# Performance and safety
+unnecessary_box_returns = "warn"
 
 # Workspace-level profiles inherit by members unless overridden.
 # Setting panic=abort for production profiles (dev/release) for safety and deterministic behavior.
@@ -100,6 +133,10 @@ default-unwind = 5
 stubbing-enabled = true
 concrete-playbook = "off"
 output-format = "terse"
+# Enhanced settings for ASIL-C/D compliance
+solver = "cadical"
+enable-unstable = true
+parallel = 4
 
 # Memory safety verification suite
 [[workspace.metadata.kani.package]]
@@ -108,7 +145,10 @@ verification-enabled = true
 harnesses = [
     "verify_bounded_collections_memory_safety",
     "verify_safe_memory_bounds", 
-    "verify_atomic_memory_operations"
+    "verify_atomic_memory_operations",
+    "verify_memory_budget_never_exceeded",
+    "verify_hierarchical_budget_consistency",
+    "verify_cross_crate_memory_isolation"
 ]
 
 # Concurrency safety verification suite  
@@ -138,4 +178,71 @@ verification-enabled = true
 harnesses = [
     "verify_error_creation_safety",
     "verify_error_propagation"
+]
+
+# Integration tests formal verification suite (KANI Phase 4)
+[[workspace.metadata.kani.package]]
+name = "wrt-integration-tests"
+verification-enabled = true
+harnesses = [
+    # Memory safety proofs (Phase 2)
+    "kani_verify_memory_budget_never_exceeded",
+    "kani_verify_hierarchical_budget_consistency",
+    "kani_verify_cross_crate_memory_isolation",
+    "kani_verify_memory_deallocation_patterns",
+    "kani_verify_memory_fragmentation_bounds",
+    "kani_verify_concurrent_allocation_safety",
+    # Safety invariants proofs (Phase 3)
+    "kani_verify_asil_level_monotonicity",
+    "kani_verify_safety_context_preservation",
+    "kani_verify_cross_standard_conversions",
+    "kani_verify_violation_count_monotonicity",
+    # Concurrency proofs (Phase 4)
+    "kani_verify_atomic_compare_and_swap",
+    "kani_verify_atomic_fetch_and_add",
+    "kani_verify_mutex_mutual_exclusion",
+    "kani_verify_rwlock_concurrent_reads",
+    "kani_verify_memory_ordering",
+    "kani_verify_deadlock_prevention",
+    # Resource lifecycle proofs (Phase 4)
+    "kani_verify_resource_id_uniqueness",
+    "kani_verify_resource_lifecycle_correctness",
+    "kani_verify_resource_table_bounds",
+    "kani_verify_cross_component_isolation",
+    "kani_verify_resource_reference_validity",
+    "kani_verify_resource_representation_consistency",
+    # Integration proofs (Phase 4)
+    "kani_verify_cross_component_memory_isolation",
+    "kani_verify_component_interface_type_safety",
+    "kani_verify_system_wide_resource_limits",
+    "kani_verify_end_to_end_safety_preservation",
+    "kani_verify_multi_component_workflow_consistency",
+    "kani_verify_component_isolation_under_stress",
+    # Advanced proofs (KANI Optimization)
+    "verify_lockstep_synchronization",
+    "verify_tmr_fault_tolerance", 
+    "verify_diverse_redundancy_correctness",
+    "verify_memory_edc_effectiveness",
+    "verify_control_flow_integrity",
+    "verify_fault_propagation_prevention"
+]
+
+# Runtime verification suite
+[[workspace.metadata.kani.package]]
+name = "wrt-runtime"
+verification-enabled = true
+harnesses = [
+    "verify_execution_stack_bounds",
+    "verify_function_call_depth",
+    "verify_memory_access_bounds"
+]
+
+# Platform abstraction verification
+[[workspace.metadata.kani.package]]
+name = "wrt-platform"
+verification-enabled = true
+harnesses = [
+    "verify_platform_memory_operations",
+    "verify_synchronization_primitives",
+    "verify_thread_safety"
 ]

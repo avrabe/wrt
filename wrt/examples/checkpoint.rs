@@ -8,7 +8,10 @@ fn main() -> wrt::error::Result<()> {
     use wrt::{
         error::Result,
         module::Module,
-        serialization::{deserialize_from_module, serialize_to_module},
+        serialization::{
+            deserialize_from_module,
+            serialize_to_module,
+        },
         stackless::StacklessEngine,
     };
 

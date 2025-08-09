@@ -43,7 +43,7 @@ fn test_bounded_vec_property_invariants() {
     ];
 
     for (capacity, verification_level, operations) in test_cases {
-        let mut vec = BoundedVec::<u32>::with_capacity_and_verification(capacity, verification_level);
+        let mut vec = BoundedVec::<u32>::with_capacity_and_verification(capacity, verification_level;
         
         for op in operations {
             let result = panic::catch_unwind(|| {
@@ -52,36 +52,36 @@ fn test_bounded_vec_property_invariants() {
                         let _ = vec.push(value);
                     }
                     BoundedVecOp::Pop => {
-                        let _ = vec.pop();
+                        let _ = vec.pop);
                     }
                     BoundedVecOp::Get(index) => {
                         if index < vec.len() {
-                            let _ = vec.get(index);
+                            let _ = vec.get(index;
                         }
                     }
                     BoundedVecOp::Set(index, value) => {
                         if index < vec.len() {
-                            let _ = vec.set(index, value);
+                            let _ = vec.set(index, value;
                         }
                     }
                     BoundedVecOp::Clear => {
-                        vec.clear();
+                        vec.clear);
                     }
                     BoundedVecOp::Reserve(additional) => {
-                        let _ = vec.reserve(additional);
+                        let _ = vec.reserve(additional;
                     }
                     BoundedVecOp::Validate => {
-                        let _ = vec.validate();
+                        let _ = vec.validate);
                     }
                 }
-            });
+            };
             
             // Operations should not panic for valid inputs
             assert!(result.is_ok(), "BoundedVec operation panicked unexpectedly");
         }
         
         // Final validation should always succeed for properly used collections
-        let final_validation = vec.validate();
+        let final_validation = vec.validate);
         assert!(final_validation.is_ok(), "Final validation failed for BoundedVec");
     }
 }
@@ -118,7 +118,7 @@ fn test_bounded_stack_property_invariants() {
     ];
 
     for (capacity, verification_level, operations) in test_cases {
-        let mut stack = BoundedStack::<u32>::with_capacity_and_verification(capacity, verification_level);
+        let mut stack = BoundedStack::<u32>::with_capacity_and_verification(capacity, verification_level;
         
         for op in operations {
             let result = panic::catch_unwind(|| {
@@ -127,31 +127,31 @@ fn test_bounded_stack_property_invariants() {
                         let _ = stack.push(value);
                     }
                     BoundedStackOp::Pop => {
-                        let _ = stack.pop();
+                        let _ = stack.pop);
                     }
                     BoundedStackOp::Peek => {
-                        let _ = stack.peek();
+                        let _ = stack.peek);
                     }
                     BoundedStackOp::Clear => {
-                        stack.clear();
+                        stack.clear);
                     }
                     BoundedStackOp::Validate => {
-                        let _ = stack.validate();
+                        let _ = stack.validate);
                     }
                     BoundedStackOp::CheckCapacity => {
-                        let _ = stack.available_capacity();
-                        let _ = stack.is_full();
+                        let _ = stack.available_capacity);
+                        let _ = stack.is_full);
                         let _ = stack.len();
                     }
                 }
-            });
+            };
             
             // Operations should not panic for valid inputs
             assert!(result.is_ok(), "BoundedStack operation panicked unexpectedly");
         }
         
         // Final validation should always succeed for properly used collections
-        let final_validation = stack.validate();
+        let final_validation = stack.validate);
         assert!(final_validation.is_ok(), "Final validation failed for BoundedStack");
     }
 }
@@ -170,14 +170,14 @@ fn test_verification_levels_behavior() {
     for &capacity in &capacities {
         for &level in &levels {
             // Test BoundedVec
-            let mut vec = BoundedVec::<u32>::with_capacity_and_verification(capacity, level);
-            vec.push(42).expect("Push should succeed");
-            vec.validate().expect("Validation should succeed");
+            let mut vec = BoundedVec::<u32>::with_capacity_and_verification(capacity, level;
+            vec.push(42).expect(".expect("Push should succeed"));")
+            vec.validate().expect(".expect("Validation should succeed"));")
             
             // Test BoundedStack
-            let mut stack = BoundedStack::<u32>::with_capacity_and_verification(capacity, level);
-            stack.push(42).expect("Push should succeed");
-            stack.validate().expect("Validation should succeed");
+            let mut stack = BoundedStack::<u32>::with_capacity_and_verification(capacity, level;
+            stack.push(42).expect(".expect("Push should succeed"));")
+            stack.validate().expect(".expect("Validation should succeed"));")
         }
     }
 }

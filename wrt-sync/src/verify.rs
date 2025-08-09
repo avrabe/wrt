@@ -10,7 +10,10 @@
 #[cfg(any(doc, kani))]
 /// Formal verification module for Kani proofs
 pub mod kani_verification {
-    use crate::{prelude::*, *};
+    use crate::{
+        prelude::*,
+        *,
+    };
 
     // --- WrtMutex Verification ---
 
@@ -20,11 +23,11 @@ pub mod kani_verification {
     pub fn verify_mutex_no_data_races() {
         let initial_value: i32 = kani::any();
         let m = WrtMutex::new(initial_value);
-        
+
         // Simulate sequence of operations that could race
         let op_count: usize = kani::any();
         kani::assume(op_count <= 5); // Limit for bounded verification
-        
+
         for _ in 0..op_count {
             let operation: u8 = kani::any();
             match operation % 3 {
@@ -33,23 +36,23 @@ pub mod kani_verification {
                     let guard = m.lock();
                     let _value = *guard;
                     // Guard automatically drops, releasing lock
-                }
+                },
                 1 => {
                     // Write operation
                     let mut guard = m.lock();
                     let increment: i32 = kani::any();
                     kani::assume(increment.abs() < 1000); // Prevent overflow
                     *guard = guard.saturating_add(increment);
-                }
+                },
                 _ => {
                     // Read-modify-write operation
                     let mut guard = m.lock();
                     let old_value = *guard;
                     *guard = old_value.saturating_mul(2);
-                }
+                },
             }
         }
-        
+
         // Verify mutex state is still valid
         let final_guard = m.lock();
         let _final_value = *final_guard;
@@ -107,10 +110,10 @@ pub mod kani_verification {
     pub fn verify_rwlock_concurrent_access() {
         let initial_value: i32 = kani::any();
         let lock = WrtRwLock::new(initial_value);
-        
+
         // Simulate concurrent reader/writer patterns
         let access_pattern: u8 = kani::any();
-        
+
         match access_pattern % 4 {
             0 => {
                 // Multiple readers scenario
@@ -120,7 +123,7 @@ pub mod kani_verification {
                 assert_eq!(*r1, initial_value);
                 drop(r1);
                 drop(r2);
-            }
+            },
             1 => {
                 // Writer then reader scenario
                 {
@@ -135,7 +138,7 @@ pub mod kani_verification {
                     // but we can verify the read succeeds)
                     let _value = *reader;
                 }
-            }
+            },
             2 => {
                 // Reader then writer scenario
                 {
@@ -146,13 +149,13 @@ pub mod kani_verification {
                     let mut writer = lock.write();
                     *writer = writer.saturating_add(1);
                 }
-            }
+            },
             _ => {
                 // Sequential write operations
                 let increment1: i32 = kani::any();
                 let increment2: i32 = kani::any();
                 kani::assume(increment1.abs() < 100 && increment2.abs() < 100);
-                
+
                 {
                     let mut writer = lock.write();
                     *writer = writer.saturating_add(increment1);
@@ -161,7 +164,7 @@ pub mod kani_verification {
                     let mut writer = lock.write();
                     *writer = writer.saturating_add(increment2);
                 }
-            }
+            },
         }
     }
 
@@ -232,55 +235,59 @@ pub mod kani_verification {
 
     // --- Atomic Operations Safety ---
 
-    /// Verify atomic operations maintain safety under concurrent access patterns
+    /// Verify atomic operations maintain safety under concurrent access
+    /// patterns
     #[cfg_attr(kani, kani::proof)]
     #[cfg_attr(kani, kani::unwind(5))]
     pub fn verify_atomic_operations_safety() {
-        use core::sync::atomic::{AtomicU32, Ordering};
-        
+        use core::sync::atomic::{
+            AtomicU32,
+            Ordering,
+        };
+
         let atomic_counter = AtomicU32::new(0);
-        
+
         // Simulate concurrent operations
         let op_count: usize = kani::any();
         kani::assume(op_count <= 5);
-        
+
         for _ in 0..op_count {
             let operation: u8 = kani::any();
             match operation % 4 {
                 0 => {
                     // Atomic load
                     let _value = atomic_counter.load(Ordering::SeqCst);
-                }
+                },
                 1 => {
                     // Atomic store
                     let new_value: u32 = kani::any();
                     kani::assume(new_value < 1000); // Reasonable bounds
                     atomic_counter.store(new_value, Ordering::SeqCst);
-                }
+                },
                 2 => {
                     // Atomic fetch_add
                     let increment: u32 = kani::any();
                     kani::assume(increment < 10); // Prevent overflow
                     let _old_value = atomic_counter.fetch_add(increment, Ordering::SeqCst);
-                }
+                },
                 _ => {
                     // Atomic compare_exchange
                     let expected: u32 = kani::any();
                     let desired: u32 = kani::any();
                     kani::assume(expected < 1000 && desired < 1000);
-                    
+
                     let _result = atomic_counter.compare_exchange(
-                        expected, 
-                        desired, 
-                        Ordering::SeqCst, 
-                        Ordering::SeqCst
+                        expected,
+                        desired,
+                        Ordering::SeqCst,
+                        Ordering::SeqCst,
                     );
                     // Result can be Ok(expected) or Err(actual_value)
                     // Both cases are valid for atomic operations
-                }
+                },
             }
         }
-        
+
         // Verify final state is still accessible
         let _final_value = atomic_counter.load(Ordering::SeqCst);
     }

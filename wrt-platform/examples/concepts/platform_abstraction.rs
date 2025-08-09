@@ -109,11 +109,11 @@ fn show_vxworks_integration_example() {
     println!("       use_memory_partitions: context == VxWorksContext::Lkm,");
     println!("       priority_inheritance: true,");
     println!("       ..Default::default()");
-    println!("   }});");
+    println!("   }});";
     println!("   ");
     println!("   // Create WRT components");
-    println!("   let allocator = platform.create_allocator_boxed()?;");
-    println!("   let futex = platform.create_futex_boxed()?;");
+    println!("   let allocator = platform.create_allocator_boxed()?;";
+    println!("   let futex = platform.create_futex_boxed()?;";
     println!("   ```");
     
     println!("\n   Integration with WRT:");
@@ -125,7 +125,7 @@ fn show_vxworks_integration_example() {
     println!("       // Generic WRT runtime code");
     println!("   }}");
     println!("   ");
-    println!("   use_with_wrt(allocator, futex);");
+    println!("   use_with_wrt(allocator, futex);";
     println!("   ```");
     
     println!("\n   Platform-Specific Features:");
@@ -160,7 +160,7 @@ fn demonstrate_trait_integration() {
     
     let futex = SpinFutexBuilder::new()
         .with_initial_value(0)
-        .build();
+        .build());
     
     println!("\n   Created SpinFutex example:");
     
@@ -225,15 +225,15 @@ fn show_external_crate_template() {
     println!("   use wrt_platform_myos::MyOsPlatform;");
     println!("   ");
     println!("   fn main() -> Result<(), Box<dyn std::error::Error>> {{");
-    println!("       let platform = MyOsPlatform::detect()?;");
-    println!("       let allocator = platform.create_allocator_boxed()?;");
-    println!("       let futex = platform.create_futex_boxed()?;");
+    println!("       let platform = MyOsPlatform::detect()?;";
+    println!("       let allocator = platform.create_allocator_boxed()?;";
+    println!("       let futex = platform.create_futex_boxed()?;";
     println!("       ");
     println!("       // Use with WRT runtime");
     println!("       let runtime = wrt::Runtime::builder()");
     println!("           .with_allocator(allocator)");
     println!("           .with_futex(futex)");
-    println!("           .build()?;");
+    println!("           .build()?;";
     println!("       ");
     println!("       Ok(())");
     println!("   }}");

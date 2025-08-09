@@ -9,7 +9,10 @@
 
 #[cfg(feature = "kani")]
 use kani;
-use wrt_sync::{prelude::*, *};
+use wrt_sync::{
+    prelude::*,
+    *,
+};
 
 // --- WrtMutex Harnesses ---
 

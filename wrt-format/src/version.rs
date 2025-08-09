@@ -257,15 +257,9 @@ impl VersionInfo {
 }
 
 // Manual trait implementations for no_std compatibility with BoundedMap
-#[cfg(not(any(feature = "std")))]
-mod no_std_traits {
-    use wrt_foundation::traits::{
-        Checksummable, FromBytes, ToBytes,
-    };
+use wrt_foundation::traits::{Checksummable, FromBytes, ToBytes};
 
-    use super::*;
-
-    impl Checksummable for ComponentModelFeature {
+impl Checksummable for ComponentModelFeature {
         fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
             checksum.update(*self as u8);
         }
@@ -280,7 +274,7 @@ mod no_std_traits {
             &self,
             writer: &mut wrt_foundation::traits::WriteStream<'a>,
             _provider: &PStream,
-        ) -> wrt_foundation::WrtResult<()> {
+        ) -> wrt_error::Result<()> {
             writer.write_u8(*self as u8)
         }
     }
@@ -289,7 +283,7 @@ mod no_std_traits {
         fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
             reader: &mut wrt_foundation::traits::ReadStream<'a>,
             _provider: &PStream,
-        ) -> wrt_foundation::WrtResult<Self> {
+        ) -> wrt_error::Result<Self> {
             let byte = reader.read_u8()?;
             match byte {
                 0 => Ok(ComponentModelFeature::CoreModule),
@@ -304,11 +298,7 @@ mod no_std_traits {
                 9 => Ok(ComponentModelFeature::Export),
                 10 => Ok(ComponentModelFeature::Value),
                 11 => Ok(ComponentModelFeature::ResourceTypes),
-                _ => Err(wrt_error::Error::new(
-                    wrt_error::ErrorCategory::Parse,
-                    wrt_error::codes::INVALID_VALUE,
-                    "Invalid ComponentModelFeature enum value",
-                )),
+                _ => Err(wrt_error::Error::runtime_execution_error("Invalid ComponentModelFeature value")),
             }
         }
     }
@@ -328,7 +318,7 @@ mod no_std_traits {
             &self,
             writer: &mut wrt_foundation::traits::WriteStream<'a>,
             _provider: &PStream,
-        ) -> wrt_foundation::WrtResult<()> {
+        ) -> wrt_error::Result<()> {
             writer.write_u8(*self as u8)
         }
     }
@@ -337,21 +327,18 @@ mod no_std_traits {
         fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
             reader: &mut wrt_foundation::traits::ReadStream<'a>,
             _provider: &PStream,
-        ) -> wrt_foundation::WrtResult<Self> {
+        ) -> wrt_error::Result<Self> {
             let byte = reader.read_u8()?;
             match byte {
                 0 => Ok(FeatureStatus::Unavailable),
                 1 => Ok(FeatureStatus::ExperimentalSupported),
                 2 => Ok(FeatureStatus::FullySupported),
-                _ => Err(wrt_error::Error::new(
-                    wrt_error::ErrorCategory::Parse,
+                _ => Err(wrt_error::Error::new(wrt_error::ErrorCategory::Parse,
                     wrt_error::codes::INVALID_VALUE,
-                    "Invalid FeatureStatus enum value",
-                )),
+                    "Invalid FeatureStatus value")),
             }
         }
     }
-}
 
 #[cfg(test)]
 mod tests {

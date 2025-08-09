@@ -28,17 +28,13 @@ impl MemoryManager {
     ) -> Result<()> {
         // Verify the resource exists
         if !resource_manager.has_resource(id) {
-            return Err(Error::new(
-                wrt_error::ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found"
-            ));
+            return Err(Error::component_not_found("Error occurred";
         }
 
         // Register with the default strategy
-        self.resource_strategies.insert(id, self.default_strategy);
+        self.resource_strategies.insert(id, self.default_strategy;
 
-        Ok(())
+        Ok(()
     }
 
     /// Register a resource with a custom memory strategy
@@ -50,23 +46,19 @@ impl MemoryManager {
     ) -> Result<()> {
         // Verify the resource exists
         if !resource_manager.has_resource(id) {
-            return Err(Error::new(
-                wrt_error::ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_NOT_FOUND,
-                "Component not found"
-            ));
+            return Err(Error::component_not_found("Error occurred";
         }
 
         // Register with the specified strategy
-        self.resource_strategies.insert(id, strategy);
+        self.resource_strategies.insert(id, strategy;
 
-        Ok(())
+        Ok(()
     }
 
     /// Get access to memory for a resource
     pub fn get_memory(&self, id: ResourceId, operation: ResourceOperation) -> Result<Vec<u8>> {
         // Get the strategy for this resource
-        let strategy = self.resource_strategies.get(&id).copied().unwrap_or(self.default_strategy);
+        let strategy = self.resource_strategies.get(&id).copied().unwrap_or(self.default_strategy;
 
         // For the test implementation, we'll just create some dummy data
         // In a real implementation, we would access the actual resource data
@@ -78,7 +70,7 @@ impl MemoryManager {
 
     /// Set the memory strategy for a resource
     pub fn set_strategy(&mut self, id: ResourceId, strategy: MemoryStrategy) {
-        self.resource_strategies.insert(id, strategy);
+        self.resource_strategies.insert(id, strategy;
     }
 
     /// Get the memory strategy for a resource
@@ -88,7 +80,7 @@ impl MemoryManager {
 
     /// Reset all strategies to default
     pub fn reset(&mut self) {
-        self.resource_strategies.clear();
+        self.resource_strategies.clear);
     }
 }
 
@@ -99,29 +91,29 @@ mod tests {
     #[test]
     fn test_memory_manager() {
         let mut resource_manager = ResourceManager::new();
-        let mut memory_manager = MemoryManager::new(MemoryStrategy::Copy);
+        let mut memory_manager = MemoryManager::new(MemoryStrategy::Copy;
 
         // Add a resource
-        let id = resource_manager.add_host_resource(vec![1, 2, 3, 4, 5]);
+        let id = resource_manager.add_host_resource(vec![1, 2, 3, 4, 5];
 
         // Register with memory manager
         memory_manager.register_resource(id, &resource_manager).unwrap();
 
         // Check strategy
-        assert_eq!(memory_manager.get_strategy(id), Some(MemoryStrategy::Copy));
+        assert_eq!(memory_manager.get_strategy(id), Some(MemoryStrategy::Copy;
 
         // Change strategy
-        memory_manager.set_strategy(id, MemoryStrategy::Reference);
-        assert_eq!(memory_manager.get_strategy(id), Some(MemoryStrategy::Reference));
+        memory_manager.set_strategy(id, MemoryStrategy::Reference;
+        assert_eq!(memory_manager.get_strategy(id), Some(MemoryStrategy::Reference;
     }
 
     #[test]
     fn test_invalid_resource_registration() {
         let resource_manager = ResourceManager::new();
-        let mut memory_manager = MemoryManager::new(MemoryStrategy::Copy);
+        let mut memory_manager = MemoryManager::new(MemoryStrategy::Copy;
 
         // Try to register a non-existent resource
-        let result = memory_manager.register_resource(ResourceId(999), &resource_manager);
-        assert!(result.is_err());
+        let result = memory_manager.register_resource(ResourceId(999), &resource_manager;
+        assert!(result.is_err();
     }
 }

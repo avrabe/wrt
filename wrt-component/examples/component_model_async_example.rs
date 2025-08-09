@@ -5,11 +5,25 @@
 
 use wrt_component::{
     async_canonical::AsyncCanonicalAbi,
-    async_types::{Future, FutureHandle, FutureState, Stream, StreamHandle, StreamState},
-    task_manager::{TaskManager, TaskState},
-    ComponentInstanceId, ValType,
+    async_types::{
+        Future,
+        FutureHandle,
+        FutureState,
+        Stream,
+        StreamHandle,
+        StreamState,
+    },
+    task_manager::{
+        TaskManager,
+        TaskState,
+    },
+    ComponentInstanceId,
+    ValType,
 };
-use wrt_foundation::{bounded_collections::BoundedVec, component_value::ComponentValue};
+use wrt_foundation::{
+    bounded_collections::BoundedVec,
+    component_value::ComponentValue,
+};
 
 fn main() {
     println!("=== WebAssembly Component Model Async Example ===\n");
@@ -64,11 +78,11 @@ fn example_stream(
             Ok(None) => {
                 println!("    Stream empty (would block)");
                 break;
-            }
+            },
             Err(e) => {
                 println!("    Error reading: {:?}", e);
                 break;
-            }
+            },
         }
     }
 

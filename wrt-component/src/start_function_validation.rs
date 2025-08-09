@@ -6,9 +6,11 @@ use crate::{
 };
 use core::{fmt, time::Duration};
 use wrt_foundation::{
-    bounded_collections::{BoundedHashMap, BoundedVec},
+    bounded_collections::{BoundedMap, BoundedVec},
     component_value::ComponentValue,
-    safe_memory::SafeMemory,
+    safe_memory::{SafeMemory, NoStdProvider},
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 const MAX_START_FUNCTION_VALIDATIONS: usize = 256;
@@ -130,7 +132,7 @@ pub enum SideEffectSeverity {
 }
 
 pub struct StartFunctionValidator {
-    validations: BoundedHashMap<
+    validations: BoundedMap<
         ComponentInstanceId,
         StartFunctionValidation,
         MAX_START_FUNCTION_VALIDATIONS,
@@ -145,7 +147,7 @@ pub struct StartFunctionValidator {
 impl StartFunctionValidator {
     pub fn new() -> Self {
         Self {
-            validations: BoundedHashMap::new(),
+            validations: BoundedMap::new(provider.clone())?,
             execution_engine: ComponentExecutionEngine::new(),
             post_return_registry: PostReturnRegistry::new(),
             default_timeout_ms: DEFAULT_START_TIMEOUT_MS,
@@ -191,7 +193,7 @@ impl StartFunctionValidator {
             component_id: Some(component_id),
         })?;
 
-        Ok(())
+        Ok(()
     }
 
     pub fn validate_start_function(
@@ -206,16 +208,16 @@ impl StartFunctionValidator {
             })?;
 
         if validation.validation_state != ValidationState::Pending {
-            return Ok(validation.validation_state);
+            return Ok(validation.validation_state;
         }
 
         validation.validation_state = ValidationState::InProgress;
-        let start_time = self.get_current_time();
+        let start_time = self.get_current_time);
 
-        let result = self.perform_validation(component_id, &validation.descriptor);
+        let result = self.perform_validation(component_id, &validation.descriptor;
 
-        let end_time = self.get_current_time();
-        let duration = end_time.saturating_sub(start_time);
+        let end_time = self.get_current_time);
+        let duration = end_time.saturating_sub(start_time;
 
         match result {
             Ok(execution_result) => {
@@ -224,7 +226,7 @@ impl StartFunctionValidator {
                 } else {
                     ValidationState::Failed
                 };
-                validation.execution_result = Some(execution_result);
+                validation.execution_result = Some(execution_result;
             }
             Err(_) => {
                 validation.validation_state = ValidationState::Failed;
@@ -240,9 +242,14 @@ impl StartFunctionValidator {
     pub fn validate_all_pending(
         &mut self,
     ) -> StartFunctionResult<
-        BoundedVec<(ComponentInstanceId, ValidationState), MAX_START_FUNCTION_VALIDATIONS>,
+        BoundedVec<(ComponentInstanceId, ValidationState), MAX_START_FUNCTION_VALIDATIONS, NoStdProvider<65536>>,
     > {
-        let mut results = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let mut results = BoundedVec::new(provider).map_err(|_| StartFunctionError {
+            kind: StartFunctionErrorKind::ResourceLimitExceeded,
+            message: "Failed to create validation results vector".to_string(),
+            component_id: None,
+        })?;
 
         let pending_components: Vec<ComponentInstanceId> = self
             .validations
@@ -271,7 +278,7 @@ impl StartFunctionValidator {
     }
 
     pub fn get_validation_summary(&self) -> ValidationSummary {
-        let mut summary = ValidationSummary::default();
+        let mut summary = ValidationSummary::default());
 
         for validation in self.validations.values() {
             summary.total += 1;
@@ -301,7 +308,7 @@ impl StartFunctionValidator {
             validation.execution_result = None;
             validation.validated_at = 0;
             validation.validation_duration_ms = 0;
-            Ok(())
+            Ok(()
         } else {
             Err(StartFunctionError {
                 kind: StartFunctionErrorKind::StartFunctionNotFound,
@@ -315,8 +322,8 @@ impl StartFunctionValidator {
         &mut self,
         component_id: ComponentInstanceId,
     ) -> StartFunctionResult<()> {
-        self.validations.remove(&component_id);
-        Ok(())
+        self.validations.remove(&component_id;
+        Ok(()
     }
 
     fn validate_descriptor(&self, descriptor: &StartFunctionDescriptor) -> StartFunctionResult<()> {
@@ -325,7 +332,7 @@ impl StartFunctionValidator {
                 kind: StartFunctionErrorKind::InvalidSignature,
                 message: "Start function name cannot be empty".to_string(),
                 component_id: None,
-            });
+            };
         }
 
         if descriptor.timeout_ms == 0 {
@@ -333,7 +340,7 @@ impl StartFunctionValidator {
                 kind: StartFunctionErrorKind::InvalidSignature,
                 message: "Timeout must be greater than zero".to_string(),
                 component_id: None,
-            });
+            };
         }
 
         // Validate parameter types
@@ -343,7 +350,7 @@ impl StartFunctionValidator {
                     kind: StartFunctionErrorKind::InvalidSignature,
                     message: "Parameter name cannot be empty".to_string(),
                     component_id: None,
-                });
+                };
             }
 
             if param.required && param.default_value.is_some() {
@@ -351,11 +358,11 @@ impl StartFunctionValidator {
                     kind: StartFunctionErrorKind::InvalidSignature,
                     message: "Required parameters cannot have default values".to_string(),
                     component_id: None,
-                });
+                };
             }
         }
 
-        Ok(())
+        Ok(()
     }
 
     fn perform_validation(
@@ -363,13 +370,13 @@ impl StartFunctionValidator {
         component_id: ComponentInstanceId,
         descriptor: &StartFunctionDescriptor,
     ) -> StartFunctionResult<StartFunctionExecutionResult> {
-        let start_time = self.get_current_time();
+        let start_time = self.get_current_time);
 
         // Check dependencies first
         self.validate_dependencies(component_id, descriptor)?;
 
         // Prepare execution context
-        let mut execution_context = ExecutionContext::new(component_id);
+        let mut execution_context = ExecutionContext::new(component_id;
 
         // Prepare arguments
         let arguments = self.prepare_arguments(descriptor)?;
@@ -382,8 +389,8 @@ impl StartFunctionValidator {
             descriptor.timeout_ms,
         )?;
 
-        let end_time = self.get_current_time();
-        let execution_time = end_time.saturating_sub(start_time);
+        let end_time = self.get_current_time);
+        let execution_time = end_time.saturating_sub(start_time;
 
         // Analyze side effects
         let side_effects = self.analyze_side_effects(&execution_context)?;
@@ -414,19 +421,24 @@ impl StartFunctionValidator {
             if !self.check_dependency_available(component_id, dependency) {
                 return Err(StartFunctionError {
                     kind: StartFunctionErrorKind::DependencyNotMet,
-                    message: "Component not found",
+                    message: format!("Dependency '{}' not available for component", dependency),
                     component_id: Some(component_id),
-                });
+                };
             }
         }
-        Ok(())
+        Ok(()
     }
 
     fn prepare_arguments(
         &self,
         descriptor: &StartFunctionDescriptor,
-    ) -> StartFunctionResult<BoundedVec<ComponentValue, MAX_START_FUNCTION_PARAMS>, NoStdProvider<65536>> {
-        let mut arguments = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+    ) -> StartFunctionResult<BoundedVec<ComponentValue, MAX_START_FUNCTION_PARAMS, NoStdProvider<65536>>> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let mut arguments = BoundedVec::new(provider).map_err(|_| StartFunctionError {
+            kind: StartFunctionErrorKind::ResourceLimitExceeded,
+            message: "Failed to create arguments vector".to_string(),
+            component_id: None,
+        })?;
 
         for param in descriptor.parameters.iter() {
             let value = if let Some(ref default) = param.default_value {
@@ -434,9 +446,9 @@ impl StartFunctionValidator {
             } else if param.required {
                 return Err(StartFunctionError {
                     kind: StartFunctionErrorKind::ValidationFailed,
-                    message: "Component not found",
+                    message: format!("Required parameter '{}' has no value", param.name),
                     component_id: None,
-                });
+                };
             } else {
                 self.get_default_value_for_type(&param.param_type)
             };
@@ -460,7 +472,7 @@ impl StartFunctionValidator {
     ) -> StartFunctionResult<Option<ComponentValue>> {
         // Create execution state
         let mut execution_state = ExecutionState::new();
-        execution_state.set_timeout(Duration::from_millis(timeout_ms));
+        execution_state.set_timeout(Duration::from_millis(timeout_ms;
 
         // Execute through the execution engine
         match self.execution_engine.call_function(
@@ -472,7 +484,7 @@ impl StartFunctionValidator {
             Ok(result) => Ok(result),
             Err(e) => Err(StartFunctionError {
                 kind: StartFunctionErrorKind::ExecutionFailed,
-                message: "Component not found",
+                message: format!("Failed to execute start function '{}'", function_name),
                 component_id: Some(component_id),
             }),
         }
@@ -481,8 +493,13 @@ impl StartFunctionValidator {
     fn analyze_side_effects(
         &self,
         execution_context: &ExecutionContext,
-    ) -> StartFunctionResult<BoundedVec<SideEffect, 32>, NoStdProvider<65536>> {
-        let mut side_effects = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+    ) -> StartFunctionResult<BoundedVec<SideEffect, 32, NoStdProvider<65536>>> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let mut side_effects = BoundedVec::new(provider).map_err(|_| StartFunctionError {
+            kind: StartFunctionErrorKind::ResourceLimitExceeded,
+            message: "Failed to create side effects vector".to_string(),
+            component_id: None,
+        })?;
 
         // Binary std/no_std choice
         if execution_context.memory_allocations() > 0 {
@@ -535,21 +552,21 @@ impl StartFunctionValidator {
                 // Check for critical side effects
                 let has_critical = side_effects
                     .iter()
-                    .any(|effect| effect.severity == SideEffectSeverity::Critical);
+                    .any(|effect| effect.severity == SideEffectSeverity::Critical;
                 Ok(!has_critical)
             }
             ValidationLevel::Strict => {
                 // Check for any error-level side effects
                 let has_errors =
-                    side_effects.iter().any(|effect| effect.severity >= SideEffectSeverity::Error);
+                    side_effects.iter().any(|effect| effect.severity >= SideEffectSeverity::Error;
                 Ok(!has_errors)
             }
             ValidationLevel::Complete => {
                 // Check for any warnings or above
                 let has_warnings = side_effects
                     .iter()
-                    .any(|effect| effect.severity >= SideEffectSeverity::Warning);
-                Ok(!has_warnings && result.is_some())
+                    .any(|effect| effect.severity >= SideEffectSeverity::Warning;
+                Ok(!has_warnings && result.is_some()
             }
         }
     }
@@ -607,16 +624,30 @@ pub struct ValidationSummary {
     pub total_memory_usage: usize,
 }
 
-pub fn create_start_function_descriptor(name: &str) -> StartFunctionDescriptor {
-    StartFunctionDescriptor {
+pub fn create_start_function_descriptor(name: &str) -> StartFunctionResult<StartFunctionDescriptor> {
+    let parameters_provider = safe_managed_alloc!(65536, CrateId::Component)?;
+    let parameters = BoundedVec::new(parameters_provider).map_err(|_| StartFunctionError {
+        kind: StartFunctionErrorKind::ResourceLimitExceeded,
+        message: "Failed to create parameters vector".to_string(),
+        component_id: None,
+    })?;
+    
+    let dependencies_provider = safe_managed_alloc!(65536, CrateId::Component)?;
+    let dependencies = BoundedVec::new(dependencies_provider).map_err(|_| StartFunctionError {
+        kind: StartFunctionErrorKind::ResourceLimitExceeded,
+        message: "Failed to create dependencies vector".to_string(),
+        component_id: None,
+    })?;
+    
+    Ok(StartFunctionDescriptor {
         name: name.to_string(),
-        parameters: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+        parameters,
         return_type: None,
         required: true,
         timeout_ms: DEFAULT_START_TIMEOUT_MS,
         validation_level: ValidationLevel::Standard,
-        dependencies: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-    }
+        dependencies,
+    })
 }
 
 pub fn create_start_function_param(name: &str, param_type: ValType) -> StartFunctionParam {
@@ -630,25 +661,25 @@ mod tests {
     #[test]
     fn test_start_function_validator_creation() {
         let validator = StartFunctionValidator::new();
-        assert_eq!(validator.default_timeout_ms, DEFAULT_START_TIMEOUT_MS);
-        assert_eq!(validator.default_validation_level, ValidationLevel::Standard);
+        assert_eq!(validator.default_timeout_ms, DEFAULT_START_TIMEOUT_MS;
+        assert_eq!(validator.default_validation_level, ValidationLevel::Standard;
     }
 
     #[test]
     fn test_start_function_descriptor_creation() {
-        let descriptor = create_start_function_descriptor("_start");
-        assert_eq!(descriptor.name, "_start");
+        let descriptor = create_start_function_descriptor("_start").unwrap();
+        assert_eq!(descriptor.name, "_start";
         assert!(descriptor.required);
-        assert_eq!(descriptor.timeout_ms, DEFAULT_START_TIMEOUT_MS);
+        assert_eq!(descriptor.timeout_ms, DEFAULT_START_TIMEOUT_MS;
     }
 
     #[test]
     fn test_start_function_param_creation() {
-        let param = create_start_function_param("argc", ValType::I32);
-        assert_eq!(param.name, "argc");
-        assert_eq!(param.param_type, ValType::I32);
+        let param = create_start_function_param("argc", ValType::I32;
+        assert_eq!(param.name, "argc";
+        assert_eq!(param.param_type, ValType::I32;
         assert!(!param.required);
-        assert!(param.default_value.is_none());
+        assert!(param.default_value.is_none();
     }
 
     #[test]
@@ -656,25 +687,30 @@ mod tests {
         let validator = StartFunctionValidator::new();
 
         // Valid descriptor
-        let valid_descriptor = create_start_function_descriptor("_start");
+        let valid_descriptor = create_start_function_descriptor("_start").unwrap();
         assert!(validator.validate_descriptor(&valid_descriptor).is_ok());
 
         // Invalid descriptor (empty name)
+        let parameters_provider = safe_managed_alloc!(65536, CrateId::Component).unwrap();
+        let parameters = BoundedVec::new(parameters_provider).unwrap();
+        let dependencies_provider = safe_managed_alloc!(65536, CrateId::Component).unwrap();
+        let dependencies = BoundedVec::new(dependencies_provider).unwrap();
+        
         let invalid_descriptor = StartFunctionDescriptor {
             name: String::new(),
-            parameters: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            parameters,
             return_type: None,
             required: true,
             timeout_ms: 1000,
             validation_level: ValidationLevel::Standard,
-            dependencies: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            dependencies,
         };
-        assert!(validator.validate_descriptor(&invalid_descriptor).is_err());
+        assert!(validator.validate_descriptor(&invalid_descriptor).is_err();
     }
 
     #[test]
     fn test_validation_summary() {
-        let summary = ValidationSummary::default();
+        let summary = ValidationSummary::default());
         assert_eq!(summary.total, 0);
         assert_eq!(summary.passed, 0);
         assert_eq!(summary.failed, 0);

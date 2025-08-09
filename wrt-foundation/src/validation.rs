@@ -18,27 +18,37 @@
 extern crate alloc;
 
 // Added BoundedVec for tests
-use wrt_error::ErrorCategory;
+use wrt_error::{
+    ErrorCategory,
+    Result,
+};
 
 #[cfg(test)]
 use crate::bounded::BoundedVec;
-use crate::prelude::{Debug /* Removed format, ToString as _ToString */};
+use crate::prelude::{
+    Debug, // Removed format, ToString as _ToString
+};
 #[cfg(test)]
 use crate::safe_memory::NoStdProvider;
-#[cfg(all(not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 // use std::format; // Removed
 #[cfg(feature = "std")]
 // use std::string::String; // Removed
 // Don't import, use fully qualified paths instead
 // Import traits from the traits module
-use crate::traits::{importance, BoundedCapacity, Checksummed, Validatable};
+use crate::traits::{
+    importance,
+    BoundedCapacity,
+    Checksummed,
+    Validatable,
+};
 
 // START NEW CODE: ValidationError enum
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidationError {
     ChecksumMismatch {
-        expected: crate::verification::Checksum,
-        actual: crate::verification::Checksum,
+        expected:    crate::verification::Checksum,
+        actual:      crate::verification::Checksum,
         description: &'static str,
     },
     // Other validation errors can be added here if needed
@@ -47,14 +57,18 @@ pub enum ValidationError {
 impl core::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::ChecksumMismatch { expected, actual, description } => {
+            Self::ChecksumMismatch {
+                expected,
+                actual,
+                description,
+            } => {
                 // core::write! is more limited than format!
                 // Consider a more structured error or a simple string construction
                 // For now, just basic info.
                 write!(f, "Checksum mismatch in ")?;
                 f.write_str(description)?;
                 write!(f, ": expected {expected}, actual {actual}")
-            }
+            },
         }
     }
 }
@@ -69,7 +83,7 @@ impl From<ValidationError> for crate::Error {
                     description,                     /* Using description as the primary message
                                                       * part */
                 )
-            }
+            },
         }
     }
 }
@@ -138,7 +152,11 @@ pub fn validate_checksum(
     } else {
         // Err(format!("Checksum mismatch in {description}: expected {expected}, actual
         // {actual}")) // Old
-        Err(ValidationError::ChecksumMismatch { expected, actual, description })
+        Err(ValidationError::ChecksumMismatch {
+            expected,
+            actual,
+            description,
+        })
         // New
     }
 }
@@ -146,17 +164,26 @@ pub fn validate_checksum(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{traits::importance, verification::{VerificationLevel, Checksum}};
     // For BoundedVec tests
     #[cfg(feature = "std")]
     use crate::safe_memory::StdProvider;
+    use crate::{
+        traits::importance,
+        verification::{
+            Checksum,
+            VerificationLevel,
+        },
+    };
 
     const TEST_CAPACITY: usize = 10; // For BoundedVec in tests
 
     #[test]
     fn test_should_validate() {
         // Off level should never validate (should_verify for Off is false)
-        assert!(!should_validate(VerificationLevel::Off, importance::CRITICAL));
+        assert!(!should_validate(
+            VerificationLevel::Off,
+            importance::CRITICAL
+        ));
 
         // Full level should always validate
         assert!(should_validate(VerificationLevel::Full, importance::READ));
@@ -193,17 +220,19 @@ mod tests {
         // ];
 
         // New: Using a fixed-size array for test data
-        let items: [(&[u8], &[u8]); 2] =
-            [("key1".as_bytes(), "value1".as_bytes()), ("key2".as_bytes(), "value2".as_bytes())];
+        let items: [(&[u8], &[u8]); 2] = [
+            ("key1".as_bytes(), "value1".as_bytes()),
+            ("key2".as_bytes(), "value2".as_bytes()),
+        ];
 
         let checksum = calculate_keyed_checksum(&items);
 
         // Calculate manually to verify
         let mut expected = Checksum::new();
-        expected.update_slice("key1".as_bytes());
-        expected.update_slice("value1".as_bytes());
-        expected.update_slice("key2".as_bytes());
-        expected.update_slice("value2".as_bytes());
+        expected.update_slice("key1".as_bytes);
+        expected.update_slice("value1".as_bytes);
+        expected.update_slice("key2".as_bytes);
+        expected.update_slice("value2".as_bytes);
 
         assert_eq!(checksum, expected);
     }
@@ -223,11 +252,16 @@ mod tests {
         let err_result = validate_checksum(checksum1, checksum2, "test_diff");
         assert!(err_result.is_err());
         match err_result {
-            Err(ValidationError::ChecksumMismatch { expected, actual, description }) => {
+            Err(ValidationError::ChecksumMismatch {
+                expected,
+                actual,
+                description,
+            }) => {
                 assert_eq!(expected, checksum1);
                 assert_eq!(actual, checksum2);
                 assert_eq!(description, "test_diff");
-            } // _ => panic!("Unexpected error type"), // Not needed if only one variant
+            },
+            Ok(_) => panic!("Expected error but got Ok"),
         }
     }
 }

@@ -1,17 +1,34 @@
 //! Tests for WebAssembly branch hinting and type reflection instructions.
 //!
-//! These tests verify that br_on_null, br_on_non_null, ref.is_null, 
+//! These tests verify that br_on_null, br_on_non_null, ref.is_null,
 //! ref.as_non_null, and ref.eq instructions work correctly.
 
 use wrt_error::Result;
 use wrt_foundation::{
-    types::{Instruction, ValueType, RefType},
-    values::{Value, FuncRef, ExternRef},
+    types::{
+        Instruction,
+        RefType,
+        ValueType,
+    },
+    values::{
+        ExternRef,
+        FuncRef,
+        Value,
+    },
 };
 use wrt_instructions::{
-    branch_hinting::{BrOnNull, BrOnNonNull, BranchHintOp},
-    reference_ops::{RefIsNull, RefAsNonNull, RefEq, ReferenceOp},
+    branch_hinting::{
+        BrOnNonNull,
+        BrOnNull,
+        BranchHintOp,
+    },
     control_ops::ControlOp,
+    reference_ops::{
+        RefAsNonNull,
+        RefEq,
+        RefIsNull,
+        ReferenceOp,
+    },
 };
 
 /// Test br_on_null instruction with various reference types
@@ -94,7 +111,7 @@ fn test_ref_is_null_instruction() -> Result<()> {
     assert_eq!(result, Value::I32(0)); // Should return 0 (false)
 
     // Test with non-reference type should error
-    let result = op.execute(Value::I32(42));
+    let result = op.execute(&Value::I32(42));
     assert!(result.is_err());
 
     Ok(())
@@ -124,7 +141,7 @@ fn test_ref_as_non_null_instruction() -> Result<()> {
     assert!(result.is_err());
 
     // Test with non-reference type - should error
-    let result = op.execute(Value::I32(42));
+    let result = op.execute(&Value::I32(42));
     assert!(result.is_err());
 
     Ok(())
@@ -168,7 +185,7 @@ fn test_ref_eq_instruction() -> Result<()> {
     assert_eq!(result, Value::I32(0)); // funcref != externref
 
     // Test with non-reference types - should error
-    let result = op.execute(Value::I32(42), Value::I32(42));
+    let result = op.execute(&Value::I32(42), &Value::I32(42));
     assert!(result.is_err());
 
     Ok(())
@@ -220,11 +237,11 @@ fn test_integration_workflow() -> Result<()> {
 
     // Test workflow: check if reference is null, then conditionally branch
     let is_null_op = RefIsNull::new();
-    
+
     // Check null funcref
     let is_null_result = is_null_op.execute(null_func.clone())?;
     assert_eq!(is_null_result, Value::I32(1));
-    
+
     // If it's null, br_on_null should branch
     let br_on_null_op = BrOnNull::new(1);
     let should_branch = br_on_null_op.execute(&null_func)?;
@@ -233,7 +250,7 @@ fn test_integration_workflow() -> Result<()> {
     // Check valid funcref
     let is_null_result = is_null_op.execute(valid_func.clone())?;
     assert_eq!(is_null_result, Value::I32(0));
-    
+
     // If it's not null, br_on_non_null should branch
     let br_on_non_null_op = BrOnNonNull::new(2);
     let (should_branch, kept_value) = br_on_non_null_op.execute(&valid_func)?;
@@ -267,31 +284,31 @@ fn test_performance() -> Result<()> {
     let valid_ref = Value::FuncRef(Some(FuncRef { index: 100 }));
 
     let start = Instant::now();
-    
+
     // Perform many operations to test performance
     for _ in 0..10000 {
         let br_on_null = BrOnNull::new(0);
         let _ = br_on_null.execute(&null_ref)?;
-        
+
         let br_on_non_null = BrOnNonNull::new(1);
         let _ = br_on_non_null.execute(&valid_ref)?;
-        
+
         let is_null = RefIsNull::new();
         let _ = is_null.execute(null_ref.clone())?;
-        
+
         let as_non_null = RefAsNonNull::new();
         let _ = as_non_null.execute(valid_ref.clone())?;
-        
+
         let eq_op = RefEq::new();
         let _ = eq_op.execute(valid_ref.clone(), valid_ref.clone())?;
     }
-    
+
     let duration = start.elapsed();
     println!("10000 branch hinting operations took: {:?}", duration);
-    
+
     // Should complete in reasonable time (less than 100ms on modern hardware)
     assert!(duration.as_millis() < 100);
-    
+
     Ok(())
 }
 

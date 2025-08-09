@@ -54,14 +54,14 @@
 //! # }
 //!
 //! // Create your custom strategy
-//! let my_strategy = Arc::new(MyStrategy);
+//! let my_strategy = Arc::new(MyStrategy;
 //!
 //! // Create an interceptor and add your strategy
-//! let mut interceptor = LinkInterceptor::new("my_interceptor");
-//! interceptor.add_strategy(my_strategy);
+//! let mut interceptor = LinkInterceptor::new("my_interceptor";
+//! interceptor.add_strategy(my_strategy;
 //!
 //! // Attach to component or host
-//! // component.with_interceptor(Arc::new(interceptor));
+//! // component.with_interceptor(Arc::new(interceptor;
 //! ```
 
 #![forbid(unsafe_code)] // Rule 2
@@ -79,6 +79,9 @@ extern crate alloc;
 
 // Include prelude for unified imports
 pub mod prelude;
+
+// Bounded infrastructure for intercept collections
+pub mod bounded_intercept;
 
 // Include built-in interception module
 pub mod builtins;
@@ -362,17 +365,13 @@ pub trait LinkInterceptorStrategy: Send + Sync {
     }
 }
 
-/// Simplified strategy pattern for intercepting component linking in `no_std` environments
+/// Simplified strategy pattern for intercepting component linking in `no_std`
+/// environments
 #[cfg(not(feature = "std"))]
 pub trait LinkInterceptorStrategy: Send + Sync {
     /// Called before a function call is made
-    fn before_call(
-        &self,
-        source: &str,
-        target: &str,
-        function: &str,
-        args: &[Value],
-    ) -> Result<()>;
+    fn before_call(&self, source: &str, target: &str, function: &str, args: &[Value])
+        -> Result<()>;
 
     /// Called after a function call completes
     fn after_call(
@@ -419,11 +418,7 @@ pub trait LinkInterceptorStrategy: Send + Sync {
     }
 
     /// Called after a component start function has executed
-    fn after_start(
-        &self,
-        _component_name: &str,
-        _result_data: Option<&[u8]>,
-    ) -> Result<()> {
+    fn after_start(&self, _component_name: &str, _result_data: Option<&[u8]>) -> Result<()> {
         Ok(())
     }
 }
@@ -433,9 +428,9 @@ pub trait LinkInterceptorStrategy: Send + Sync {
 pub struct LinkInterceptor {
     /// Name of this interceptor for identification
     #[cfg(feature = "std")]
-    name: String,
+    name:           String,
     #[cfg(not(feature = "std"))]
-    name: &'static str,
+    name:           &'static str,
     /// Collection of strategies to apply
     #[cfg(feature = "std")]
     pub strategies: Vec<Arc<dyn LinkInterceptorStrategy>>,
@@ -452,14 +447,15 @@ impl LinkInterceptor {
     ///
     /// * `Self` - A new `LinkInterceptor` instance
     #[cfg_attr(not(feature = "std"), allow(unused_variables))]
-    #[must_use] pub fn new(name: &str) -> Self {
-        Self { 
+    #[must_use]
+    pub fn new(name: &str) -> Self {
+        Self {
             #[cfg(feature = "std")]
-            name: name.to_string(), 
+            name:                               name.to_string(),
             #[cfg(not(feature = "std"))]
-            name: "default",
+            name:                               "default",
             #[cfg(feature = "std")]
-            strategies: Vec::new() 
+            strategies:                         Vec::new(),
         }
     }
 
@@ -524,15 +520,18 @@ impl LinkInterceptor {
 
         result
     }
-    
 
     /// Gets the name of this interceptor
     ///
     /// # Returns
     ///
     /// * `&str` - The interceptor name
-    #[must_use] pub fn name(&self) -> &str {
-        self.name
+    #[must_use]
+    pub fn name(&self) -> &str {
+        #[cfg(feature = "std")]
+        return &self.name;
+        #[cfg(not(feature = "std"))]
+        return self.name;
     }
 
     /// Gets the first strategy in this interceptor
@@ -570,7 +569,10 @@ impl LinkInterceptor {
         results: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
     ) -> Result<InterceptionResult> {
         // Create default result (no modifications)
-        let mut result = InterceptionResult { modified: false, modifications: Vec::new() };
+        let mut result = InterceptionResult {
+            modified:      false,
+            modifications: Vec::new(),
+        };
 
         // Process with each strategy
         for strategy in &self.strategies {
@@ -606,13 +608,14 @@ impl LinkInterceptor {
 
         for modification in modifications {
             match modification {
+                Modification::None => {
+                    // No modification needed
+                },
                 Modification::Replace { offset, data } => {
                     let end_offset = offset + data.len();
                     if end_offset > modified_data.len() {
-                        return Err(Error::new(
-                            wrt_error::ErrorCategory::Validation,
-                            wrt_error::codes::VALIDATION_ERROR,
-                            "Replacement range out of bounds",
+                        return Err(Error::runtime_execution_error(
+                            "Replace range exceeds data length",
                         ));
                     }
 
@@ -620,32 +623,30 @@ impl LinkInterceptor {
                     let start = *offset;
                     let end = start + data.len();
                     modified_data[start..end].copy_from_slice(data);
-                }
+                },
                 Modification::Insert { offset, data } => {
                     let start = *offset;
                     if start > modified_data.len() {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Validation,
                             wrt_error::codes::VALIDATION_ERROR,
-                            "Insertion offset out of bounds",
+                            "Insert offset exceeds data length",
                         ));
                     }
 
                     modified_data.splice(start..start, data.iter().cloned());
-                }
+                },
                 Modification::Remove { offset, length } => {
                     let start = *offset;
                     let end = start + length;
                     if end > modified_data.len() {
-                        return Err(Error::new(
-                            wrt_error::ErrorCategory::Validation,
-                            wrt_error::codes::VALIDATION_ERROR,
-                            "Removal range out of bounds",
+                        return Err(Error::runtime_execution_error(
+                            "Remove range exceeds data length",
                         ));
                     }
 
                     modified_data.drain(start..end);
-                }
+                },
             }
         }
 
@@ -654,40 +655,56 @@ impl LinkInterceptor {
 }
 
 /// Result of an interception operation
-#[cfg(feature = "std")]
 #[derive(Debug, Clone)]
 pub struct InterceptionResult {
     /// Whether the data has been modified
-    pub modified: bool,
+    pub modified:      bool,
     /// Modifications to apply to the serialized data
+    #[cfg(feature = "std")]
     pub modifications: Vec<Modification>,
-}
-
-/// Result of an interception operation (`no_std` version)
-#[cfg(not(feature = "std"))]
-#[derive(Debug, Clone)]
-pub struct InterceptionResult {
-    /// Whether the data has been modified
-    pub modified: bool,
+    /// Modifications to apply to the serialized data
+    #[cfg(not(feature = "std"))]
+    pub modifications: wrt_foundation::bounded::BoundedVec<
+        Modification,
+        32,
+        wrt_foundation::safe_memory::NoStdProvider<8192>,
+    >,
 }
 
 /// Modification to apply to serialized data
-#[cfg(feature = "std")]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Modification {
+    /// No modification (default)
+    None,
     /// Replace data at an offset
     Replace {
         /// Byte offset where the replacement starts
         offset: usize,
         /// New data to insert at the offset
-        data: Vec<u8>,
+        #[cfg(feature = "std")]
+        data:   Vec<u8>,
+        /// New data to insert at the offset
+        #[cfg(not(feature = "std"))]
+        data: wrt_foundation::bounded::BoundedVec<
+            u8,
+            256,
+            wrt_foundation::safe_memory::NoStdProvider<4096>,
+        >,
     },
     /// Insert data at an offset
     Insert {
         /// Byte offset where to insert data
         offset: usize,
         /// Data to insert at the offset
-        data: Vec<u8>,
+        #[cfg(feature = "std")]
+        data:   Vec<u8>,
+        /// New data to insert at the offset
+        #[cfg(not(feature = "std"))]
+        data: wrt_foundation::bounded::BoundedVec<
+            u8,
+            256,
+            wrt_foundation::safe_memory::NoStdProvider<4096>,
+        >,
     },
     /// Remove data at an offset with a given length
     Remove {
@@ -698,12 +715,204 @@ pub enum Modification {
     },
 }
 
-/// Modification to apply to serialized data (`no_std` version)
-#[cfg(not(feature = "std"))]
-#[derive(Debug, Clone)]
-pub enum Modification {
-    /// No modifications in `no_std`
-    None,
+impl Default for Modification {
+    fn default() -> Self {
+        Modification::None
+    }
+}
+
+// Implement required traits for BoundedVec compatibility
+impl wrt_foundation::traits::Checksummable for Modification {
+    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
+        match self {
+            Modification::None => {
+                checksum.update_slice(&[0u8]);
+            },
+            Modification::Replace { offset, data } => {
+                checksum.update_slice(&offset.to_le_bytes());
+                checksum.update_slice(&[1u8]); // tag for Replace variant
+                #[cfg(feature = "std")]
+                checksum.update_slice(data);
+                #[cfg(not(feature = "std"))]
+                for i in 0..data.len() {
+                    if let Ok(byte) = data.get(i) {
+                        checksum.update_slice(&[byte]);
+                    }
+                }
+            },
+            Modification::Insert { offset, data } => {
+                checksum.update_slice(&offset.to_le_bytes());
+                checksum.update_slice(&[2u8]); // tag for Insert variant
+                #[cfg(feature = "std")]
+                checksum.update_slice(data);
+                #[cfg(not(feature = "std"))]
+                for i in 0..data.len() {
+                    if let Ok(byte) = data.get(i) {
+                        checksum.update_slice(&[byte]);
+                    }
+                }
+            },
+            Modification::Remove { offset, length } => {
+                checksum.update_slice(&offset.to_le_bytes());
+                checksum.update_slice(&length.to_le_bytes());
+                checksum.update_slice(&[3u8]); // tag for Remove variant
+            },
+        }
+    }
+}
+
+impl wrt_foundation::traits::ToBytes for Modification {
+    fn serialized_size(&self) -> usize {
+        match self {
+            Modification::None => 1, // Just the tag
+            Modification::Replace { data, .. } => {
+                1 + 8 + 4 + data.len() // tag + offset + length + data
+            },
+            Modification::Insert { data, .. } => {
+                1 + 8 + 4 + data.len() // tag + offset + length + data
+            },
+            Modification::Remove { .. } => {
+                1 + 8 + 8 // tag + offset + length
+            },
+        }
+    }
+
+    fn to_bytes_with_provider<'a, P: wrt_foundation::MemoryProvider>(
+        &self,
+        writer: &mut wrt_foundation::traits::WriteStream<'a>,
+        _provider: &P,
+    ) -> wrt_error::Result<()> {
+        match self {
+            Modification::None => {
+                writer.write_u8(0)?; // Tag for None
+            },
+            Modification::Replace { offset, data } => {
+                writer.write_u8(1)?; // Tag for Replace
+                writer.write_usize_le(*offset)?;
+                writer.write_u32_le(data.len() as u32)?;
+                #[cfg(feature = "std")]
+                writer.write_all(data)?;
+                #[cfg(not(feature = "std"))]
+                for i in 0..data.len() {
+                    if let Ok(byte) = data.get(i) {
+                        writer.write_u8(byte)?;
+                    }
+                }
+            },
+            Modification::Insert { offset, data } => {
+                writer.write_u8(2)?; // Tag for Insert
+                writer.write_usize_le(*offset)?;
+                writer.write_u32_le(data.len() as u32)?;
+                #[cfg(feature = "std")]
+                writer.write_all(data)?;
+                #[cfg(not(feature = "std"))]
+                for i in 0..data.len() {
+                    if let Ok(byte) = data.get(i) {
+                        writer.write_u8(byte)?;
+                    }
+                }
+            },
+            Modification::Remove { offset, length } => {
+                writer.write_u8(3)?; // Tag for Remove
+                writer.write_usize_le(*offset)?;
+                writer.write_usize_le(*length)?;
+            },
+        }
+        Ok(())
+    }
+}
+
+impl wrt_foundation::traits::FromBytes for Modification {
+    fn from_bytes_with_provider<'a, P: wrt_foundation::MemoryProvider>(
+        reader: &mut wrt_foundation::traits::ReadStream<'a>,
+        _provider: &P,
+    ) -> wrt_error::Result<Self> {
+        use wrt_error::Error;
+
+        let tag = reader.read_u8()?;
+
+        match tag {
+            0 => Ok(Modification::None),
+            1 => {
+                // Replace variant
+                let offset = reader.read_usize_le()?;
+                let data_len = reader.read_u32_le()? as usize;
+
+                #[cfg(feature = "std")]
+                let data = {
+                    let mut vec = Vec::with_capacity(data_len);
+                    for _ in 0..data_len {
+                        vec.push(reader.read_u8()?);
+                    }
+                    vec
+                };
+                #[cfg(not(feature = "std"))]
+                let data = {
+                    use wrt_foundation::{
+                        bounded::BoundedVec,
+                        budget_aware_provider::CrateId,
+                        safe_managed_alloc,
+                    };
+                    let provider = safe_managed_alloc!(4096, CrateId::Intercept).map_err(|_| {
+                        Error::memory_error("Failed to allocate for modification data")
+                    })?;
+                    let mut bounded_data = BoundedVec::new(provider)
+                        .map_err(|_| Error::memory_error("Failed to create bounded vec"))?;
+                    for _ in 0..data_len {
+                        bounded_data
+                            .push(reader.read_u8()?)
+                            .map_err(|_| Error::memory_error("Failed to push to bounded vec"))?;
+                    }
+                    bounded_data
+                };
+
+                Ok(Modification::Replace { offset, data })
+            },
+            2 => {
+                // Insert variant
+                let offset = reader.read_usize_le()?;
+                let data_len = reader.read_u32_le()? as usize;
+
+                #[cfg(feature = "std")]
+                let data = {
+                    let mut vec = Vec::with_capacity(data_len);
+                    for _ in 0..data_len {
+                        vec.push(reader.read_u8()?);
+                    }
+                    vec
+                };
+                #[cfg(not(feature = "std"))]
+                let data = {
+                    use wrt_foundation::{
+                        bounded::BoundedVec,
+                        budget_aware_provider::CrateId,
+                        safe_managed_alloc,
+                    };
+                    let provider = safe_managed_alloc!(4096, CrateId::Intercept).map_err(|_| {
+                        Error::memory_error("Failed to allocate for modification data")
+                    })?;
+                    let mut bounded_data = BoundedVec::new(provider)
+                        .map_err(|_| Error::memory_error("Failed to create bounded vec"))?;
+                    for _ in 0..data_len {
+                        bounded_data
+                            .push(reader.read_u8()?)
+                            .map_err(|_| Error::memory_error("Failed to push to bounded vec"))?;
+                    }
+                    bounded_data
+                };
+
+                Ok(Modification::Insert { offset, data })
+            },
+            3 => {
+                // Remove variant
+                let offset = reader.read_usize_le()?;
+                let length = reader.read_usize_le()?;
+
+                Ok(Modification::Remove { offset, length })
+            },
+            _ => Err(Error::parse_error("Unknown Modification variant")),
+        }
+    }
 }
 
 #[cfg(feature = "std")]
@@ -719,21 +928,19 @@ impl std::fmt::Debug for LinkInterceptor {
 #[cfg(not(feature = "std"))]
 impl core::fmt::Debug for LinkInterceptor {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("LinkInterceptor")
-            .field("name", &self.name)
-            .finish()
+        f.debug_struct("LinkInterceptor").field("name", &self.name).finish()
     }
 }
 
 // Duplicate Debug implementation removed
 
-#[cfg(all(test, ))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
     struct TestStrategy {
-        bypass: bool,
-        modify_args: bool,
+        bypass:        bool,
+        modify_args:   bool,
         modify_result: bool,
     }
 
@@ -846,8 +1053,8 @@ mod tests {
 
         fn clone_strategy(&self) -> Arc<dyn LinkInterceptorStrategy> {
             Arc::new(Self {
-                bypass: self.bypass,
-                modify_args: self.modify_args,
+                bypass:        self.bypass,
+                modify_args:   self.modify_args,
                 modify_result: self.modify_result,
             })
         }
@@ -860,7 +1067,10 @@ mod tests {
             _results: &[ComponentValue],
         ) -> Result<Option<Vec<Modification>>> {
             if self.modify_result {
-                Ok(Some(vec![Modification::Replace { offset: 0, data: vec![42] }]))
+                Ok(Some(vec![Modification::Replace {
+                    offset: 0,
+                    data:   vec![42],
+                }]))
             } else {
                 Ok(None)
             }
@@ -869,8 +1079,11 @@ mod tests {
 
     #[test]
     fn test_interceptor_passthrough() {
-        let strategy =
-            Arc::new(TestStrategy { bypass: false, modify_args: false, modify_result: false });
+        let strategy = Arc::new(TestStrategy {
+            bypass:        false,
+            modify_args:   false,
+            modify_result: false,
+        });
 
         let mut interceptor = LinkInterceptor::new("test");
         interceptor.add_strategy(strategy);
@@ -885,8 +1098,11 @@ mod tests {
 
     #[test]
     fn test_interceptor_modify_args() {
-        let strategy =
-            Arc::new(TestStrategy { bypass: false, modify_args: true, modify_result: false });
+        let strategy = Arc::new(TestStrategy {
+            bypass:        false,
+            modify_args:   true,
+            modify_result: false,
+        });
 
         let mut interceptor = LinkInterceptor::new("test");
         interceptor.add_strategy(strategy);
@@ -901,8 +1117,11 @@ mod tests {
 
     #[test]
     fn test_interceptor_modify_result() {
-        let strategy =
-            Arc::new(TestStrategy { bypass: false, modify_args: false, modify_result: true });
+        let strategy = Arc::new(TestStrategy {
+            bypass:        false,
+            modify_args:   false,
+            modify_result: true,
+        });
 
         let mut interceptor = LinkInterceptor::new("test");
         interceptor.add_strategy(strategy);
@@ -917,8 +1136,11 @@ mod tests {
 
     #[test]
     fn test_interceptor_bypass() {
-        let strategy =
-            Arc::new(TestStrategy { bypass: true, modify_args: true, modify_result: false });
+        let strategy = Arc::new(TestStrategy {
+            bypass:        true,
+            modify_args:   true,
+            modify_result: false,
+        });
 
         let mut interceptor = LinkInterceptor::new("test");
         interceptor.add_strategy(strategy);
@@ -932,11 +1154,17 @@ mod tests {
 
     #[test]
     fn test_multiple_strategies() {
-        let strategy1 =
-            Arc::new(TestStrategy { bypass: false, modify_args: true, modify_result: false });
+        let strategy1 = Arc::new(TestStrategy {
+            bypass:        false,
+            modify_args:   true,
+            modify_result: false,
+        });
 
-        let strategy2 =
-            Arc::new(TestStrategy { bypass: false, modify_args: false, modify_result: true });
+        let strategy2 = Arc::new(TestStrategy {
+            bypass:        false,
+            modify_args:   false,
+            modify_result: true,
+        });
 
         let mut interceptor = LinkInterceptor::new("test");
         interceptor.add_strategy(strategy1);
@@ -953,8 +1181,8 @@ mod tests {
 
 // Panic handler disabled to avoid conflicts with other crates
 // The main wrt crate should provide the panic handler
-// #[cfg(all(not(feature = "std"), not(test), not(feature = "disable-panic-handler")))]
-// #[panic_handler]
+// #[cfg(all(not(feature = "std"), not(test), not(feature =
+// "disable-panic-handler")))] #[panic_handler]
 // fn panic(_info: &core::panic::PanicInfo) -> ! {
 //     loop {}
 // }

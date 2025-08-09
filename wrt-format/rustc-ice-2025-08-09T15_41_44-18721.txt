@@ -1,0 +1,28 @@
+thread 'main' panicked at src/tools/rustfmt/src/items.rs:567:10:
+called `Option::unwrap()` on a `None` value
+stack backtrace:
+   0:        0x110fe0dc0 - std::backtrace::Backtrace::create::ha42a5a5bd6141c18
+   1:        0x10f0e2120 - rustc_driver_impl[bab3c31bceb15f1e]::install_ice_hook::{closure#1}
+   2:        0x110ffe81c - std::panicking::panic_with_hook::hf403d8cc1fe624b9
+   3:        0x110ffe3e0 - std::panicking::panic_handler::{{closure}}::h563f63364f65f467
+   4:        0x110ff9864 - std::sys::backtrace::__rust_end_short_backtrace::h6a41ee3fb21cf6fb
+   5:        0x110ffe10c - __rustc[91f234d998cd6254]::rust_begin_unwind
+   6:        0x113d51d54 - core::panicking::panic_fmt::h55116aa2a5d430e0
+   7:        0x113d51dc4 - core::panicking::panic::hbf2ea9acf69b52c0
+   8:        0x113d51cec - core::option::unwrap_failed::h9f1364487b3ebf82
+   9:        0x1027eeaec - <rustfmt_nightly[4a2d1c1c509d81]::visitor::FmtVisitor>::visit_enum
+  10:        0x102840f28 - <rustfmt_nightly[4a2d1c1c509d81]::visitor::FmtVisitor>::visit_item
+  11:        0x102827108 - <rustfmt_nightly[4a2d1c1c509d81]::visitor::FmtVisitor>::visit_items_with_reordering
+  12:        0x1028448f8 - <rustfmt_nightly[4a2d1c1c509d81]::visitor::FmtVisitor>::format_separate_mod
+  13:        0x10274da04 - <rustfmt_nightly[4a2d1c1c509d81]::Session<std[9ee61909fc2eb978]::io::stdio::Stdout>>::format_input_inner::{closure#0}
+  14:        0x10275b7ec - rustfmt[8d96239798e6d84]::format_and_emit_report::<std[9ee61909fc2eb978]::io::stdio::Stdout>
+  15:        0x102759fc0 - rustfmt[8d96239798e6d84]::execute
+  16:        0x102756400 - rustfmt[8d96239798e6d84]::main
+  17:        0x10274b5dc - std[9ee61909fc2eb978]::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  18:        0x10274ba00 - std[9ee61909fc2eb978]::rt::lang_start::<()>::{closure#0}
+  19:        0x110fdeaa4 - std::rt::lang_start_internal::h1118c4b356fd8869
+  20:        0x10275c87c - _main
+
+
+rustc version: 1.91.0-nightly (de3efa79f 2025-08-08)
+platform: aarch64-apple-darwin

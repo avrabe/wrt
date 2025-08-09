@@ -5,7 +5,10 @@
 
 use wrt_error::kinds::PoisonedLockError;
 
-use super::{ResourceId, ResourceTable};
+use super::{
+    ResourceId,
+    ResourceTable,
+};
 use crate::prelude::*;
 
 /// A resource arena for managing resource lifecycles as a group
@@ -18,20 +21,28 @@ pub struct ResourceArena {
     /// Handles to resources managed by this arena
     resources: Vec<u32>,
     /// The resource table used for actual resource management
-    table: Arc<Mutex<ResourceTable>>,
+    table:     Arc<Mutex<ResourceTable>>,
     /// Name of this arena, for debugging
-    name: Option<String>,
+    name:      Option<String>,
 }
 
 impl ResourceArena {
     /// Create a new resource arena with the given resource table
     pub fn new(table: Arc<Mutex<ResourceTable>>) -> Self {
-        Self { resources: Vec::new(), table, name: None }
+        Self {
+            resources: Vec::new(),
+            table,
+            name: None,
+        }
     }
 
     /// Create a new resource arena with the given name
     pub fn new_with_name(table: Arc<Mutex<ResourceTable>>, name: &str) -> Self {
-        Self { resources: Vec::new(), table, name: Some(name.to_string()) }
+        Self {
+            resources: Vec::new(),
+            table,
+            name: Some(name.to_string()),
+        }
     }
 
     /// Create a resource in this arena
@@ -43,13 +54,8 @@ impl ResourceArena {
         type_idx: u32,
         data: Arc<dyn Any + Send + Sync>,
     ) -> Result<u32> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table =
+            self.table.lock().map_err(|e| Error::runtime_poisoned_lock("Error occurred"))?;
 
         let handle = table.create_resource(type_idx, data)?;
         self.resources.push(handle);
@@ -63,13 +69,8 @@ impl ResourceArena {
         data: Arc<dyn Any + Send + Sync>,
         name: &str,
     ) -> Result<u32> {
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table =
+            self.table.lock().map_err(|e| Error::runtime_poisoned_lock("Error occurred"))?;
 
         // Create the resource
         let handle = table.create_resource(type_idx, data)?;
@@ -97,26 +98,16 @@ impl ResourceArena {
 
     /// Get access to a resource
     pub fn get_resource(&self, handle: u32) -> Result<Arc<Mutex<super::Resource>>> {
-        let table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let table =
+            self.table.lock().map_err(|e| Error::runtime_poisoned_lock("Error occurred"))?;
 
         table.get_resource(handle)
     }
 
     /// Check if a resource exists
     pub fn has_resource(&self, id: ResourceId) -> Result<bool> {
-        let table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let table =
+            self.table.lock().map_err(|e| Error::runtime_poisoned_lock("Error occurred"))?;
 
         // First check if it's in our arena
         if !self.resources.contains(&id.0) {
@@ -147,21 +138,12 @@ impl ResourceArena {
     pub fn drop_resource(&mut self, handle: u32) -> Result<()> {
         // First remove it from our tracking
         if !self.remove_resource(handle) {
-            return Err(Error::new(
-                ErrorCategory::Resource,
-                codes::RESOURCE_ERROR,
-                "Component not found",
-            ));
+            return Err(Error::resource_error("Error occurred"));
         }
 
         // Then drop it from the table
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table =
+            self.table.lock().map_err(|e| Error::runtime_poisoned_lock("Error occurred"))?;
 
         table.drop_resource(handle)
     }
@@ -169,16 +151,11 @@ impl ResourceArena {
     /// Release all resources managed by this arena
     pub fn release_all(&mut self) -> Result<()> {
         if self.resources.is_empty() {
-            return Ok(());
+            return Ok();
         }
 
-        let mut table = self.table.lock().map_err(|e| {
-            Error::new(
-                ErrorCategory::Runtime,
-                codes::POISONED_LOCK,
-                PoisonedLockError("Component not found"),
-            )
-        })?;
+        let mut table =
+            self.table.lock().map_err(|e| Error::runtime_poisoned_lock("Error occurred"))?;
 
         let mut error = None;
 

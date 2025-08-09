@@ -3,10 +3,11 @@
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-#[cfg(all(not(feature = "std")))]
+#[cfg(not(feature = "std"))]
+use crate::safe_managed_alloc;
 extern crate alloc;
 
-#[cfg(all(not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 use alloc::format;
 use core::fmt;
 #[cfg(not(feature = "std"))]
@@ -19,13 +20,36 @@ use std::fmt::Debug;
 // #[cfg(feature = "component-model-resources")]
 // use crate::bounded::BoundedVec;
 use crate::{
-    bounded::{BoundedString, BoundedVec, WasmName, MAX_WASM_NAME_LENGTH},
-    prelude::{str, Eq, PartialEq},
+    bounded::{
+        BoundedString,
+        BoundedVec,
+        WasmName,
+        MAX_WASM_NAME_LENGTH,
+    },
+    memory_sizing::{
+        size_classes,
+        MediumProvider,
+    },
+    prelude::{
+        str,
+        Eq,
+        PartialEq,
+    },
     safe_memory::NoStdProvider,
-    traits::{Checksummable, FromBytes, ReadStream, SerializationError, ToBytes, WriteStream},
+    traits::{
+        Checksummable,
+        FromBytes,
+        ReadStream,
+        SerializationError,
+        ToBytes,
+        WriteStream,
+    },
     types::ValueType,
-    verification::{Checksum, VerificationLevel},
-    MemoryProvider, WrtResult,
+    verification::{
+        Checksum,
+        VerificationLevel,
+    },
+    MemoryProvider,
 };
 
 // use crate::prelude::{format, ToString, String as PreludeString, Vec as
@@ -142,11 +166,7 @@ impl core::str::FromStr for ResourceOperation {
             "delete" => Ok(ResourceOperation::Delete),
             "reference" => Ok(ResourceOperation::Reference),
             "dereference" => Ok(ResourceOperation::Dereference),
-            _ => Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Parse,
-                wrt_error::codes::PARSE_ERROR,
-                "Unknown resource operation",
-            )),
+            _ => Err(wrt_error::Error::parse_error("Unknown resource operation")),
         }
     }
 }
@@ -162,14 +182,14 @@ pub enum ResourceRepresentation {
     #[cfg(feature = "std")]
     Record(
         BoundedVec<
-            BoundedString<MAX_RESOURCE_FIELD_NAME_LEN, NoStdProvider<0>>,
+            BoundedString<MAX_RESOURCE_FIELD_NAME_LEN, MediumProvider>,
             MAX_RESOURCE_FIELDS,
-            NoStdProvider<0>,
+            MediumProvider,
         >,
     ),
     /// Aggregate representation with type indices
     #[cfg(feature = "std")]
-    Aggregate(BoundedVec<u32, MAX_RESOURCE_AGGREGATE_IDS, NoStdProvider<0>>),
+    Aggregate(BoundedVec<u32, MAX_RESOURCE_AGGREGATE_IDS, MediumProvider>),
     /// Binary std/no_std choice
     #[cfg(not(feature = "std"))]
     Record,
@@ -208,47 +228,51 @@ impl core::str::FromStr for ResourceRepresentation {
             "record" => {
                 #[cfg(feature = "std")]
                 {
-                    Ok(ResourceRepresentation::Record(
-                        BoundedVec::new(NoStdProvider::default()).map_err(|_e| {
-                            wrt_error::Error::new(
-                                wrt_error::ErrorCategory::Memory,
-                                wrt_error::codes::MEMORY_ALLOCATION_ERROR,
-                                "Failed to create BoundedVec for ResourceRepresentation::Record",
-                            )
-                        })?,
-                    ))
+                    use crate::{
+                        budget_aware_provider::CrateId,
+                        safe_allocation::capability_factories,
+                        verification::VerificationLevel,
+                    };
+
+                    let (vec, _capability) =
+                        capability_factories::safe_static_bounded_vec::<
+                            BoundedString<MAX_RESOURCE_FIELD_NAME_LEN, MediumProvider>,
+                            MAX_RESOURCE_FIELDS,
+                            { size_classes::MEDIUM },
+                        >(CrateId::Foundation, VerificationLevel::Standard)?;
+                    Ok(ResourceRepresentation::Record(vec))
                 }
                 #[cfg(not(feature = "std"))]
                 {
                     Ok(ResourceRepresentation::Record)
                 }
-            }
+            },
             "aggregate" => {
                 #[cfg(feature = "std")]
                 {
-                    Ok(ResourceRepresentation::Aggregate(
-                        BoundedVec::new(NoStdProvider::default()).map_err(|_e| {
-                            wrt_error::Error::new(
-                                wrt_error::ErrorCategory::Memory,
-                                wrt_error::codes::MEMORY_ALLOCATION_ERROR,
-                                "Failed to create BoundedVec for ResourceRepresentation::Aggregate",
-                            )
-                        })?,
-                    ))
+                    use crate::{
+                        budget_aware_provider::CrateId,
+                        safe_allocation::capability_factories,
+                        verification::VerificationLevel,
+                    };
+
+                    let (vec, _capability) =
+                        capability_factories::safe_static_bounded_vec::<
+                            u32,
+                            MAX_RESOURCE_AGGREGATE_IDS,
+                            { size_classes::MEDIUM },
+                        >(CrateId::Foundation, VerificationLevel::Standard)?;
+                    Ok(ResourceRepresentation::Aggregate(vec))
                 }
                 #[cfg(not(feature = "std"))]
                 {
-                    Err(wrt_error::Error::new(
-                        wrt_error::ErrorCategory::Parse,
-                        wrt_error::codes::PARSE_ERROR,
+                    Err(wrt_error::Error::parse_error(
                         "ResourceRepresentation::Aggregate is not available without the 'alloc' \
                          feature",
                     ))
                 }
-            }
-            _ => Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Parse,
-                wrt_error::codes::PARSE_ERROR,
+            },
+            _ => Err(wrt_error::Error::parse_error(
                 "Unknown resource representation",
             )),
         }
@@ -302,7 +326,7 @@ where
             ResourceRepr::Record(fields) => fields.update_checksum(checksum),
             ResourceRepr::List(vt) => vt.update_checksum(checksum),
             ResourceRepr::Aggregate(ids) => ids.update_checksum(checksum),
-            ResourceRepr::Opaque => {} // No data to checksum
+            ResourceRepr::Opaque => {}, // No data to checksum
         }
     }
 }
@@ -323,24 +347,24 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> ToBytes for ResourceRepr<
         &self,
         writer: &mut WriteStream<'a>,
         stream_provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         match self {
             ResourceRepr::Primitive(val_type) => {
                 writer.write_u8(0)?; // Tag for Primitive
                 val_type.to_bytes_with_provider(writer, stream_provider) // ValueType uses stream_provider
-            }
+            },
             ResourceRepr::Record(fields) => {
                 writer.write_u8(1)?; // Tag for Record
                 fields.to_bytes_with_provider(writer, stream_provider) // BoundedVec takes stream_provider
-            }
+            },
             ResourceRepr::List(val_type) => {
                 writer.write_u8(2)?; // Tag for List
                 val_type.to_bytes_with_provider(writer, stream_provider) // ValueType uses stream_provider
-            }
+            },
             ResourceRepr::Aggregate(ids) => {
                 writer.write_u8(3)?; // Tag for Aggregate
                 ids.to_bytes_with_provider(writer, stream_provider) // BoundedVec takes stream_provider
-            }
+            },
             ResourceRepr::Opaque => writer.write_u8(4), // Tag for Opaque
         }
     }
@@ -350,13 +374,13 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> FromBytes for ResourceRep
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         stream_provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let tag = reader.read_u8()?;
         match tag {
             0 => {
                 let val_type = ValueType::from_bytes_with_provider(reader, stream_provider)?;
                 Ok(ResourceRepr::Primitive(val_type))
-            }
+            },
             1 => {
                 let fields = BoundedVec::<
                     BoundedString<MAX_RESOURCE_FIELD_NAME_LEN, P>,
@@ -365,11 +389,11 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> FromBytes for ResourceRep
                 >::from_bytes_with_provider(reader, stream_provider)
                 .map_err(wrt_error::Error::from)?;
                 Ok(ResourceRepr::Record(fields))
-            }
+            },
             2 => {
                 let val_type = ValueType::from_bytes_with_provider(reader, stream_provider)?;
                 Ok(ResourceRepr::List(val_type))
-            }
+            },
             3 => {
                 let ids =
                     BoundedVec::<u32, MAX_RESOURCE_AGGREGATE_IDS, P>::from_bytes_with_provider(
@@ -377,7 +401,7 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> FromBytes for ResourceRep
                         stream_provider,
                     )?;
                 Ok(ResourceRepr::Aggregate(ids))
-            }
+            },
             4 => Ok(ResourceRepr::Opaque),
             _ => Err(SerializationError::Custom("Invalid tag for ResourceRepr").into()),
         }
@@ -388,9 +412,9 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> FromBytes for ResourceRep
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Resource<P: MemoryProvider + Default + Clone + Eq + Debug> {
     /// Unique identifier for the resource.
-    pub id: u32,
+    pub id:             u32,
     /// The representation or type of the resource.
-    pub repr: ResourceRepr<P>,
+    pub repr:           ResourceRepr<P>,
     /// Optional human-readable name for the resource.
     // Using WasmName (which uses BoundedString internally)
     pub name: Option<WasmName<MAX_WASM_NAME_LENGTH, P>>, // MAX_WASM_NAME_LENGTH from bounded.rs
@@ -406,7 +430,12 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> Resource<P> {
         name: Option<WasmName<MAX_WASM_NAME_LENGTH, P>>,
         verification_level: VerificationLevel,
     ) -> Self {
-        Self { id, repr, name, verification_level }
+        Self {
+            id,
+            repr,
+            name,
+            verification_level,
+        }
     }
 
     /// Gets the verification level of the resource.
@@ -438,7 +467,7 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> ToBytes for Resource<P> {
         &self,
         writer: &mut WriteStream<'a>,
         stream_provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.id.to_bytes_with_provider(writer, stream_provider)?; // u32 doesn't use provider, but trait requires it
         self.repr.to_bytes_with_provider(writer, stream_provider)?;
         self.name.to_bytes_with_provider(writer, stream_provider)?;
@@ -451,7 +480,7 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> FromBytes for Resource<P>
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         stream_provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let id = u32::from_bytes_with_provider(reader, stream_provider)?; // u32 doesn't use provider, but trait requires it
         let repr = ResourceRepr::<P>::from_bytes_with_provider(reader, stream_provider)?;
         let name = Option::<WasmName<MAX_WASM_NAME_LENGTH, P>>::from_bytes_with_provider(
@@ -460,7 +489,12 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> FromBytes for Resource<P>
         )?;
         let verification_level =
             VerificationLevel::from_bytes_with_provider(reader, stream_provider)?; // VerificationLevel is simple
-        Ok(Resource { id, repr, name, verification_level })
+        Ok(Resource {
+            id,
+            repr,
+            name,
+            verification_level,
+        })
     }
 }
 
@@ -479,11 +513,11 @@ pub enum ResourceType<P: MemoryProvider + Default + Clone + Eq> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ResourceItem<P: MemoryProvider + Default + Clone + Eq> {
     /// Unique identifier for the resource.
-    pub id: u32,
+    pub id:    u32,
     /// The type of the resource.
     pub type_: ResourceType<P>,
     /// Optional human-readable name for the resource.
-    pub name: Option<WasmName<MAX_WASM_NAME_LENGTH, P>>,
+    pub name:  Option<WasmName<MAX_WASM_NAME_LENGTH, P>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -494,7 +528,7 @@ impl ToBytes for ResourceTableIdx {
         &self,
         writer: &mut WriteStream<'a>,
         _provider: &PStream, // Not used by u32
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.0.to_bytes_with_provider(writer, _provider) // u32's to_bytes
                                                          // doesn't take
                                                          // provider
@@ -505,7 +539,7 @@ impl FromBytes for ResourceTableIdx {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         _provider: &PStream, // Not used by u32
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let val = u32::from_bytes_with_provider(reader, _provider)?; // u32's from_bytes doesn't take provider
         Ok(ResourceTableIdx(val))
     }
@@ -516,16 +550,16 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> ToBytes for ResourceType<
         &self,
         writer: &mut WriteStream<'a>,
         stream_provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         match self {
             ResourceType::Record(fields) => {
                 writer.write_u8(DISCRIMINANT_RESOURCE_TYPE_RECORD)?;
                 fields.to_bytes_with_provider(writer, stream_provider)?
-            }
+            },
             ResourceType::Aggregate(ids) => {
                 writer.write_u8(DISCRIMINANT_RESOURCE_TYPE_AGGREGATE)?;
                 ids.to_bytes_with_provider(writer, stream_provider)?
-            }
+            },
         }
         Ok(())
     }
@@ -535,7 +569,7 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> FromBytes for ResourceTyp
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         stream_provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let tag = reader.read_u8()?;
         match tag {
             DISCRIMINANT_RESOURCE_TYPE_RECORD => {
@@ -547,7 +581,7 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> FromBytes for ResourceTyp
                 >::from_bytes_with_provider(reader, stream_provider)
                 .map_err(wrt_error::Error::from)?;
                 Ok(ResourceType::Record(fields))
-            }
+            },
             DISCRIMINANT_RESOURCE_TYPE_AGGREGATE => {
                 // Read the aggregate IDs
                 let ids =
@@ -556,8 +590,177 @@ impl<P: MemoryProvider + Default + Clone + Eq + Debug> FromBytes for ResourceTyp
                         stream_provider,
                     )?;
                 Ok(ResourceType::Aggregate(ids))
-            }
+            },
             _ => Err(SerializationError::Custom("Invalid tag for ResourceType").into()),
         }
+    }
+}
+
+/// Kani verification proofs for resource operations
+#[cfg(kani)]
+mod kani_proofs {
+    use super::*;
+
+    /// Verify that ResourceId creation and equality work correctly
+    #[kani::proof]
+    fn verify_resource_id_operations() {
+        let id1 = ResourceId(42);
+        let id2 = ResourceId(42);
+        let id3 = ResourceId(43);
+
+        // Same values should be equal
+        assert_eq!(id1, id2);
+        assert_ne!(id1, id3);
+
+        // Hash should be consistent
+        use core::hash::{
+            Hash,
+            Hasher,
+        };
+        let mut hasher1 = core::hash::SipHasher::new();
+        let mut hasher2 = core::hash::SipHasher::new();
+
+        id1.hash(&mut hasher1);
+        id2.hash(&mut hasher2);
+
+        assert_eq!(hasher1.finish(), hasher2.finish());
+    }
+
+    /// Verify resource operation permission checking
+    #[kani::proof]
+    fn verify_resource_operation_permissions() {
+        let read_op = ResourceOperation::Read;
+        let write_op = ResourceOperation::Write;
+        let execute_op = ResourceOperation::Execute;
+        let create_op = ResourceOperation::Create;
+
+        // Read operations
+        assert!(read_op.requires_read());
+        assert!(!read_op.requires_write());
+        assert!(execute_op.requires_read());
+
+        // Write operations
+        assert!(write_op.requires_write());
+        assert!(!write_op.requires_read());
+        assert!(create_op.requires_write());
+
+        // Operations should be consistent
+        for op in [
+            ResourceOperation::Read,
+            ResourceOperation::Write,
+            ResourceOperation::Execute,
+            ResourceOperation::Create,
+            ResourceOperation::Delete,
+            ResourceOperation::Reference,
+            ResourceOperation::Dereference,
+        ] {
+            // No operation should require both read and write simultaneously
+            // (unless explicitly designed that way)
+            let read_req = op.requires_read();
+            let write_req = op.requires_write();
+
+            // At least one permission should be required
+            assert!(read_req || write_req);
+        }
+    }
+
+    /// Verify resource type serialization roundtrip
+    #[kani::proof]
+    fn verify_resource_type_serialization() {
+        // Note: Using default here is safe in Kani proofs for verification purposes
+        let provider = crate::memory_sizing::SmallProvider::default();
+
+        // Test primitive resource type
+        let primitive =
+            ResourceType::<crate::memory_sizing::SmallProvider>::Primitive(ValueType::I32);
+
+        // Serialize
+        let mut buffer = [0u8; 256];
+        let mut write_stream = WriteStream::new(&mut buffer[..]);
+        primitive.to_bytes_with_provider(&mut write_stream, &provider).unwrap();
+
+        // Deserialize
+        let mut read_stream = ReadStream::new(&buffer[..write_stream.position()]);
+        let deserialized =
+            ResourceType::from_bytes_with_provider(&mut read_stream, &provider).unwrap();
+
+        // Should be equal
+        assert_eq!(primitive, deserialized);
+    }
+
+    /// Verify resource handle uniqueness and validity
+    #[kani::proof]
+    fn verify_resource_handle_properties() {
+        let handle1 = ResourceHandle::new();
+        let handle2 = ResourceHandle::new();
+
+        // Handles should be unique (assuming monotonic ID generation)
+        // This depends on implementation details
+        assert_ne!(handle1.id(), handle2.id());
+
+        // Handles should be valid when created
+        assert!(handle1.is_valid());
+        assert!(handle2.is_valid());
+    }
+
+    /// Verify resource bounds checking
+    #[kani::proof]
+    fn verify_resource_bounds_checking() {
+        const MAX_RESOURCES: usize = 16;
+        // Note: Using default here is safe in Kani proofs for verification purposes
+        let provider = crate::memory_sizing::MediumProvider::default();
+
+        // Create a resource collection with bounded capacity
+        let mut resources: BoundedVec<ResourceId, MAX_RESOURCES, _> =
+            BoundedVec::new(provider).unwrap();
+
+        // Fill to capacity
+        for i in 0..MAX_RESOURCES {
+            let id = ResourceId(i as u64);
+            assert!(resources.push(id).is_ok());
+        }
+
+        // Should be at capacity
+        assert!(resources.is_full());
+        assert_eq!(resources.len(), MAX_RESOURCES);
+
+        // Adding more should fail
+        let overflow_id = ResourceId(MAX_RESOURCES as u64);
+        assert!(resources.push(overflow_id).is_err());
+
+        // Length should remain unchanged
+        assert_eq!(resources.len(), MAX_RESOURCES);
+    }
+
+    /// Verify resource access pattern safety
+    #[kani::proof]
+    fn verify_resource_access_safety() {
+        // Note: Using default here is safe in Kani proofs for verification purposes
+        let provider = crate::memory_sizing::SmallProvider::default();
+        let mut resources: BoundedVec<ResourceHandle, 8, _> = BoundedVec::new(provider).unwrap();
+
+        // Add some resources
+        let handle1 = ResourceHandle::new();
+        let handle2 = ResourceHandle::new();
+
+        resources.push(handle1).unwrap();
+        resources.push(handle2).unwrap();
+
+        // Valid access
+        assert!(resources.get(0).unwrap().is_some());
+        assert!(resources.get(1).unwrap().is_some());
+
+        // Invalid access returns None safely
+        assert!(resources.get(2).unwrap().is_none());
+        assert!(resources.get(100).unwrap().is_none());
+
+        // Remove a resource
+        let removed = resources.pop().unwrap();
+        assert!(removed.is_some());
+        assert_eq!(resources.len(), 1);
+
+        // Access patterns should still be safe
+        assert!(resources.get(0).unwrap().is_some());
+        assert!(resources.get(1).unwrap().is_none());
     }
 }

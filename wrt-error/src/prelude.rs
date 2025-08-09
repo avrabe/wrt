@@ -27,18 +27,33 @@
 // };
 pub use core::{
     any::Any,
-    cmp::{Eq, Ord, PartialEq, PartialOrd},
-    convert::{TryFrom, TryInto},
+    cmp::{
+        Eq,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    },
+    convert::{
+        TryFrom,
+        TryInto,
+    },
     fmt,
-    fmt::{Debug, Display},
+    fmt::{
+        Debug,
+        Display,
+    },
     marker::PhantomData,
     mem,
-    ops::{Deref, DerefMut},
-    slice, str,
+    ops::{
+        Deref,
+        DerefMut,
+    },
+    slice,
+    str,
 };
 
 // Re-export from std when the std feature is enabled
-// #[cfg(feature = \"std\")]
+// #[cfg(feature = "std")]
 // pub use std::{
 //     boxed::Box,
 //     collections::{HashMap, HashSet},
@@ -54,13 +69,31 @@ pub use crate::helpers::*;
 pub use crate::{
     codes,
     kinds::{
-        self, ComponentError, InvalidType, OutOfBoundsError, ParseError, PoisonedLockError,
-        ResourceError, RuntimeError, ValidationError,
+        self,
+        ComponentError,
+        InvalidType,
+        OutOfBoundsError,
+        ParseError,
+        PoisonedLockError,
+        ResourceError,
+        RuntimeError,
+        ValidationError,
     },
-    Error, ErrorCategory, ErrorSource, FromError, Result, ToErrorCategory,
+    Error,
+    ErrorCategory,
+    ErrorSource,
+    FromError,
+    Result,
+    ToErrorCategory,
 };
 // Re-export error factory functions
 pub use crate::{
-    component_error, invalid_type, out_of_bounds_error, parse_error, poisoned_lock_error,
-    resource_error, runtime_error, validation_error,
+    component_error,
+    invalid_type,
+    out_of_bounds_error,
+    parse_error,
+    poisoned_lock_error,
+    resource_error,
+    runtime_error,
+    validation_error,
 };

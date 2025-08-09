@@ -73,7 +73,7 @@ pub struct MemoryAccessOutOfBoundsError {
     /// The memory address that was accessed
     pub address: u64,
     /// The length of memory being accessed
-    pub length: u64,
+    pub length:  u64,
 }
 
 /// Type mismatch error
@@ -203,7 +203,7 @@ pub struct MalformedWasm30TypeInformationSection(pub &'static str);
 #[derive(Debug, Clone, Copy)]
 pub struct InvalidMemoryIndexWasm30 {
     /// The invalid memory index that was used.
-    pub index: u32,
+    pub index:        u32,
     /// The maximum number of allowed memories (if applicable).
     pub max_memories: u32,
 }
@@ -216,9 +216,9 @@ pub struct UnknownOpcodeForVersion {
     /// Minor version number of Wasm.
     pub version_minor: u16,
     /// The first byte of the opcode.
-    pub opcode_byte1: u8,
+    pub opcode_byte1:  u8,
     /// The second byte of the opcode, if it's a multi-byte opcode.
-    pub opcode_byte2: Option<u8>,
+    pub opcode_byte2:  Option<u8>,
 }
 
 /// Error for an invalid import/export kind byte for the detected/specified Wasm
@@ -230,7 +230,7 @@ pub struct InvalidImportExportKindForVersion {
     /// Minor version number of Wasm.
     pub version_minor: u16,
     /// The kind byte that was encountered.
-    pub kind_byte: u8,
+    pub kind_byte:     u8,
 }
 
 /// Helper function for creating `ValidationError`
@@ -497,7 +497,10 @@ pub const fn invalid_memory_index_wasm30(
     index: u32,
     max_memories: u32,
 ) -> InvalidMemoryIndexWasm30 {
-    InvalidMemoryIndexWasm30 { index, max_memories }
+    InvalidMemoryIndexWasm30 {
+        index,
+        max_memories,
+    }
 }
 
 /// Helper function for creating `UnknownOpcodeForVersion`
@@ -508,7 +511,12 @@ pub const fn unknown_opcode_for_version(
     opcode_byte1: u8,
     opcode_byte2: Option<u8>,
 ) -> UnknownOpcodeForVersion {
-    UnknownOpcodeForVersion { version_major, version_minor, opcode_byte1, opcode_byte2 }
+    UnknownOpcodeForVersion {
+        version_major,
+        version_minor,
+        opcode_byte1,
+        opcode_byte2,
+    }
 }
 
 /// Helper function for creating `InvalidImportExportKindForVersion`
@@ -518,7 +526,11 @@ pub const fn invalid_import_export_kind_for_version(
     version_minor: u16,
     kind_byte: u8,
 ) -> InvalidImportExportKindForVersion {
-    InvalidImportExportKindForVersion { version_major, version_minor, kind_byte }
+    InvalidImportExportKindForVersion {
+        version_major,
+        version_minor,
+        kind_byte,
+    }
 }
 
 /// Error when a Wasm 2.0 specific construct is encountered in a context that
@@ -544,7 +556,7 @@ pub struct BulkOperationError {
     /// "table.init").
     pub operation_name: &'static str,
     /// Detailed message about the error.
-    pub reason: &'static str,
+    pub reason:         &'static str,
 }
 
 /// Error specific to Wasm 2.0 SIMD operations.
@@ -554,7 +566,7 @@ pub struct SimdOperationError {
     pub instruction_name: &'static str,
     /// Detailed message about the SIMD error (e.g., invalid lane index, type
     /// mismatch).
-    pub reason: &'static str,
+    pub reason:           &'static str,
 }
 
 /// Error related to Wasm 2.0 tail call instructions.
@@ -582,7 +594,10 @@ pub const fn bulk_operation_error(
     operation_name: &'static str,
     reason: &'static str,
 ) -> BulkOperationError {
-    BulkOperationError { operation_name, reason }
+    BulkOperationError {
+        operation_name,
+        reason,
+    }
 }
 
 /// Creates a new `SimdOperationError` error.
@@ -591,7 +606,10 @@ pub const fn simd_operation_error(
     instruction_name: &'static str,
     reason: &'static str,
 ) -> SimdOperationError {
-    SimdOperationError { instruction_name, reason }
+    SimdOperationError {
+        instruction_name,
+        reason,
+    }
 }
 
 /// Creates a new `TailCallError` error.
@@ -724,7 +742,11 @@ impl core::fmt::Display for PoisonedLockError {
 
 impl core::fmt::Display for MemoryAccessOutOfBoundsError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Memory access out of bounds: address {}, length {}", self.address, self.length)
+        write!(
+            f,
+            "Memory access out of bounds: address {}, length {}",
+            self.address, self.length
+        )
     }
 }
 
@@ -890,13 +912,21 @@ impl core::fmt::Display for InvalidArgumentError {
 
 impl core::fmt::Display for UnsupportedWasm30ConstructInWasm20Module {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Unsupported Wasm 3.0 construct in Wasm 2.0 module: {}", self.construct_name)
+        write!(
+            f,
+            "Unsupported Wasm 3.0 construct in Wasm 2.0 module: {}",
+            self.construct_name
+        )
     }
 }
 
 impl core::fmt::Display for InvalidWasm30InstructionImmediate {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Invalid Wasm 3.0 instruction immediate: {}", self.instruction)
+        write!(
+            f,
+            "Invalid Wasm 3.0 instruction immediate: {}",
+            self.instruction
+        )
     }
 }
 
@@ -954,13 +984,21 @@ impl core::fmt::Display for InvalidReferenceTypeUsage {
 
 impl core::fmt::Display for BulkOperationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Bulk operation error [{}]: {}", self.operation_name, self.reason)
+        write!(
+            f,
+            "Bulk operation error [{}]: {}",
+            self.operation_name, self.reason
+        )
     }
 }
 
 impl core::fmt::Display for SimdOperationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "SIMD operation error [{}]: {}", self.instruction_name, self.reason)
+        write!(
+            f,
+            "SIMD operation error [{}]: {}",
+            self.instruction_name, self.reason
+        )
     }
 }
 

@@ -1,0 +1,154 @@
+// WASI Neural Network Interface
+// This interface is preview-agnostic and uses WIT for type definitions
+
+package wasi:nn@0.2.0;
+
+interface inference {
+    // Tensor data representation
+    type tensor-data = list<u8>;
+    
+    // Opaque graph handle
+    type graph = u32;
+    
+    // Opaque execution context handle
+    type execution-context = u32;
+    
+    // Supported model encodings
+    enum graph-encoding {
+        onnx,
+        tensorflow,
+        pytorch,
+        openvino,
+        tract-native,
+    }
+    
+    // Execution target for optimization hints
+    enum execution-target {
+        cpu,
+        gpu,
+        tpu,
+        npu,
+    }
+    
+    // Tensor data types
+    enum tensor-type {
+        f16,
+        f32,
+        f64,
+        u8,
+        i8,
+        u16,
+        i16,
+        u32,
+        i32,
+        u64,
+        i64,
+        bool,
+    }
+    
+    // Tensor dimensions
+    type tensor-dimensions = list<u32>;
+    
+    // Error types
+    enum error-code {
+        // Invalid argument provided
+        invalid-argument,
+        // Invalid model encoding
+        invalid-encoding,
+        // Runtime error during execution
+        runtime-error,
+        // Resource limits exceeded
+        resource-exhausted,
+        // Operation not supported
+        unsupported-operation,
+        // Model verification failed
+        verification-failed,
+        // Timeout during execution
+        timeout,
+    }
+    
+    // Load a graph from bytes
+    load: func(
+        data: tensor-data,
+        encoding: graph-encoding,
+        target: execution-target,
+    ) -> result<graph, error-code>;
+    
+    // Create an execution context for a graph
+    init-execution-context: func(
+        graph: graph,
+    ) -> result<execution-context, error-code>;
+    
+    // Set input tensor for execution
+    set-input: func(
+        ctx: execution-context,
+        index: u32,
+        tensor: tensor-data,
+        dimensions: tensor-dimensions,
+        tensor-type: tensor-type,
+    ) -> result<_, error-code>;
+    
+    // Execute the inference
+    compute: func(
+        ctx: execution-context,
+    ) -> result<_, error-code>;
+    
+    // Get output tensor from execution
+    get-output: func(
+        ctx: execution-context,
+        index: u32,
+    ) -> result<tuple<tensor-data, tensor-dimensions, tensor-type>, error-code>;
+    
+    // Get output tensor metadata without copying data
+    get-output-metadata: func(
+        ctx: execution-context,
+        index: u32,
+    ) -> result<tuple<tensor-dimensions, tensor-type>, error-code>;
+    
+    // Resource cleanup functions
+    drop-graph: func(graph: graph) -> result<_, error-code>;
+    drop-execution-context: func(ctx: execution-context) -> result<_, error-code>;
+}
+
+// Graph builder interface for constructing models programmatically
+interface graph-builder {
+    use inference.{graph, tensor-type, error-code};
+    
+    type graph-builder = u32;
+    type operation = u32;
+    
+    enum operation-type {
+        input,
+        constant,
+        add,
+        multiply,
+        relu,
+        sigmoid,
+        tanh,
+        concat,
+        reshape,
+        conv2d,
+        maxpool2d,
+        linear,
+    }
+    
+    // Create a new graph builder
+    create-builder: func() -> result<graph-builder, error-code>;
+    
+    // Add operation to graph
+    add-operation: func(
+        builder: graph-builder,
+        op-type: operation-type,
+        inputs: list<operation>,
+        params: list<u8>, // Operation-specific parameters
+    ) -> result<operation, error-code>;
+    
+    // Build the final graph
+    build: func(
+        builder: graph-builder,
+        outputs: list<operation>,
+    ) -> result<graph, error-code>;
+    
+    // Drop the builder
+    drop-builder: func(builder: graph-builder) -> result<_, error-code>;
+}

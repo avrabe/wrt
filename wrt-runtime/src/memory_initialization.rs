@@ -42,11 +42,7 @@ impl RuntimeMemoryManager {
     pub fn initialize(safety_level: SafetyLevel) -> Result<Self> {
         // Step 1: Discover platform limits
         let platform_limits = discover_platform_limits()
-            .map_err(|_| Error::new(
-                ErrorCategory::Platform,
-                codes::PLATFORM_ERROR,
-                "Failed to discover platform memory limits"
-            ))?;
+            .map_err(|_| Error::platform_error("Failed to discover platform memory limits"))?;
 
         // Step 2: Initialize global memory system with platform limits
         #[cfg(feature = "platform-memory")]
@@ -58,7 +54,7 @@ impl RuntimeMemoryManager {
 
         println!("WRT Memory Manager initialized:");
         println!("  Platform: {:?}", platform_limits.platform_id);
-        println!("  Total Budget: {} bytes ({} MB)", total_budget, total_budget / (1024 * 1024));
+        println!("  Total Budget: {} bytes ({} MB)", total_budget, total_budget / (1024 * 1024);
         println!("  Safety Level: {:?}", safety_level);
 
         Ok(Self {
@@ -79,17 +75,13 @@ impl RuntimeMemoryManager {
         component_safety_level: SafetyLevel,
     ) -> Result<Vec<Box<[u8]>>> {
         if self.phase != InitializationPhase::Startup && self.phase != InitializationPhase::PreAllocation {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ERROR,
-                "Cannot pre-allocate: initialization phase complete"
-            ));
+            return Err(Error::memory_error("Cannot pre-allocate: initialization phase complete";
         }
 
         self.phase = InitializationPhase::PreAllocation;
 
         // Register component with budget system
-        let total_component_memory: usize = memory_requirements.iter().map(|(size, _)| *size).sum();
+        let total_component_memory: usize = memory_requirements.iter().map(|(size, _)| *size).sum);
         global_budget()?.register_component(component_id, total_component_memory, component_safety_level)?;
 
         // Pre-allocate all memory for this component
@@ -99,10 +91,10 @@ impl RuntimeMemoryManager {
             component_safety_level,
         )?;
 
-        self.allocated_components.push((component_id, total_component_memory));
+        self.allocated_components.push((component_id, total_component_memory);
 
         println!("Pre-allocated {} bytes for component {} (Safety: {:?})", 
-                 total_component_memory, component_id, component_safety_level);
+                 total_component_memory, component_id, component_safety_level;
 
         Ok(allocated_blocks)
     }
@@ -113,24 +105,20 @@ impl RuntimeMemoryManager {
     /// The system enters runtime mode.
     pub fn lock_system(mut self) -> Result<LockedRuntimeMemoryManager> {
         if self.phase == InitializationPhase::Locked || self.phase == InitializationPhase::Runtime {
-            return Err(Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ERROR,
-                "System already locked"
-            ));
+            return Err(Error::memory_error("System already locked";
         }
 
         // Lock the memory system
         lock_memory_system()?;
         self.phase = InitializationPhase::Locked;
 
-        let total_allocated: usize = self.allocated_components.iter().map(|(_, size)| *size).sum();
-        let utilization = (total_allocated * 100) / self.total_budget.max(1);
+        let total_allocated: usize = self.allocated_components.iter().map(|(_, size)| *size).sum);
+        let utilization = (total_allocated * 100) / self.total_budget.max(1;
 
         println!("Memory system locked:");
-        println!("  Total allocated: {} bytes ({} MB)", total_allocated, total_allocated / (1024 * 1024));
+        println!("  Total allocated: {} bytes ({} MB)", total_allocated, total_allocated / (1024 * 1024);
         println!("  Budget utilization: {}%", utilization);
-        println!("  Components: {}", self.allocated_components.len());
+        println!("  Components: {}", self.allocated_components.len();
 
         Ok(LockedRuntimeMemoryManager {
             phase: InitializationPhase::Locked,
@@ -142,7 +130,7 @@ impl RuntimeMemoryManager {
 
     /// Get current memory statistics
     pub fn memory_stats(&self) -> RuntimeMemoryStats {
-        let total_allocated: usize = self.allocated_components.iter().map(|(_, size)| *size).sum();
+        let total_allocated: usize = self.allocated_components.iter().map(|(_, size)| *size).sum);
         RuntimeMemoryStats {
             phase: self.phase,
             total_budget: self.total_budget,
@@ -176,7 +164,7 @@ impl LockedRuntimeMemoryManager {
 
     /// Get memory statistics for the locked system
     pub fn memory_stats(&self) -> RuntimeMemoryStats {
-        let total_allocated: usize = self.allocated_components.iter().map(|(_, size)| *size).sum();
+        let total_allocated: usize = self.allocated_components.iter().map(|(_, size)| *size).sum);
         RuntimeMemoryStats {
             phase: self.phase,
             total_budget: self.total_budget,
@@ -199,11 +187,7 @@ impl RuntimeExecutionManager {
     pub fn verify_system_integrity(&self) -> Result<()> {
         // Verify memory system is still locked
         if !wrt_foundation::memory_enforcement::is_memory_system_locked() {
-            return Err(Error::new(
-                ErrorCategory::Safety,
-                codes::SAFETY_VIOLATION,
-                "Memory system lock compromised"
-            ));
+            return Err(Error::safety_violation("Memory system lock compromised";
         }
 
         // Additional integrity checks based on safety level
@@ -222,15 +206,11 @@ impl RuntimeExecutionManager {
     /// Verify integrity of component allocations
     fn verify_component_integrity(&self) -> Result<()> {
         // Check that all component allocations are still within budget
-        let stats = global_memory_config().memory_stats();
-        let expected_total: usize = self.allocated_components.iter().map(|(_, size)| *size).sum();
+        let stats = global_memory_config().memory_stats);
+        let expected_total: usize = self.allocated_components.iter().map(|(_, size)| *size).sum);
         
         if stats.allocated > expected_total {
-            return Err(Error::new(
-                ErrorCategory::Safety,
-                codes::SAFETY_VIOLATION,
-                "Unexpected memory allocation detected"
-            ));
+            return Err(Error::safety_violation("Unexpected memory allocation detected";
         }
 
         Ok(())
@@ -238,7 +218,7 @@ impl RuntimeExecutionManager {
 
     /// Get current runtime statistics
     pub fn runtime_stats(&self) -> RuntimeStats {
-        let total_allocated: usize = self.allocated_components.iter().map(|(_, size)| *size).sum();
+        let total_allocated: usize = self.allocated_components.iter().map(|(_, size)| *size).sum);
         RuntimeStats {
             safety_level: self.safety_level,
             total_budget: self.total_budget,
@@ -305,13 +285,13 @@ mod example_usage {
         let locked_manager = memory_manager.lock_system()?;
 
         // Step 4: Enter runtime execution
-        let runtime_manager = locked_manager.enter_runtime();
+        let runtime_manager = locked_manager.enter_runtime);
 
         // Step 5: During runtime, verify system integrity periodically
         runtime_manager.verify_system_integrity()?;
 
         // Step 6: Get runtime statistics
-        let stats = runtime_manager.runtime_stats();
+        let stats = runtime_manager.runtime_stats);
         println!("Runtime stats: {:?}", stats);
 
         Ok(())

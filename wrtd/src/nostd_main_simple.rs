@@ -6,7 +6,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-use heapless::Vec;
+use crate::bounded_wrtd_infra::{
+    BoundedLogEntryVec, WrtdProvider, new_log_entry_vec
+};
 
 /// Configuration for no-std runtime
 #[derive(Debug, Clone)]
@@ -41,8 +43,8 @@ pub struct NoStdStats {
 pub struct NoStdRuntime {
     config: NoStdConfig,
     stats: NoStdStats,
-    // Fixed-size execution log
-    execution_log: Vec<u8, 32>,
+    // Fixed-size execution log using bounded collections
+    execution_log: BoundedLogEntryVec<u8>,
 }
 
 impl NoStdRuntime {
@@ -51,7 +53,7 @@ impl NoStdRuntime {
         Self {
             config,
             stats: NoStdStats::default(),
-            execution_log: Vec::new(),
+            execution_log: new_log_entry_vec(),
         }
     }
     
@@ -73,7 +75,7 @@ impl NoStdRuntime {
         
         self.stats.modules_executed += 1;
         self.stats.fuel_consumed += fuel_used;
-        self.stats.peak_memory = self.stats.peak_memory.max(memory_used);
+        self.stats.peak_memory = self.stats.peak_memory.max(memory_used;
         
         Ok(fuel_used as u32)
     }
@@ -96,8 +98,8 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 
 /// Entry point for no-std mode
 fn main() -> Result<(), u8> {
-    let config = NoStdConfig::default();
-    let mut runtime = NoStdRuntime::new(config);
+    let config = NoStdConfig::default());
+    let mut runtime = NoStdRuntime::new(config;
     
     // Simulate execution with minimal WASM module
     let fake_module = [0x00, 0x61, 0x73, 0x6d]; // WASM magic number

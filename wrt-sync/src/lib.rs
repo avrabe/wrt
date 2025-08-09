@@ -21,7 +21,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-/// Synchronization primitives for Wasmtime, supporting both std and `no_std`
+/// Synchronization primitives for WRT, supporting both std and `no_std`
 /// environments.
 ///
 /// This module provides essential synchronization tools like `WrtMutex` and
@@ -56,8 +56,8 @@ pub mod mutex;
 /// use wrt_sync::{prelude::*, WrtOnce};
 /// static SOME_STATIC: WrtOnce<Vec<i32>> = WrtOnce::new();
 /// fn main() {
-///     let data = SOME_STATIC.get_or_init(|| vec![1,2,3]);
-///     assert_eq!(data, &vec![1,2,3]);
+///     let data = SOME_STATIC.get_or_init(|| vec![1,2,3];
+///     assert_eq!(data, &vec![1,2,3];
 /// }
 /// ```
 pub mod once;
@@ -71,23 +71,42 @@ pub mod prelude {
     pub use core::{
         cell::UnsafeCell,
         fmt,
-        ops::{Deref, DerefMut},
-        sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+        ops::{
+            Deref,
+            DerefMut,
+        },
+        sync::atomic::{
+            AtomicBool,
+            AtomicUsize,
+            Ordering,
+        },
     };
-    
     #[cfg(feature = "std")]
     pub use std::{
         boxed::Box,
         cell::UnsafeCell,
         fmt,
-        ops::{Deref, DerefMut},
+        ops::{
+            Deref,
+            DerefMut,
+        },
         sync::{
-            atomic::{AtomicBool, AtomicUsize, Ordering},
+            atomic::{
+                AtomicBool,
+                AtomicUsize,
+                Ordering,
+            },
             Arc,
             // Note: Mutex, RwLock from std::sync are not re-exported here
             // to avoid conflict with wrt_sync's own types.
         },
-        thread::{self, park as park_thread, sleep, yield_now, JoinHandle},
+        thread::{
+            self,
+            park as park_thread,
+            sleep,
+            yield_now,
+            JoinHandle,
+        },
         time::Duration,
         vec::Vec,
     };
@@ -127,22 +146,35 @@ pub mod unified_sync;
 pub mod verify;
 
 // Re-export types for convenience
-pub use mutex::{WrtMutex, WrtMutexGuard};
+pub use mutex::{
+    WrtMutex,
+    WrtMutexGuard,
+};
 pub use once::WrtOnce;
 // Publicly exported synchronization primitives when the `std` feature is
 // enabled. These are the parking versions.
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 pub use rwlock::parking_impl::{
-    WrtParkingRwLock, WrtParkingRwLockReadGuard, WrtParkingRwLockWriteGuard,
+    WrtParkingRwLock,
+    WrtParkingRwLockReadGuard,
+    WrtParkingRwLockWriteGuard,
 };
 // Re-export the basic (spin-lock) RwLock and its guards.
 // These are always available as they don't depend on std for parking.
-pub use rwlock::{WrtRwLock, WrtRwLockReadGuard, WrtRwLockWriteGuard};
-
+pub use rwlock::{
+    WrtRwLock,
+    WrtRwLockReadGuard,
+    WrtRwLockWriteGuard,
+};
 // Re-export unified synchronization primitives
 pub use unified_sync::{
-    SafeMutex, SafeMutexGuard, BoundedChannel, BoundedSender, BoundedReceiver, SafeAtomicCounter,
+    BoundedChannel,
+    BoundedReceiver,
+    BoundedSender,
+    SafeAtomicCounter,
+    SafeMutex,
+    SafeMutexGuard,
 };
 
 // Convenience aliases for easier importing
@@ -153,8 +185,8 @@ pub type RwLock<T> = WrtRwLock<T>;
 
 // Panic handler disabled to avoid conflicts with other crates
 // The main wrt crate should provide the panic handler
-// #[cfg(all(not(feature = "std"), not(test), not(feature = "disable-panic-handler")))]
-// #[panic_handler]
+// #[cfg(all(not(feature = "std"), not(test), not(feature =
+// "disable-panic-handler")))] #[panic_handler]
 // fn panic(_info: &core::panic::PanicInfo) -> ! {
 //     loop {}
 // }

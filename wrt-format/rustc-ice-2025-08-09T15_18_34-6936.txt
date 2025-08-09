@@ -1,0 +1,27 @@
+thread 'main' panicked at src/tools/rustfmt/src/items.rs:567:10:
+called `Option::unwrap()` on a `None` value
+stack backtrace:
+   0:        0x1136dfb80 - std::backtrace::Backtrace::create::h155045fb57b97ec3
+   1:        0x1117d05dc - rustc_driver_impl[1d09c31650c4f7ad]::install_ice_hook::{closure#1}
+   2:        0x1136fd44c - std::panicking::rust_panic_with_hook::h1111582fd2721c97
+   3:        0x1136fd00c - std::panicking::begin_panic_handler::{{closure}}::h74d74ac905781507
+   4:        0x1136f8514 - std::sys::backtrace::__rust_end_short_backtrace::h4501accf34ee92d1
+   5:        0x1136fcd38 - __rustc[ddaf9348b0c17a67]::rust_begin_unwind
+   6:        0x116338868 - core::panicking::panic_fmt::h49e25520c4c961f6
+   7:        0x1163388d8 - core::panicking::panic::hb5c46388de9780bc
+   8:        0x116338800 - core::option::unwrap_failed::h749b3bd46a1baec8
+   9:        0x105158908 - <rustfmt_nightly[17e5c208a4c519c9]::visitor::FmtVisitor>::visit_item
+  10:        0x1051388b0 - <rustfmt_nightly[17e5c208a4c519c9]::visitor::FmtVisitor>::visit_items_with_reordering
+  11:        0x10515dcf4 - <rustfmt_nightly[17e5c208a4c519c9]::visitor::FmtVisitor>::format_separate_mod
+  12:        0x10505eb1c - <rustfmt_nightly[17e5c208a4c519c9]::Session<std[cedde8cc68c2f8ff]::io::stdio::Stdout>>::format_input_inner::{closure#0}
+  13:        0x10506d5e4 - rustfmt[3d443e945a9f38bd]::format_and_emit_report::<std[cedde8cc68c2f8ff]::io::stdio::Stdout>
+  14:        0x10506b35c - rustfmt[3d443e945a9f38bd]::execute
+  15:        0x105067614 - rustfmt[3d443e945a9f38bd]::main
+  16:        0x10505c614 - std[cedde8cc68c2f8ff]::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  17:        0x10505ca38 - std[cedde8cc68c2f8ff]::rt::lang_start::<()>::{closure#0}
+  18:        0x1136dd8cc - std::rt::lang_start_internal::h126fd70d565579f1
+  19:        0x10506e660 - _main
+
+
+rustc version: 1.90.0-nightly (e46629662 2025-07-17)
+platform: aarch64-apple-darwin

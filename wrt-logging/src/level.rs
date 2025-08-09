@@ -5,13 +5,14 @@
 use core::str::FromStr;
 
 /// Log levels for WebAssembly component logging
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum LogLevel {
     /// Trace-level messages (detailed debugging information)
     Trace,
     /// Debug-level messages (useful for developers)
     Debug,
     /// Informational messages (general runtime information)
+    #[default]
     Info,
     /// Warning messages (potential issues)
     Warn,
@@ -57,7 +58,9 @@ impl FromStr for LogLevel {
             "warn" | "warning" => Ok(Self::Warn),
             "error" | "err" => Ok(Self::Error),
             "critical" | "fatal" => Ok(Self::Critical),
-            _ => Err(ParseLogLevelError { message: "Invalid log level" }),
+            _ => Err(ParseLogLevelError {
+                message: "Invalid log level",
+            }),
         }
     }
 }
@@ -81,7 +84,9 @@ impl FromStr for LogLevel {
         } else if s.eq_ignore_ascii_case("critical") || s.eq_ignore_ascii_case("fatal") {
             Ok(Self::Critical)
         } else {
-            Err(ParseLogLevelError { message: "Invalid log level" })
+            Err(ParseLogLevelError {
+                message: "Invalid log level",
+            })
         }
     }
 }
@@ -133,7 +138,7 @@ mod tests {
 
         // Test error message
         let err = "invalid".parse::<LogLevel>().unwrap_err();
-        assert_eq!(err.invalid_level, "invalid");
+        assert_eq!(err.message, "Invalid log level");
     }
 
     #[test]
@@ -143,7 +148,10 @@ mod tests {
         assert_eq!(LogLevel::from_string_or_default("info"), LogLevel::Info);
         assert_eq!(LogLevel::from_string_or_default("warn"), LogLevel::Warn);
         assert_eq!(LogLevel::from_string_or_default("error"), LogLevel::Error);
-        assert_eq!(LogLevel::from_string_or_default("critical"), LogLevel::Critical);
+        assert_eq!(
+            LogLevel::from_string_or_default("critical"),
+            LogLevel::Critical
+        );
 
         // Test invalid defaults to Info
         assert_eq!(LogLevel::from_string_or_default("invalid"), LogLevel::Info);

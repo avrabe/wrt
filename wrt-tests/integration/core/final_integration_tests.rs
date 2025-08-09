@@ -56,20 +56,20 @@ mod tests {
         let params = vec![i32_type, i64_type];
         let results = vec![i32_type];
         
-        let func_type = FuncType::new(params, results);
+        let func_type = FuncType::new(params, results;
         
-        assert_eq!(func_type.params().len(), 2);
+        assert_eq!(func_type.params().len(), 2;
         assert_eq!(func_type.results().len(), 1);
     }
     
     #[test]
     fn test_value_integration() {
         // Test Value from wrt-foundation
-        let i32_val = Value::I32(42);
-        let f64_val = Value::F64(3.14159);
+        let i32_val = Value::I32(42;
+        let f64_val = Value::F64(3.14159;
         
-        assert_eq!(i32_val.get_type(), ValueType::I32);
-        assert_eq!(f64_val.get_type(), ValueType::F64);
+        assert_eq!(i32_val.get_type(), ValueType::I32;
+        assert_eq!(f64_val.get_type(), ValueType::F64;
     }
     
     #[test]
@@ -78,32 +78,29 @@ mod tests {
         let mut vec = BoundedVec::<u32, 5>::new();
         assert!(vec.push(1).is_ok());
         assert!(vec.push(2).is_ok());
-        assert_eq!(vec.len(), 2);
+        assert_eq!(vec.len(), 2;
         
         // Test BoundedStack from wrt-foundation
         let mut stack = BoundedStack::<u32, 5>::new();
         assert!(stack.push(1).is_ok());
         assert!(stack.push(2).is_ok());
-        assert_eq!(stack.pop(), Some(2));
+        assert_eq!(stack.pop(), Some(2;
     }
     
     #[test]
     fn test_resource_integration() {
         // Test Resource from wrt-foundation
-        let resource_id = ResourceId::new(42);
-        assert_eq!(resource_id.get(), 42);
+        let resource_id = ResourceId::new(42;
+        assert_eq!(resource_id.get(), 42;
     }
     
     #[test]
     fn test_error_integration() {
         // Test Error from wrt-error
-        let error = Error::new(
-            ErrorCategory::Core,
-            1,
-            "Integration test error".to_string(),
-        );
+        let error = Error::runtime_execution_error(".to_string(),
+        ;
         
-        assert_eq!(error.category(), ErrorCategory::Core);
+        assert_eq!(error.category(), ErrorCategory::Core;
         assert_eq!(error.code(), 1);
     }
     
@@ -116,7 +113,7 @@ mod tests {
                 max: Some(2),
             },
             shared: false,
-        });
+        };
         
         // Write and read memory
         let data = [1, 2, 3, 4];
@@ -125,7 +122,7 @@ mod tests {
         let mut buffer = [0; 4];
         assert!(memory.read(100, &mut buffer).is_ok());
         
-        assert_eq!(buffer, data);
+        assert_eq!(buffer, data;
     }
     
     #[test]
@@ -137,7 +134,7 @@ mod tests {
                 min: 1,
                 max: Some(10),
             },
-        });
+        };
         
         assert_eq!(table.size(), 1);
     }
@@ -153,11 +150,11 @@ mod tests {
             Value::I32(42),
         ).unwrap();
         
-        assert_eq!(global.get(), Value::I32(42));
+        assert_eq!(global.get(), Value::I32(42;
         
         // Test mutability
         assert!(global.set(Value::I32(100)).is_ok());
-        assert_eq!(global.get(), Value::I32(100));
+        assert_eq!(global.get(), Value::I32(100;
     }
     
     #[test]
@@ -167,36 +164,36 @@ mod tests {
         assert!(module.exports().is_empty());
         
         // Create a new engine
-        let engine = new_engine();
+        let engine = new_engine);
         assert!(engine.validate_module(&module).is_ok());
     }
     
     #[test]
     fn test_sync_integration() {
         // Test Sync primitives from wrt-sync
-        let atomic = AtomicBool::new(false);
-        atomic.store(true, wrt::sync::atomic::Ordering::SeqCst);
-        assert!(atomic.load(wrt::sync::atomic::Ordering::SeqCst));
+        let atomic = AtomicBool::new(false;
+        atomic.store(true, wrt::sync::atomic::Ordering::SeqCst;
+        assert!(atomic.load(wrt::sync::atomic::Ordering::SeqCst);
         
         // Test Mutex
-        let mutex = Mutex::new(42);
+        let mutex = Mutex::new(42;
         {
-            let mut guard = mutex.lock();
+            let mut guard = mutex.lock);
             *guard = 100;
         }
-        assert_eq!(*mutex.lock(), 100);
+        assert_eq!(*mutex.lock(), 100;
         
         // Test RwLock
-        let rwlock = RwLock::new(vec![1, 2, 3]);
+        let rwlock = RwLock::new(vec![1, 2, 3];
         {
-            let guard = rwlock.read();
-            assert_eq!(*guard, vec![1, 2, 3]);
+            let guard = rwlock.read);
+            assert_eq!(*guard, vec![1, 2, 3];
         }
         {
-            let mut guard = rwlock.write();
+            let mut guard = rwlock.write);
             guard.push(4);
         }
-        assert_eq!(*rwlock.read(), vec![1, 2, 3, 4]);
+        assert_eq!(*rwlock.read(), vec![1, 2, 3, 4];
     }
     
     // This test ensures that all components of WRT can work together
@@ -212,7 +209,7 @@ mod tests {
                 max: Some(2),
             },
             shared: false,
-        });
+        };
         
         // Create globals
         let global = new_global(
@@ -224,13 +221,13 @@ mod tests {
         ).unwrap();
         
         // Create engine
-        let engine = new_engine();
+        let engine = new_engine);
         
         // Validate the module
         assert!(engine.validate_module(&module).is_ok());
         
         // Test serialization if enabled
-        #[cfg(feature = "serialization")]
+        #[cfg(feature = ")]
         {
             use wrt::serialization::{serialize_module, deserialize_module};
             

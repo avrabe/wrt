@@ -3,22 +3,38 @@
 //! This module provides basic AST node definitions that work with the current
 //! wrt-foundation constraints while still providing source location tracking.
 
-#[cfg(feature = "std")]
-use std::{vec::Vec, fmt, boxed::Box};
-#[cfg(all(not(feature = "std")))]
-use std::{vec::Vec, boxed::Box};
 #[cfg(not(feature = "std"))]
 use core::fmt;
+#[cfg(feature = "std")]
+use std::{
+    boxed::Box,
+    fmt,
+    vec::Vec,
+};
+#[cfg(not(feature = "std"))]
+use std::{
+    boxed::Box,
+    vec::Vec,
+};
 
-use crate::wit_parser::{WitBoundedString, WitBoundedStringSmall};
+// Temporarily disabled - wit_parser module is commented out
+// use crate::wit_parser::{WitBoundedString, WitBoundedStringSmall};
+use wrt_foundation::{
+    BoundedString,
+    NoStdProvider,
+};
+
+// Type aliases to replace wit_parser types
+type WitBoundedString = BoundedString<64, NoStdProvider<1024>>;
+type WitBoundedStringSmall = BoundedString<32, NoStdProvider<1024>>;
 
 /// Source location span for AST nodes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct SourceSpan {
     /// Byte offset of the start of this span
-    pub start: u32,
+    pub start:   u32,
     /// Byte offset of the end of this span (exclusive)
-    pub end: u32,
+    pub end:     u32,
     /// Source file identifier
     pub file_id: u32,
 }
@@ -26,12 +42,20 @@ pub struct SourceSpan {
 impl SourceSpan {
     /// Create a new source span
     pub const fn new(start: u32, end: u32, file_id: u32) -> Self {
-        Self { start, end, file_id }
+        Self {
+            start,
+            end,
+            file_id,
+        }
     }
 
     /// Create an empty span (used for synthetic nodes)
     pub const fn empty() -> Self {
-        Self { start: 0, end: 0, file_id: 0 }
+        Self {
+            start:   0,
+            end:     0,
+            file_id: 0,
+        }
     }
 
     /// Get the length of the span in bytes
@@ -46,10 +70,13 @@ impl SourceSpan {
 
     /// Merge two spans to create a span covering both
     pub fn merge(&self, other: &Self) -> Self {
-        assert_eq!(self.file_id, other.file_id, "Cannot merge spans from different files");
+        assert_eq!(
+            self.file_id, other.file_id,
+            "Cannot merge spans from different files"
+        );
         Self {
-            start: self.start.min(other.start),
-            end: self.end.max(other.end),
+            start:   self.start.min(other.start),
+            end:     self.end.max(other.end),
             file_id: self.file_id,
         }
     }
@@ -75,15 +102,15 @@ impl Identifier {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct WitDocument {
     /// Optional package declaration
-    pub package: Option<PackageDecl>,
+    pub package:   Option<PackageDecl>,
     /// Use declarations at the top level
     #[cfg(feature = "std")]
     pub use_items: Vec<UseDecl>,
     /// Top-level items (interfaces, worlds, types)
     #[cfg(feature = "std")]
-    pub items: Vec<TopLevelItem>,
+    pub items:     Vec<TopLevelItem>,
     /// Source span of the entire document
-    pub span: SourceSpan,
+    pub span:      SourceSpan,
 }
 
 /// Package declaration
@@ -92,11 +119,11 @@ pub struct PackageDecl {
     /// Package namespace (e.g., "wasi" in "wasi:cli")
     pub namespace: Identifier,
     /// Package name (e.g., "cli" in "wasi:cli")
-    pub name: Identifier,
+    pub name:      Identifier,
     /// Optional version
-    pub version: Option<Version>,
+    pub version:   Option<Version>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:      SourceSpan,
 }
 
 /// Semantic version
@@ -109,31 +136,31 @@ pub struct Version {
     /// Patch version number
     pub patch: u32,
     /// Optional pre-release identifier
-    pub pre: Option<WitBoundedStringSmall>,
+    pub pre:   Option<WitBoundedStringSmall>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:  SourceSpan,
 }
 
 /// Use declaration for importing items
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct UseDecl {
     /// The path being imported from
-    pub path: UsePath,
+    pub path:  UsePath,
     /// Optional renaming
     pub names: UseNames,
     /// Source span
-    pub span: SourceSpan,
+    pub span:  SourceSpan,
 }
 
 /// Path in a use declaration
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct UsePath {
     /// Optional package prefix (e.g., "wasi:cli" in "use wasi:cli/types")
-    pub package: Option<PackageRef>,
+    pub package:   Option<PackageRef>,
     /// Interface name
     pub interface: Identifier,
     /// Source span
-    pub span: SourceSpan,
+    pub span:      SourceSpan,
 }
 
 /// Package reference in a use path
@@ -142,11 +169,11 @@ pub struct PackageRef {
     /// Namespace
     pub namespace: Identifier,
     /// Package name
-    pub name: Identifier,
+    pub name:      Identifier,
     /// Optional version
-    pub version: Option<Version>,
+    pub version:   Option<Version>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:      SourceSpan,
 }
 
 /// Names being imported in a use declaration
@@ -169,11 +196,11 @@ impl Default for UseNames {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct UseItem {
     /// Original name
-    pub name: Identifier,
+    pub name:    Identifier,
     /// Optional rename (for "as" syntax)
     pub as_name: Option<Identifier>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:    SourceSpan,
 }
 
 /// Top-level items in a WIT document
@@ -204,7 +231,7 @@ pub struct TypeDecl {
     /// Type name
     pub name: Identifier,
     /// Type definition
-    pub def: TypeDef,
+    pub def:  TypeDef,
     /// Documentation comments
     pub docs: Option<Documentation>,
     /// Source span
@@ -273,12 +300,11 @@ impl TypeExpr {
             Self::Primitive(p) => p.span,
             Self::Named(n) => n.span,
             #[cfg(feature = "std")]
-            Self::List(_, span) 
-            | Self::Option(_, span) 
-            | Self::Stream(_, span) 
+            Self::List(_, span)
+            | Self::Option(_, span)
+            | Self::Stream(_, span)
             | Self::Future(_, span) => *span,
-            Self::Own(_, span) 
-            | Self::Borrow(_, span) => *span,
+            Self::Own(_, span) | Self::Borrow(_, span) => *span,
             Self::Result(r) => r.span,
             Self::Tuple(t) => t.span,
         }
@@ -333,9 +359,9 @@ pub struct NamedType {
     /// Package reference (for qualified names)
     pub package: Option<PackageRef>,
     /// Type name
-    pub name: Identifier,
+    pub name:    Identifier,
     /// Source span
-    pub span: SourceSpan,
+    pub span:    SourceSpan,
 }
 
 /// Result type
@@ -343,10 +369,10 @@ pub struct NamedType {
 pub struct ResultType {
     /// Success type
     #[cfg(feature = "std")]
-    pub ok: Option<Box<TypeExpr>>,
+    pub ok:   Option<Box<TypeExpr>>,
     /// Error type
     #[cfg(feature = "std")]
-    pub err: Option<Box<TypeExpr>>,
+    pub err:  Option<Box<TypeExpr>>,
     /// Source span
     pub span: SourceSpan,
 }
@@ -358,7 +384,7 @@ pub struct TupleType {
     #[cfg(feature = "std")]
     pub types: Vec<TypeExpr>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:  SourceSpan,
 }
 
 /// Record type definition
@@ -368,7 +394,7 @@ pub struct RecordType {
     #[cfg(feature = "std")]
     pub fields: Vec<RecordField>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:   SourceSpan,
 }
 
 /// Record field
@@ -377,7 +403,7 @@ pub struct RecordField {
     /// Field name
     pub name: Identifier,
     /// Field type
-    pub ty: TypeExpr,
+    pub ty:   TypeExpr,
     /// Documentation
     pub docs: Option<Documentation>,
     /// Source span
@@ -391,7 +417,7 @@ pub struct VariantType {
     #[cfg(feature = "std")]
     pub cases: Vec<VariantCase>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:  SourceSpan,
 }
 
 /// Variant case
@@ -400,7 +426,7 @@ pub struct VariantCase {
     /// Case name
     pub name: Identifier,
     /// Optional payload type
-    pub ty: Option<TypeExpr>,
+    pub ty:   Option<TypeExpr>,
     /// Documentation
     pub docs: Option<Documentation>,
     /// Source span
@@ -414,7 +440,7 @@ pub struct EnumType {
     #[cfg(feature = "std")]
     pub cases: Vec<EnumCase>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:  SourceSpan,
 }
 
 /// Enum case
@@ -435,7 +461,7 @@ pub struct FlagsType {
     #[cfg(feature = "std")]
     pub flags: Vec<FlagValue>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:  SourceSpan,
 }
 
 /// Flag value
@@ -456,7 +482,7 @@ pub struct ResourceType {
     #[cfg(feature = "std")]
     pub methods: Vec<ResourceMethod>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:    SourceSpan,
 }
 
 /// Resource method
@@ -495,14 +521,14 @@ impl Default for ResourceMethodKind {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct InterfaceDecl {
     /// Interface name
-    pub name: Identifier,
+    pub name:  Identifier,
     /// Interface items
     #[cfg(feature = "std")]
     pub items: Vec<InterfaceItem>,
     /// Documentation
-    pub docs: Option<Documentation>,
+    pub docs:  Option<Documentation>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:  SourceSpan,
 }
 
 /// Interface items
@@ -545,13 +571,13 @@ pub struct FunctionDecl {
 pub struct Function {
     /// Parameters
     #[cfg(feature = "std")]
-    pub params: Vec<Param>,
+    pub params:   Vec<Param>,
     /// Results
-    pub results: FunctionResults,
+    pub results:  FunctionResults,
     /// Whether this is async
     pub is_async: bool,
     /// Source span
-    pub span: SourceSpan,
+    pub span:     SourceSpan,
 }
 
 /// Function parameter
@@ -560,7 +586,7 @@ pub struct Param {
     /// Parameter name
     pub name: Identifier,
     /// Parameter type
-    pub ty: TypeExpr,
+    pub ty:   TypeExpr,
     /// Source span
     pub span: SourceSpan,
 }
@@ -589,7 +615,7 @@ pub struct NamedResult {
     /// Result name
     pub name: Identifier,
     /// Result type
-    pub ty: TypeExpr,
+    pub ty:   TypeExpr,
     /// Source span
     pub span: SourceSpan,
 }
@@ -598,14 +624,14 @@ pub struct NamedResult {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct WorldDecl {
     /// World name
-    pub name: Identifier,
+    pub name:  Identifier,
     /// World items
     #[cfg(feature = "std")]
     pub items: Vec<WorldItem>,
     /// Documentation
-    pub docs: Option<Documentation>,
+    pub docs:  Option<Documentation>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:  SourceSpan,
 }
 
 /// World items
@@ -664,9 +690,9 @@ pub struct IncludeItem {
     /// World being included
     pub world: NamedType,
     /// Optional include specifier
-    pub with: Option<IncludeWith>,
+    pub with:  Option<IncludeWith>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:  SourceSpan,
 }
 
 /// Include with specifier
@@ -676,7 +702,7 @@ pub struct IncludeWith {
     #[cfg(feature = "std")]
     pub items: Vec<IncludeRename>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:  SourceSpan,
 }
 
 /// Include rename item
@@ -685,7 +711,7 @@ pub struct IncludeRename {
     /// Original name
     pub from: Identifier,
     /// New name
-    pub to: Identifier,
+    pub to:   Identifier,
     /// Source span
     pub span: SourceSpan,
 }
@@ -714,7 +740,7 @@ pub struct Documentation {
     #[cfg(feature = "std")]
     pub lines: Vec<WitBoundedString>,
     /// Source span
-    pub span: SourceSpan,
+    pub span:  SourceSpan,
 }
 
 // Display implementations for better debugging

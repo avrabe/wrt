@@ -51,7 +51,7 @@ fuzz_target!(|input: FuzzInput| {
     // Create runtime memory
     let memory_result = panic::catch_unwind(|| {
         Memory::new(initial_pages)
-    });
+    };
     
     let memory = match memory_result {
         Ok(Ok(memory)) => Arc::new(memory),
@@ -70,7 +70,7 @@ fuzz_target!(|input: FuzzInput| {
     let adapter = SafeMemoryAdapter::with_verification_level(
         memory.clone(),
         verification_level,
-    );
+    ;
     
     // Process operations
     for op in &input.operations {
@@ -79,26 +79,26 @@ fuzz_target!(|input: FuzzInput| {
             match op {
                 Operation::Store { offset, data } => {
                     if !data.is_empty() {
-                        let _ = adapter.store(*offset, data);
+                        let _ = adapter.store(*offset, data;
                     }
                 }
                 Operation::Load { offset, length } => {
                     if *length > 0 && *length <= 10000 {
-                        let _ = adapter.load(*offset, *length);
+                        let _ = adapter.load(*offset, *length;
                     }
                 }
                 Operation::Size => {
-                    let _ = adapter.size();
+                    let _ = adapter.size);
                 }
                 Operation::ByteSize => {
-                    let _ = adapter.byte_size();
+                    let _ = adapter.byte_size);
                 }
                 Operation::Grow { pages } => {
                     let pages = std::cmp::min(*pages, 5); // Limit growth
-                    let _ = adapter.grow(pages);
+                    let _ = adapter.grow(pages;
                 }
                 Operation::VerifyIntegrity => {
-                    let _ = adapter.verify_integrity();
+                    let _ = adapter.verify_integrity);
                 }
                 Operation::CorruptMemory { offset, value } => {
                     // Only try corruption with full verification to test detection
@@ -109,7 +109,7 @@ fuzz_target!(|input: FuzzInput| {
                                 // Try to directly manipulate memory
                                 // We write data through the adapter first so we have something to corrupt
                                 let data = vec![0u8; 1];
-                                let _ = adapter.store(*offset, &data);
+                                let _ = adapter.store(*offset, &data;
                                 
                                 // Now corrupt it directly through the runtime memory
                                 // This simulates memory corruption
@@ -119,7 +119,7 @@ fuzz_target!(|input: FuzzInput| {
                                 }
                                 
                                 // Check if verification detects the corruption
-                                let integrity_result = adapter.verify_integrity();
+                                let integrity_result = adapter.verify_integrity);
                                 
                                 // With full verification, this should detect the corruption
                                 if integrity_result.is_ok() {
@@ -132,9 +132,9 @@ fuzz_target!(|input: FuzzInput| {
                     }
                 }
             }
-        });
+        };
     }
     
     // Final validation
-    let _ = adapter.verify_integrity();
-});
+    let _ = adapter.verify_integrity);
+};

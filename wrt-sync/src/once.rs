@@ -14,7 +14,11 @@
 //! This module provides a `WrtOnce<T>` type that allows for safe, one-time
 //! initialization of a value, typically used for global statics.
 
-use core::{cell::UnsafeCell, fmt, mem::MaybeUninit};
+use core::{
+    cell::UnsafeCell,
+    fmt,
+    mem::MaybeUninit,
+};
 
 use crate::mutex::WrtMutex; // Using the WrtMutex from this crate. Removed WrtMutexGuard as
                             // it's not used directly here.
@@ -30,8 +34,8 @@ use crate::mutex::WrtMutex; // Using the WrtMutex from this crate. Removed WrtMu
 /// that the initialization logic runs at most once. After initialization, the
 /// data is considered immutable and references can be safely given out.
 pub struct WrtOnce<T> {
-    mutex: WrtMutex<()>, // Used as a traditional lock for the initialization check
-    data: UnsafeCell<MaybeUninit<T>>,
+    mutex:       WrtMutex<()>, // Used as a traditional lock for the initialization check
+    data:        UnsafeCell<MaybeUninit<T>>,
     initialized: AtomicBool, // Tracks if `data` is initialized
 }
 
@@ -62,8 +66,8 @@ impl<T> WrtOnce<T> {
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            mutex: WrtMutex::new(()),
-            data: UnsafeCell::new(MaybeUninit::uninit()),
+            mutex:       WrtMutex::new(()),
+            data:        UnsafeCell::new(MaybeUninit::uninit()),
             initialized: AtomicBool::new(false),
         }
     }
@@ -218,4 +222,7 @@ impl<T> Drop for WrtOnce<T> {
 
 // Re-import core items used by the module that might not be in scope otherwise
 // in no_std
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{
+    AtomicBool,
+    Ordering,
+};

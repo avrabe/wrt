@@ -1,3 +1,4 @@
+
 // Copyright (c) 2025 Ralf Anton Beier
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
@@ -53,7 +54,7 @@ mod simd_tests {
         assert!(runtime.provider().is_available());
         
         // Provider level should match capabilities
-        assert_eq!(runtime.provider().simd_level(), runtime.capabilities().level);
+        assert_eq!(runtime.provider().simd_level(), runtime.capabilities().level());
         
         // Test that hardware acceleration detection works
         if runtime.has_acceleration() {

@@ -14,7 +14,6 @@
 //! WebAssembly Component Model type system, enabling compile-time
 //! guaranteed list sizes for better performance and safety.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -27,15 +26,17 @@ use wrt_foundation::{
     bounded::{BoundedVec},
     component_value::ComponentValue,
     types::ValueType,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
-#[cfg(not(any(feature = "std", )))]
+#[cfg(not(feature = "std"))]
 use wrt_foundation::{BoundedString};
 
 // Constants for no_std environments
-#[cfg(not(any(feature = "std", )))]
+#[cfg(not(feature = "std"))]
 const MAX_FIXED_LIST_SIZE: usize = 1024;
-#[cfg(not(any(feature = "std", )))]
+#[cfg(not(feature = "std"))]
 const MAX_TYPE_DEFINITIONS: usize = 256;
 
 /// Fixed-length list type definition
@@ -91,22 +92,16 @@ impl FixedLengthListType {
 
     pub fn validate_size(&self) -> Result<()> {
         if self.length == 0 {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Fixed-length list cannot have zero length"
-            ));
+            return Err(Error::type_error("Error occurred")
+            ;
         }
         
         if self.length > MAX_FIXED_LIST_SIZE as u32 {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Fixed-length list size exceeds maximum"
-            ));
+            return Err(Error::type_error("Error occurred")
+            ;
         }
         
-        Ok(())
+        Ok(()
     }
 }
 
@@ -116,25 +111,26 @@ pub struct FixedLengthList {
     pub list_type: FixedLengthListType,
     #[cfg(feature = "std")]
     pub elements: Vec<ComponentValue>,
-    #[cfg(not(any(feature = "std", )))]
-    pub elements: BoundedVec<ComponentValue, MAX_FIXED_LIST_SIZE, NoStdProvider<65536>>,
+    #[cfg(not(feature = "std"))]
+    pub elements: BoundedVec<ComponentValue, MAX_FIXED_LIST_SIZE>,
 }
 
 impl FixedLengthList {
     #[cfg(feature = "std")]
     pub fn new(list_type: FixedLengthListType) -> Result<Self> {
         list_type.validate_size()?;
-        let elements = Vec::with_capacity(list_type.length as usize);
+        let elements = Vec::with_capacity(list_type.length as usize;
         Ok(Self {
             list_type,
             elements,
         })
     }
 
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub fn new(list_type: FixedLengthListType) -> Result<Self> {
         list_type.validate_size()?;
-        let elements = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let elements = BoundedVec::new(provider)?;
         Ok(Self {
             list_type,
             elements,
@@ -146,21 +142,14 @@ impl FixedLengthList {
         list_type.validate_size()?;
         
         if elements.len() != list_type.length as usize {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Element count does not match fixed list length"
-            ));
+            return Err(Error::type_error("Error occurred")
+            ;
         }
         
         // Validate element types
         for (i, element) in elements.iter().enumerate() {
             if !Self::validate_element_type(element, &list_type.element_type) {
-                return Err(Error::new(
-                    ErrorCategory::Type,
-                    wrt_error::codes::TYPE_MISMATCH,
-                    &"Component not found"
-                ));
+                return Err(Error::component_not_found("Error occurred";
             }
         }
         
@@ -170,34 +159,25 @@ impl FixedLengthList {
         })
     }
 
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub fn with_elements(list_type: FixedLengthListType, elements: &[ComponentValue]) -> Result<Self> {
         list_type.validate_size()?;
         
         if elements.len() != list_type.length as usize {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Element count does not match fixed list length"
-            ));
+            return Err(Error::type_error("Error occurred")
+            ;
         }
         
         // Validate element types
         for (i, element) in elements.iter().enumerate() {
             if !Self::validate_element_type(element, &list_type.element_type) {
-                return Err(Error::new(
-                    ErrorCategory::Type,
-                    wrt_error::codes::TYPE_MISMATCH,
-                    "Element has incorrect type"
-                ));
+                return Err(Error::type_error("Error occurred")
+                ;
             }
         }
         
         let bounded_elements = BoundedVec::new_from_slice(elements)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Too many elements for no_std environment"
+            .map_err(|_| Error::memory_allocation_failed("Error occurred")
             ))?;
         
         Ok(Self {
@@ -254,27 +234,18 @@ impl FixedLengthList {
 
     pub fn set(&mut self, index: u32, value: ComponentValue) -> Result<()> {
         if !self.list_type.mutable {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Cannot modify immutable fixed-length list"
-            ));
+            return Err(Error::type_error("Error occurred")
+            ;
         }
 
         if index >= self.list_type.length {
-            return Err(Error::new(
-                ErrorCategory::InvalidInput,
-                wrt_error::codes::OUT_OF_BOUNDS_ERROR,
-                "Index out of bounds"
-            ));
+            return Err(Error::runtime_execution_error("Error occurred"
+            ;
         }
 
         if !Self::validate_element_type(&value, &self.list_type.element_type) {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Value type does not match list element type"
-            ));
+            return Err(Error::type_error("Missing error message")
+            ;
         }
 
         if let Some(element) = self.elements.get_mut(index as usize) {
@@ -284,61 +255,43 @@ impl FixedLengthList {
             if self.elements.len() == index as usize {
                 #[cfg(feature = "std")]
                 self.elements.push(value);
-                #[cfg(not(any(feature = "std", )))]
+                #[cfg(not(feature = "std"))]
                 self.elements.push(value)
-                    .map_err(|_| Error::new(
-                        ErrorCategory::Memory,
-                        wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                        "List storage full"
+                    .map_err(|_| Error::memory_allocation_failed("Error occurred")
                     ))?;
             } else {
-                return Err(Error::new(
-                    ErrorCategory::InvalidInput,
-                    wrt_error::codes::OUT_OF_BOUNDS_ERROR,
-                    "Cannot set non-consecutive index"
-                ));
+                return Err(Error::runtime_execution_error("Error occurred"
+                ;
             }
         }
 
-        Ok(())
+        Ok(()
     }
 
     pub fn push(&mut self, value: ComponentValue) -> Result<()> {
         if !self.list_type.mutable {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Cannot modify immutable fixed-length list"
-            ));
+            return Err(Error::type_error("Missing error message")
+            ;
         }
 
         if self.is_full() {
-            return Err(Error::new(
-                ErrorCategory::InvalidInput,
-                wrt_error::codes::OUT_OF_BOUNDS_ERROR,
-                "Fixed-length list is already full"
-            ));
+            return Err(Error::runtime_execution_error("Error occurred"
+            ;
         }
 
         if !Self::validate_element_type(&value, &self.list_type.element_type) {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Value type does not match list element type"
-            ));
+            return Err(Error::type_error("Missing error message")
+            ;
         }
 
         #[cfg(feature = "std")]
         self.elements.push(value);
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         self.elements.push(value)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "List storage full"
+            .map_err(|_| Error::memory_allocation_failed("Error occurred")
             ))?;
 
-        Ok(())
+        Ok(()
     }
 
     pub fn current_length(&self) -> u32 {
@@ -358,7 +311,7 @@ impl FixedLengthList {
         self.elements.clone()
     }
 
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(feature = "std"))]
     pub fn to_slice(&self) -> &[ComponentValue] {
         self.elements.as_slice()
     }
@@ -369,8 +322,8 @@ impl FixedLengthList {
 pub struct FixedLengthListTypeRegistry {
     #[cfg(feature = "std")]
     types: Vec<FixedLengthListType>,
-    #[cfg(not(any(feature = "std", )))]
-    types: BoundedVec<FixedLengthListType, MAX_TYPE_DEFINITIONS, NoStdProvider<65536>>,
+    #[cfg(not(feature = "std"))]
+    types: BoundedVec<FixedLengthListType, MAX_TYPE_DEFINITIONS>,
 }
 
 impl FixedLengthListTypeRegistry {
@@ -378,8 +331,12 @@ impl FixedLengthListTypeRegistry {
         Self {
             #[cfg(feature = "std")]
             types: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            types: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            types: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)
+                    .expect(".expect("Failed to allocate memory for type registry"));")
+                BoundedVec::new(provider).expect("Failed to create BoundedVec")
+            },
         }
     }
 
@@ -389,7 +346,7 @@ impl FixedLengthListTypeRegistry {
         // Check for duplicate
         for (i, existing_type) in self.types.iter().enumerate() {
             if existing_type == &list_type {
-                return Ok(i as u32);
+                return Ok(i as u32;
             }
         }
         
@@ -397,12 +354,9 @@ impl FixedLengthListTypeRegistry {
         
         #[cfg(feature = "std")]
         self.types.push(list_type);
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         self.types.push(list_type)
-            .map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                wrt_error::codes::MEMORY_ALLOCATION_FAILED,
-                "Type registry full"
+            .map_err(|_| Error::memory_allocation_failed("Error occurred")
             ))?;
         
         Ok(index)
@@ -419,7 +373,7 @@ impl FixedLengthListTypeRegistry {
     pub fn find_type(&self, element_type: &ValueType, length: u32) -> Option<u32> {
         for (i, list_type) in self.types.iter().enumerate() {
             if list_type.element_type == *element_type && list_type.length == length {
-                return Some(i as u32);
+                return Some(i as u32;
             }
         }
         None
@@ -443,7 +397,7 @@ pub mod component_integration {
             {
                 ComponentValue::List(list.elements)
             }
-            #[cfg(not(any(feature = "std", )))]
+            #[cfg(not(feature = "std"))]
             {
                 // Convert to regular list representation
                 let vec_data: Vec<ComponentValue> = list.elements.iter().cloned().collect();
@@ -464,16 +418,13 @@ pub mod component_integration {
                     {
                         Self::with_elements(expected_type, elements)
                     }
-                    #[cfg(not(any(feature = "std", )))]
+                    #[cfg(not(feature = "std"))]
                     {
                         Self::with_elements(expected_type, &elements)
                     }
                 }
-                _ => Err(Error::new(
-                    ErrorCategory::Type,
-                    wrt_error::codes::TYPE_MISMATCH,
-                    "ComponentValue is not a list"
-                ))
+                _ => Err(Error::type_error("Error occurred")
+            })?;
             }
         }
     }
@@ -489,7 +440,7 @@ pub mod component_integration {
 
     impl ExtendedValueType {
         pub fn is_fixed_length_list(&self) -> bool {
-            matches!(self, Self::FixedLengthList(_))
+            matches!(self, Self::FixedLengthList(_)
         }
 
         pub fn as_fixed_length_list_index(&self) -> Option<u32> {
@@ -524,7 +475,7 @@ pub mod fixed_list_utils {
         element: ComponentValue,
         count: u32
     ) -> Result<FixedLengthList> {
-        let list_type = FixedLengthListType::new(element_type, count);
+        let list_type = FixedLengthListType::new(element_type, count;
         let mut list = FixedLengthList::new(list_type)?;
         
         for _ in 0..count {
@@ -552,10 +503,7 @@ pub mod fixed_list_utils {
             ValueType::String => ComponentValue::String("".to_string()),
             ValueType::I32 => ComponentValue::I32(0),
             ValueType::I64 => ComponentValue::I64(0),
-            _ => return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Cannot create default value for this type"
+            _ => return Err(Error::type_error("Error occurred")
             )),
         };
         
@@ -565,15 +513,12 @@ pub mod fixed_list_utils {
     /// Create a fixed-length list from a range
     pub fn from_range(start: i32, end: i32) -> Result<FixedLengthList> {
         if start >= end {
-            return Err(Error::new(
-                ErrorCategory::InvalidInput,
-                wrt_error::codes::OUT_OF_BOUNDS_ERROR,
-                "Start must be less than end"
-            ));
+            return Err(Error::runtime_execution_error("Error occurred"
+            ;
         }
         
         let count = (end - start) as u32;
-        let list_type = FixedLengthListType::new(ValueType::I32, count);
+        let list_type = FixedLengthListType::new(ValueType::I32, count;
         let mut list = FixedLengthList::new(list_type)?;
         
         for i in start..end {
@@ -589,15 +534,12 @@ pub mod fixed_list_utils {
         list2: &FixedLengthList
     ) -> Result<FixedLengthList> {
         if list1.element_type() != list2.element_type() {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                wrt_error::codes::TYPE_MISMATCH,
-                "Cannot concatenate lists with different element types"
-            ));
+            return Err(Error::type_error("Missing error message")
+            ;
         }
         
-        let new_length = list1.length() + list2.length();
-        let new_type = FixedLengthListType::new(list1.element_type().clone(), new_length);
+        let new_length = list1.length() + list2.length);
+        let new_type = FixedLengthListType::new(list1.element_type().clone(), new_length;
         let mut result = FixedLengthList::new(new_type)?;
         
         // Add elements from first list
@@ -620,14 +562,11 @@ pub mod fixed_list_utils {
         length: u32
     ) -> Result<FixedLengthList> {
         if start + length > list.length() {
-            return Err(Error::new(
-                ErrorCategory::InvalidInput,
-                wrt_error::codes::OUT_OF_BOUNDS_ERROR,
-                "Slice range exceeds list bounds"
-            ));
+            return Err(Error::runtime_execution_error("Error occurred"
+            ;
         }
         
-        let slice_type = FixedLengthListType::new(list.element_type().clone(), length);
+        let slice_type = FixedLengthListType::new(list.element_type().clone(), length;
         let mut result = FixedLengthList::new(slice_type)?;
         
         for i in start..start + length {
@@ -648,43 +587,43 @@ mod tests {
 
     #[test]
     fn test_fixed_length_list_type_creation() {
-        let list_type = FixedLengthListType::new(ValueType::I32, 10);
-        assert_eq!(list_type.element_type(), &ValueType::I32);
-        assert_eq!(list_type.length(), 10);
-        assert!(!list_type.is_mutable());
+        let list_type = FixedLengthListType::new(ValueType::I32, 10;
+        assert_eq!(list_type.element_type(), &ValueType::I32;
+        assert_eq!(list_type.length(), 10;
+        assert!(!list_type.is_mutable();
         assert_eq!(list_type.size_in_bytes(), 40); // 10 * 4 bytes
 
-        let mutable_type = FixedLengthListType::new_mutable(ValueType::F64, 5);
-        assert!(mutable_type.is_mutable());
+        let mutable_type = FixedLengthListType::new_mutable(ValueType::F64, 5;
+        assert!(mutable_type.is_mutable();
         assert_eq!(mutable_type.size_in_bytes(), 40); // 5 * 8 bytes
     }
 
     #[test]
     fn test_fixed_length_list_validation() {
-        let valid_type = FixedLengthListType::new(ValueType::I32, 10);
+        let valid_type = FixedLengthListType::new(ValueType::I32, 10;
         assert!(valid_type.validate_size().is_ok());
 
         let zero_length_type = FixedLengthListType::new(ValueType::I32, 0);
-        assert!(zero_length_type.validate_size().is_err());
+        assert!(zero_length_type.validate_size().is_err();
 
-        let too_large_type = FixedLengthListType::new(ValueType::I32, MAX_FIXED_LIST_SIZE as u32 + 1);
-        assert!(too_large_type.validate_size().is_err());
+        let too_large_type = FixedLengthListType::new(ValueType::I32, MAX_FIXED_LIST_SIZE as u32 + 1;
+        assert!(too_large_type.validate_size().is_err();
     }
 
     #[test]
     fn test_fixed_length_list_creation() {
-        let list_type = FixedLengthListType::new(ValueType::I32, 3);
+        let list_type = FixedLengthListType::new(ValueType::I32, 3;
         let list = FixedLengthList::new(list_type).unwrap();
         
-        assert_eq!(list.length(), 3);
+        assert_eq!(list.length(), 3;
         assert_eq!(list.current_length(), 0);
-        assert_eq!(list.remaining_capacity(), 3);
-        assert!(!list.is_full());
+        assert_eq!(list.remaining_capacity(), 3;
+        assert!(!list.is_full();
     }
 
     #[test]
     fn test_fixed_length_list_with_elements() {
-        let list_type = FixedLengthListType::new(ValueType::I32, 3);
+        let list_type = FixedLengthListType::new(ValueType::I32, 3;
         let elements = vec![
             ComponentValue::I32(1),
             ComponentValue::I32(2),
@@ -693,7 +632,7 @@ mod tests {
 
         #[cfg(feature = "std")]
         let list = FixedLengthList::with_elements(list_type, elements).unwrap();
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         let list = FixedLengthList::with_elements(list_type, &elements).unwrap();
 
         assert_eq!(list.current_length(), 3);
@@ -706,15 +645,15 @@ mod tests {
 
     #[test]
     fn test_fixed_length_list_type_validation() {
-        let list_type = FixedLengthListType::new(ValueType::I32, 2);
+        let list_type = FixedLengthListType::new(ValueType::I32, 2;
         
         // Wrong number of elements
         let wrong_count = vec![ComponentValue::I32(1)];
         #[cfg(feature = "std")]
-        let result = FixedLengthList::with_elements(list_type.clone(), wrong_count);
-        #[cfg(not(any(feature = "std", )))]
-        let result = FixedLengthList::with_elements(list_type.clone(), &wrong_count);
-        assert!(result.is_err());
+        let result = FixedLengthList::with_elements(list_type.clone(), wrong_count;
+        #[cfg(not(feature = "std"))]
+        let result = FixedLengthList::with_elements(list_type.clone(), &wrong_count;
+        assert!(result.is_err();
 
         // Wrong element type
         let wrong_type = vec![
@@ -722,15 +661,15 @@ mod tests {
             ComponentValue::Bool(true), // Wrong type
         ];
         #[cfg(feature = "std")]
-        let result = FixedLengthList::with_elements(list_type, wrong_type);
-        #[cfg(not(any(feature = "std", )))]
-        let result = FixedLengthList::with_elements(list_type, &wrong_type);
-        assert!(result.is_err());
+        let result = FixedLengthList::with_elements(list_type, wrong_type;
+        #[cfg(not(feature = "std"))]
+        let result = FixedLengthList::with_elements(list_type, &wrong_type;
+        assert!(result.is_err();
     }
 
     #[test]
     fn test_fixed_length_list_mutable_operations() {
-        let list_type = FixedLengthListType::new_mutable(ValueType::I32, 3);
+        let list_type = FixedLengthListType::new_mutable(ValueType::I32, 3;
         let mut list = FixedLengthList::new(list_type).unwrap();
 
         // Test push
@@ -740,15 +679,15 @@ mod tests {
         assert!(list.is_full());
 
         // Try to push when full
-        assert!(list.push(ComponentValue::I32(4)).is_err());
+        assert!(list.push(ComponentValue::I32(4)).is_err();
 
         // Test set
         assert!(list.set(1, ComponentValue::I32(42)).is_ok());
-        assert_eq!(list.get(1), Some(&ComponentValue::I32(42)));
+        assert_eq!(list.get(1), Some(&ComponentValue::I32(42;
 
         // Test invalid set
-        assert!(list.set(5, ComponentValue::I32(999)).is_err()); // Out of bounds
-        assert!(list.set(0, ComponentValue::Bool(true)).is_err()); // Wrong type
+        assert!(list.set(5, ComponentValue::I32(999)).is_err())); // Out of bounds
+        assert!(list.set(0, ComponentValue::Bool(true)).is_err())); // Wrong type
     }
 
     #[test]
@@ -757,10 +696,10 @@ mod tests {
         let mut list = FixedLengthList::new(list_type).unwrap();
 
         // Should not be able to modify immutable list
-        assert!(list.set(0, ComponentValue::I32(1)).is_err());
+        assert!(list.set(0, ComponentValue::I32(1)).is_err();
         
         // Push should also fail for immutable lists
-        assert!(list.push(ComponentValue::I32(1)).is_err());
+        assert!(list.push(ComponentValue::I32(1)).is_err();
     }
 
     #[test]
@@ -768,15 +707,15 @@ mod tests {
         let mut registry = FixedLengthListTypeRegistry::new();
         assert_eq!(registry.type_count(), 0);
 
-        let list_type1 = FixedLengthListType::new(ValueType::I32, 10);
+        let list_type1 = FixedLengthListType::new(ValueType::I32, 10;
         let index1 = registry.register_type(list_type1.clone()).unwrap();
         assert_eq!(index1, 0);
         assert_eq!(registry.type_count(), 1);
 
-        let list_type2 = FixedLengthListType::new(ValueType::F64, 5);
+        let list_type2 = FixedLengthListType::new(ValueType::F64, 5;
         let index2 = registry.register_type(list_type2).unwrap();
         assert_eq!(index2, 1);
-        assert_eq!(registry.type_count(), 2);
+        assert_eq!(registry.type_count(), 2;
 
         // Register duplicate should return existing index
         let duplicate_index = registry.register_type(list_type1).unwrap();
@@ -785,20 +724,20 @@ mod tests {
 
         // Test retrieval
         let retrieved = registry.get_type(0).unwrap();
-        assert_eq!(retrieved.element_type(), &ValueType::I32);
-        assert_eq!(retrieved.length(), 10);
+        assert_eq!(retrieved.element_type(), &ValueType::I32;
+        assert_eq!(retrieved.length(), 10;
 
         // Test find
-        let found_index = registry.find_type(&ValueType::I32, 10);
-        assert_eq!(found_index, Some(0));
+        let found_index = registry.find_type(&ValueType::I32, 10;
+        assert_eq!(found_index, Some(0;
 
-        let not_found = registry.find_type(&ValueType::Bool, 10);
-        assert_eq!(not_found, None);
+        let not_found = registry.find_type(&ValueType::Bool, 10;
+        assert_eq!(not_found, None;
     }
 
     #[test]
     fn test_component_value_conversion() {
-        let list_type = FixedLengthListType::new(ValueType::I32, 3);
+        let list_type = FixedLengthListType::new(ValueType::I32, 3;
         let elements = vec![
             ComponentValue::I32(1),
             ComponentValue::I32(2),
@@ -807,90 +746,90 @@ mod tests {
 
         #[cfg(feature = "std")]
         let list = FixedLengthList::with_elements(list_type.clone(), elements.clone()).unwrap();
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         let list = FixedLengthList::with_elements(list_type.clone(), &elements).unwrap();
 
         // Convert to ComponentValue
         let component_value: ComponentValue = list.clone().into();
         match component_value {
             ComponentValue::List(ref list_elements) => {
-                assert_eq!(list_elements.len(), 3);
-                assert_eq!(list_elements[0], ComponentValue::I32(1));
+                assert_eq!(list_elements.len(), 3;
+                assert_eq!(list_elements[0], ComponentValue::I32(1;
             }
             _ => panic!("Expected List variant"),
         }
 
         // Convert back from ComponentValue
         let converted_back = FixedLengthList::try_from_component_value(component_value, list_type).unwrap();
-        assert_eq!(converted_back.current_length(), 3);
-        assert_eq!(converted_back.get(0), Some(&ComponentValue::I32(1)));
+        assert_eq!(converted_back.current_length(), 3;
+        assert_eq!(converted_back.get(0), Some(&ComponentValue::I32(1;
     }
 
     #[test]
     fn test_utility_functions() {
         // Test repeat_element
         let repeated = repeat_element(ValueType::Bool, ComponentValue::Bool(true), 5).unwrap();
-        assert_eq!(repeated.current_length(), 5);
-        assert_eq!(repeated.get(0), Some(&ComponentValue::Bool(true)));
-        assert_eq!(repeated.get(4), Some(&ComponentValue::Bool(true)));
+        assert_eq!(repeated.current_length(), 5;
+        assert_eq!(repeated.get(0), Some(&ComponentValue::Bool(true;
+        assert_eq!(repeated.get(4), Some(&ComponentValue::Bool(true;
 
         // Test zero_filled
         let zeros = zero_filled(ValueType::I32, 3).unwrap();
-        assert_eq!(zeros.current_length(), 3);
-        assert_eq!(zeros.get(0), Some(&ComponentValue::I32(0)));
+        assert_eq!(zeros.current_length(), 3;
+        assert_eq!(zeros.get(0), Some(&ComponentValue::I32(0;
 
         // Test from_range
         let range_list = from_range(5, 8).unwrap();
-        assert_eq!(range_list.current_length(), 3);
-        assert_eq!(range_list.get(0), Some(&ComponentValue::I32(5)));
-        assert_eq!(range_list.get(1), Some(&ComponentValue::I32(6)));
-        assert_eq!(range_list.get(2), Some(&ComponentValue::I32(7)));
+        assert_eq!(range_list.current_length(), 3;
+        assert_eq!(range_list.get(0), Some(&ComponentValue::I32(5;
+        assert_eq!(range_list.get(1), Some(&ComponentValue::I32(6;
+        assert_eq!(range_list.get(2), Some(&ComponentValue::I32(7;
     }
 
     #[test]
     fn test_list_operations() {
-        let list1_type = FixedLengthListType::new(ValueType::I32, 2);
+        let list1_type = FixedLengthListType::new(ValueType::I32, 2;
         let list1_elements = vec![ComponentValue::I32(1), ComponentValue::I32(2)];
         #[cfg(feature = "std")]
         let list1 = FixedLengthList::with_elements(list1_type, list1_elements).unwrap();
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         let list1 = FixedLengthList::with_elements(list1_type, &list1_elements).unwrap();
 
-        let list2_type = FixedLengthListType::new(ValueType::I32, 2);
+        let list2_type = FixedLengthListType::new(ValueType::I32, 2;
         let list2_elements = vec![ComponentValue::I32(3), ComponentValue::I32(4)];
         #[cfg(feature = "std")]
         let list2 = FixedLengthList::with_elements(list2_type, list2_elements).unwrap();
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         let list2 = FixedLengthList::with_elements(list2_type, &list2_elements).unwrap();
 
         // Test concatenation
         let concatenated = concatenate(&list1, &list2).unwrap();
-        assert_eq!(concatenated.current_length(), 4);
-        assert_eq!(concatenated.get(0), Some(&ComponentValue::I32(1)));
-        assert_eq!(concatenated.get(1), Some(&ComponentValue::I32(2)));
-        assert_eq!(concatenated.get(2), Some(&ComponentValue::I32(3)));
-        assert_eq!(concatenated.get(3), Some(&ComponentValue::I32(4)));
+        assert_eq!(concatenated.current_length(), 4;
+        assert_eq!(concatenated.get(0), Some(&ComponentValue::I32(1;
+        assert_eq!(concatenated.get(1), Some(&ComponentValue::I32(2;
+        assert_eq!(concatenated.get(2), Some(&ComponentValue::I32(3;
+        assert_eq!(concatenated.get(3), Some(&ComponentValue::I32(4;
 
         // Test slicing
         let sliced = slice(&concatenated, 1, 2).unwrap();
-        assert_eq!(sliced.current_length(), 2);
-        assert_eq!(sliced.get(0), Some(&ComponentValue::I32(2)));
-        assert_eq!(sliced.get(1), Some(&ComponentValue::I32(3)));
+        assert_eq!(sliced.current_length(), 2;
+        assert_eq!(sliced.get(0), Some(&ComponentValue::I32(2;
+        assert_eq!(sliced.get(1), Some(&ComponentValue::I32(3;
     }
 
     #[test]
     fn test_extended_value_type() {
-        let standard = ExtendedValueType::Standard(ValueType::I32);
-        assert!(!standard.is_fixed_length_list());
-        assert_eq!(standard.as_standard_type(), Some(&ValueType::I32));
-        assert_eq!(standard.as_fixed_length_list_index(), None);
+        let standard = ExtendedValueType::Standard(ValueType::I32;
+        assert!(!standard.is_fixed_length_list();
+        assert_eq!(standard.as_standard_type(), Some(&ValueType::I32;
+        assert_eq!(standard.as_fixed_length_list_index(), None;
 
-        let fixed_list = ExtendedValueType::FixedLengthList(42);
-        assert!(fixed_list.is_fixed_length_list());
-        assert_eq!(fixed_list.as_fixed_length_list_index(), Some(42));
-        assert_eq!(fixed_list.as_standard_type(), None);
+        let fixed_list = ExtendedValueType::FixedLengthList(42;
+        assert!(fixed_list.is_fixed_length_list();
+        assert_eq!(fixed_list.as_fixed_length_list_index(), Some(42;
+        assert_eq!(fixed_list.as_standard_type(), None;
 
         let from_standard: ExtendedValueType = ValueType::F64.into();
-        assert!(!from_standard.is_fixed_length_list());
+        assert!(!from_standard.is_fixed_length_list();
     }
 }

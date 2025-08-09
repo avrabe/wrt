@@ -20,22 +20,22 @@ fn main() {
     #[cfg(all(feature = "platform-vxworks", target_os = "vxworks"))]
     {
         println!("Running VxWorks LKM examples...\n");
-        run_lkm_examples();
+        run_lkm_examples);
     }
     
     #[cfg(not(all(feature = "platform-vxworks", target_os = "vxworks")))]
     {
         println!("VxWorks platform not available - showing LKM concepts");
-        show_lkm_concepts();
+        show_lkm_concepts);
     }
 }
 
 #[cfg(all(feature = "platform-vxworks", target_os = "vxworks"))]
 fn run_lkm_examples() {
-    example_lkm_memory();
-    example_lkm_synchronization();
-    example_lkm_threading();
-    example_lkm_integration();
+    example_lkm_memory);
+    example_lkm_synchronization);
+    example_lkm_threading);
+    example_lkm_integration);
 }
 
 #[cfg(all(feature = "platform-vxworks", target_os = "vxworks"))]
@@ -49,19 +49,19 @@ fn example_lkm_memory() {
         .use_dedicated_partition(true)  // LKM benefits from dedicated partitions
         .enable_guard_pages(true)       // Important for kernel space safety
         .build()
-        .expect("Failed to create LKM allocator");
+        .expect(".expect("Failed to create LKM allocator"));")
     
     println!("✓ Created LKM allocator using memory partitions");
     println!("  Features: dedicated partition, guard pages enabled");
     
     // Allocate memory using VxWorks partition APIs
     let initial_pages = 5;
-    let max_pages = Some(25);
+    let max_pages = Some(25;
     
     match allocator.allocate(initial_pages, max_pages) {
         Ok((ptr, size)) => {
             println!("✓ Allocated {} pages ({} bytes) from partition", initial_pages, size);
-            println!("  Kernel memory at: {:p}", ptr.as_ptr());
+            println!("  Kernel memory at: {:p}", ptr.as_ptr);
             
             // Test controlled memory growth
             if allocator.grow(initial_pages, 3).is_ok() {
@@ -70,7 +70,7 @@ fn example_lkm_memory() {
             
             // Clean up partition memory
             unsafe {
-                allocator.deallocate(ptr, size).expect("Failed to deallocate partition memory");
+                allocator.deallocate(ptr, size).expect(".expect("Failed to deallocate partition memory"));")
             }
             println!("✓ Partition memory deallocated successfully");
         }
@@ -86,14 +86,14 @@ fn example_lkm_synchronization() {
     let futex = VxWorksFutexBuilder::new(VxWorksContext::Lkm)
         .initial_value(1)
         .build()
-        .expect("Failed to create LKM futex");
+        .expect(".expect("Failed to create LKM futex"));")
     
     println!("✓ Created LKM futex using VxWorks binary semaphores");
     println!("  Features: priority inheritance, kernel-space synchronization");
     
     // Test atomic operations in kernel space
-    futex.store(42, Ordering::Release);
-    let value = futex.load(Ordering::Acquire);
+    futex.store(42, Ordering::Release;
+    let value = futex.load(Ordering::Acquire;
     println!("✓ Kernel atomic operations: stored and loaded {}", value);
     
     // Test kernel-space wait/wake
@@ -187,11 +187,11 @@ fn show_lkm_concepts() {
     println!("       .max_pages(512)");
     println!("       .use_dedicated_partition(true)");
     println!("       .enable_guard_pages(true)");
-    println!("       .build()?;");
+    println!("       .build()?;";
     println!("   ");
     println!("   let futex = VxWorksFutexBuilder::new(VxWorksContext::Lkm)");
     println!("       .initial_value(1)");
-    println!("       .build()?;");
+    println!("       .build()?;";
     println!("   ```");
     
     println!("\n6. Benefits:");

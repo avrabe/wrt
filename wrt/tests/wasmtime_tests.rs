@@ -1,4 +1,9 @@
-use wrt::{Error, ExportKind, Module, Result};
+use wrt::{
+    Error,
+    ExportKind,
+    Module,
+    Result,
+};
 
 #[test]
 fn test_memory_persistence() -> Result<()> {

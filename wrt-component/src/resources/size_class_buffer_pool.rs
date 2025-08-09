@@ -8,11 +8,11 @@ use std::collections::BTreeMap;
 /// Statistics about a buffer pool
 pub struct BufferPoolStats {
     /// Total number of buffers in the pool
-    pub total_buffers: usize,
+    pub total_buffers:  usize,
     /// Total capacity of all buffers in bytes
     pub total_capacity: usize,
     /// Number of different buffer sizes
-    pub size_count: usize,
+    pub size_count:     usize,
 }
 
 /// Binary std/no_std choice
@@ -21,13 +21,13 @@ pub struct BufferPoolStats {
 /// and reduced fragmentation compared to the basic buffer pool.
 pub struct SizeClassBufferPool {
     /// Power-of-two size classes from 16B to 16KB
-    size_classes: [Vec<Vec<u8>>; 11], // 16, 32, 64, 128, 256, 512, 1K, 2K, 4K, 8K, 16K
+    size_classes:          [Vec<Vec<u8>>; 11], // 16, 32, 64, 128, 256, 512, 1K, 2K, 4K, 8K, 16K
     /// Pools for sizes larger than size classes
-    overflow_pools: BTreeMap<usize, Vec<Vec<u8>>>,
+    overflow_pools:        BTreeMap<usize, Vec<Vec<u8>>>,
     /// Maximum buffers per size class
     max_buffers_per_class: usize,
     /// Maximum buffer size to keep in the pool
-    max_buffer_size: usize,
+    max_buffer_size:       usize,
 }
 
 impl SizeClassBufferPool {

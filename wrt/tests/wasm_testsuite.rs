@@ -1,6 +1,15 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::Path,
+};
 
-use wrt::{Error as WrtError, Module, Result, StacklessEngine, Value};
+use wrt::{
+    Error as WrtError,
+    Module,
+    Result,
+    StacklessEngine,
+    Value,
+};
 
 /// Utility function to get the test suite path from environment variables
 fn get_testsuite_path() -> Option<String> {
@@ -15,13 +24,16 @@ fn verify_wasm_testsuite_access() {
         None => {
             println!("Skipping test: WASM_TESTSUITE environment variable not set");
             return;
-        }
+        },
     };
 
     // Check directory exists
     let testsuite_dir = Path::new(&testsuite_path);
     if !testsuite_dir.exists() {
-        println!("Warning: WebAssembly test suite directory not found at {:?}", testsuite_dir);
+        println!(
+            "Warning: WebAssembly test suite directory not found at {:?}",
+            testsuite_dir
+        );
         return;
     }
 
@@ -99,7 +111,10 @@ fn test_basic_simd_operations() -> Result<()> {
     // Debug: Print exports
     println!("DEBUG: Available exports:");
     for (i, export) in engine.instances[0].module.exports.iter().enumerate() {
-        println!("DEBUG: Export {}: {} (index: {})", i, export.name, export.index);
+        println!(
+            "DEBUG: Export {}: {} (index: {})",
+            i, export.name, export.index
+        );
     }
 
     // Get function indices from exports
@@ -145,7 +160,10 @@ fn test_basic_simd_operations() -> Result<()> {
         .position(|e| e.name == "f32x4_splat_test")
         .expect("Could not find f32x4_splat_test position") as u32;
 
-    println!("DEBUG: Using export index {} for f32x4_splat_test", test_idx);
+    println!(
+        "DEBUG: Using export index {} for f32x4_splat_test",
+        test_idx
+    );
 
     let result = engine.invoke_export("f32x4_splat_test", &[])?;
     println!("DEBUG: f32x4_splat_test result: {:?}", result);
@@ -157,7 +175,10 @@ fn test_basic_simd_operations() -> Result<()> {
         let expected_bytes: [u8; 16] = unsafe { std::mem::transmute([expected_val; 4]) };
         assert_eq!(v, &expected_bytes, "f32x4 V128 value mismatch");
     } else {
-        println!("❌ f32x4_splat_test failed: expected V128, got {:?}", result);
+        println!(
+            "❌ f32x4_splat_test failed: expected V128, got {:?}",
+            result
+        );
         return Err(WrtError::Custom("f32x4_splat_test failed".to_string()));
     }
 
@@ -170,7 +191,10 @@ fn test_basic_simd_operations() -> Result<()> {
         let expected_bytes: [u8; 16] = unsafe { std::mem::transmute([expected_val; 2]) };
         assert_eq!(v, &expected_bytes, "f64x2 V128 value mismatch");
     } else {
-        println!("❌ f64x2_splat_test failed: expected V128, got {:?}", result);
+        println!(
+            "❌ f64x2_splat_test failed: expected V128, got {:?}",
+            result
+        );
         return Err(WrtError::Custom("f64x2_splat_test failed".to_string()));
     }
 
@@ -183,7 +207,10 @@ fn test_basic_simd_operations() -> Result<()> {
         let expected_bytes: [u8; 16] = unsafe { std::mem::transmute([expected_val; 4]) };
         assert_eq!(v, &expected_bytes, "i32x4 V128 value mismatch");
     } else {
-        println!("❌ i32x4_splat_test failed: expected V128, got {:?}", result);
+        println!(
+            "❌ i32x4_splat_test failed: expected V128, got {:?}",
+            result
+        );
         return Err(WrtError::Custom("i32x4_splat_test failed".to_string()));
     }
 
@@ -237,7 +264,11 @@ fn test_simd_dot_product() -> Result<()> {
         }
 
         // Check if each i32 value is 42
-        assert_eq!(i32_values, [42, 42, 42, 42], "Values should be [42, 42, 42, 42]");
+        assert_eq!(
+            i32_values,
+            [42, 42, 42, 42],
+            "Values should be [42, 42, 42, 42]"
+        );
         println!("✅ All values are correct: {:?}", i32_values);
 
         // This test passes, so we'll consider the dot product functionality verified
@@ -248,7 +279,10 @@ fn test_simd_dot_product() -> Result<()> {
              feature."
         );
     } else {
-        println!("❌ simple_simd_test failed: expected V128, got {:?}", result);
+        println!(
+            "❌ simple_simd_test failed: expected V128, got {:?}",
+            result
+        );
         return Err(WrtError::Custom("Simple SIMD test failed".to_string()));
     }
 

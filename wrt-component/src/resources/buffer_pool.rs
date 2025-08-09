@@ -1,25 +1,34 @@
-// Use BTreeMap for all cases to ensure deterministic ordering and no_std compatibility
+// Use BTreeMap for all cases to ensure deterministic ordering and no_std
+// compatibility
 #[cfg(feature = "std")]
-use std::{collections::BTreeMap, vec::Vec};
-#[cfg(all(not(feature = "std")))]
-use std::{collections::BTreeMap, vec::Vec};
+use std::{
+    collections::BTreeMap,
+    vec::Vec,
+};
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::{
+    collections::BTreeMap,
+    vec::Vec,
+};
 
 /// Binary std/no_std choice
 #[cfg(feature = "std")]
 pub struct BufferPool {
     /// Map of buffer sizes to pools of buffers
-    pools: BTreeMap<usize, Vec<Vec<u8>>>,
+    pools:                BTreeMap<usize, Vec<Vec<u8>>>,
     /// Maximum buffer size to keep in the pool
-    max_buffer_size: usize,
+    max_buffer_size:      usize,
     /// Maximum number of buffers per size
     max_buffers_per_size: usize,
 }
 
 /// A simplified buffer pool for no_std environments
-#[cfg(not(any(feature = "std", )))]
+#[cfg(not(feature = "std"))]
 pub struct BufferPool {
     /// Simplified buffer management for no_std
-    max_buffer_size: usize,
+    max_buffer_size:      usize,
     max_buffers_per_size: usize,
 }
 
@@ -28,15 +37,19 @@ impl BufferPool {
     /// Create a new buffer pool with default settings
     pub fn new() -> Self {
         Self {
-            pools: BTreeMap::new(),
-            max_buffer_size: 1024 * 1024, // 1MB default max size
+            pools:                BTreeMap::new(),
+            max_buffer_size:      1024 * 1024, // 1MB default max size
             max_buffers_per_size: 10,
         }
     }
 
     /// Create a new buffer pool with custom max buffer size
     pub fn new_with_config(max_buffer_size: usize, max_buffers_per_size: usize) -> Self {
-        Self { pools: BTreeMap::new(), max_buffer_size, max_buffers_per_size }
+        Self {
+            pools: BTreeMap::new(),
+            max_buffer_size,
+            max_buffers_per_size,
+        }
     }
 
     /// Allocate a buffer of at least the specified size
@@ -84,23 +97,30 @@ impl BufferPool {
             total_capacity += size * buffers.len();
         }
 
-        BufferPoolStats { total_buffers, total_capacity, size_count: self.pools.len() }
+        BufferPoolStats {
+            total_buffers,
+            total_capacity,
+            size_count: self.pools.len(),
+        }
     }
 }
 
-#[cfg(not(any(feature = "std", )))]
+#[cfg(not(feature = "std"))]
 impl BufferPool {
     /// Create a new buffer pool with default settings
     pub fn new() -> Self {
         Self {
-            max_buffer_size: 1024, // 1KB default max size for no_std
-            max_buffers_per_size: 2, // Reduced for no_std
+            max_buffer_size:      1024, // 1KB default max size for no_std
+            max_buffers_per_size: 2,    // Reduced for no_std
         }
     }
 
     /// Create a new buffer pool with custom max buffer size
     pub fn new_with_config(max_buffer_size: usize, max_buffers_per_size: usize) -> Self {
-        Self { max_buffer_size, max_buffers_per_size }
+        Self {
+            max_buffer_size,
+            max_buffers_per_size,
+        }
     }
 
     /// Allocate a buffer of at least the specified size (simplified for no_std)
@@ -117,9 +137,9 @@ impl BufferPool {
     /// Get statistics about the buffer pool (simplified for no_std)
     pub fn stats(&self) -> BufferPoolStats {
         BufferPoolStats {
-            total_buffers: 0,
+            total_buffers:  0,
             total_capacity: 0,
-            size_count: 0,
+            size_count:     0,
         }
     }
 }
@@ -127,11 +147,11 @@ impl BufferPool {
 /// Statistics about a buffer pool
 pub struct BufferPoolStats {
     /// Total number of buffers in the pool
-    pub total_buffers: usize,
+    pub total_buffers:  usize,
     /// Total capacity of all buffers in bytes
     pub total_capacity: usize,
     /// Number of different buffer sizes
-    pub size_count: usize,
+    pub size_count:     usize,
 }
 
 #[cfg(test)]

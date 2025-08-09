@@ -5,15 +5,18 @@
 //!
 //! This module requires the `std` feature since it uses std::thread and std::time.
 
+#[cfg(any(feature = "alloc", feature = "std"))]
+extern crate alloc;
+
 use core::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Duration,
 };
 
 #[cfg(not(feature = "std"))]
-use std::{collections::BTreeMap, string::String, sync::Arc};
+use alloc::{collections::BTreeMap, string::String, sync::Arc};
 #[cfg(feature = "std")]
-use std::{collections::BTreeMap, string::String, sync::Arc};
+use alloc::{collections::BTreeMap, string::String, sync::Arc};
 
 use wrt_sync::{WrtMutex, WrtRwLock};
 
@@ -139,21 +142,23 @@ impl SoftwareWatchdog {
                     if elapsed > task.timeout {
                         // Timeout detected
                         eprintln!(
-                            "Watchdog: Task '{}' (ID: {:?}) timed out after {:?}",
-                            task.name, task.id, elapsed
+                            "Watchdog: Task '{name}' (ID: {id:?}) timed out after {elapsed:?}",
+                            name = task.name,
+                            id = task.id,
+                            elapsed = elapsed
                         );
 
                         // Execute action
                         match &task.action {
                             WatchdogAction::Log => {
                                 // Already logged above
-                            }
+                            },
                             WatchdogAction::Kill => {
                                 if auto_kill {
                                     // Platform-specific kill logic would go here
-                                    eprintln!("Watchdog: Would kill task {}", task.name);
+                                    eprintln!("Watchdog: Would kill task {name}", name = task.name);
                                 }
-                            }
+                            },
                         }
 
                         // Mark as inactive after timeout
@@ -208,10 +213,8 @@ impl SoftwareWatchdog {
         {
             let tasks = self.tasks.read();
             if tasks.len() >= self.config.max_watched_tasks {
-                return Err(Error::new(
-                    ErrorCategory::Resource,
-                    1,
-                    "Too many watched tasks",
+                return Err(Error::runtime_execution_error(
+                    "Maximum watched tasks limit reached",
                 ));
             }
         }
@@ -227,16 +230,12 @@ impl SoftwareWatchdog {
     /// Send heartbeat for a task
     pub fn heartbeat(&self, task_id: WatchedTaskId) -> Result<()> {
         let tasks = self.tasks.read();
-        let task = tasks.get(&task_id).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Validation,
-                1,
-                "Task not found",
-            )
-        })?;
+        let task = tasks
+            .get(&task_id)
+            .ok_or_else(|| Error::new(ErrorCategory::Validation, 1, "Task not found"))?;
 
         if task.active.load(Ordering::Acquire) {
-            // Update heartbeat timestamp 
+            // Update heartbeat timestamp
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -244,11 +243,7 @@ impl SoftwareWatchdog {
             *task.last_heartbeat.lock() = now;
             Ok(())
         } else {
-            Err(Error::new(
-                ErrorCategory::Runtime,
-                1,
-                "Task is no longer active",
-            ))
+            Err(Error::runtime_execution_error("Task is not active"))
         }
     }
 
@@ -258,11 +253,7 @@ impl SoftwareWatchdog {
             task.active.store(false, Ordering::Release);
             Ok(())
         } else {
-            Err(Error::new(
-                ErrorCategory::Validation,
-                1,
-                "Task not found",
-            ))
+            Err(Error::new(ErrorCategory::Validation, 1, "Task not found"))
         }
     }
 }
@@ -279,11 +270,7 @@ impl<'a> WatchdogHandle<'a> {
         if let Some(task) = &self.task {
             self.watchdog.heartbeat(task.id)
         } else {
-            Err(Error::new(
-                ErrorCategory::Runtime,
-                1,
-                "Handle already consumed",
-            ))
+            Err(Error::runtime_execution_error("Task is not active"))
         }
     }
 
@@ -313,11 +300,7 @@ impl<'a> Drop for WatchdogHandle<'a> {
 /// Integration with WASM execution
 pub trait WatchdogIntegration {
     /// Start watching a WASM module execution
-    fn watch_wasm_execution(
-        &self,
-        module_name: &str,
-        timeout: Duration,
-    ) -> Result<WatchdogHandle>;
+    fn watch_wasm_execution(&self, module_name: &str, timeout: Duration) -> Result<WatchdogHandle>;
 
     /// Create a scoped watchdog for a function
     fn watch_function<F, R>(&self, name: &str, timeout: Duration, f: F) -> Result<R>
@@ -326,13 +309,9 @@ pub trait WatchdogIntegration {
 }
 
 impl WatchdogIntegration for SoftwareWatchdog {
-    fn watch_wasm_execution(
-        &self,
-        module_name: &str,
-        timeout: Duration,
-    ) -> Result<WatchdogHandle> {
+    fn watch_wasm_execution(&self, module_name: &str, timeout: Duration) -> Result<WatchdogHandle> {
         self.watch_task(
-            format!("wasm:{module_name}"),
+            format!("WASM module: {module_name}"),
             Some(timeout),
             WatchdogAction::Log,
         )
@@ -367,9 +346,7 @@ mod tests {
         watchdog.start().unwrap();
 
         // Watch a task
-        let handle = watchdog
-            .watch_task("test_task", None, WatchdogAction::Log)
-            .unwrap();
+        let handle = watchdog.watch_task("test_task", None, WatchdogAction::Log).unwrap();
 
         // Send heartbeats
         for _ in 0..5 {
@@ -408,7 +385,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(100));
 
         // Task should have timed out (verified through logs)
-        
+
         watchdog.stop().unwrap();
     }
 

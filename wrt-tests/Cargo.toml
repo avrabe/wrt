@@ -3,6 +3,15 @@ name = "wrt-tests"
 version = "0.2.0"
 edition = "2021"
 
+[features]
+default = ["std"]
+std = []
+no_std = []
+safety-asil-b = []
+safety-asil-c = ["safety-asil-b"]
+safety-asil-d = ["safety-asil-c"]
+
+
 [lib]
 name = "wrt_tests"
 path = "integration/lib.rs"

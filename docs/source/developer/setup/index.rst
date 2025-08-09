@@ -15,13 +15,14 @@ This guide covers setting up a complete development environment for contributing
 Prerequisites
 =============
 
-System Requirements
--------------------
+For basic prerequisites and installation instructions, see the :doc:`/getting_started/installation` guide.
 
-* **Rust 1.86.0 or newer**
-* **Git 2.20 or newer**
+Additional Development Requirements
+-----------------------------------
+
 * **Docker or Podman** (for Dagger CI)
-* **4GB RAM minimum** (8GB recommended)
+* **4GB RAM minimum** (8GB recommended for development)
+* **Python 3.8+** (for documentation generation)
 
 Platform Support
 -----------------
@@ -30,39 +31,26 @@ Platform Support
 * **macOS**: Full support with native tools
 * **Windows**: WSL2 recommended
 
-Essential Tools
-===============
+Development Tools
+=================
 
-Core Toolchain
---------------
+Beyond the basic installation requirements, developers need additional tools:
 
 .. code-block:: bash
-
-   # Install Rust
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   source ~/.cargo/env
-
-   # Install just (task runner)
-   cargo install just
 
    # Install Dagger (CI tool)
    curl -fsSL https://dl.dagger.io/dagger/install.sh | sh
 
-Development Tools
------------------
-
-.. code-block:: bash
-
-   # WASM tooling
-   cargo install cargo-component
-   cargo install wasm-tools
-
-   # Code quality
+   # Code quality tools
    cargo install cargo-llvm-cov
    cargo install cargo-deny
 
-   # Documentation
+   # Documentation dependencies
    pip install -r docs/requirements.txt
+
+   # Optional: Additional development utilities
+   cargo install cargo-watch  # For automatic rebuilds
+   cargo install cargo-expand # For macro expansion debugging
 
 Quick Setup
 ===========
@@ -73,14 +61,52 @@ Quick Setup
    git clone https://github.com/pulseengine/wrt.git
    cd wrt
 
+   # Install unified build tool
+   cargo install --path cargo-wrt
+
+   # Setup development environment and tools
+   cargo-wrt setup --check       # Check tool dependencies
+   cargo-wrt setup --all         # Install tools and setup git hooks
+
+   # Verify tool versions (optional)
+   cargo-wrt tool-versions check --verbose
+
    # Verify build
-   just build
+   cargo-wrt build
 
    # Run tests
-   just ci-test
+   cargo-wrt test
 
-   # Format code
-   just fmt
+   # Format code and run checks
+   cargo-wrt check
+
+Tool Version Management
+=======================
+
+WRT uses a sophisticated tool version management system to ensure reproducible development environments:
+
+.. code-block:: bash
+
+   # Check all tool versions against requirements
+   cargo-wrt tool-versions check
+
+   # Show detailed version information
+   cargo-wrt tool-versions check --verbose
+
+   # Check specific tool
+   cargo-wrt tool-versions check --tool kani
+
+   # Generate tool-versions.toml configuration file
+   cargo-wrt tool-versions generate
+
+The ``tool-versions.toml`` file in the workspace root specifies:
+
+* **Exact version requirements** (e.g., kani must be exactly 0.63.0)
+* **Minimum version requirements** (e.g., git must be at least 2.30.0) 
+* **Installation commands** for each tool
+* **Command mapping** - which cargo-wrt commands require each tool
+
+This ensures all contributors use compatible tool versions for consistent builds and testing.
 
 Next Steps
 ==========

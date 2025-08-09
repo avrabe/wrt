@@ -12,7 +12,7 @@ mod bounded_collections_tests;
 
 /// Run all memory safety integration tests
 pub fn run_tests() -> TestResult {
-    let mut runner = TestRunner::new("Memory Safety Integration");
+    let mut runner = TestRunner::new("Memory Safety Integration";
     
     runner.add_test_suite("Core Memory Safety", || {
         // The consolidated tests are run via standard test framework
@@ -43,7 +43,7 @@ mod tests {
     
     #[test]
     fn memory_safety_integration() {
-        let result = run_tests();
+        let result = run_tests);
         assert!(result.is_success(), "Memory safety integration tests failed: {:?}", result);
     }
 }

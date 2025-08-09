@@ -1,9 +1,18 @@
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::{
+        Path,
+        PathBuf,
+    },
 };
 
-use wrt::{Error as WrtError, Module, Result, StacklessEngine, Value};
+use wrt::{
+    Error as WrtError,
+    Module,
+    Result,
+    StacklessEngine,
+    Value,
+};
 
 #[test]
 fn test_i32_add() -> Result<()> {
@@ -169,7 +178,10 @@ fn run_test_case(wasm_path: &Path) -> Result<()> {
     let _instance_idx = engine.instantiate(module)?;
 
     // TODO: Add actual test logic here to invoke functions and check results
-    println!("Successfully loaded and instantiated {:?}, but no tests run.", wasm_path);
+    println!(
+        "Successfully loaded and instantiated {:?}, but no tests run.",
+        wasm_path
+    );
 
     Ok(())
 }
@@ -203,7 +215,7 @@ fn test_run_all_spec_tests() -> Result<()> {
 
     if !testsuite_path.exists() {
         println!("Test suite directory not found, skipping spec tests.");
-        return Ok(());
+        return Ok();
     }
 
     for entry in fs::read_dir(testsuite_path).map_err(|e| WrtError::IO(e.to_string()))? {

@@ -1,34 +1,51 @@
 //! Core module to component adapter
 //!
-//! This module provides adaptation between WebAssembly core modules and components,
-//! allowing core modules to be used within the component model ecosystem.
+//! This module provides adaptation between WebAssembly core modules and
+//! components, allowing core modules to be used within the component model
+//! ecosystem.
 
 #[cfg(not(feature = "std"))]
-use core::{fmt, mem};
-#[cfg(feature = "std")]
-use std::{fmt, mem};
-
-#[cfg(feature = "std")]
-use std::{boxed::Box, string::String, vec::Vec};
-
-use wrt_foundation::{
-    bounded::BoundedVec, component::ComponentType, prelude::*,
+use core::{
+    fmt,
+    mem,
 };
-
-#[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedString, safe_memory::NoStdProvider};
+#[cfg(feature = "std")]
+use std::{
+    boxed::Box,
+    string::String,
+    vec::Vec,
+};
+#[cfg(feature = "std")]
+use std::{
+    fmt,
+    mem,
+};
 
 #[cfg(feature = "std")]
 use wrt_foundation::component_value::ComponentValue;
+use wrt_foundation::{
+    bounded::BoundedVec,
+    prelude::*,
+};
+#[cfg(not(feature = "std"))]
+use wrt_foundation::{
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+    safe_memory::NoStdProvider,
+    BoundedString,
+};
 
 #[cfg(not(feature = "std"))]
 // For no_std, use a simpler ComponentValue representation
 use crate::types::Value as ComponentValue;
-
 use crate::{
     canonical_abi::CanonicalABI,
     components::Component,
-    types::{ValType, Value},
+    execution_engine::ComponentExecutionEngine,
+    types::{
+        ValType,
+        Value,
+    },
 };
 
 /// Maximum number of adapted functions in no_std environments
@@ -40,31 +57,31 @@ pub struct CoreModuleAdapter {
     /// Module name/identifier
     #[cfg(feature = "std")]
     pub name: String,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(any(feature = "std",)))]
     pub name: BoundedString<64, NoStdProvider<65536>>,
 
     /// Function adapters
     #[cfg(feature = "std")]
     pub functions: Vec<FunctionAdapter>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(any(feature = "std",)))]
     pub functions: BoundedVec<FunctionAdapter, MAX_ADAPTED_FUNCTIONS, NoStdProvider<65536>>,
 
     /// Memory adapters
     #[cfg(feature = "std")]
     pub memories: Vec<MemoryAdapter>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(any(feature = "std",)))]
     pub memories: BoundedVec<MemoryAdapter, 16, NoStdProvider<65536>>,
 
     /// Table adapters
     #[cfg(feature = "std")]
     pub tables: Vec<TableAdapter>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(any(feature = "std",)))]
     pub tables: BoundedVec<TableAdapter, 16, NoStdProvider<65536>>,
 
     /// Global adapters
     #[cfg(feature = "std")]
     pub globals: Vec<GlobalAdapter>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(any(feature = "std",)))]
     pub globals: BoundedVec<GlobalAdapter, 64, NoStdProvider<65536>>,
 }
 
@@ -72,13 +89,13 @@ pub struct CoreModuleAdapter {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FunctionAdapter {
     /// Core function index
-    pub core_index: u32,
+    pub core_index:          u32,
     /// Component function signature
-    pub component_signature: ComponentType,
+    pub component_signature: WrtComponentType,
     /// Core function signature (WebAssembly types)
-    pub core_signature: CoreFunctionSignature,
+    pub core_signature:      CoreFunctionSignature,
     /// Adaptation mode
-    pub mode: AdaptationMode,
+    pub mode:                AdaptationMode,
 }
 
 /// Core WebAssembly function signature
@@ -86,13 +103,13 @@ pub struct FunctionAdapter {
 pub struct CoreFunctionSignature {
     /// Parameter types (WebAssembly core types)
     #[cfg(feature = "std")]
-    pub params: Vec<CoreValType>,
-    #[cfg(not(any(feature = "std", )))]
-    pub params: BoundedVec<CoreValType, 32, NoStdProvider<65536>>,
+    pub params:  Vec<CoreValType>,
+    #[cfg(not(any(feature = "std",)))]
+    pub params:  BoundedVec<CoreValType, 32, NoStdProvider<65536>>,
     /// Result types (WebAssembly core types)
     #[cfg(feature = "std")]
     pub results: Vec<CoreValType>,
-    #[cfg(not(any(feature = "std", )))]
+    #[cfg(not(any(feature = "std",)))]
     pub results: BoundedVec<CoreValType, 8, NoStdProvider<65536>>,
 }
 
@@ -136,9 +153,9 @@ pub struct MemoryAdapter {
     /// Core memory index
     pub core_index: u32,
     /// Memory limits
-    pub limits: MemoryLimits,
+    pub limits:     MemoryLimits,
     /// Shared flag
-    pub shared: bool,
+    pub shared:     bool,
 }
 
 /// Memory limits
@@ -154,11 +171,11 @@ pub struct MemoryLimits {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TableAdapter {
     /// Core table index
-    pub core_index: u32,
+    pub core_index:   u32,
     /// Element type
     pub element_type: CoreValType,
     /// Table limits
-    pub limits: TableLimits,
+    pub limits:       TableLimits,
 }
 
 /// Table limits
@@ -174,11 +191,11 @@ pub struct TableLimits {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct GlobalAdapter {
     /// Core global index
-    pub core_index: u32,
+    pub core_index:  u32,
     /// Global type
     pub global_type: CoreValType,
     /// Mutability
-    pub mutable: bool,
+    pub mutable:     bool,
 }
 
 impl CoreModuleAdapter {
@@ -195,9 +212,9 @@ impl CoreModuleAdapter {
     }
 
     /// Create a new core module adapter (no_std version)
-    #[cfg(not(any(feature = "std", )))]
-    pub fn new(name: BoundedString<64, NoStdProvider<65536>>) -> Result<Self, Error> {
-        let provider = NoStdProvider::<65536>::default();
+    #[cfg(not(any(feature = "std",)))]
+    pub fn new(name: BoundedString<64, NoStdProvider<65536>>) -> core::result::Result<Self, Error> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
         Ok(Self {
             name,
             functions: BoundedVec::new(provider.clone())?,
@@ -214,11 +231,11 @@ impl CoreModuleAdapter {
             self.functions.push(adapter);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
-            self.functions.push(adapter).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many function adapters".into())
-            })
+            self.functions
+                .push(adapter)
+                .map_err(|_| wrt_error::Error::resource_exhausted("Too many function adapters"))
         }
     }
 
@@ -229,11 +246,11 @@ impl CoreModuleAdapter {
             self.memories.push(adapter);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
-            self.memories.push(adapter).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many memory adapters".into())
-            })
+            self.memories
+                .push(adapter)
+                .map_err(|_| wrt_error::Error::resource_exhausted("Too many memory adapters"))
         }
     }
 
@@ -244,11 +261,11 @@ impl CoreModuleAdapter {
             self.tables.push(adapter);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
-            self.tables.push(adapter).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many table adapters".into())
-            })
+            self.tables
+                .push(adapter)
+                .map_err(|_| wrt_error::Error::resource_exhausted("Too many table adapters"))
         }
     }
 
@@ -259,11 +276,11 @@ impl CoreModuleAdapter {
             self.globals.push(adapter);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
-            self.globals.push(adapter).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many global adapters".into())
-            })
+            self.globals
+                .push(adapter)
+                .map_err(|_| wrt_error::Error::resource_exhausted("Too many global adapters"))
         }
     }
 
@@ -324,15 +341,15 @@ impl CoreModuleAdapter {
     }
 
     /// Convert core type to component type
-    fn core_type_to_component_type(&self, core_type: CoreValType) -> ComponentType {
+    fn core_type_to_component_type(&self, core_type: CoreValType) -> WrtComponentType {
         match core_type {
-            CoreValType::I32 => ComponentType::Unit, // Simplified
-            CoreValType::I64 => ComponentType::Unit,
-            CoreValType::F32 => ComponentType::Unit,
-            CoreValType::F64 => ComponentType::Unit,
-            CoreValType::V128 => ComponentType::Unit,
-            CoreValType::FuncRef => ComponentType::Unit,
-            CoreValType::ExternRef => ComponentType::Unit,
+            CoreValType::I32 => WrtComponentType::Unit, // Simplified
+            CoreValType::I64 => WrtComponentType::Unit,
+            CoreValType::F32 => WrtComponentType::Unit,
+            CoreValType::F64 => WrtComponentType::Unit,
+            CoreValType::V128 => WrtComponentType::Unit,
+            CoreValType::FuncRef => WrtComponentType::Unit,
+            CoreValType::ExternRef => WrtComponentType::Unit,
         }
     }
 
@@ -343,35 +360,35 @@ impl CoreModuleAdapter {
         args: &[Value],
         engine: &mut ComponentExecutionEngine,
     ) -> Result<Value> {
-        let adapter = self
-            .get_function(func_index)
-            .ok_or_else(|| wrt_foundation::WrtError::invalid_input("Invalid input"))?;
+        let adapter = self.get_function(func_index).ok_or_else(|| {
+            wrt_error::Error::runtime_function_not_found("Function adapter not found")
+        })?;
 
         match adapter.mode {
             AdaptationMode::Direct => {
                 // Direct call - no adaptation needed
                 self.call_core_function_direct(adapter.core_index, args, engine)
-            }
+            },
             AdaptationMode::Lift => {
                 // Lower component args to core args, call, then lift result
                 let core_args = self.lower_args_to_core(args, &adapter.core_signature)?;
                 let core_result =
                     self.call_core_function_direct(adapter.core_index, &core_args, engine)?;
                 self.lift_result_to_component(core_result, &adapter.component_signature)
-            }
+            },
             AdaptationMode::Lower => {
                 // Already have core args, call directly
                 let core_result =
                     self.call_core_function_direct(adapter.core_index, args, engine)?;
                 self.lift_result_to_component(core_result, &adapter.component_signature)
-            }
+            },
             AdaptationMode::Bidirectional => {
                 // Full bidirectional adaptation
                 let core_args = self.lower_args_to_core(args, &adapter.core_signature)?;
                 let core_result =
                     self.call_core_function_direct(adapter.core_index, &core_args, engine)?;
                 self.lift_result_to_component(core_result, &adapter.component_signature)
-            }
+            },
         }
     }
 
@@ -401,7 +418,7 @@ impl CoreModuleAdapter {
         {
             Ok(args.to_vec())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             let mut result = Vec::new();
             for arg in args {
@@ -415,7 +432,7 @@ impl CoreModuleAdapter {
     fn lift_result_to_component(
         &self,
         result: Value,
-        _component_signature: &ComponentType,
+        _component_signature: &WrtComponentType,
     ) -> Result<Value> {
         // Simplified lifting - in reality would use canonical ABI
         Ok(result)
@@ -426,11 +443,16 @@ impl FunctionAdapter {
     /// Create a new function adapter
     pub fn new(
         core_index: u32,
-        component_signature: ComponentType,
+        component_signature: WrtComponentType,
         core_signature: CoreFunctionSignature,
         mode: AdaptationMode,
     ) -> Self {
-        Self { core_index, component_signature, core_signature, mode }
+        Self {
+            core_index,
+            component_signature,
+            core_signature,
+            mode,
+        }
     }
 
     /// Check if this adapter needs canonical ABI processing
@@ -444,17 +466,23 @@ impl FunctionAdapter {
 
 impl CoreFunctionSignature {
     /// Create a new core function signature
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
-            params: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            params: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            params:                               Vec::new(),
+            #[cfg(not(feature = "std"))]
+            params:                               {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
             #[cfg(feature = "std")]
-            results: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            results: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            results:                              Vec::new(),
+            #[cfg(not(feature = "std"))]
+            results:                              {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider)?
+            },
+        })
     }
 
     /// Add a parameter type
@@ -464,11 +492,11 @@ impl CoreFunctionSignature {
             self.params.push(param_type);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
-            self.params.push(param_type).map_err(|_| {
-                wrt_foundation::WrtError::ResourceExhausted("Too many parameters".into())
-            })
+            self.params
+                .push(param_type)
+                .map_err(|_| wrt_error::Error::resource_exhausted("Too many parameters"))
         }
     }
 
@@ -479,39 +507,60 @@ impl CoreFunctionSignature {
             self.results.push(result_type);
             Ok(())
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             self.results
                 .push(result_type)
-                .map_err(|_| wrt_foundation::WrtError::ResourceExhausted("Too many results".into()))
+                .map_err(|_| wrt_error::Error::resource_exhausted("Too many results"))
         }
     }
 }
 
 impl Default for CoreFunctionSignature {
     fn default() -> Self {
-        Self::new()
+        Self::new().unwrap_or_else(|_| Self {
+            #[cfg(feature = "std")]
+            params:                               Vec::new(),
+            #[cfg(not(feature = "std"))]
+            params:                               BoundedVec::new_with_default_provider().unwrap(),
+            #[cfg(feature = "std")]
+            results:                              Vec::new(),
+            #[cfg(not(feature = "std"))]
+            results:                              BoundedVec::new_with_default_provider().unwrap(),
+        })
     }
 }
 
 impl MemoryAdapter {
     /// Create a new memory adapter
     pub fn new(core_index: u32, min: u32, max: Option<u32>, shared: bool) -> Self {
-        Self { core_index, limits: MemoryLimits { min, max }, shared }
+        Self {
+            core_index,
+            limits: MemoryLimits { min, max },
+            shared,
+        }
     }
 }
 
 impl TableAdapter {
     /// Create a new table adapter
     pub fn new(core_index: u32, element_type: CoreValType, min: u32, max: Option<u32>) -> Self {
-        Self { core_index, element_type, limits: TableLimits { min, max } }
+        Self {
+            core_index,
+            element_type,
+            limits: TableLimits { min, max },
+        }
     }
 }
 
 impl GlobalAdapter {
     /// Create a new global adapter
     pub fn new(core_index: u32, global_type: CoreValType, mutable: bool) -> Self {
-        Self { core_index, global_type, mutable }
+        Self {
+            core_index,
+            global_type,
+            mutable,
+        }
     }
 }
 
@@ -541,7 +590,13 @@ impl fmt::Display for AdaptationMode {
 }
 
 // Implement required traits for BoundedVec compatibility
-use wrt_foundation::traits::{Checksummable, ToBytes, FromBytes, WriteStream, ReadStream};
+use wrt_foundation::traits::{
+    Checksummable,
+    FromBytes,
+    ReadStream,
+    ToBytes,
+    WriteStream,
+};
 
 // Macro to implement basic traits for simple types
 macro_rules! impl_basic_traits {
@@ -597,10 +652,10 @@ mod tests {
             assert_eq!(adapter.name, "test_module");
             assert_eq!(adapter.functions.len(), 0);
         }
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(feature = "std"))]
         {
             let name = BoundedString::from_str("test_module").unwrap();
-            let adapter = CoreModuleAdapter::new(name);
+            let adapter = CoreModuleAdapter::new(name).unwrap();
             assert_eq!(adapter.name.as_str(), "test_module");
             assert_eq!(adapter.functions.len(), 0);
         }
@@ -608,12 +663,12 @@ mod tests {
 
     #[test]
     fn test_function_adapter() {
-        let mut core_sig = CoreFunctionSignature::new();
+        let mut core_sig = CoreFunctionSignature::new().unwrap();
         core_sig.add_param(CoreValType::I32).unwrap();
         core_sig.add_result(CoreValType::I32).unwrap();
 
         let adapter =
-            FunctionAdapter::new(0, ComponentType::Unit, core_sig, AdaptationMode::Direct);
+            FunctionAdapter::new(0, WrtComponentType::Unit, core_sig, AdaptationMode::Direct);
 
         assert_eq!(adapter.core_index, 0);
         assert_eq!(adapter.mode, AdaptationMode::Direct);

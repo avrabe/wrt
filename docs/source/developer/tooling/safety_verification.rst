@@ -28,11 +28,8 @@ Initialize Requirements
 
 .. code-block:: bash
 
-   # Create requirements template
-   just init-requirements
-   
-   # Or with xtask directly
-   cargo xtask init-requirements
+   # Create requirements template (handled automatically)
+   cargo-wrt verify --asil c
 
 Run Safety Verification
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -40,30 +37,30 @@ Run Safety Verification
 .. code-block:: bash
 
    # Quick verification dashboard
-   just safety-dashboard
+   cargo-wrt verify --detailed
    
    # Check requirements traceability
-   just check-requirements
+   cargo-wrt verify --asil c
    
    # Full safety verification
-   just verify-safety
+   cargo-wrt verify --asil d
    
    # Detailed requirements verification
-   just verify-requirements
+   cargo-wrt verify --asil d --detailed
 
 Generate Reports
 ~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-   # Text report
-   just safety-report
+   # Comprehensive verification with reports
+   cargo-wrt verify --asil d --detailed
    
-   # JSON report
-   cargo xtask verify-safety --format json
+   # Matrix verification with reports
+   cargo-wrt verify-matrix --report
    
-   # Save to file
-   cargo xtask safety-report --format json --output safety.json
+   # CI simulation with artifacts
+   cargo-wrt simulate-ci --verbose
 
 Available Commands
 ------------------
@@ -71,7 +68,7 @@ Available Commands
 Core Commands
 ~~~~~~~~~~~~~
 
-All safety verification commands are implemented in ``xtask`` for proper integration with the WRT build system:
+All safety verification commands are implemented in ``cargo-wrt`` for unified build system integration:
 
 .. list-table:: Safety Verification Commands
    :widths: 30 50 20
@@ -80,22 +77,22 @@ All safety verification commands are implemented in ``xtask`` for proper integra
    * - Command
      - Description
      - Output Formats
-   * - ``cargo xtask check-requirements``
+   * - ``cargo-wrt verify --detailed``
      - Quick requirements file validation
      - Text
-   * - ``cargo xtask verify-requirements``
+   * - ``cargo-wrt verify --asil c``
      - Detailed file existence checking
      - Text
-   * - ``cargo xtask verify-safety``
+   * - ``cargo-wrt verify --asil d``
      - SCORE-inspired safety framework verification
      - Text, JSON, HTML
-   * - ``cargo xtask safety-report``
+   * - ``cargo-wrt verify-matrix --report``
      - Generate comprehensive safety reports
      - Text, JSON, HTML
-   * - ``cargo xtask safety-dashboard``
+   * - ``cargo-wrt verify --detailed``
      - Complete safety status overview
      - Text
-   * - ``cargo xtask init-requirements``
+   * - ``cargo-wrt verify --asil c``
      - Create requirements template
      - N/A
 
@@ -105,16 +102,16 @@ Advanced Options
 .. code-block:: bash
 
    # JSON output for CI integration
-   cargo xtask verify-safety --format json --output safety.json
+   cargo-wrt verify --asil d --detailed
    
    # Detailed requirements verification
-   cargo xtask verify-requirements --detailed --requirements-file custom.toml
+   cargo-wrt verify --asil d --detailed
    
-   # Skip file verification (faster checks)
-   cargo xtask verify-requirements --skip-files
+   # Quick verification (faster checks)
+   cargo-wrt verify --asil c
    
    # HTML report for stakeholders
-   cargo xtask safety-report --format html --output report.html
+   cargo-wrt verify-matrix --report
 
 Requirements Format
 -------------------
@@ -283,8 +280,8 @@ Machine-readable format for CI integration and automated processing:
 
 .. code-block:: bash
 
-   # Generate JSON report
-   cargo xtask verify-safety --format json | jq '.certification_readiness.overall_readiness'
+   # Generate verification report
+   cargo-wrt verify --asil d --detailed
    # Output: 76.42857142857143
 
 **Example JSON Output Structure:**
@@ -337,17 +334,15 @@ Machine-readable format for CI integration and automated processing:
 
 .. code-block:: bash
 
-   # Fail CI if overall readiness < 75%
-   READINESS=$(cargo xtask verify-safety --format json | jq '.certification_readiness.overall_readiness')
-   if (( $(echo "$READINESS < 75.0" | bc -l) )); then
-     echo "❌ Safety readiness below threshold: $READINESS%"
+   # Fail CI if ASIL-D verification fails
+   if ! cargo-wrt verify --asil d; then
+     echo "❌ ASIL-D compliance failure - blocking release"
      exit 1
    fi
    
-   # Check for critical ASIL-D failures
-   ASIL_D_FAIL=$(cargo xtask verify-safety --format json | jq '.asil_compliance[] | select(.level=="AsilD" and .status=="Fail")')
-   if [ ! -z "$ASIL_D_FAIL" ]; then
-     echo "❌ ASIL-D compliance failure - blocking release"
+   # Check verification matrix
+   if ! cargo-wrt verify-matrix --report; then
+     echo "❌ Build matrix verification failed"
      exit 1
    fi
 
@@ -358,7 +353,7 @@ Formatted reports for stakeholder presentations and documentation:
 
 .. code-block:: bash
 
-   cargo xtask safety-report --format html --output safety-report.html
+   cargo-wrt verify-matrix --report
 
 CI Integration
 --------------
@@ -373,8 +368,8 @@ Add to your CI pipeline:
    # .github/workflows/safety.yml
    - name: Safety Verification
      run: |
-       cargo xtask verify-safety --format json --output safety-report.json
-       cargo xtask check-requirements
+       cargo-wrt verify --asil d --detailed
+       cargo-wrt verify-matrix --report
 
    - name: Upload Safety Report
      uses: actions/upload-artifact@v3
@@ -390,8 +385,8 @@ The safety verification system integrates with:
 - **CI Pipeline**: Automated safety checks on every build
 - **Documentation**: Requirements linked to Sphinx documentation  
 - **Testing**: ASIL-tagged test categorization
-- **Build System**: Integrated through xtask automation
-- **Justfile**: Convenient command aliases
+- **Build System**: Integrated through cargo-wrt unified build tool
+- **cargo-wrt**: Unified command interface
 
 Implementation Details
 ----------------------
@@ -399,9 +394,9 @@ Implementation Details
 Core Components
 ~~~~~~~~~~~~~~~
 
-- ``xtask/src/safety_verification.rs`` - Core verification framework
+- ``wrt-build-core/src/verify.rs`` - Core verification framework
 - ``requirements.toml`` - Requirements definition file
-- ``justfile`` - Convenient command aliases
+- ``cargo-wrt`` - Unified command interface
 - ``docs/architecture/safety.rst`` - Safety documentation
 
 File Structure
@@ -410,10 +405,10 @@ File Structure
 .. code-block:: text
 
    wrt2/
-   ├── requirements.toml           # Requirements definitions
-   ├── xtask/src/
-   │   └── safety_verification.rs  # Core implementation
-   ├── justfile                    # Command aliases
+   ├── requirements.toml                    # Requirements definitions
+   ├── wrt-build-core/src/
+   │   └── verify.rs                       # Core implementation
+   ├── cargo-wrt/                          # Unified command interface
    └── docs/
        ├── architecture/safety.rst # Architecture docs
        └── qualification/          # Certification materials
@@ -479,10 +474,12 @@ Use safety verification results to make data-driven release decisions:
    #!/bin/bash
    # Safety gate for release pipeline
    
-   RESULTS=$(cargo xtask verify-safety --format json)
-   READINESS=$(echo "$RESULTS" | jq '.certification_readiness.overall_readiness')
-   ASIL_D_STATUS=$(echo "$RESULTS" | jq -r '.asil_compliance[] | select(.level=="AsilD") | .status')
-   MISSING_COUNT=$(echo "$RESULTS" | jq '.missing_files | length')
+   # Run verification
+   if cargo-wrt verify --asil d; then
+     ASIL_D_STATUS="Pass"
+   else
+     ASIL_D_STATUS="Fail"
+   fi
    
    echo "🔍 Safety Gate Assessment:"
    echo "   Overall Readiness: $READINESS%"
@@ -535,19 +532,19 @@ Team Communication
 .. code-block:: bash
 
    # Quick standup status
-   cargo xtask verify-safety | grep "Overall Certification Readiness"
+   cargo-wrt verify --detailed
    # Output: 🎯 Overall Certification Readiness: 76.4%
 
 **Weekly Stakeholder Reports:**
 
 .. code-block:: bash
 
-   # Generate stakeholder-friendly HTML report
-   cargo xtask safety-report --format html --output "weekly-safety-$(date +%Y%m%d).html"
+   # Generate stakeholder-friendly report
+   cargo-wrt verify-matrix --report
    
    # Email-friendly summary
    echo "WRT Safety Status - Week $(date +%U)"
-   cargo xtask verify-safety | grep -E "(Overall|ASIL.*FAIL|Missing Files)"
+   cargo-wrt verify --asil d --detailed
 
 Best Practices
 --------------
@@ -566,13 +563,13 @@ Daily Development Workflow
 .. code-block:: bash
 
    # Before committing changes
-   just safety-dashboard
+   cargo-wrt verify --detailed
    
    # Check specific requirements
-   cargo xtask verify-requirements --detailed
+   cargo-wrt verify --asil d --detailed
    
    # Generate report for stakeholders
-   cargo xtask safety-report --format html --output weekly-report.html
+   cargo-wrt verify-matrix --report
 
 Monitoring & Alerts
 ~~~~~~~~~~~~~~~~~~~
@@ -582,14 +579,12 @@ Monitoring & Alerts
 .. code-block:: bash
 
    # Add to CI pipeline for trend monitoring
-   cargo xtask verify-safety --format json > "safety-report-$(date +%Y%m%d).json"
+   cargo-wrt verify-matrix --report
    
-   # Alert on readiness degradation
-   PREV_READINESS=$(cat previous-safety.json | jq '.certification_readiness.overall_readiness')
-   CURR_READINESS=$(cargo xtask verify-safety --format json | jq '.certification_readiness.overall_readiness')
+   # Monitor build matrix status
+   if ! cargo-wrt verify --asil d; then
    
-   if (( $(echo "$CURR_READINESS < $PREV_READINESS - 5.0" | bc -l) )); then
-     echo "🚨 ALERT: Safety readiness dropped by >5%"
+     echo "🚨 ALERT: ASIL-D verification failed"
      # Send notification to team
    fi
 
@@ -617,7 +612,7 @@ Common Issues
    .. code-block:: bash
    
       # Check syntax
-      cargo xtask check-requirements
+      cargo-wrt verify --detailed
 
 See Also
 --------

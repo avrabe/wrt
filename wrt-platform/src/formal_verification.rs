@@ -1,3 +1,4 @@
+
 // WRT - wrt-platform
 // Module: Formal Verification Support
 // SW-REQ-ID: REQ_PLATFORM_VERIFICATION_001
@@ -41,8 +42,8 @@ pub mod annotations {
     /// Assert that a pointer is valid and aligned
     #[cfg(kani)]
     pub fn assert_valid_ptr<T>(ptr: *const T) {
-        kani::assume(!ptr.is_null());
-        kani::assume(ptr.is_aligned());
+        kani::assume(!ptr.is_null);
+        kani::assume(ptr.is_aligned);
     }
 
     /// Assert that a memory region is valid
@@ -114,7 +115,7 @@ pub mod memory_verification {
         //     // Verify alignment
         //     #[cfg(kani)]
         //     kani::assert(ptr.as_ptr() as usize % WASM_PAGE_SIZE == 0, "Page
-        // alignment");
+        // alignment";
         //
         // Binary std/no_std choice
         // }
@@ -450,13 +451,13 @@ pub mod cbmc_integration {
 
         pub fn cbmc_assert(condition: bool, description: &str) {
             unsafe {
-                __CPROVER_assert(condition, description.as_ptr());
+                __CPROVER_assert(condition, description.as_ptr);
             }
         }
 
         pub fn cbmc_cover(condition: bool, description: &str) {
             unsafe {
-                __CPROVER_cover(condition, description.as_ptr());
+                __CPROVER_cover(condition, description.as_ptr);
             }
         }
     }

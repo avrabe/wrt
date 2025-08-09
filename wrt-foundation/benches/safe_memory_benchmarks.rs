@@ -10,10 +10,18 @@
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{
+    black_box,
+    criterion_group,
+    criterion_main,
+    Criterion,
+};
 #[cfg(feature = "std")] // StdMemoryProvider is std-only
 use wrt_foundation::safe_memory::StdMemoryProvider;
-use wrt_foundation::{safe_memory::SafeMemoryHandler, verification::VerificationLevel};
+use wrt_foundation::{
+    safe_memory::SafeMemoryHandler,
+    verification::VerificationLevel,
+};
 
 const CAPACITY: usize = 65536; // 64KiB
 const CHUNK_SIZE: usize = 1024; // 1KiB
@@ -24,7 +32,11 @@ fn safe_memory_store_benchmark(c: &mut Criterion) {
 
     let data_to_store = vec![1u8; CHUNK_SIZE];
 
-    for &level in &[VerificationLevel::Off, VerificationLevel::Sampling, VerificationLevel::Full] {
+    for &level in &[
+        VerificationLevel::Off,
+        VerificationLevel::Sampling,
+        VerificationLevel::Full,
+    ] {
         group.bench_function(format!("verification_{:?}", level), |b| {
             b.iter(|| {
                 #[cfg(feature = "std")]
@@ -55,7 +67,11 @@ fn safe_memory_load_benchmark(c: &mut Criterion) {
         initial_data_vec[i] = (i % 256) as u8;
     }
 
-    for &level in &[VerificationLevel::Off, VerificationLevel::Sampling, VerificationLevel::Full] {
+    for &level in &[
+        VerificationLevel::Off,
+        VerificationLevel::Sampling,
+        VerificationLevel::Full,
+    ] {
         #[cfg(feature = "std")]
         let mut handler =
             SafeMemoryHandler::new(StdMemoryProvider::new(initial_data_vec.clone()), level);
@@ -86,5 +102,9 @@ fn safe_memory_load_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, safe_memory_store_benchmark, safe_memory_load_benchmark);
+criterion_group!(
+    benches,
+    safe_memory_store_benchmark,
+    safe_memory_load_benchmark
+);
 criterion_main!(benches);

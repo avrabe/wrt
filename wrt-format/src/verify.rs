@@ -22,7 +22,7 @@ pub mod kani_verification {
         let decoded = rle_decode(&encoded);
 
         // Verify round-trip correctness
-        assert_eq!(original, decoded.as_slice());
+        assert_eq!(original, decoded.as_slice);
     }
 
     /// Verify binary module version detection

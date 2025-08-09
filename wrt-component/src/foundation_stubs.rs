@@ -6,8 +6,8 @@
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-// Foundation stubs for Agent C independent development
-// These will be replaced with real implementations during integration
+// Foundation stubs for component module development
+// These provide the interface to the foundation module's types
 
 use alloc::vec::Vec;
 
@@ -52,8 +52,8 @@ impl SafetyContext {
 
 // Memory provider stubs
 pub trait UnifiedMemoryProvider: Send + Sync {
-    fn allocate(&mut self, size: usize) -> Result<&mut [u8], wrt_error::Error>;
-    fn deallocate(&mut self, ptr: &mut [u8]) -> Result<(), wrt_error::Error>;
+    fn allocate(&mut self, size: usize) -> core::result::Result<&mut [u8], wrt_error::Error>;
+    fn deallocate(&mut self, ptr: &mut [u8]) -> core::result::Result<(), wrt_error::Error>;
     fn available_memory(&self) -> usize;
     fn total_memory(&self) -> usize;
 }
@@ -79,18 +79,18 @@ impl<const SIZE: usize> Default for NoStdProvider<SIZE> {
 }
 
 impl<const SIZE: usize> UnifiedMemoryProvider for NoStdProvider<SIZE> {
-    fn allocate(&mut self, size: usize) -> Result<&mut [u8], wrt_error::Error> {
+    fn allocate(&mut self, size: usize) -> core::result::Result<&mut [u8], wrt_error::Error> {
         if self.allocated + size > SIZE {
-            return Err(wrt_error::Error::OUT_OF_MEMORY);
+            return Err(wrt_error::Error::OUT_OF_MEMORY;
         }
         let start = self.allocated;
         self.allocated += size;
         Ok(&mut self.buffer[start..self.allocated])
     }
     
-    fn deallocate(&mut self, _ptr: &mut [u8]) -> Result<(), wrt_error::Error> {
+    fn deallocate(&mut self, _ptr: &mut [u8]) -> core::result::Result<(), wrt_error::Error> {
         // Simple implementation - could reset if ptr is at end
-        Ok(())
+        Ok(()
     }
     
     fn available_memory(&self) -> usize {
@@ -141,9 +141,9 @@ impl ThreadManager {
         }
     }
 
-    pub fn spawn_thread(&mut self) -> Result<ThreadId, Error> {
+    pub fn spawn_thread(&mut self) -> core::result::Result<ThreadId, Error> {
         if self.thread_count >= self.max_threads {
-            return Err(Error::OUT_OF_MEMORY);
+            return Err(Error::OUT_OF_MEMORY;
         }
         
         let thread_id = self.thread_count;
@@ -151,19 +151,19 @@ impl ThreadManager {
         Ok(thread_id)
     }
 
-    pub fn get_thread_stats(&self, _thread_id: ThreadId) -> Result<ThreadExecutionStats, Error> {
-        Ok(ThreadExecutionStats::default())
+    pub fn get_thread_stats(&self, _thread_id: ThreadId) -> core::result::Result<ThreadExecutionStats, Error> {
+        Ok(ThreadExecutionStats::default()
     }
 
-    pub fn get_thread_state(&self, _thread_id: ThreadId) -> Result<ThreadState, Error> {
+    pub fn get_thread_state(&self, _thread_id: ThreadId) -> core::result::Result<ThreadState, Error> {
         Ok(ThreadState::Ready)
     }
 
-    pub fn terminate_thread(&mut self, _thread_id: ThreadId) -> Result<(), Error> {
+    pub fn terminate_thread(&mut self, _thread_id: ThreadId) -> core::result::Result<(), Error> {
         if self.thread_count > 0 {
             self.thread_count -= 1;
         }
-        Ok(())
+        Ok(()
     }
 }
 

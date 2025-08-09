@@ -5,12 +5,12 @@ use wrt_test_registry::prelude::*;
 #[cfg(feature = "threading")]
 pub fn run_tests() -> TestResult {
     let mut suite = TestSuite::new("Platform Threading");
-    
+
     suite.add_test("thread_creation", test_thread_creation);
     suite.add_test("thread_synchronization", test_thread_synchronization);
     suite.add_test("thread_local_storage", test_thread_local_storage);
     suite.add_test("wasm_thread_manager", test_wasm_thread_manager);
-    
+
     suite.run().into()
 }
 
