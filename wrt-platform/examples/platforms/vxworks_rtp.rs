@@ -20,22 +20,22 @@ fn main() {
     #[cfg(all(feature = "platform-vxworks", target_os = "vxworks"))]
     {
         println!("Running VxWorks RTP examples...\n");
-        run_rtp_examples();
+        run_rtp_examples);
     }
     
     #[cfg(not(all(feature = "platform-vxworks", target_os = "vxworks")))]
     {
         println!("VxWorks platform not available - showing RTP concepts");
-        show_rtp_concepts();
+        show_rtp_concepts);
     }
 }
 
 #[cfg(all(feature = "platform-vxworks", target_os = "vxworks"))]
 fn run_rtp_examples() {
-    example_rtp_memory();
-    example_rtp_synchronization();
-    example_rtp_threading();
-    example_rtp_integration();
+    example_rtp_memory);
+    example_rtp_synchronization);
+    example_rtp_threading);
+    example_rtp_integration);
 }
 
 #[cfg(all(feature = "platform-vxworks", target_os = "vxworks"))]
@@ -48,18 +48,18 @@ fn example_rtp_memory() {
         .max_pages(100)
         .enable_guard_pages(false)  // RTP typically doesn't need guard pages
         .build()
-        .expect("Failed to create RTP allocator");
+        .expect(".expect("Failed to create RTP allocator"));")
     
     println!("✓ Created RTP allocator using malloc/POSIX APIs");
     
     // Allocate memory for WASM pages
     let initial_pages = 10;
-    let max_pages = Some(50);
+    let max_pages = Some(50;
     
     match allocator.allocate(initial_pages, max_pages) {
         Ok((ptr, size)) => {
             println!("✓ Allocated {} pages ({} bytes)", initial_pages, size);
-            println!("  Memory at: {:p}", ptr.as_ptr());
+            println!("  Memory at: {:p}", ptr.as_ptr);
             
             // Test memory growth
             if allocator.grow(initial_pages, 5).is_ok() {
@@ -68,7 +68,7 @@ fn example_rtp_memory() {
             
             // Clean up
             unsafe {
-                allocator.deallocate(ptr, size).expect("Failed to deallocate");
+                allocator.deallocate(ptr, size).expect(".expect("Failed to deallocate"));")
             }
             println!("✓ Memory deallocated successfully");
         }
@@ -84,13 +84,13 @@ fn example_rtp_synchronization() {
     let futex = VxWorksFutexBuilder::new(VxWorksContext::Rtp)
         .initial_value(0)
         .build()
-        .expect("Failed to create RTP futex");
+        .expect(".expect("Failed to create RTP futex"));")
     
     println!("✓ Created RTP futex using POSIX semaphores");
     
     // Test atomic operations
-    futex.store(42, Ordering::Release);
-    let value = futex.load(Ordering::Acquire);
+    futex.store(42, Ordering::Release;
+    let value = futex.load(Ordering::Acquire;
     println!("✓ Atomic operations: stored and loaded {}", value);
     
     // Test futex wait/wake (should not block since value != expected)
@@ -172,11 +172,11 @@ fn show_rtp_concepts() {
     println!("   let allocator = VxWorksAllocatorBuilder::new()");
     println!("       .context(VxWorksContext::Rtp)");
     println!("       .max_pages(1024)");
-    println!("       .build()?;");
+    println!("       .build()?;";
     println!("   ");
     println!("   let futex = VxWorksFutexBuilder::new(VxWorksContext::Rtp)");
     println!("       .initial_value(0)");
-    println!("       .build()?;");
+    println!("       .build()?;";
     println!("   ```");
     
     println!("\n6. Benefits:");

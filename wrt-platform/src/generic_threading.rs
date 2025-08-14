@@ -5,31 +5,54 @@
 //!
 //! This module is only available when the `std` feature is enabled.
 
+extern crate alloc;
+
 use core::{
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::atomic::{
+        AtomicBool,
+        AtomicU64,
+        Ordering,
+    },
     time::Duration,
 };
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    sync::Arc,
+    vec::Vec,
+};
 
-use std::{boxed::Box, collections::BTreeMap, sync::Arc, vec::Vec};
-
-use wrt_sync::{WrtMutex, WrtRwLock};
-
-use wrt_error::{codes, Error, ErrorCategory, Result};
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+    Result,
+};
+use wrt_sync::{
+    WrtMutex,
+    WrtRwLock,
+};
 
 use crate::threading::{
-    CpuSet, PlatformThreadHandle, PlatformThreadPool, ThreadHandle, ThreadPoolConfig,
-    ThreadPoolStats, ThreadStats, WasmTask,
+    CpuSet,
+    PlatformThreadHandle,
+    PlatformThreadPool,
+    ThreadHandle,
+    ThreadPoolConfig,
+    ThreadPoolStats,
+    ThreadStats,
+    WasmTask,
 };
 
 /// Generic thread handle using std::thread
 #[cfg(feature = "std")]
 struct GenericThreadHandle {
     /// Thread join handle
-    handle: Option<std::thread::JoinHandle<Result<Vec<u8>>>>,
+    handle:  Option<std::thread::JoinHandle<Result<Vec<u8>>>>,
     /// Running flag
     running: Arc<AtomicBool>,
     /// Thread statistics
-    stats: Arc<WrtMutex<ThreadStats>>,
+    stats:   Arc<WrtMutex<ThreadStats>>,
 }
 
 #[cfg(feature = "std")]
@@ -38,9 +61,7 @@ impl PlatformThreadHandle for GenericThreadHandle {
         if let Some(handle) = self.handle.take() {
             match handle.join() {
                 Ok(result) => result,
-                Err(_) => Err(Error::new(
-                    ErrorCategory::Platform,
-                    1,
+                Err(_) => Err(Error::runtime_execution_error(
                     "Thread panicked during execution",
                 )),
             }
@@ -48,7 +69,7 @@ impl PlatformThreadHandle for GenericThreadHandle {
             Err(Error::new(
                 ErrorCategory::Runtime,
                 1,
-                "Thread handle already consumed",
+                "No thread handle available to join",
             ))
         }
     }
@@ -60,23 +81,34 @@ impl PlatformThreadHandle for GenericThreadHandle {
     fn get_stats(&self) -> Result<ThreadStats> {
         Ok(self.stats.lock().clone())
     }
+
+    fn terminate(&self) -> Result<()> {
+        self.running.store(false, Ordering::Release);
+        Ok(())
+    }
+
+    fn join_timeout(&self, timeout: Duration) -> Result<Option<Vec<u8>>> {
+        // For generic implementation, we can't easily implement timeout join
+        // Return None to indicate timeout not supported
+        Ok(None)
+    }
 }
 
 /// Generic thread pool implementation
 #[cfg(feature = "std")]
 pub struct GenericThreadPool {
     /// Configuration
-    config: ThreadPoolConfig,
+    config:         ThreadPoolConfig,
     /// Active threads
     active_threads: Arc<WrtRwLock<BTreeMap<u64, Box<dyn PlatformThreadHandle>>>>,
     /// Thread statistics
-    stats: Arc<WrtMutex<ThreadPoolStats>>,
+    stats:          Arc<WrtMutex<ThreadPoolStats>>,
     /// Next thread ID
     next_thread_id: AtomicU64,
     /// Shutdown flag
-    shutdown: AtomicBool,
+    shutdown:       AtomicBool,
     /// Task executor
-    executor: Arc<dyn Fn(WasmTask) -> Result<Vec<u8>> + Send + Sync>,
+    executor:       Arc<dyn Fn(WasmTask) -> Result<Vec<u8>> + Send + Sync>,
 }
 
 #[cfg(feature = "std")]
@@ -115,9 +147,7 @@ impl PlatformThreadPool for GenericThreadPool {
     fn spawn_wasm_thread(&self, task: WasmTask) -> Result<ThreadHandle> {
         // Check if shutting down
         if self.shutdown.load(Ordering::Acquire) {
-            return Err(Error::new(
-                ErrorCategory::Platform, 1,
-                
+            return Err(Error::runtime_execution_error(
                 "Thread pool is shutting down",
             ));
         }
@@ -126,9 +156,9 @@ impl PlatformThreadPool for GenericThreadPool {
         let active_count = self.active_threads.read().len();
         if active_count >= self.config.max_threads {
             return Err(Error::new(
-                ErrorCategory::Resource, 1,
-                
-                "Thread pool limit reached",
+                ErrorCategory::Resource,
+                1,
+                "Thread pool has reached maximum thread limit",
             ));
         }
 
@@ -151,9 +181,7 @@ impl PlatformThreadPool for GenericThreadPool {
         let handle = std::thread::Builder::new()
             .name(thread_name)
             .stack_size(
-                task.stack_size
-                    .unwrap_or(self.config.stack_size)
-                    .max(64 * 1024), // Minimum 64KB
+                task.stack_size.unwrap_or(self.config.stack_size).max(64 * 1024), // Minimum 64KB
             )
             .spawn(move || {
                 // Mark as running
@@ -167,13 +195,7 @@ impl PlatformThreadPool for GenericThreadPool {
 
                 result
             })
-            .map_err(|_| {
-                Error::new(
-                    ErrorCategory::Platform, 1,
-                    
-                    "Failed to spawn thread",
-                )
-            })?;
+            .map_err(|_| Error::runtime_execution_error("Failed to spawn thread"))?;
 
         // Create platform handle
         let platform_handle = Box::new(GenericThreadHandle {
@@ -189,10 +211,7 @@ impl PlatformThreadPool for GenericThreadPool {
             stats.total_spawned += 1;
         }
 
-        Ok(ThreadHandle {
-            id: thread_id,
-            platform_handle,
-        })
+        Ok(ThreadHandle::new(thread_id, platform_handle))
     }
 
     fn get_stats(&self) -> ThreadPoolStats {
@@ -205,7 +224,7 @@ impl PlatformThreadPool for GenericThreadPool {
 
         // Wait for threads to complete
         let start = std::time::Instant::now();
-        while self.active_threads.read().len() > 0 && start.elapsed() < timeout {
+        while !self.active_threads.read().is_empty() && start.elapsed() < timeout {
             std::thread::sleep(Duration::from_millis(10));
         }
 
@@ -217,14 +236,14 @@ impl PlatformThreadPool for GenericThreadPool {
 impl Clone for WasmTask {
     fn clone(&self) -> Self {
         Self {
-            id: self.id,
-            function_id: self.function_id,
-            args: self.args.clone(),
-            priority: self.priority,
-            stack_size: self.stack_size,
+            id:           self.id,
+            function_id:  self.function_id,
+            args:         self.args.clone(),
+            priority:     self.priority,
+            stack_size:   self.stack_size,
             memory_limit: self.memory_limit,
             cpu_affinity: self.cpu_affinity.clone(),
-            deadline: self.deadline,
+            deadline:     self.deadline,
         }
     }
 }
@@ -249,14 +268,14 @@ mod tests {
 
         // Spawn a thread
         let task = WasmTask {
-            id: 1,
-            function_id: 100,
-            args: vec![1, 2, 3, 4],
-            priority: ThreadPriority::Normal,
-            stack_size: None,
+            id:           1,
+            function_id:  100,
+            args:         vec![1, 2, 3, 4],
+            priority:     ThreadPriority::Normal,
+            stack_size:   None,
             memory_limit: None,
             cpu_affinity: None,
-            deadline: None,
+            deadline:     None,
         };
 
         let handle = pool.spawn_wasm_thread(task).unwrap();
@@ -280,14 +299,14 @@ mod tests {
         let pool = GenericThreadPool::new(config).unwrap();
 
         let task = WasmTask {
-            id: 1,
-            function_id: 100,
-            args: vec![],
-            priority: ThreadPriority::Normal,
-            stack_size: None,
+            id:           1,
+            function_id:  100,
+            args:         vec![],
+            priority:     ThreadPriority::Normal,
+            stack_size:   None,
             memory_limit: None,
             cpu_affinity: None,
-            deadline: None,
+            deadline:     None,
         };
 
         // First thread should succeed

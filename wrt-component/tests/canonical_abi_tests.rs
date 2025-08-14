@@ -1,12 +1,20 @@
 #![deny(warnings)]
 
 use wrt_component::{
-    canonical::{CanonicalABI, CanonicalOptions, ValueType},
+    canonical::{
+        CanonicalABI,
+        CanonicalOptions,
+        ValueType,
+    },
     resources::ResourceStrategy,
     ComponentValue,
 };
 use wrt_error::Error;
-use wrt_foundation::values::{Integer, Real, Value};
+use wrt_foundation::values::{
+    Integer,
+    Real,
+    Value,
+};
 
 /// Tests for encoding/decoding simple primitive types
 #[test]
@@ -88,8 +96,9 @@ fn test_encode_decode_lists() {
     // Empty list
     let empty_list = ComponentValue::List(vec![]);
     let encoded = abi.encode(&empty_list).unwrap();
-    let decoded =
-        abi.decode::<ComponentValue>(&encoded, ValueType::List(Box::new(ValueType::I32))).unwrap();
+    let decoded = abi
+        .decode::<ComponentValue>(&encoded, ValueType::List(Box::new(ValueType::I32)))
+        .unwrap();
     assert_eq!(decoded, empty_list);
 
     // List of i32
@@ -99,8 +108,9 @@ fn test_encode_decode_lists() {
         ComponentValue::I32(3),
     ]);
     let encoded = abi.encode(&i32_list).unwrap();
-    let decoded =
-        abi.decode::<ComponentValue>(&encoded, ValueType::List(Box::new(ValueType::I32))).unwrap();
+    let decoded = abi
+        .decode::<ComponentValue>(&encoded, ValueType::List(Box::new(ValueType::I32)))
+        .unwrap();
     assert_eq!(decoded, i32_list);
 
     // Nested list
@@ -162,7 +172,7 @@ fn test_encode_decode_variants() {
 
     // Simple variant
     let variant = ComponentValue::Variant {
-        case: 1,
+        case:  1,
         value: Box::new(ComponentValue::String("success".to_string())),
     };
 
@@ -178,14 +188,20 @@ fn test_encode_decode_variants() {
     assert_eq!(decoded, variant);
 
     // Another case
-    let variant2 = ComponentValue::Variant { case: 2, value: Box::new(ComponentValue::Bool(true)) };
+    let variant2 = ComponentValue::Variant {
+        case:  2,
+        value: Box::new(ComponentValue::Bool(true)),
+    };
 
     let encoded = abi.encode(&variant2).unwrap();
     let decoded = abi.decode::<ComponentValue>(&encoded, variant_type.clone()).unwrap();
     assert_eq!(decoded, variant2);
 
     // Empty variant case
-    let variant0 = ComponentValue::Variant { case: 0, value: Box::new(ComponentValue::I32(404)) };
+    let variant0 = ComponentValue::Variant {
+        case:  0,
+        value: Box::new(ComponentValue::I32(404)),
+    };
 
     let encoded = abi.encode(&variant0).unwrap();
     let decoded = abi.decode::<ComponentValue>(&encoded, variant_type).unwrap();
@@ -283,16 +299,20 @@ fn test_encode_decode_results() {
         value: Box::new(ComponentValue::String("success".to_string())),
     };
 
-    let result_type =
-        ValueType::Result { ok: Box::new(ValueType::String), err: Box::new(ValueType::I32) };
+    let result_type = ValueType::Result {
+        ok:  Box::new(ValueType::String),
+        err: Box::new(ValueType::I32),
+    };
 
     let encoded = abi.encode(&ok_result).unwrap();
     let decoded = abi.decode::<ComponentValue>(&encoded, result_type.clone()).unwrap();
     assert_eq!(decoded, ok_result);
 
     // Err result
-    let err_result =
-        ComponentValue::Result { is_ok: false, value: Box::new(ComponentValue::I32(404)) };
+    let err_result = ComponentValue::Result {
+        is_ok: false,
+        value: Box::new(ComponentValue::I32(404)),
+    };
 
     let encoded = abi.encode(&err_result).unwrap();
     let decoded = abi.decode::<ComponentValue>(&encoded, result_type).unwrap();
@@ -338,7 +358,7 @@ fn test_error_handling() {
 
     // Invalid variant case
     let invalid_variant = ComponentValue::Variant {
-        case: 5, // Out of bounds
+        case:  5, // Out of bounds
         value: Box::new(ComponentValue::I32(0)),
     };
 
@@ -412,8 +432,9 @@ fn test_rust_native_conversions() {
     let rust_vec = vec![1, 2, 3];
     let component_vec = ComponentValue::from_vec(rust_vec.clone());
     let encoded = abi.encode(&component_vec).unwrap();
-    let decoded =
-        abi.decode_vec::<i32>(&encoded, ValueType::List(Box::new(ValueType::I32))).unwrap();
+    let decoded = abi
+        .decode_vec::<i32>(&encoded, ValueType::List(Box::new(ValueType::I32)))
+        .unwrap();
     assert_eq!(decoded, rust_vec);
 
     // Convert from Rust tuple
@@ -480,7 +501,7 @@ impl CanonicalABI {
             // Convert items to T (simplified for testing)
             Ok(vec![])
         } else {
-            Err(Error::new("Not a list"))
+            Err(Error::runtime_execution_error("Error occurred: Not a list"))
         }
     }
 
@@ -489,9 +510,13 @@ impl CanonicalABI {
         let component_value = self.decode::<ComponentValue>(bytes, ty)?;
         if let ComponentValue::Tuple(_) = component_value {
             // Convert to T (simplified for testing)
-            Err(Error::new("Not implemented in tests"))
+            Err(Error::runtime_execution_error(
+                "Error occurred: Not implemented in tests",
+            ))
         } else {
-            Err(Error::new("Not a tuple"))
+            Err(Error::runtime_execution_error(
+                "Error occurred: Not a tuple",
+            ))
         }
     }
 }
@@ -501,30 +526,59 @@ impl CanonicalABI {
 fn test_type_conversion_bidirectional() {
     use wrt_component::type_conversion::bidirectional::*;
     use wrt_format::component::{
-        ExternType as FormatExternType, ResourceRepresentation, ValType as FormatValType,
+        ExternType as FormatExternType,
+        ResourceRepresentation,
+        ValType as FormatValType,
     };
     use wrt_foundation::{
         component::ResourceType,
         component_value::ValType as TypesValType,
-        types::{FuncType as TypesFuncType, ValueType},
+        types::{
+            FuncType as TypesFuncType,
+            ValueType,
+        },
         ExternType as TypesExternType,
     };
 
     // Test conversion from core ValueType to format ValType
-    assert_eq!(value_type_to_format_val_type(&ValueType::I32).unwrap(), FormatValType::S32);
-    assert_eq!(value_type_to_format_val_type(&ValueType::I64).unwrap(), FormatValType::S64);
-    assert_eq!(value_type_to_format_val_type(&ValueType::F32).unwrap(), FormatValType::F32);
-    assert_eq!(value_type_to_format_val_type(&ValueType::F64).unwrap(), FormatValType::F64);
+    assert_eq!(
+        value_type_to_format_val_type(&ValueType::I32).unwrap(),
+        FormatValType::S32
+    );
+    assert_eq!(
+        value_type_to_format_val_type(&ValueType::I64).unwrap(),
+        FormatValType::S64
+    );
+    assert_eq!(
+        value_type_to_format_val_type(&ValueType::F32).unwrap(),
+        FormatValType::F32
+    );
+    assert_eq!(
+        value_type_to_format_val_type(&ValueType::F64).unwrap(),
+        FormatValType::F64
+    );
 
     // Test reference types that should return errors
     assert!(value_type_to_format_val_type(&ValueType::FuncRef).is_err());
     assert!(value_type_to_format_val_type(&ValueType::ExternRef).is_err());
 
     // Test conversion from format ValType to core ValueType
-    assert_eq!(format_val_type_to_value_type(&FormatValType::S32).unwrap(), ValueType::I32);
-    assert_eq!(format_val_type_to_value_type(&FormatValType::S64).unwrap(), ValueType::I64);
-    assert_eq!(format_val_type_to_value_type(&FormatValType::F32).unwrap(), ValueType::F32);
-    assert_eq!(format_val_type_to_value_type(&FormatValType::F64).unwrap(), ValueType::F64);
+    assert_eq!(
+        format_val_type_to_value_type(&FormatValType::S32).unwrap(),
+        ValueType::I32
+    );
+    assert_eq!(
+        format_val_type_to_value_type(&FormatValType::S64).unwrap(),
+        ValueType::I64
+    );
+    assert_eq!(
+        format_val_type_to_value_type(&FormatValType::F32).unwrap(),
+        ValueType::F32
+    );
+    assert_eq!(
+        format_val_type_to_value_type(&FormatValType::F64).unwrap(),
+        ValueType::F64
+    );
 
     // Test complex types that should return errors
     assert!(format_val_type_to_value_type(&FormatValType::String).is_err());
@@ -532,18 +586,48 @@ fn test_type_conversion_bidirectional() {
     assert!(format_val_type_to_value_type(&FormatValType::Char).is_err());
 
     // Test conversion from core ValueType to TypesValType
-    assert_eq!(value_type_to_types_valtype(&ValueType::I32), TypesValType::S32);
-    assert_eq!(value_type_to_types_valtype(&ValueType::I64), TypesValType::S64);
-    assert_eq!(value_type_to_types_valtype(&ValueType::F32), TypesValType::F32);
-    assert_eq!(value_type_to_types_valtype(&ValueType::F64), TypesValType::F64);
-    assert_eq!(value_type_to_types_valtype(&ValueType::FuncRef), TypesValType::Own(0));
-    assert_eq!(value_type_to_types_valtype(&ValueType::ExternRef), TypesValType::Ref(0));
+    assert_eq!(
+        value_type_to_types_valtype(&ValueType::I32),
+        TypesValType::S32
+    );
+    assert_eq!(
+        value_type_to_types_valtype(&ValueType::I64),
+        TypesValType::S64
+    );
+    assert_eq!(
+        value_type_to_types_valtype(&ValueType::F32),
+        TypesValType::F32
+    );
+    assert_eq!(
+        value_type_to_types_valtype(&ValueType::F64),
+        TypesValType::F64
+    );
+    assert_eq!(
+        value_type_to_types_valtype(&ValueType::FuncRef),
+        TypesValType::Own(0)
+    );
+    assert_eq!(
+        value_type_to_types_valtype(&ValueType::ExternRef),
+        TypesValType::Ref(0)
+    );
 
     // Test conversion from format ValType to TypesValType - primitive types
-    assert_eq!(format_valtype_to_types_valtype(&FormatValType::S32), TypesValType::S32);
-    assert_eq!(format_valtype_to_types_valtype(&FormatValType::U32), TypesValType::U32);
-    assert_eq!(format_valtype_to_types_valtype(&FormatValType::S64), TypesValType::S64);
-    assert_eq!(format_valtype_to_types_valtype(&FormatValType::U64), TypesValType::U64);
+    assert_eq!(
+        format_valtype_to_types_valtype(&FormatValType::S32),
+        TypesValType::S32
+    );
+    assert_eq!(
+        format_valtype_to_types_valtype(&FormatValType::U32),
+        TypesValType::U32
+    );
+    assert_eq!(
+        format_valtype_to_types_valtype(&FormatValType::S64),
+        TypesValType::S64
+    );
+    assert_eq!(
+        format_valtype_to_types_valtype(&FormatValType::U64),
+        TypesValType::U64
+    );
 
     // Test round-trip conversion of simple types
     let test_types = vec![
@@ -567,13 +651,22 @@ fn test_type_conversion_bidirectional() {
     }
 
     // Test conversion utility functions
-    assert_eq!(common_to_format_val_type(&ValueType::I32).unwrap(), FormatValType::S32);
+    assert_eq!(
+        common_to_format_val_type(&ValueType::I32).unwrap(),
+        FormatValType::S32
+    );
 
-    assert_eq!(format_to_common_val_type(&FormatValType::S32).unwrap(), ValueType::I32);
+    assert_eq!(
+        format_to_common_val_type(&FormatValType::S32).unwrap(),
+        ValueType::I32
+    );
 
     // Test error handling in conversion functions
     let unsupported_types = vec![
-        FormatValType::ResultBoth(Box::new(FormatValType::S32), Box::new(FormatValType::String)),
+        FormatValType::ResultBoth(
+            Box::new(FormatValType::S32),
+            Box::new(FormatValType::String),
+        ),
         FormatValType::ErrorContext,
     ];
 
@@ -596,23 +689,34 @@ fn test_type_conversion_bidirectional() {
 fn test_complex_type_conversions() {
     use wrt_component::type_conversion::bidirectional::*;
     use wrt_format::component::{
-        ExternType as FormatExternType, ResourceRepresentation, ValType as FormatValType,
+        ExternType as FormatExternType,
+        ResourceRepresentation,
+        ValType as FormatValType,
     };
     use wrt_foundation::{
         component::ResourceType,
         component_value::ValType as TypesValType,
-        types::{FuncType as TypesFuncType, ValueType},
+        types::{
+            FuncType as TypesFuncType,
+            ValueType,
+        },
         ExternType as TypesExternType,
     };
 
     // Test compound types
     let list_type = FormatValType::List(Box::new(FormatValType::S32));
     let expected_list_type = TypesValType::List(Box::new(TypesValType::S32));
-    assert_eq!(format_valtype_to_types_valtype(&list_type), expected_list_type);
+    assert_eq!(
+        format_valtype_to_types_valtype(&list_type),
+        expected_list_type
+    );
 
     let option_type = FormatValType::Option(Box::new(FormatValType::S32));
     let expected_option_type = TypesValType::Option(Box::new(TypesValType::S32));
-    assert_eq!(format_valtype_to_types_valtype(&option_type), expected_option_type);
+    assert_eq!(
+        format_valtype_to_types_valtype(&option_type),
+        expected_option_type
+    );
 
     // Test record type
     let record_fields = vec![
@@ -645,8 +749,14 @@ fn test_complex_type_conversions() {
     );
 
     // Test resource handles
-    assert_eq!(format_valtype_to_types_valtype(&FormatValType::Own(5)), TypesValType::Own(5));
-    assert_eq!(format_valtype_to_types_valtype(&FormatValType::Borrow(5)), TypesValType::Borrow(5));
+    assert_eq!(
+        format_valtype_to_types_valtype(&FormatValType::Own(5)),
+        TypesValType::Own(5)
+    );
+    assert_eq!(
+        format_valtype_to_types_valtype(&FormatValType::Borrow(5)),
+        TypesValType::Borrow(5)
+    );
 }
 
 /// Tests for extern type conversion
@@ -654,18 +764,23 @@ fn test_complex_type_conversions() {
 fn test_extern_type_conversion() {
     use wrt_component::type_conversion::bidirectional::*;
     use wrt_format::component::{
-        ExternType as FormatExternType, ResourceRepresentation, ValType as FormatValType,
+        ExternType as FormatExternType,
+        ResourceRepresentation,
+        ValType as FormatValType,
     };
     use wrt_foundation::{
         component::ResourceType,
         component_value::ValType as TypesValType,
-        types::{FuncType as TypesFuncType, ValueType},
+        types::{
+            FuncType as TypesFuncType,
+            ValueType,
+        },
         ExternType as TypesExternType,
     };
 
     // Test function type conversion
     let format_func = FormatExternType::Function {
-        params: vec![("arg".to_string(), FormatValType::S32)],
+        params:  vec![("arg".to_string(), FormatValType::S32)],
         results: vec![FormatValType::S32],
     };
 
@@ -675,7 +790,7 @@ fn test_extern_type_conversion() {
         TypesExternType::Function(func_type) => {
             assert_eq!(func_type.params.len(), 1);
             assert_eq!(func_type.results.len(), 1);
-        }
+        },
         _ => panic!("Expected Function type, got {:?}", runtime_func),
     }
 
@@ -700,13 +815,15 @@ fn test_extern_type_conversion() {
             assert_eq!(func_type.params[0], ValueType::I32);
             assert_eq!(func_type.params[1], ValueType::I64);
             assert_eq!(func_type.results[0], ValueType::F32);
-        }
+        },
         _ => panic!("Expected Function type after roundtrip"),
     }
 
     // Test resource type conversion
-    let resource_extern_type =
-        ExternType::Resource { rep: ResourceRepresentation::Handle32, nullable: false };
+    let resource_extern_type = FormatExternType::Resource {
+        rep:      ResourceRepresentation::Handle32,
+        nullable: false,
+    };
 
     let runtime_resource = format_to_runtime_extern_type(&resource_extern_type).unwrap();
 
@@ -716,10 +833,10 @@ fn test_extern_type_conversion() {
                 ResourceType::Indexed(repr, _) => {
                     assert_eq!(repr, 0); // Representation should be mapped to
                                          // index
-                }
+                },
                 _ => panic!("Expected indexed resource type"),
             }
-        }
+        },
         _ => panic!("Expected Resource type, got {:?}", runtime_resource),
     }
 }
@@ -728,15 +845,21 @@ fn test_extern_type_conversion() {
 #[test]
 fn test_conversion_traits() {
     use wrt_component::type_conversion::bidirectional::*;
-    use wrt_format::component::{ExternType as FormatExternType, ValType as FormatValType};
+    use wrt_format::component::{
+        ExternType as FormatExternType,
+        ValType as FormatValType,
+    };
     use wrt_foundation::{
-        types::{FuncType as TypesFuncType, ValueType},
+        types::{
+            FuncType as TypesFuncType,
+            ValueType,
+        },
         ExternType as TypesExternType,
     };
 
     // Test IntoRuntimeType for FormatExternType
     let format_func = FormatExternType::Function {
-        params: vec![("arg".to_string(), FormatValType::S32)],
+        params:  vec![("arg".to_string(), FormatValType::S32)],
         results: vec![FormatValType::S32],
     };
 

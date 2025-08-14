@@ -1,36 +1,103 @@
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{
+    AtomicU32,
+    Ordering,
+};
 
 use wrt_component::{
-    async_types::{AsyncType, ErrorContext, Future, FutureState, Stream, StreamState},
-    canonical_options::{CanonicalOptions, LiftContext, LowerContext},
-    canonical_realloc::{AllocationInfo, ReallocManager},
-    component_linker::{ComponentLinker, LinkingResult},
-    component_resolver::{ComponentResolver, ResolutionResult},
+    async_types::{
+        AsyncType,
+        ErrorContext,
+        Future,
+        FutureState,
+        Stream,
+        StreamState,
+    },
+    canonical_options::{
+        CanonicalOptions,
+        LiftContext,
+        LowerContext,
+    },
+    canonical_realloc::{
+        AllocationInfo,
+        ReallocManager,
+    },
+    component_linker::{
+        ComponentLinker,
+        LinkingResult,
+    },
+    component_resolver::{
+        ComponentResolver,
+        ResolutionResult,
+    },
     cross_component_resource_sharing::{
-        create_basic_sharing_policy, CrossComponentResourceSharingManager, PolicyRule,
-        SharingLifetime, TransferPolicy,
+        create_basic_sharing_policy,
+        CrossComponentResourceSharingManager,
+        PolicyRule,
+        SharingLifetime,
+        TransferPolicy,
     },
-    generative_types::{GenerativeResourceType, GenerativeTypeRegistry},
-    handle_representation::{AccessRights, HandleOperation, HandleRepresentationManager},
-    post_return::{CleanupTask, CleanupTaskType, PostReturnRegistry},
+    generative_types::{
+        GenerativeResourceType,
+        GenerativeTypeRegistry,
+    },
+    handle_representation::{
+        AccessRights,
+        HandleOperation,
+        HandleRepresentationManager,
+    },
+    post_return::{
+        CleanupTask,
+        CleanupTaskType,
+        PostReturnRegistry,
+    },
     start_function_validation::{
-        create_start_function_descriptor, create_start_function_param, StartFunctionValidator,
-        ValidationLevel, ValidationState,
+        create_start_function_descriptor,
+        create_start_function_param,
+        StartFunctionValidator,
+        ValidationLevel,
+        ValidationState,
     },
-    task_manager::{TaskManager, TaskState},
-    thread_spawn::{ComponentThreadManager, ThreadConfiguration, ThreadId, ThreadSpawnRequest},
+    task_manager::{
+        TaskManager,
+        TaskState,
+    },
+    thread_spawn::{
+        ComponentThreadManager,
+        ThreadConfiguration,
+        ThreadId,
+        ThreadSpawnRequest,
+    },
     thread_spawn_fuel::{
-        create_fuel_thread_config, FuelThreadConfiguration, FuelTrackedThreadManager,
+        create_fuel_thread_config,
+        FuelThreadConfiguration,
+        FuelTrackedThreadManager,
     },
-    type_bounds::{TypeBound, TypeBoundKind, TypeBoundsChecker},
+    type_bounds::{
+        TypeBound,
+        TypeBoundKind,
+        TypeBoundsChecker,
+    },
     virtualization::{
-        Capability, ExportVisibility, IsolationLevel, MemoryPermissions, VirtualExport,
-        VirtualImport, VirtualSource, VirtualizationManager,
+        Capability,
+        ExportVisibility,
+        IsolationLevel,
+        MemoryPermissions,
+        VirtualExport,
+        VirtualImport,
+        VirtualSource,
+        VirtualizationManager,
     },
-    ComponentInstance, ComponentInstanceId, ResourceHandle, TypeId, ValType,
+    ComponentInstance,
+    ComponentInstanceId,
+    ResourceHandle,
+    TypeId,
+    ValType,
 };
 use wrt_foundation::{
-    bounded_collections::{BoundedHashMap, BoundedVec},
+    bounded_collections::{
+        BoundedHashMap,
+        BoundedVec,
+    },
     component_value::ComponentValue,
     safe_memory::SafeMemory,
 };
@@ -92,9 +159,9 @@ fn test_generative_types_with_bounds(
 
     // Establish type bounds
     let bound = TypeBound {
-        sub_type: derived_type.type_id,
+        sub_type:   derived_type.type_id,
         super_type: base_type.type_id,
-        kind: TypeBoundKind::Sub,
+        kind:       TypeBoundKind::Sub,
     };
 
     bounds_checker.add_bound(bound).unwrap();
@@ -134,7 +201,10 @@ fn test_async_workflow(task_manager: &mut TaskManager, instance_id: ComponentIns
 
     // Start task
     task_manager.start_task(task_id).unwrap();
-    assert_eq!(task_manager.get_task_state(task_id).unwrap(), TaskState::Ready);
+    assert_eq!(
+        task_manager.get_task_state(task_id).unwrap(),
+        TaskState::Ready
+    );
 
     // Execute task step
     let result = task_manager.execute_task_step(task_id);
@@ -194,17 +264,19 @@ fn test_post_return_integration(
                     CleanupTaskType::Memory { ptr, size, .. } => {
                         assert!(ptr > 0);
                         assert!(size > 0);
-                    }
+                    },
                     CleanupTaskType::Resource { handle } => {
                         assert!(handle.id() > 0);
-                    }
-                    _ => {}
+                    },
+                    _ => {},
                 }
             }
             Ok(())
         };
 
-    registry.register_post_return_function(instance_id, Box::new(post_return_fn)).unwrap();
+    registry
+        .register_post_return_function(instance_id, Box::new(post_return_fn))
+        .unwrap();
 
     // Add cleanup tasks
     let memory_task = CleanupTask::memory_cleanup(1000, 512, 8);
@@ -233,23 +305,31 @@ fn test_virtualization_integration() {
 
     // Grant memory capability
     let memory_capability = Capability::Memory { max_size: 2048 };
-    virt_manager.grant_capability(component_id, memory_capability.clone(), None, true).unwrap();
+    virt_manager
+        .grant_capability(component_id, memory_capability.clone(), None, true)
+        .unwrap();
 
     // Verify capability check
     assert!(virt_manager.check_capability(component_id, &memory_capability));
 
     // Allocate virtual memory
-    let permissions = MemoryPermissions { read: true, write: true, execute: false };
+    let permissions = MemoryPermissions {
+        read:    true,
+        write:   true,
+        execute: false,
+    };
 
     let mem_addr = virt_manager.allocate_virtual_memory(component_id, 1024, permissions).unwrap();
     assert!(mem_addr > 0);
 
     // Create virtual import
     let virtual_import = VirtualImport {
-        name: "host-function".to_string(),
-        val_type: ValType::I32,
-        required: true,
-        virtual_source: Some(VirtualSource::HostFunction { name: "get-time".to_string() }),
+        name:                "host-function".to_string(),
+        val_type:            ValType::I32,
+        required:            true,
+        virtual_source:      Some(VirtualSource::HostFunction {
+            name: "get-time".to_string(),
+        }),
         capability_required: None,
     };
 
@@ -257,9 +337,9 @@ fn test_virtualization_integration() {
 
     // Create virtual export
     let virtual_export = VirtualExport {
-        name: "compute-result".to_string(),
-        val_type: ValType::I32,
-        visibility: ExportVisibility::Public,
+        name:                "compute-result".to_string(),
+        val_type:            ValType::I32,
+        visibility:          ExportVisibility::Public,
         capability_required: None,
     };
 
@@ -280,10 +360,10 @@ fn test_thread_spawn_integration() {
 
     // Create thread configuration
     let thread_config = ThreadConfiguration {
-        stack_size: 128 * 1024,
-        priority: None,
-        name: Some("test-thread".to_string()),
-        detached: false,
+        stack_size:   128 * 1024,
+        priority:     None,
+        name:         Some("test-thread".to_string()),
+        detached:     false,
         cpu_affinity: None,
         capabilities: BoundedVec::new(),
     };
@@ -433,7 +513,10 @@ fn test_start_function_validation_integration() {
     // Test validation reset
     validator.reset_validation(component_id).unwrap();
     let validation_after_reset = validator.get_validation_result(component_id).unwrap();
-    assert_eq!(validation_after_reset.validation_state, ValidationState::Pending);
+    assert_eq!(
+        validation_after_reset.validation_state,
+        ValidationState::Pending
+    );
 }
 
 fn test_handle_representation_and_sharing() {
@@ -450,7 +533,11 @@ fn test_handle_representation_and_sharing() {
 
     // Create handle with full access
     let handle = handle_manager
-        .create_handle(source_component, resource_type.clone(), AccessRights::full_access())
+        .create_handle(
+            source_component,
+            resource_type.clone(),
+            AccessRights::full_access(),
+        )
         .unwrap();
 
     // Verify handle was created
@@ -491,7 +578,12 @@ fn test_handle_representation_and_sharing() {
     let mut policy = create_basic_sharing_policy("test-policy");
     let mut allowed_types = BoundedVec::new();
     allowed_types.push(resource_type.type_id).unwrap();
-    policy.rules.push(PolicyRule::AllowedResourceTypes { types: allowed_types }).unwrap();
+    policy
+        .rules
+        .push(PolicyRule::AllowedResourceTypes {
+            types: allowed_types,
+        })
+        .unwrap();
     sharing_manager.add_sharing_policy(policy).unwrap();
 
     // Share the resource
@@ -499,7 +591,9 @@ fn test_handle_representation_and_sharing() {
     assert_ne!(shared_handle, handle); // Should be a new handle
 
     // Verify target component can access shared resource
-    let read_op_target = HandleOperation::Read { fields: BoundedVec::new() };
+    let read_op_target = HandleOperation::Read {
+        fields: BoundedVec::new(),
+    };
 
     let access_result =
         sharing_manager.access_shared_resource(target_component, handle, read_op_target);
@@ -556,16 +650,16 @@ fn test_component_composition() {
     match resolution {
         ResolutionResult::Success => {
             // Verify successful resolution
-        }
+        },
         ResolutionResult::MissingImports(missing) => {
             panic!("Unexpected missing imports: {:?}", missing);
-        }
+        },
         ResolutionResult::TypeMismatch(mismatches) => {
             panic!("Unexpected type mismatches: {:?}", mismatches);
-        }
+        },
         ResolutionResult::CircularDependency(cycle) => {
             panic!("Unexpected circular dependency: {:?}", cycle);
-        }
+        },
     }
 }
 
@@ -672,7 +766,10 @@ fn test_resource_lifecycle_integration() {
 #[cfg(feature = "std")]
 #[test]
 fn test_std_specific_features() {
-    use std::{sync::Arc, thread};
+    use std::{
+        sync::Arc,
+        thread,
+    };
 
     // Test thread safety of our implementations
     let type_registry = Arc::new(GenerativeTypeRegistry::new());

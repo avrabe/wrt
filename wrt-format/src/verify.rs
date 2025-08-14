@@ -9,7 +9,14 @@
 // coverage testing.
 #[cfg(any(doc, kani))]
 pub mod kani_verification {
-    use crate::{binary::*, compression::*, module::*, section::*, state::*, *};
+    use crate::{
+        binary::*,
+        compression::*,
+        module::*,
+        section::*,
+        state::*,
+        *,
+    };
 
     /// Verify RLE compression round-trip
     #[cfg_attr(kani, kani::proof)]
@@ -22,7 +29,7 @@ pub mod kani_verification {
         let decoded = rle_decode(&encoded);
 
         // Verify round-trip correctness
-        assert_eq!(original, decoded.as_slice());
+        assert_eq!(original, decoded.as_slice);
     }
 
     /// Verify binary module version detection
@@ -58,7 +65,10 @@ pub mod kani_verification {
     #[cfg_attr(kani, kani::proof)]
     pub fn verify_memory_limits() {
         // Create valid limits
-        let limits = Limits { min: 1, max: Some(2) };
+        let limits = Limits {
+            min: 1,
+            max: Some(2),
+        };
 
         // Basic validation
         assert!(limits.max.unwrap() >= limits.min);

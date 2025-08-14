@@ -4,9 +4,21 @@
 //! instructions. It focuses on basic type checking without requiring
 //! complex trait implementations.
 
-use crate::prelude::{Debug, Eq, PartialEq, str};
-use wrt_error::{Error, Result};
-use wrt_foundation::types::{ValueType, BlockType};
+use wrt_error::{
+    Error,
+    Result,
+};
+use wrt_foundation::types::{
+    BlockType,
+    ValueType,
+};
+
+use crate::prelude::{
+    str,
+    Debug,
+    Eq,
+    PartialEq,
+};
 
 /// Validation context for type checking
 pub struct ValidationContext {
@@ -15,9 +27,9 @@ pub struct ValidationContext {
     /// Whether code is currently unreachable
     pub unreachable: bool,
     /// Number of available memories
-    pub memories: u32,
+    pub memories:    u32,
     /// Number of available tables  
-    pub tables: u32,
+    pub tables:      u32,
 }
 
 impl Default for ValidationContext {
@@ -28,17 +40,19 @@ impl Default for ValidationContext {
 
 impl ValidationContext {
     /// Create a new validation context
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             stack_depth: 0,
             unreachable: false,
-            memories: 1,
-            tables: 1,
+            memories:    1,
+            tables:      1,
         }
     }
 
     /// Check if the current code is unreachable
-    #[must_use] pub fn is_unreachable(&self) -> bool {
+    #[must_use]
+    pub fn is_unreachable(&self) -> bool {
         self.unreachable
     }
 
@@ -94,7 +108,8 @@ impl ValidationContext {
     /// Validate a branch target label
     pub fn validate_branch_target(&mut self, _label: u32) -> Result<()> {
         // For simplified validation, we just check that the label is reasonable
-        // In a full implementation, this would validate against the current control stack
+        // In a full implementation, this would validate against the current control
+        // stack
         Ok(())
     }
 }
@@ -103,9 +118,9 @@ impl ValidationContext {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ControlFrame {
     /// Type of control structure
-    pub kind: ControlKind,
+    pub kind:        ControlKind,
     /// Stack height when entering frame
-    pub height: usize,
+    pub height:      usize,
     /// Whether this frame is unreachable
     pub unreachable: bool,
 }
@@ -182,10 +197,7 @@ pub fn validate_control_op(
 }
 
 /// Validate branch operations
-pub fn validate_branch(
-    depth: u32,
-    ctx: &mut ValidationContext,
-) -> Result<()> {
+pub fn validate_branch(depth: u32, ctx: &mut ValidationContext) -> Result<()> {
     // Basic validation only
     if depth > 1000 {
         return Err(Error::validation_error("Invalid branch depth"));
@@ -195,20 +207,13 @@ pub fn validate_branch(
 }
 
 /// Validate function calls
-pub fn validate_call(
-    _func_idx: u32,
-    _ctx: &mut ValidationContext,
-) -> Result<()> {
+pub fn validate_call(_func_idx: u32, _ctx: &mut ValidationContext) -> Result<()> {
     // Simplified validation
     Ok(())
 }
 
 /// Validate local variable operations
-pub fn validate_local_op(
-    _local_idx: u32,
-    is_get: bool,
-    ctx: &mut ValidationContext,
-) -> Result<()> {
+pub fn validate_local_op(_local_idx: u32, is_get: bool, ctx: &mut ValidationContext) -> Result<()> {
     if is_get {
         // local.get: [] -> [type]
         ctx.push_type(ValueType::I32)?; // Assume i32 for simplicity
@@ -240,10 +245,7 @@ pub fn validate_global_op(
 }
 
 /// Validate comparison operations
-pub fn validate_comparison_op(
-    input_type: ValueType,
-    ctx: &mut ValidationContext,
-) -> Result<()> {
+pub fn validate_comparison_op(input_type: ValueType, ctx: &mut ValidationContext) -> Result<()> {
     if !ctx.is_unreachable() {
         ctx.pop_expect(input_type)?;
         ctx.pop_expect(input_type)?;
@@ -277,18 +279,18 @@ pub fn validate_ref_op(
             if let Some(ty) = ref_type {
                 ctx.push_type(ty)?;
             }
-        }
+        },
         "ref.is_null" => {
             // ref.is_null: [ref] -> [i32]
             if !ctx.is_unreachable() {
                 ctx.pop_type()?;
             }
             ctx.push_type(ValueType::I32)?;
-        }
+        },
         "ref.func" => {
             // ref.func: [] -> [funcref]
             ctx.push_type(ValueType::FuncRef)?;
-        }
+        },
         _ => return Err(Error::validation_error("Unknown ref operation")),
     }
     Ok(())
@@ -308,17 +310,17 @@ mod tests {
     #[test]
     fn test_push_pop_types() {
         let mut ctx = ValidationContext::new();
-        
+
         // Push some types
         ctx.push_type(ValueType::I32).unwrap();
         ctx.push_type(ValueType::F64).unwrap();
         assert_eq!(ctx.stack_depth, 2);
-        
+
         // Pop types
         ctx.pop_type().unwrap();
         ctx.pop_type().unwrap();
         assert_eq!(ctx.stack_depth, 0);
-        
+
         // Underflow should error
         assert!(ctx.pop_type().is_err());
     }
@@ -326,11 +328,11 @@ mod tests {
     #[test]
     fn test_unreachable_handling() {
         let mut ctx = ValidationContext::new();
-        
+
         // Mark as unreachable
         ctx.mark_unreachable().unwrap();
         assert!(ctx.is_unreachable());
-        
+
         // Pop should succeed even with empty stack when unreachable
         ctx.pop_type().unwrap();
     }
@@ -338,19 +340,20 @@ mod tests {
     #[test]
     fn test_validate_arithmetic() {
         let mut ctx = ValidationContext::new();
-        
+
         // Set up stack for i32.add
         ctx.push_type(ValueType::I32).unwrap();
         ctx.push_type(ValueType::I32).unwrap();
-        
+
         // Validate i32.add
         validate_arithmetic_op(
             "i32.add",
             &[ValueType::I32, ValueType::I32],
             ValueType::I32,
-            &mut ctx
-        ).unwrap();
-        
+            &mut ctx,
+        )
+        .unwrap();
+
         // Should have one i32 on stack
         assert_eq!(ctx.stack_depth, 1);
     }
@@ -358,10 +361,10 @@ mod tests {
     #[test]
     fn test_validate_memory_load() {
         let mut ctx = ValidationContext::new();
-        
+
         // Push address
         ctx.push_type(ValueType::I32).unwrap();
-        
+
         // Validate i32.load
         validate_memory_op(
             "i32.load",
@@ -369,9 +372,10 @@ mod tests {
             2, // alignment
             ValueType::I32,
             true, // is_load
-            &mut ctx
-        ).unwrap();
-        
+            &mut ctx,
+        )
+        .unwrap();
+
         // Should have loaded value
         assert_eq!(ctx.stack_depth, 1);
     }
@@ -379,14 +383,14 @@ mod tests {
     #[test]
     fn test_validate_comparison() {
         let mut ctx = ValidationContext::new();
-        
+
         // Push two i32s
         ctx.push_type(ValueType::I32).unwrap();
         ctx.push_type(ValueType::I32).unwrap();
-        
+
         // Validate i32.eq
         validate_comparison_op(ValueType::I32, &mut ctx).unwrap();
-        
+
         // Should have i32 result
         assert_eq!(ctx.stack_depth, 1);
     }

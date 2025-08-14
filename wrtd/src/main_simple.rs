@@ -10,7 +10,6 @@
 // Conditional imports based on runtime mode
 #[cfg(feature = "std-runtime")]
 use std::{
-    collections::HashMap,
     env, 
     fs,
     path::PathBuf,
@@ -18,21 +17,35 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(feature = "std-runtime")]
+use crate::bounded_wrtd_infra::{
+    BoundedServiceMap, BoundedLogEntryVec, WrtdProvider,
+    new_service_map, new_log_entry_vec
+};
+
 #[cfg(feature = "alloc-runtime")]
 extern crate alloc;
 
 #[cfg(feature = "alloc-runtime")]
 use std::{
-    collections::BTreeMap,
     string::{String, ToString},
-    vec::Vec,
+};
+
+#[cfg(feature = "alloc-runtime")]
+use crate::bounded_wrtd_infra::{
+    BoundedServiceMap, BoundedLogEntryVec, WrtdProvider,
+    new_service_map, new_log_entry_vec
 };
 
 #[cfg(feature = "nostd-runtime")]
 use heapless::{
     String,
-    Vec,
     FnvIndexMap as Map,
+};
+
+#[cfg(feature = "nostd-runtime")]
+use crate::bounded_wrtd_infra::{
+    BoundedLogEntryVec, WrtdProvider, new_log_entry_vec
 };
 
 /// Configuration for the runtime daemon
@@ -78,7 +91,7 @@ pub mod std_runtime {
     pub struct StdRuntime {
         config: WrtdConfig,
         stats: Mutex<RuntimeStats>,
-        module_cache: Mutex<HashMap<String, Vec<u8>>>,
+        module_cache: Mutex<BoundedServiceMap<BoundedLogEntryVec<u8>>>,
     }
     
     impl StdRuntime {
@@ -87,7 +100,7 @@ pub mod std_runtime {
             Self {
                 config,
                 stats: Mutex::new(RuntimeStats::default()),
-                module_cache: Mutex::new(HashMap::new()),
+                module_cache: Mutex::new(new_service_map()),
             }
         }
         
@@ -102,13 +115,13 @@ pub mod std_runtime {
             };
             
             if self.config.verbose {
-                println!("Loaded module: {} bytes", module_bytes.len());
+                println!("Loaded module: {} bytes", module_bytes.len();
             }
             
             // Cache the module
             {
                 let mut cache = self.module_cache.lock().unwrap();
-                cache.insert(module_path.to_string(), module_bytes.clone());
+                cache.insert(module_path.to_string(), module_bytes.clone();
             }
             
             // Simulate execution
@@ -116,11 +129,11 @@ pub mod std_runtime {
             let memory_used = module_bytes.len() * 2; // Estimate
             
             if fuel_used > self.config.max_fuel {
-                return Err(format!("Fuel limit exceeded: {} > {}", fuel_used, self.config.max_fuel));
+                return Err(format!("Fuel limit exceeded: {} > {}", fuel_used, self.config.max_fuel;
             }
             
             if memory_used > self.config.max_memory {
-                return Err(format!("Memory limit exceeded: {} > {}", memory_used, self.config.max_memory));
+                return Err(format!("Memory limit exceeded: {} > {}", memory_used, self.config.max_memory;
             }
             
             // Update stats
@@ -128,7 +141,7 @@ pub mod std_runtime {
                 let mut stats = self.stats.lock().unwrap();
                 stats.modules_executed += 1;
                 stats.fuel_consumed += fuel_used;
-                stats.peak_memory = stats.peak_memory.max(memory_used);
+                stats.peak_memory = stats.peak_memory.max(memory_used;
                 stats.execution_time_ms += start.elapsed().as_millis() as u64;
             }
             
@@ -155,7 +168,7 @@ pub mod std_runtime {
         let args: Vec<String> = env::args().collect();
         if args.len() < 3 {
             println!("Usage: {} <module.wasm> <function>", args[0]);
-            return Ok(());
+            return Ok();
         }
         
         let module_path = &args[1];
@@ -167,18 +180,18 @@ pub mod std_runtime {
             verbose: args.contains(&"--verbose".to_string()),
         };
         
-        let runtime = StdRuntime::new(config);
+        let runtime = StdRuntime::new(config;
         
         match runtime.execute_module(module_path, function) {
             Ok(result) => {
                 println!("✓ {}", result);
-                let stats = runtime.stats();
+                let stats = runtime.stats);
                 println!("📊 Stats: {} modules, {} fuel, {}KB peak memory", 
-                        stats.modules_executed, stats.fuel_consumed, stats.peak_memory / 1024);
+                        stats.modules_executed, stats.fuel_consumed, stats.peak_memory / 1024;
             }
             Err(e) => {
                 eprintln!("✗ Error: {}", e);
-                std::process::exit(1);
+                std::process::exit(1;
             }
         }
         
@@ -195,7 +208,7 @@ pub mod alloc_runtime {
     pub struct AllocRuntime {
         config: WrtdConfig,
         stats: RuntimeStats,
-        module_cache: BTreeMap<String, Vec<u8>>,
+        module_cache: BoundedServiceMap<BoundedLogEntryVec<u8>>,
     }
     
     impl AllocRuntime {
@@ -204,7 +217,7 @@ pub mod alloc_runtime {
             Self {
                 config,
                 stats: RuntimeStats::default(),
-                module_cache: BTreeMap::new(),
+                module_cache: new_service_map(),
             }
         }
         
@@ -229,7 +242,7 @@ pub mod alloc_runtime {
             // Update stats
             self.stats.modules_executed += 1;
             self.stats.fuel_consumed += fuel_used;
-            self.stats.peak_memory = self.stats.peak_memory.max(memory_used);
+            self.stats.peak_memory = self.stats.peak_memory.max(memory_used;
             
             Ok(format!("Executed '{}' (alloc mode)", function))
         }
@@ -251,14 +264,14 @@ pub mod alloc_runtime {
             verbose: false,
         };
         
-        let mut runtime = AllocRuntime::new(config);
+        let mut runtime = AllocRuntime::new(config;
         
         // Simulate a small WASM module
         let fake_module = vec![0x00, 0x61, 0x73, 0x6d]; // WASM magic number
         
         match runtime.execute_module(&fake_module, "start") {
             Ok(_) => {
-                let stats = runtime.stats();
+                let stats = runtime.stats);
                 // Success - in real implementation this would signal back to host
                 Ok(())
             }
@@ -276,8 +289,8 @@ pub mod nostd_runtime {
     pub struct NoStdRuntime {
         config: WrtdConfig,
         stats: RuntimeStats,
-        // Using heapless collections with fixed capacity
-        execution_log: Vec<u8, 64>, // Log last 64 execution events
+        // Using bounded collections with fixed capacity
+        execution_log: BoundedLogEntryVec<u8>, // Log execution events
     }
     
     impl NoStdRuntime {
@@ -286,7 +299,7 @@ pub mod nostd_runtime {
             Self {
                 config,
                 stats: RuntimeStats::default(),
-                execution_log: Vec::new(),
+                execution_log: new_log_entry_vec(),
             }
         }
         
@@ -310,7 +323,7 @@ pub mod nostd_runtime {
             // Update stats
             self.stats.modules_executed += 1;
             self.stats.fuel_consumed += fuel_used;
-            self.stats.peak_memory = self.stats.peak_memory.max(memory_used);
+            self.stats.peak_memory = self.stats.peak_memory.max(memory_used;
             
             Ok(fuel_used as u32)
         }
@@ -329,7 +342,7 @@ pub mod nostd_runtime {
             verbose: false,
         };
         
-        let mut runtime = NoStdRuntime::new(config);
+        let mut runtime = NoStdRuntime::new(config;
         
         // Simulate a tiny WASM module for bare metal
         let fake_module = [0x00, 0x61, 0x73, 0x6d]; // WASM magic number

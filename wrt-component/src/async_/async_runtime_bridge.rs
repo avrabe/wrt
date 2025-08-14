@@ -1,50 +1,72 @@
 //! Bridge between Component Model async and Rust async (if needed)
 //!
-//! The WebAssembly Component Model defines its own async primitives (stream, future, error-context)
-//! that are different from Rust's async/await. This module provides optional bridges between them.
+//! The WebAssembly Component Model defines its own async primitives (stream,
+//! future, error-context) that are different from Rust's async/await. This
+//! module provides optional bridges between them.
 
-use crate::{
-    async_types::{
-        Future as WasmFuture, FutureHandle, FutureState, Stream as WasmStream, StreamHandle,
-    },
-    task_manager::{TaskId, TaskManager, TaskState},
-    ComponentInstanceId, ValType,
-};
 use core::{
     pin::Pin,
-    task::{Context, Poll, Waker},
+    task::{
+        Context,
+        Poll,
+        Waker,
+    },
 };
-#[cfg(feature = "std")]
-use wrt_foundation::{bounded_collections::BoundedVec, component_value::ComponentValue};
 
+#[cfg(feature = "std")]
+use wrt_foundation::{
+    bounded_collections::BoundedVec,
+    component_value::ComponentValue,
+};
+
+use super::async_types::{
+    Future as WasmFuture,
+    FutureHandle,
+    FutureState,
+    Stream as WasmStream,
+    StreamHandle,
+};
 #[cfg(not(feature = "std"))]
 // For no_std, use a simpler ComponentValue representation
 use crate::types::Value as ComponentValue;
+use crate::{
+    threading::task_manager::{
+        TaskId,
+        TaskManager,
+        TaskState,
+    },
+    ComponentInstanceId,
+    ValType,
+};
 
 /// The Component Model async primitives DO NOT require Rust's Future trait.
 /// They work through their own polling/waiting mechanisms via the task manager.
 ///
-/// However, if you want to integrate with Rust async runtimes (tokio, async-std),
-/// this module provides adapters.
+/// However, if you want to integrate with Rust async runtimes (tokio,
+/// async-std), this module provides adapters.
 
 #[cfg(feature = "std")]
 pub mod rust_async_bridge {
-    use super::*;
     use std::{
         future::Future as RustFuture,
-        sync::{Arc, Mutex},
+        sync::{
+            Arc,
+            Mutex,
+        },
         task::Wake,
     };
 
+    use super::*;
+
     /// Adapter to use a Component Model Future in Rust async code
     pub struct ComponentFutureAdapter<T> {
-        wasm_future: Arc<Mutex<WasmFuture<T>>>,
+        wasm_future:  Arc<Mutex<WasmFuture<T>>>,
         task_manager: Arc<Mutex<TaskManager>>,
-        task_id: TaskId,
+        task_id:      TaskId,
     }
 
     impl<T: Clone + Send + 'static> RustFuture for ComponentFutureAdapter<T> {
-        type Output = Result<T, String>;
+        type Output = core::result::Result<T, String>;
 
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             let future = self.wasm_future.lock().unwrap();
@@ -56,7 +78,7 @@ pub mod rust_async_bridge {
                     } else {
                         Poll::Ready(Err("Future ready but no value".to_string()))
                     }
-                }
+                },
                 FutureState::Failed => Poll::Ready(Err("Future failed".to_string())),
                 FutureState::Cancelled => Poll::Ready(Err("Future cancelled".to_string())),
                 FutureState::Pending => {
@@ -65,7 +87,7 @@ pub mod rust_async_bridge {
                     // to wake this future when the Component Model future completes
                     cx.waker().wake_by_ref();
                     Poll::Pending
-                }
+                },
             }
         }
     }
@@ -75,7 +97,7 @@ pub mod rust_async_bridge {
         future: F,
         task_manager: &mut TaskManager,
         component_id: ComponentInstanceId,
-    ) -> Result<FutureHandle, String>
+    ) -> core::result::Result<FutureHandle, String>
     where
         F: RustFuture<Output = T> + Send + 'static,
         T: Into<ComponentValue>,
@@ -95,14 +117,16 @@ pub mod component_async {
     pub fn execute_async_operation(
         task_manager: &mut TaskManager,
         operation: AsyncOperation,
-    ) -> Result<TaskId, String> {
+    ) -> core::result::Result<TaskId, String> {
         // Create a task for the async operation
         let task_id = task_manager
             .create_task(operation.component_id, &operation.name)
-            .map_err(|e| "Component not found")?;
+            .map_err(|e| Error::runtime_execution_error("Component not found"))?;
 
         // Start the task
-        task_manager.start_task(task_id).map_err(|e| "Component not found")?;
+        task_manager
+            .start_task(task_id)
+            .map_err(|e| Error::runtime_execution_error("Failed to start task"))?;
 
         Ok(task_id)
     }
@@ -119,7 +143,7 @@ pub mod component_async {
                 } else {
                     PollResult::Error("Future ready but no value".to_string())
                 }
-            }
+            },
             FutureState::Pending => PollResult::Pending,
             FutureState::Failed => PollResult::Error("Future failed".to_string()),
             FutureState::Cancelled => PollResult::Error("Future cancelled".to_string()),
@@ -137,7 +161,7 @@ pub mod component_async {
             {
                 StreamPollResult::Item(stream.buffer.remove(0))
             }
-            #[cfg(not(any(feature = "std", )))]
+            #[cfg(not(any(feature = "std",)))]
             {
                 if let Some(item) = stream.buffer.pop_front() {
                     StreamPollResult::Item(item)
@@ -154,8 +178,8 @@ pub mod component_async {
 
     #[derive(Debug, Clone)]
     pub struct AsyncOperation {
-        pub component_id: ComponentInstanceId,
-        pub name: String,
+        pub component_id:   ComponentInstanceId,
+        pub name:           String,
         pub operation_type: AsyncOperationType,
     }
 
@@ -185,8 +209,10 @@ pub mod component_async {
 /// Example of using Component Model async WITHOUT Rust futures
 #[cfg(test)]
 mod tests {
-    use super::component_async::*;
-    use super::*;
+    use super::{
+        component_async::*,
+        *,
+    };
 
     #[test]
     fn test_component_model_async_without_rust_futures() {
@@ -237,18 +263,19 @@ mod tests {
     }
 }
 
-/// Summary: The WebAssembly Component Model async does NOT require the futures crate
-/// or Rust's async/await. It has its own async primitives:
+/// Summary: The WebAssembly Component Model async does NOT require the futures
+/// crate or Rust's async/await. It has its own async primitives:
 ///
 /// 1. `stream<T>` - for incremental value passing
-/// 2. `future<T>` - for deferred single values  
+/// 2. `future<T>` - for deferred single values
 /// 3. `error-context` - for detailed error information
 ///
-/// These are polled/waited on through the task manager and canonical built-ins like:
+/// These are polled/waited on through the task manager and canonical built-ins
+/// like:
 /// - `task.wait` - wait for async operations
 /// - `stream.read` / `stream.write` - stream operations
 /// - `future.read` / `future.write` - future operations
 ///
-/// The Rust Future trait is only needed if you want to integrate with Rust async
-/// runtimes like tokio or async-std, which is optional.
+/// The Rust Future trait is only needed if you want to integrate with Rust
+/// async runtimes like tokio or async-std, which is optional.
 pub struct ComponentModelAsyncSummary;

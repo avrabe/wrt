@@ -34,49 +34,75 @@
 //! }
 //! ```
 
-use wrt_error::{codes, Error, ErrorCategory, Result};
-use crate::prelude::BoundedVecExt;
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+    Result,
+};
 use wrt_format::binary;
-use wrt_foundation::NoStdProvider;
+use wrt_foundation::{
+    capabilities::CapabilityAwareProvider,
+    capability_context,
+    safe_capability_alloc,
+    traits::BoundedCapacity,
+    CrateId,
+    NoStdProvider,
+};
+
+// Type aliases for cleaner signatures
+type DecoderProvider = NoStdProvider<65536>;
+
+// Helper functions to create properly sized providers
+fn create_provider_1024() -> Result<DecoderProvider> {
+    // For this no_std focused module, use the direct provider creation
+    Ok(DecoderProvider::default())
+}
 
 /// Read a name from binary data (no_std version)
 /// Returns (name_bytes, total_bytes_read)
 fn read_name(data: &[u8], offset: usize) -> Result<(&[u8], usize)> {
     if offset >= data.len() {
-        return Err(Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Offset beyond data"));
+        return Err(Error::parse_error("Offset beyond data"));
     }
-    
+
     // Read length as LEB128
     let (name_len, leb_bytes) = binary::read_leb128_u32(data, offset)?;
     let name_start = offset + leb_bytes;
     let name_end = name_start + name_len as usize;
-    
+
     if name_end > data.len() {
-        return Err(Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Name extends beyond data"));
+        return Err(Error::parse_error("Name extends beyond data"));
     }
-    
+
     Ok((&data[name_start..name_end], leb_bytes + name_len as usize))
 }
-// BoundedCapacity trait is private, using alternative approaches for length operations
+// BoundedCapacity trait is private, using alternative approaches for length
+// operations
 use wrt_foundation::{
     bounded::{
-        BoundedString, BoundedVec, MAX_BUFFER_SIZE, MAX_COMPONENT_LIST_ITEMS,
-        MAX_COMPONENT_RECORD_FIELDS, MAX_COMPONENT_TYPES, MAX_WASM_NAME_LENGTH,
+        BoundedString,
+        BoundedVec,
+        MAX_COMPONENT_TYPES,
     },
-    component::{MAX_COMPONENT_EXPORTS, MAX_COMPONENT_IMPORTS},
-    safe_memory::SafeSlice,
+    component::{
+        MAX_COMPONENT_EXPORTS,
+        MAX_COMPONENT_IMPORTS,
+    },
     verification::VerificationLevel,
 };
 
 use crate::{
-    component::{
-        section::{
-            ComponentExport, ComponentImport, ComponentInstance, ComponentSection, ComponentType,
-        },
-        validation,
+    component::section::{
+        ComponentExport,
+        ComponentImport,
+        ComponentType,
     },
     decoder_no_alloc::{
-        create_error, create_memory_provider, verify_wasm_header, NoAllocErrorCode, MAX_MODULE_SIZE,
+        create_error,
+        create_memory_provider,
+        NoAllocErrorCode,
+        MAX_MODULE_SIZE,
     },
     prelude::*,
 };
@@ -110,29 +136,29 @@ pub const COMPONENT_VERSION: u32 = 1;
 #[repr(u8)]
 pub enum ComponentSectionId {
     /// Custom section (0)
-    Custom = 0,
+    Custom            = 0,
     /// Component type section (1)
-    ComponentType = 1,
+    ComponentType     = 1,
     /// Component import section (2)
-    Import = 2,
+    Import            = 2,
     /// Core module section (3)
-    CoreModule = 3,
+    CoreModule        = 3,
     /// Component instance section (4)
-    Instance = 4,
+    Instance          = 4,
     /// Component alias section (5)
-    Alias = 5,
+    Alias             = 5,
     /// Component export section (6)
-    Export = 6,
+    Export            = 6,
     /// Component start section (7)
-    Start = 7,
+    Start             = 7,
     /// Component module section (8)
-    Module = 8,
+    Module            = 8,
     /// Component canonical function section (9)
     CanonicalFunction = 9,
     /// Component instance export section (10)
-    InstanceExport = 10,
+    InstanceExport    = 10,
     /// Unknown section
-    Unknown = 255,
+    Unknown           = 255,
 }
 
 impl From<u8> for ComponentSectionId {
@@ -158,9 +184,9 @@ impl From<u8> for ComponentSectionId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ComponentSectionInfo {
     /// Section ID
-    pub id: ComponentSectionId,
+    pub id:     ComponentSectionId,
     /// Section size in bytes
-    pub size: u32,
+    pub size:   u32,
     /// Offset of the section data in the binary
     pub offset: usize,
 }
@@ -205,25 +231,27 @@ pub fn verify_component_header(bytes: &[u8]) -> Result<()> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentHeader {
     /// Component size in bytes
-    pub size: usize,
+    pub size:               usize,
     /// Number of sections detected in the component
-    pub section_count: u8,
+    pub section_count:      u8,
     /// Component types
-    pub types: BoundedVec<ComponentType, MAX_COMPONENT_TYPES, NoStdProvider<1024>>,
+    pub types:              BoundedVec<ComponentType, MAX_COMPONENT_TYPES, DecoderProvider>,
     /// Component exports
-    pub exports: BoundedVec<ComponentExport, MAX_COMPONENT_EXPORTS, NoStdProvider<1024>>,
+    pub exports:
+        BoundedVec<ComponentExport<DecoderProvider>, MAX_COMPONENT_EXPORTS, DecoderProvider>,
     /// Component imports
-    pub imports: BoundedVec<ComponentImport, MAX_COMPONENT_IMPORTS, NoStdProvider<1024>>,
+    pub imports:
+        BoundedVec<ComponentImport<DecoderProvider>, MAX_COMPONENT_IMPORTS, DecoderProvider>,
     /// Whether the component contains a start function
-    pub has_start: bool,
+    pub has_start:          bool,
     /// Whether the component contains core modules
-    pub has_core_modules: bool,
+    pub has_core_modules:   bool,
     /// Whether the component contains sub-components
     pub has_sub_components: bool,
     /// Whether the component uses resources
-    pub uses_resources: bool,
+    pub uses_resources:     bool,
     /// Section information
-    pub sections: [Option<ComponentSectionInfo>; MAX_COMPONENT_SECTIONS],
+    pub sections:           [Option<ComponentSectionInfo>; MAX_COMPONENT_SECTIONS],
     /// Verification level used for validation
     pub verification_level: VerificationLevel,
 }
@@ -231,12 +259,16 @@ pub struct ComponentHeader {
 impl ComponentHeader {
     /// Creates a new ComponentHeader with default values
     pub fn new(verification_level: VerificationLevel) -> Self {
+        let provider = create_provider_1024().unwrap_or_else(|_| {
+            // Create default provider as fallback with same type
+            DecoderProvider::default()
+        });
         Self {
             size: 0,
             section_count: 0,
-            types: BoundedVec::empty(),
-            exports: BoundedVec::empty(),
-            imports: BoundedVec::empty(),
+            types: BoundedVec::new(provider.clone()).unwrap_or_default(),
+            exports: BoundedVec::new(provider.clone()).unwrap_or_default(),
+            imports: BoundedVec::new(provider.clone()).unwrap_or_default(),
             has_start: false,
             has_core_modules: false,
             has_sub_components: false,
@@ -319,14 +351,14 @@ pub fn decode_component_header(
     verify_component_header(bytes)?;
 
     // Create a memory provider for the component data
-    let provider = create_memory_provider(bytes, verification_level)?;
+    let _provider = create_memory_provider(bytes, verification_level)?;
 
     // Initialize the component header
     let mut header = ComponentHeader::new(verification_level);
     header.size = bytes.len();
 
     // Create empty collections for the component header
-    let header_provider = NoStdProvider::<1024>::default();
+    let header_provider = create_provider_1024()?;
     let types = BoundedVec::new(header_provider.clone())?;
     let exports = BoundedVec::new(header_provider.clone())?;
     let imports = BoundedVec::new(header_provider)?;
@@ -365,8 +397,8 @@ pub fn decode_component_header(
 
         // Save section info
         header.sections[section_index] = Some(ComponentSectionInfo {
-            id: section_id_enum,
-            size: section_size,
+            id:     section_id_enum,
+            size:   section_size,
             offset: section_data_offset,
         });
 
@@ -377,20 +409,20 @@ pub fn decode_component_header(
         match section_id_enum {
             ComponentSectionId::Start => {
                 header.has_start = true;
-            }
+            },
             ComponentSectionId::CoreModule => {
                 header.has_core_modules = true;
-            }
+            },
             ComponentSectionId::Module => {
                 header.has_sub_components = true;
-            }
+            },
             ComponentSectionId::ComponentType => {
                 // Check for resource type usage
                 if check_for_resource_types(bytes, section_data_offset, section_size) {
                     header.uses_resources = true;
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         // Move to next section
@@ -460,7 +492,11 @@ fn check_for_resource_types(bytes: &[u8], offset: usize, size: u32) -> bool {
 /// * `Result<()>` - Ok if successful
 fn scan_component_imports(
     section_data: &[u8],
-    imports: &mut BoundedVec<ComponentImport, MAX_COMPONENT_IMPORTS, NoStdProvider<1024>>,
+    imports: &mut BoundedVec<
+        ComponentImport<DecoderProvider>,
+        MAX_COMPONENT_IMPORTS,
+        DecoderProvider,
+    >,
 ) -> Result<()> {
     if section_data.is_empty() {
         return Ok(());
@@ -487,16 +523,16 @@ fn scan_component_imports(
             // In a real implementation, we would read the import type here
             // For now, just store the name
             let import = ComponentImport {
-                name: {
+                name:       {
                     let name_str = core::str::from_utf8(name)
-                        .map_err(|_| Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Invalid UTF-8 in name"))?;
-                    BoundedString::from_str_truncate(name_str, NoStdProvider::<1024>::default())?
+                        .map_err(|_| Error::parse_error("Invalid UTF-8 in name"))?;
+                    BoundedString::from_str_truncate(name_str, create_provider_1024()?)?
                 },
                 type_index: 0, // Placeholder
             };
 
             // Try to add the import to our bounded collection
-            let _ = imports.try_push(import);
+            let _ = imports.push(import);
 
             // Skip the import type (simplified)
             if offset < section_data.len() {
@@ -522,7 +558,11 @@ fn scan_component_imports(
 /// * `Result<()>` - Ok if successful
 fn scan_component_exports(
     section_data: &[u8],
-    exports: &mut BoundedVec<ComponentExport, MAX_COMPONENT_EXPORTS, NoStdProvider<1024>>,
+    exports: &mut BoundedVec<
+        ComponentExport<DecoderProvider>,
+        MAX_COMPONENT_EXPORTS,
+        DecoderProvider,
+    >,
 ) -> Result<()> {
     if section_data.is_empty() {
         return Ok(());
@@ -549,17 +589,17 @@ fn scan_component_exports(
             // In a real implementation, we would read the export type here
             // For now, just store the name
             let export = ComponentExport {
-                name: {
+                name:       {
                     let name_str = core::str::from_utf8(name)
-                        .map_err(|_| Error::new(ErrorCategory::Parse, codes::PARSE_ERROR, "Invalid UTF-8 in name"))?;
-                    BoundedString::from_str_truncate(name_str, NoStdProvider::<1024>::default())?
+                        .map_err(|_| Error::parse_error("Invalid UTF-8 in name"))?;
+                    BoundedString::from_str_truncate(name_str, create_provider_1024()?)?
                 },
                 type_index: 0, // Placeholder
-                kind: 0,       // Placeholder
+                kind:       0, // Placeholder
             };
 
             // Try to add the export to our bounded collection
-            let _ = exports.try_push(export);
+            let _ = exports.push(export);
 
             // Skip the export type and index (simplified)
             if offset < section_data.len() {
@@ -585,7 +625,7 @@ fn scan_component_exports(
 /// * `Result<()>` - Ok if successful
 fn scan_component_types(
     section_data: &[u8],
-    types: &mut BoundedVec<ComponentType, MAX_COMPONENT_TYPES, NoStdProvider<1024>>,
+    types: &mut BoundedVec<ComponentType, MAX_COMPONENT_TYPES, DecoderProvider>,
 ) -> Result<()> {
     if section_data.is_empty() {
         return Ok(());
@@ -617,7 +657,7 @@ fn scan_component_types(
             };
 
             // Try to add the type to our bounded collection
-            let _ = types.try_push(component_type);
+            let _ = types.push(component_type);
 
             // Skip remaining type data (simplified)
             // In a real implementation, we would parse the type structure
@@ -938,7 +978,10 @@ mod tests {
     #[test]
     fn test_component_section_id_from_u8() {
         assert_eq!(ComponentSectionId::from(0), ComponentSectionId::Custom);
-        assert_eq!(ComponentSectionId::from(1), ComponentSectionId::ComponentType);
+        assert_eq!(
+            ComponentSectionId::from(1),
+            ComponentSectionId::ComponentType
+        );
         assert_eq!(ComponentSectionId::from(255), ComponentSectionId::Unknown);
     }
 

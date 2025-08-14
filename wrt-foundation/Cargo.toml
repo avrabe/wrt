@@ -10,44 +10,293 @@ keywords = ["wasm", "webassembly", "foundation", "no_std", "safety"]
 categories = ["wasm", "no-std", "embedded"]
 
 [features]
-# Default features for standard environments
-# Binary choice: std OR no_std (no alloc middle ground)
-default = [] # Now strictly no_std, no alloc by default; component model features opt-in
+default = []
 
-# Binary choice: std OR no_std (no alloc middle ground)
-std = ["wrt-sync/std"]
+# NOTE: Legacy feature definitions have been moved to the four-layer architecture below.
+# This comment serves as a placeholder to maintain line numbering for now.
+
+# ============================================================================
+# FOUR-LAYER SAFETY ARCHITECTURE
+# ============================================================================
+# This architecture separates safety concerns into four clean layers:
+# 1. Memory Management Strategy (how memory is allocated)
+# 2. Safety Feature Capabilities (what safety features are enabled)
+# 3. Safety Standards (which international standard to follow)
+# 4. Safety Integrity Levels (what level within that standard)
+
+# ============================================================================
+# Layer 1: Memory Management Strategy (Foundation)
+# ============================================================================
+# These control HOW memory is allocated and managed.
+# They are mutually exclusive and qualification-aware.
+# Each strategy has its own capability namespace to prevent conflicts.
+
+# Pure deterministic allocation (highest safety levels: ASIL-D, DAL-A, SIL-4, Class C)
+static-allocation = [
+    "static-memory-layout",
+    "static-capacity-limits", 
+    "static-verification"
+]
+
+# Bounded deterministic allocation (medium safety levels: ASIL-C, DAL-B, SIL-3, Class B)
+bounded-allocation = [
+    "bounded-runtime-checks",
+    "bounded-capacity-limits",
+    "bounded-monitoring",
+    "bounded-collections"
+]
+
+# Managed dynamic allocation (lower safety levels: ASIL-A/B, DAL-D, SIL-1/2, Class A)  
+managed-allocation = [
+    "managed-monitoring",
+    "managed-dynamic-alloc"
+]
+
+# Unqualified allocation (non-safety-critical only: QM, DAL-E)
+std-allocation = [
+    "std",
+    "std-dynamic-alloc",
+    "std-collections"
+]
+
+# ============================================================================
+# Layer 2: Safety Feature Capabilities (Composable)
+# ============================================================================
+# These control WHAT safety mechanisms are enabled.
+# They can be composed together as needed.
+
+# Memory safety capabilities
+stack-overflow-protection = []
+buffer-overflow-protection = []
+
+# Execution safety capabilities  
+control-flow-integrity = []
+instruction-validation = []
+execution-monitoring = []
+deterministic-timing = []
+
+# Data integrity capabilities
+error-detection-codes = []
+checksums-verification = []
+data-flow-monitoring = []
+
+# ============================================================================
+# Strategy-Specific Capability Features (Independent Namespaces)
+# ============================================================================
+
+# Static allocation capabilities (ASIL-D, DAL-A, SIL-4, Class C)
+static-memory-layout = []
+static-capacity-limits = []
+static-verification = []
+
+# Bounded allocation capabilities (ASIL-C, DAL-B, SIL-3, Class B)
+bounded-runtime-checks = []
+bounded-capacity-limits = []
+bounded-monitoring = []
+bounded-budget-enforcement = ["bounded-capacity-limits"]
+
+# Managed allocation capabilities (ASIL-A/B, DAL-D, SIL-1/2, Class A)
+managed-monitoring = []
+managed-dynamic-alloc = []
+
+# Standard allocation capabilities (QM, DAL-E)
+std-dynamic-alloc = []
+std-collections = []
+
+# Shared safety capabilities (can be used across strategies)
+memory-isolation = ["bounded-budget-enforcement"]
+
+# Composite capability features
+bounded-collections = [
+    "bounded-capacity-limits",
+    "bounded-runtime-checks",
+    "bounded-monitoring"
+]
+
+# Legacy capability features (will be removed in future versions)
+basic-monitoring = ["bounded-monitoring"]  # DEPRECATED: use bounded-monitoring
+dynamic-allocation = ["managed-dynamic-alloc"]  # DEPRECATED: use managed-dynamic-alloc
+runtime-bounds-checking = ["bounded-runtime-checks"]  # DEPRECATED: use bounded-runtime-checks
+
+redundant-safety-checks = ["bounded-runtime-checks"]
+verified-static-allocation = ["static-allocation", "formal-verification-required", "static-memory-layout"]
+
+# Verification capabilities
+formal-verification-required = ["dep:kani-verifier"]
+mathematical-proofs = ["formal-verification-required"]
+coverage-analysis = []
+fault-injection-testing = []
+
+# Advanced safety capabilities
+redundant-computation = []
+automotive-hazard-analysis = []
+asil-decomposition-support = []
+functional-safety-concept = []
+structural-coverage-analysis = []
+requirements-traceability = []
+configuration-management = []
+systematic-capability = []
+random-hardware-failures = []
+common-cause-failures = []
+risk-management-process = []
+software-lifecycle-process = []
+clinical-evaluation = []
+railway-specific-hazards = []
+tolerable-hazard-rate = []
+systematic-failures = []
+agricultural-machinery-safety = []
+operator-protection = []
+environmental-conditions = []
+
+# Isolation capabilities
+component-isolation = ["memory-isolation"]
+process-isolation = ["component-isolation"]  
+hardware-isolation = ["component-isolation"]
+
+# ============================================================================
+# Layer 3: Safety Standards (Domain-Specific)
+# ============================================================================
+# These control WHICH international safety standard to follow.
+# They are mutually exclusive within a project.
+
+# Automotive safety standard (ISO 26262)
+iso-26262 = [
+    "automotive-hazard-analysis",
+    "asil-decomposition-support",
+    "functional-safety-concept"
+]
+
+# Aerospace safety standard (DO-178C) 
+do-178c = [
+    "structural-coverage-analysis", 
+    "requirements-traceability",
+    "configuration-management"
+]
+
+# Industrial functional safety (IEC 61508)
+iec-61508 = [
+    "systematic-capability", 
+    "random-hardware-failures",
+    "common-cause-failures"
+]
+
+# Medical device software (IEC 62304)
+iec-62304 = [
+    "risk-management-process",
+    "software-lifecycle-process", 
+    "clinical-evaluation"
+]
+
+# Railway safety (EN 50128)
+en-50128 = [
+    "railway-specific-hazards",
+    "tolerable-hazard-rate",
+    "systematic-failures"
+]
+
+# Agricultural machinery safety (ISO 25119) 
+iso-25119 = [
+    "agricultural-machinery-safety",
+    "operator-protection",
+    "environmental-conditions"
+]
+
+# ============================================================================
+# Layer 4: Safety Integrity Levels (Standard-Dependent)
+# ============================================================================
+# These control the LEVEL within each safety standard.
+# They automatically select appropriate memory strategies and capabilities.
+
+# ISO 26262 - Automotive Safety Integrity Levels
+qm = ["managed-allocation"]                                         # Quality Management
+asil-a = ["managed-allocation"]                                   # ASIL A  
+asil-b = ["bounded-allocation", "runtime-bounds-checking"]     # ASIL B
+asil-c = ["bounded-allocation", "memory-isolation", "control-flow-integrity"] # ASIL C
+asil-d = ["static-allocation", "redundant-computation", "mathematical-proofs", "hardware-isolation"] # ASIL D
+
+# DO-178C - Design Assurance Levels (Aerospace)
+dal-e = ["managed-allocation"]                                    # No effect on safety
+dal-d = ["managed-allocation"]                                    # Minor effect
+dal-c = ["bounded-allocation", "execution-monitoring"]         # Major effect
+dal-b = ["bounded-allocation", "formal-verification-required", "coverage-analysis"] # Hazardous effect
+dal-a = ["static-allocation", "mathematical-proofs", "redundant-computation"] # Catastrophic effect
+
+# IEC 61508 - Safety Integrity Levels (Industrial)
+sil-1 = ["managed-allocation"]
+sil-2 = ["bounded-allocation", "error-detection-codes"] 
+sil-3 = ["bounded-allocation", "redundant-computation", "formal-verification-required"]
+sil-4 = ["static-allocation", "mathematical-proofs", "fault-injection-testing"]
+
+# IEC 62304 - Medical Device Safety Classes
+class-a = ["managed-allocation"] # No injury possible
+class-b = ["bounded-allocation", "error-detection-codes"]     # Non-life-threatening injury
+class-c = ["static-allocation", "redundant-computation"]      # Life-threatening/death possible
+
+# EN 50128 - Railway Safety Integrity Levels  
+railway-sil-0 = ["managed-allocation"]
+railway-sil-1 = ["managed-allocation"]
+railway-sil-2 = ["bounded-allocation", "error-detection-codes"]
+railway-sil-3 = ["bounded-allocation", "redundant-computation", "formal-verification-required"] 
+railway-sil-4 = ["static-allocation", "mathematical-proofs", "fault-injection-testing"]
+
+# ISO 25119 - Agricultural Performance Levels
+agpl-a = ["managed-allocation"] # No risk of injury to persons
+agpl-b = ["managed-allocation"] # Light to moderate injury
+agpl-c = ["bounded-allocation", "redundant-computation"]     # Severe to life-threatening injury
+agpl-d = ["bounded-allocation", "formal-verification-required"] # Life-threatening to fatal (one person)
+agpl-e = ["static-allocation", "mathematical-proofs"]        # Life-threatening to fatal (multiple persons)
+
+# ============================================================================
+# Legacy Compatibility Features (DEPRECATED)
+# ============================================================================
+# These features are provided for backward compatibility only.
+# New code should use the four-layer architecture above.
+# These will be removed in a future major version.
+
+# DEPRECATED: Use std-allocation instead
+std = ["wrt-sync/std", "std-allocation"]
 no_std = []
 
-# Optional external dependencies - not enabled by default
-use-hashbrown = ["dep:hashbrown", "std"] # Requires std
+# DEPRECATED: Use bounded-allocation instead
+alloc = ["bounded-allocation"]
 
-# Optional feature to bypass some safety checks in performance-critical paths
+# DEPRECATED: Use iso-26262 + asil-* instead
+safety-asil-b = ["iso-26262", "asil-b"]
+safety-asil-c = ["iso-26262", "asil-c"] 
+safety-asil-d = ["iso-26262", "asil-d"]
+
+# DEPRECATED: Use bounded-allocation instead
+safe-memory = ["bounded-allocation"]
+budget-enforcement = ["bounded-budget-enforcement"]
+
+# DEPRECATED: Use std-allocation instead
+wrt-allocator = ["std-allocation"]
+default-provider = ["std-allocation"]
+
+# General features (still supported)
 optimize = []
-# Additional safety features for ASIL-B compliance
-safety = []
-# Enable default memory provider functionality
-default-provider = ["std"]
-# Feature for formal verification, requires nightly for full functionality
 kani = ["dep:kani-verifier"]
-
-# Feature for platform-backed linear memory
+use-hashbrown = ["dep:hashbrown", "std"]
 platform-memory = ["dep:wrt-platform"]
 
-# Safe memory implementations
-safe-memory = []
+# DEPRECATED: Use bounded-allocation instead
+safety = ["bounded-allocation"]
+static-memory-safety = ["static-allocation", "memory-isolation"]
+fault-detection = ["basic-monitoring"]
+maximum-safety = ["static-allocation", "mathematical-proofs", "redundant-safety-checks", "hardware-isolation"]
 
 # Component Model features
-component-model-core = []  # Basic component model support
-component-model-values = []  # 🪙 Experimental values
-component-model-resources = []  # Resource types
-component-model-fixed-lists = []  # 🔧 Fixed-length lists
-component-model-namespaces = []  #  Nested namespaces
-component-model-async = []  # 🚝 Async value types and operations
-component-model-error-context = []  # 📝 Error context types and operations
-component-model-threading = []  # 🧵 Threading operations
+component-model-core = []
+component-model-values = []
+component-model-resources = []
+component-model-fixed-lists = []
+component-model-namespaces = []
+component-model-async = []
+component-model-error-context = []
+component-model-threading = []
 
 # Pluggable async executor support
-async-api = []  # Enable async/await API with pluggable executor
+async-api = []
 
 # Disable panic handler for library builds to avoid conflicts
 disable-panic-handler = []
@@ -55,7 +304,7 @@ disable-panic-handler = []
 [dependencies]
 wrt-error = { workspace = true, default-features = false }
 wrt-sync = { workspace = true, default-features = false } # Make alloc conditional via features
-wrt-platform = { workspace = true, default-features = false, optional = true, features = ["disable-panic-handler"] }
+wrt-platform = { workspace = true, optional = true }
 
 # Only include hashbrown when explicitly requested with alloc feature
 hashbrown = { version = "0.15", optional = true } # For no_std with alloc

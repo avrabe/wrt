@@ -36,7 +36,10 @@
 
 #![allow(dead_code)] // Allow during development
 
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{
+    AtomicUsize,
+    Ordering,
+};
 
 /// Side-channel resistance levels for different security contexts
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -267,9 +270,8 @@ pub mod constant_time {
     /// Uses cache line alignment and prefetching for timing consistency.
     pub fn constant_time_copy(dst: &mut [u8], src: &[u8]) -> Result<(), wrt_error::Error> {
         if dst.len() != src.len() {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Memory, 1,
-                "Source and destination buffers must have the same length",
+            return Err(wrt_error::Error::runtime_execution_error(
+                "Source and destination lengths must match",
             ));
         }
 
@@ -329,19 +331,19 @@ pub mod cache_aware_allocation {
     /// Binary std/no_std choice
     pub struct CacheAwareAllocator {
         /// Binary std/no_std choice
-        blocks: &'static mut [CacheBlock],
+        blocks:            &'static mut [CacheBlock],
         /// Allocation bitmap (constant-time operations)
         allocation_bitmap: AtomicUsize,
         /// Block size (power of 2, cache-aligned)
-        block_size: usize,
+        block_size:        usize,
         /// Total blocks available
-        total_blocks: usize,
+        total_blocks:      usize,
     }
 
     /// Binary std/no_std choice
     #[repr(align(64))] // Cache line alignment
     pub struct CacheBlock {
-        data: [u8; 64], // One cache line
+        data:      [u8; 64], // One cache line
         next_free: AtomicUsize,
     }
 
@@ -405,11 +407,11 @@ pub mod cache_aware_allocation {
                         // Binary std/no_std choice
                         let block_ptr = &self.blocks[free_bit] as *const CacheBlock as *mut u8;
                         return NonNull::new(block_ptr);
-                    }
+                    },
                     Err(_) => {
                         attempts += 1;
                         // Continue retry loop
-                    }
+                    },
                 }
             }
 
@@ -440,7 +442,7 @@ pub mod cache_aware_allocation {
                         Ordering::Relaxed,
                     ) {
                         Ok(_) => break,
-                        Err(_) => {}
+                        Err(_) => {},
                     }
                 }
             }
@@ -494,11 +496,11 @@ pub mod cache_aware_allocation {
         /// Total number of memory blocks
         pub total_blocks: usize,
         /// Number of blocks currently in use
-        pub used_blocks: usize,
+        pub used_blocks:  usize,
         /// Number of free blocks available
-        pub free_blocks: usize,
+        pub free_blocks:  usize,
         /// Size of each memory block in bytes
-        pub block_size: usize,
+        pub block_size:   usize,
     }
 }
 
@@ -512,7 +514,7 @@ pub mod access_obfuscation {
     /// which memory location is actually accessed.
     pub struct ObliviousMemoryAccess {
         /// Memory region to obfuscate
-        memory: &'static mut [u8],
+        memory:          &'static mut [u8],
         /// Cache line size for access alignment
         cache_line_size: usize,
     }
@@ -617,22 +619,22 @@ pub mod platform_integration {
     #[derive(Debug, Clone)]
     pub struct SideChannelConfig {
         /// Target resistance level
-        pub resistance_level: ResistanceLevel,
+        pub resistance_level:      ResistanceLevel,
         /// Specific attack vectors to defend against
-        pub protected_vectors: &'static [AttackVector],
+        pub protected_vectors:     &'static [AttackVector],
         /// Performance impact tolerance (0.0 to 1.0)
         pub performance_tolerance: f32,
         /// Enable formal verification of timing properties
-        pub verify_timing: bool,
+        pub verify_timing:         bool,
     }
 
     impl Default for SideChannelConfig {
         fn default() -> Self {
             Self {
-                resistance_level: ResistanceLevel::Basic,
-                protected_vectors: &[AttackVector::Timing, AttackVector::Cache],
+                resistance_level:      ResistanceLevel::Basic,
+                protected_vectors:     &[AttackVector::Timing, AttackVector::Cache],
                 performance_tolerance: 0.1, // 10% performance overhead acceptable
-                verify_timing: false,
+                verify_timing:         false,
             }
         }
     }
@@ -670,15 +672,15 @@ pub mod platform_integration {
     /// Security-first paradigm with comprehensive side-channel resistance
     pub fn security_first_side_channel_config() -> SideChannelConfig {
         SideChannelConfig {
-            resistance_level: ResistanceLevel::Comprehensive,
-            protected_vectors: &[
+            resistance_level:      ResistanceLevel::Comprehensive,
+            protected_vectors:     &[
                 AttackVector::Timing,
                 AttackVector::Cache,
                 AttackVector::BranchPrediction,
                 AttackVector::MemoryPattern,
             ],
             performance_tolerance: 0.5, // Accept 50% performance overhead for security
-            verify_timing: true,
+            verify_timing:         true,
         }
     }
 
@@ -686,10 +688,10 @@ pub mod platform_integration {
     #[must_use]
     pub fn realtime_side_channel_config() -> SideChannelConfig {
         SideChannelConfig {
-            resistance_level: ResistanceLevel::Advanced,
-            protected_vectors: &[AttackVector::Timing, AttackVector::Cache],
-            performance_tolerance: 0.1, // Strict performance requirements
-            verify_timing: true,        // Essential for real-time guarantees
+            resistance_level:      ResistanceLevel::Advanced,
+            protected_vectors:     &[AttackVector::Timing, AttackVector::Cache],
+            performance_tolerance: 0.1,  // Strict performance requirements
+            verify_timing:         true, // Essential for real-time guarantees
         }
     }
 
@@ -697,10 +699,10 @@ pub mod platform_integration {
     #[must_use]
     pub fn posix_side_channel_config() -> SideChannelConfig {
         SideChannelConfig {
-            resistance_level: ResistanceLevel::Basic,
-            protected_vectors: &[AttackVector::Timing],
+            resistance_level:      ResistanceLevel::Basic,
+            protected_vectors:     &[AttackVector::Timing],
             performance_tolerance: 0.05, // Minimal performance impact
-            verify_timing: false,
+            verify_timing:         false,
         }
     }
 
@@ -708,15 +710,15 @@ pub mod platform_integration {
     #[must_use]
     pub fn baremetal_side_channel_config() -> SideChannelConfig {
         SideChannelConfig {
-            resistance_level: ResistanceLevel::Advanced,
-            protected_vectors: &[
+            resistance_level:      ResistanceLevel::Advanced,
+            protected_vectors:     &[
                 AttackVector::Timing,
                 AttackVector::Cache,
                 AttackVector::Power,
                 AttackVector::Electromagnetic,
             ],
             performance_tolerance: 0.2,
-            verify_timing: true,
+            verify_timing:         true,
         }
     }
 }

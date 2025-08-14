@@ -4,7 +4,15 @@
 //! execution engine, supporting both the core WebAssembly specification and
 //! the Component Model.
 
-use crate::{prelude::*, stackless::engine::StacklessEngine, module::{MemoryWrapper, TableWrapper, GlobalWrapper}};
+use crate::{
+    module::{
+        GlobalWrapper,
+        MemoryWrapper,
+        TableWrapper,
+    },
+    prelude::*,
+    stackless::engine::StacklessEngine,
+};
 
 /// Types that represent a Wasm module instance
 pub trait ModuleInstance: Debug {
@@ -21,7 +29,10 @@ pub trait ModuleInstance: Debug {
     fn global(&self, idx: u32) -> Result<GlobalWrapper>;
 
     /// Get the function type for a function in this instance
-    fn function_type(&self, idx: u32) -> Result<FuncType>;
+    fn function_type(
+        &self,
+        idx: u32,
+    ) -> Result<wrt_foundation::types::FuncType<wrt_foundation::safe_memory::NoStdProvider<8192>>>;
 }
 
 // Further implementations will be added in subsequent updates

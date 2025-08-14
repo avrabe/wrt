@@ -230,7 +230,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> WitParser<P> {
 
         #[cfg(feature = "std")]
         while i < lines.len() {
-            let line = lines[i].trim();
+            let line = lines[i].trim);
             
             if line.is_empty() || line.starts_with("//") {
                 i += 1;
@@ -274,7 +274,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> WitParser<P> {
 
         #[cfg(feature = "std")]
         while i < lines.len() {
-            let line = lines[i].trim();
+            let line = lines[i].trim);
             
             if line.is_empty() || line.starts_with("//") {
                 i += 1;
@@ -307,7 +307,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> WitParser<P> {
         if parts.len() < 3 {
             return Err(WitParseError::InvalidSyntax(
                 BoundedString::from_str("Invalid import syntax", self.provider.clone()).unwrap()
-            ));
+            ;
         }
 
         #[cfg(feature = "std")]
@@ -327,12 +327,12 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> WitParser<P> {
             _ => {
                 return Err(WitParseError::InvalidSyntax(
                     BoundedString::from_str("Unsupported import type", self.provider.clone()).unwrap()
-                ));
+                ;
             }
         };
 
         #[cfg(feature = "std")]
-        return Ok(WitImport { name, item });
+        return Ok(WitImport { name, item };
         
         #[cfg(not(any(feature = "std", )))]
         Err(WitParseError::InvalidSyntax(
@@ -347,7 +347,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> WitParser<P> {
         if parts.len() < 3 {
             return Err(WitParseError::InvalidSyntax(
                 BoundedString::from_str("Invalid export syntax", self.provider.clone()).unwrap()
-            ));
+            ;
         }
 
         #[cfg(feature = "std")]
@@ -367,12 +367,12 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> WitParser<P> {
             _ => {
                 return Err(WitParseError::InvalidSyntax(
                     BoundedString::from_str("Unsupported export type", self.provider.clone()).unwrap()
-                ));
+                ;
             }
         };
 
         #[cfg(feature = "std")]
-        return Ok(WitExport { name, item });
+        return Ok(WitExport { name, item };
         
         #[cfg(not(any(feature = "std", )))]
         Err(WitParseError::InvalidSyntax(
@@ -390,7 +390,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> WitParser<P> {
 
         #[cfg(feature = "std")]
         if let Some(colon_pos) = line.find(':') {
-            let name_part = &line[..colon_pos].trim();
+            let name_part = &line[..colon_pos].trim);
             let parts: Vec<&str> = name_part.split_whitespace().collect();
             
             if let Some(name) = parts.last() {
@@ -411,7 +411,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> WitParser<P> {
         if parts.len() < 3 {
             return Err(WitParseError::InvalidSyntax(
                 BoundedString::from_str("Invalid type definition", self.provider.clone()).unwrap()
-            ));
+            ;
         }
 
         #[cfg(feature = "std")]
@@ -423,7 +423,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> WitParser<P> {
         #[cfg(feature = "std")]
         let type_str = parts[2];
         #[cfg(feature = "std")]
-        let is_resource = type_str.starts_with("resource");
+        let is_resource = type_str.starts_with("resource";
         
         #[cfg(feature = "std")]
         let ty = self.parse_type(type_str)?;
@@ -433,7 +433,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> WitParser<P> {
             name: name.clone(),
             ty: ty.clone(),
             is_resource,
-        });
+        };
         
         #[cfg(not(any(feature = "std", )))]
         Err(WitParseError::InvalidSyntax(
@@ -442,7 +442,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> WitParser<P> {
     }
 
     fn parse_type(&mut self, type_str: &str) -> Result<WitType<P>, WitParseError<P>> {
-        let type_str = type_str.trim();
+        let type_str = type_str.trim);
         
         match type_str {
             "bool" => Ok(WitType::Bool),

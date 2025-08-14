@@ -6,12 +6,20 @@
 
 use core::{
     ptr::NonNull,
-    sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
+    sync::atomic::{
+        AtomicPtr,
+        AtomicUsize,
+        Ordering,
+    },
 };
 
 use wrt_error::Error;
 
-use crate::memory::{PageAllocator, VerificationLevel, WASM_PAGE_SIZE};
+use crate::memory::{
+    PageAllocator,
+    VerificationLevel,
+    WASM_PAGE_SIZE,
+};
 
 /// Tock OS system call interface
 mod syscall {
@@ -115,11 +123,11 @@ mod syscall {
 #[derive(Debug, Copy, Clone)]
 struct GrantRegion {
     /// Pointer to the granted memory region
-    ptr: NonNull<u8>,
+    ptr:        NonNull<u8>,
     /// Size of the granted region in bytes
-    size: usize,
+    size:       usize,
     /// Binary std/no_std choice
-    allocated: bool,
+    allocated:  bool,
     /// Protection flags for this region
     #[allow(dead_code)]
     protection: u32,
@@ -128,7 +136,12 @@ struct GrantRegion {
 impl GrantRegion {
     /// Create new grant region
     fn new(ptr: NonNull<u8>, size: usize, protection: u32) -> Self {
-        Self { ptr, size, allocated: false, protection }
+        Self {
+            ptr,
+            size,
+            allocated: false,
+            protection,
+        }
     }
 
     /// Binary std/no_std choice
@@ -159,19 +172,19 @@ const MAX_GRANT_REGIONS: usize = 8;
 #[derive(Debug)]
 pub struct TockAllocator {
     /// Available grant regions (using array instead of heapless::Vec)
-    grant_regions: [Option<GrantRegion>; MAX_GRANT_REGIONS],
+    grant_regions:       [Option<GrantRegion>; MAX_GRANT_REGIONS],
     /// Number of active grant regions
     grant_regions_count: usize,
     /// Binary std/no_std choice
-    current_allocation: AtomicPtr<u8>,
+    current_allocation:  AtomicPtr<u8>,
     /// Binary std/no_std choice
-    current_size: AtomicUsize,
+    current_size:        AtomicUsize,
     /// Maximum pages allowed
-    maximum_pages: u32,
+    maximum_pages:       u32,
     /// Verification level
-    verification_level: VerificationLevel,
+    verification_level:  VerificationLevel,
     /// Binary std/no_std choice
-    static_buffer: Option<&'static mut [u8]>,
+    static_buffer:       Option<&'static mut [u8]>,
 }
 
 unsafe impl Send for TockAllocator {}
@@ -291,7 +304,9 @@ impl PageAllocator for TockAllocator {
         }
 
         if max_pages > self.maximum_pages {
-            return Err(Error::resource_error("Requested pages exceed allocator limit"));
+            return Err(Error::resource_error(
+                "Requested pages exceed allocator limit",
+            ));
         }
 
         let allocation_size = (initial_pages as usize) * WASM_PAGE_SIZE;
@@ -314,13 +329,13 @@ impl PageAllocator for TockAllocator {
 
         // Verification based on level
         match self.verification_level {
-            VerificationLevel::Off => {}
+            VerificationLevel::Off => {},
             VerificationLevel::Minimal => {
                 // Basic verification: check alignment
                 if ptr.as_ptr() as usize % WASM_PAGE_SIZE != 0 {
                     return Err(Error::validation_error("Allocated memory not page-aligned"));
                 }
-            }
+            },
             VerificationLevel::Standard | VerificationLevel::Full | VerificationLevel::Critical => {
                 // Full verification: check alignment, bounds, and MPU configuration
                 if ptr.as_ptr() as usize % WASM_PAGE_SIZE != 0 {
@@ -335,7 +350,7 @@ impl PageAllocator for TockAllocator {
                         return Err(Error::validation_error("Memory verification failed"));
                     }
                 }
-            }
+            },
         }
 
         Ok((ptr, allocation_size))
@@ -347,11 +362,15 @@ impl PageAllocator for TockAllocator {
         let current_size = self.current_size.load(Ordering::SeqCst);
 
         if ptr.as_ptr() != current_ptr {
-            return Err(Error::validation_error("Pointer does not match current allocation"));
+            return Err(Error::validation_error(
+                "Pointer does not match current allocation",
+            ));
         }
 
         if size != current_size {
-            return Err(Error::validation_error("Size does not match current allocation"));
+            return Err(Error::validation_error(
+                "Size does not match current allocation",
+            ));
         }
 
         // Clear MPU protection
@@ -377,24 +396,26 @@ impl PageAllocator for TockAllocator {
     fn grow(&mut self, _current_pages: u32, _additional_pages: u32) -> Result<(), Error> {
         // Tock OS grant system doesn't support dynamic growth
         // This is a limitation of the security-first paradigm
-        Err(Error::resource_error("Dynamic memory growth not supported in Tock OS"))
+        Err(Error::resource_error(
+            "Dynamic memory growth not supported in Tock OS",
+        ))
     }
 }
 
 /// Builder for TockAllocator
 pub struct TockAllocatorBuilder {
-    maximum_pages: u32,
+    maximum_pages:      u32,
     verification_level: VerificationLevel,
-    static_buffer: Option<&'static mut [u8]>,
+    static_buffer:      Option<&'static mut [u8]>,
 }
 
 impl TockAllocatorBuilder {
     /// Create new builder
     pub fn new() -> Self {
         Self {
-            maximum_pages: 1024,
+            maximum_pages:      1024,
             verification_level: VerificationLevel::Full,
-            static_buffer: None,
+            static_buffer:      None,
         }
     }
 
@@ -418,7 +439,11 @@ impl TockAllocatorBuilder {
 
     /// Binary std/no_std choice
     pub fn build(self) -> Result<TockAllocator, Error> {
-        TockAllocator::new(self.maximum_pages, self.verification_level, self.static_buffer)
+        TockAllocator::new(
+            self.maximum_pages,
+            self.verification_level,
+            self.static_buffer,
+        )
     }
 }
 
@@ -487,6 +512,9 @@ mod tests {
         let allocator = result.unwrap();
         assert_eq!(allocator.grant_regions_count, 1);
         assert!(allocator.grant_regions[0].is_some());
-        assert_eq!(allocator.grant_regions[0].as_ref().unwrap().size, WASM_PAGE_SIZE);
+        assert_eq!(
+            allocator.grant_regions[0].as_ref().unwrap().size,
+            WASM_PAGE_SIZE
+        );
     }
 }

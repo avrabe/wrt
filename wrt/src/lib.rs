@@ -58,19 +58,22 @@
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 // Binary std/no_std choice
 // All memory management uses bounded collections with NoStdProvider
 
-// Panic handler for no_std builds - temporarily disabled to avoid workspace conflicts
-// Applications using WRT should provide their own panic handler
-// #[cfg(all(not(feature = "std"), not(test), not(feature = "disable-panic-handler")))]
-// #[panic_handler]
+// Panic handler for no_std builds - temporarily disabled to avoid workspace
+// conflicts Applications using WRT should provide their own panic handler
+// #[cfg(all(not(feature = "std"), not(test), not(feature =
+// "disable-panic-handler")))] #[panic_handler]
 // fn panic(_info: &core::panic::PanicInfo) -> ! {
 //     // ASIL-B/D compliant panic handling:
 //     // 1. Ensure deterministic behavior (no heap allocations)
 //     // 2. Enter safe state immediately
 //     // 3. Prevent any restart or recovery attempts
-//     
+//
 //     // For safety-critical systems, we enter an infinite loop
 //     // to ensure the system remains in a known safe state
 //     loop {
@@ -103,12 +106,35 @@ macro_rules! debug_println {
 // Include prelude module for consistent imports across crates
 pub mod prelude;
 
+// Bounded infrastructure for static memory allocation
+pub mod bounded_wrt_infra;
+
+// Safety-critical memory limits
+#[cfg(feature = "safety-critical")]
+pub mod memory_limits;
+
+// Bulk memory operations runtime
+pub mod bulk_memory_runtime;
+
+// Atomic operations runtime
+pub mod atomic_runtime;
+
+// Shared memory runtime for WebAssembly 3.0 threads
+pub mod shared_memory_runtime;
+
+// Multi-memory runtime for WebAssembly 3.0 multi-memory proposal
+pub mod multi_memory_runtime;
+
+// Unified WebAssembly 3.0 features runtime integration
+pub mod webassembly_3_runtime;
+
 // Module adapters for integration between specialized crates
-#[cfg(feature = "std")] // CFI integration requires std features currently
-pub mod cfi_integration;
+// #[cfg(feature = "std")] // CFI integration requires std features currently
+// pub mod cfi_integration;
 // pub mod decoder_integration; // Temporarily disabled
-// pub mod instructions_adapter; // Temporarily disabled 
-// pub mod memory_adapter; // Temporarily disabled due to trait object size issues
+pub mod instructions_adapter;
+// pub mod memory_adapter; // Temporarily disabled due to trait object size
+// issues
 
 // No_std implementation modules are now handled by wrt-foundation
 
@@ -120,6 +146,8 @@ pub mod resource; // WebAssembly component model resource types with std
 pub mod resource_nostd; // No_std compatible resource implementation
 #[cfg(not(feature = "std"))]
 pub use resource_nostd as resource; // Use resource_nostd as resource when no_std
+// Export the StacklessEngine for direct use
+pub use wrt_runtime::stackless::StacklessEngine;
 
 // Re-export all public types and functionality through the prelude
 pub use crate::prelude::*;
@@ -138,7 +166,7 @@ pub const COMPONENT_VERSION: &str = "0.1.0";
 /// # Returns
 ///
 /// A new stackless execution engine.
-pub fn new_stackless_engine() -> StacklessEngine {
+pub fn new_stackless_engine() -> wrt_runtime::stackless::StacklessEngine {
     wrt_runtime::stackless::StacklessEngine::new()
 }
 
@@ -148,9 +176,10 @@ pub fn new_stackless_engine() -> StacklessEngine {
 ///
 /// A `Result` containing the new module, or an error if the module
 /// could not be created.
-pub fn new_module() -> Result<Module> {
-    Module::new()
-}
+// TODO: Re-enable after fixing dependency compilation issues in wrt-instructions
+// pub fn new_module() -> Result<Module> {
+//     wrt_runtime::module::Module::new()
+// }
 
 /// Create a new WebAssembly memory with the given type.
 ///
@@ -161,9 +190,10 @@ pub fn new_module() -> Result<Module> {
 /// # Returns
 ///
 /// A new memory instance.
-pub fn new_memory(mem_type: ComponentMemoryType) -> Memory {
-    Memory::new(mem_type).unwrap()
-}
+// TODO: Re-enable after fixing dependency compilation issues in wrt-instructions
+// pub fn new_memory(mem_type: ComponentMemoryType) -> Memory {
+//     Memory::new(mem_type).unwrap()
+// }
 
 // /// Create a new WebAssembly memory adapter with the given type.
 // ///
@@ -187,12 +217,13 @@ pub fn new_memory(mem_type: ComponentMemoryType) -> Memory {
 /// # Returns
 ///
 /// A new table instance.
-pub fn new_table(table_type: ComponentTableType) -> Table {
-    // Create a default value based on the element type
-    let default_value = Value::default_for_type(&table_type.element_type);
-
-    Table::new(table_type, default_value).unwrap()
-}
+// TODO: Re-enable after fixing dependency compilation issues in wrt-instructions
+// pub fn new_table(table_type: ComponentTableType) -> Table {
+//     // Create a default value based on the element type
+//     let default_value = Value::default_for_type(&table_type.element_type;
+//
+//     Table::new(table_type, default_value).unwrap()
+// }
 
 /// Load a module from a WebAssembly binary.
 ///
@@ -206,12 +237,13 @@ pub fn new_table(table_type: ComponentTableType) -> Table {
 /// # Returns
 ///
 /// A Result containing the runtime module or an error
-pub fn load_module_from_binary(binary: &[u8]) -> Result<Module> {
-    // Directly use the function re-exported by the prelude from wrt_runtime
-    // The types `Result` and `Module` are also from the prelude (originating in
-    // wrt_error and wrt_runtime)
-    prelude::load_module_from_binary(binary)
-}
+// TODO: Re-enable after fixing dependency compilation issues in wrt-instructions
+// pub fn load_module_from_binary(binary: &[u8]) -> Result<Module> {
+//     // Directly use the function re-exported by the prelude from wrt_runtime
+//     // The types `Result` and `Module` are also from the prelude (originating in
+//     // wrt_error and wrt_runtime)
+//     prelude::load_module_from_binary(binary)
+// }
 
 /// Create a new CFI-protected execution engine with default settings.
 ///

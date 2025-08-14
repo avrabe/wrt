@@ -1,16 +1,14 @@
 // WRT - wrt-runtime
-// Module: Component Type Stubs (Agent D)
-// TEMPORARY - These stubs will be replaced by Agent C's work
+// Module: Component Type Stubs
 //
 // Copyright (c) 2025 The WRT Project Developers
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-//! Temporary stubs for Agent C's component types
-//! 
-//! These types allow Agent D to work independently while Agent C
-//! implements the Component Model. They will be removed during
-//! the final integration phase.
+//! Component type stubs for runtime integration
+//!
+//! These types provide the interface between the runtime
+//! and the Component Model implementation.
 
 #![allow(dead_code)] // Allow during stub phase
 
@@ -24,7 +22,7 @@ impl ComponentInstance {
     pub fn new(id: ComponentId) -> Self {
         Self { id }
     }
-    
+
     pub fn id(&self) -> ComponentId {
         self.id
     }
@@ -56,16 +54,16 @@ impl ComponentType {
 #[derive(Debug, Clone)]
 pub struct ComponentRequirements {
     pub component_count: usize,
-    pub resource_count: usize,
-    pub memory_usage: usize,
+    pub resource_count:  usize,
+    pub memory_usage:    usize,
 }
 
 impl Default for ComponentRequirements {
     fn default() -> Self {
         Self {
             component_count: 1,
-            resource_count: 0,
-            memory_usage: 4096, // 4KB default
+            resource_count:  0,
+            memory_usage:    4096, // 4KB default
         }
     }
 }
@@ -73,18 +71,18 @@ impl Default for ComponentRequirements {
 /// Component memory budget stub
 #[derive(Debug, Clone)]
 pub struct ComponentMemoryBudget {
-    pub total_memory: usize,
+    pub total_memory:       usize,
     pub component_overhead: usize,
-    pub available_memory: usize,
+    pub available_memory:   usize,
 }
 
 impl ComponentMemoryBudget {
-    pub fn calculate(limits: &super::platform_stubs::ComprehensivePlatformLimits) -> Result<Self, wrt_error::Error> {
-        let component_overhead = limits.max_total_memory / 100; // 1% overhead
-        let available_memory = limits.max_total_memory.saturating_sub(component_overhead);
-        
+    pub fn calculate(limits: &wrt_foundation::PlatformLimits) -> Result<Self, wrt_error::Error> {
+        let component_overhead = limits.max_memory / 100; // 1% overhead
+        let available_memory = limits.max_memory.saturating_sub(component_overhead);
+
         Ok(Self {
-            total_memory: limits.max_total_memory,
+            total_memory: limits.max_memory,
             component_overhead,
             available_memory,
         })

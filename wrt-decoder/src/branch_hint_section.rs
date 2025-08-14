@@ -1,10 +1,11 @@
 //! WebAssembly Branch Hint Custom Section Parser
-//! 
+//!
 //! This module requires the `alloc` feature.
 //!
-//! This module implements parsing for the "metadata.code.branch_hint" custom section
-//! as defined in the WebAssembly Branch Hinting proposal. This section contains
-//! performance hints that suggest which branches are more likely to be taken.
+//! This module implements parsing for the "metadata.code.branch_hint" custom
+//! section as defined in the WebAssembly Branch Hinting proposal. This section
+//! contains performance hints that suggest which branches are more likely to be
+//! taken.
 //!
 //! # Custom Section Format
 //!
@@ -22,33 +23,49 @@
 // Core/std library imports
 
 #[cfg(feature = "std")]
-use std::{vec::Vec, collections::{BTreeMap, HashMap}};
+use std::{
+    collections::HashMap,
+    vec::Vec,
+};
 
 // External crates
-use wrt_error::{Error, ErrorCategory, Result, codes};
-use wrt_format::binary::{read_leb128_u32, read_u8};
-use wrt_foundation::NoStdProvider;
-use wrt_foundation::traits::{Checksummable, ToBytes, FromBytes, ReadStream, WriteStream, SerializationError};
-use wrt_foundation::{WrtResult, verification::Checksum};
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+    Result,
+};
+use wrt_format::binary::{
+    read_leb128_u32,
+    read_u8,
+};
+use wrt_foundation::traits::{
+    Checksummable,
+    FromBytes,
+    ReadStream,
+    ToBytes,
+    WriteStream,
+};
+// NoStdProvider import removed - not used
+use wrt_foundation::{
+    verification::Checksum,
+};
 
 // Internal modules
 use crate::prelude::*;
 
 /// Safe conversion from Rust usize to WebAssembly u32 for LEB128 encoding
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `size` - Rust size as usize
-/// 
+///
 /// # Returns
-/// 
+///
 /// Ok(u32) if conversion is safe, error otherwise  
 fn usize_to_wasm_u32(size: usize) -> Result<u32> {
-    u32::try_from(size).map_err(|_| Error::new(
-        ErrorCategory::Parse, 
-        codes::PARSE_ERROR, 
-        "Size exceeds u32 limit for LEB128 encoding"
-    ))
+    u32::try_from(size)
+        .map_err(|_| Error::parse_error("Size exceeds u32 limit for LEB128 encoding"))
 }
 
 /// Branch hint value indicating the likelihood of a branch being taken
@@ -58,7 +75,7 @@ pub enum BranchHintValue {
     #[default]
     LikelyFalse = 0,
     /// Branch is likely to be taken (0x01)
-    LikelyTrue = 1,
+    LikelyTrue  = 1,
 }
 
 impl BranchHintValue {
@@ -67,11 +84,7 @@ impl BranchHintValue {
         match value {
             0x00 => Ok(BranchHintValue::LikelyFalse),
             0x01 => Ok(BranchHintValue::LikelyTrue),
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE_TYPE,
-                "Invalid branch hint value"
-            )),
+            _ => Err(Error::runtime_execution_error("Invalid branch hint value")),
         }
     }
 
@@ -100,7 +113,7 @@ impl ToBytes for BranchHintValue {
         &self,
         writer: &mut WriteStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         writer.write_u8(self.to_byte())
     }
 
@@ -113,13 +126,16 @@ impl FromBytes for BranchHintValue {
     fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let byte = reader.read_u8()?;
-        Self::from_byte(byte).map_err(|e| wrt_error::Error::new(
-            wrt_error::ErrorCategory::Parse,
-            wrt_error::codes::INVALID_VALUE_TYPE,
-            "Invalid branch hint value"
-        ).into())
+        Self::from_byte(byte).map_err(|_e| {
+            wrt_error::Error::new(
+                wrt_error::ErrorCategory::Parse,
+                wrt_error::codes::INVALID_VALUE_TYPE,
+                "Invalid branch hint byte",
+            )
+            .into()
+        })
     }
 }
 
@@ -129,7 +145,7 @@ pub struct BranchHint {
     /// Byte offset of the instruction within the function body
     pub instruction_offset: u32,
     /// Hint about whether the branch is likely to be taken
-    pub hint_value: BranchHintValue,
+    pub hint_value:         BranchHintValue,
 }
 
 impl BranchHint {
@@ -141,7 +157,8 @@ impl BranchHint {
         }
     }
 
-    /// Check if this hint suggests the branch should be optimized for the taken path
+    /// Check if this hint suggests the branch should be optimized for the taken
+    /// path
     pub fn optimize_for_taken(&self) -> bool {
         self.hint_value.is_likely_taken()
     }
@@ -154,9 +171,9 @@ pub struct FunctionBranchHints {
     pub function_index: u32,
     /// Map from instruction offset to branch hint
     #[cfg(feature = "std")]
-    pub hints: HashMap<u32, BranchHintValue>,
+    pub hints:          HashMap<u32, BranchHintValue>,
     #[cfg(all(not(feature = "std")))]
-    pub hints: BTreeMap<u32, BranchHintValue>,
+    pub hints:          BTreeMap<u32, BranchHintValue>,
 }
 
 impl FunctionBranchHints {
@@ -213,9 +230,9 @@ impl BranchHintSection {
     pub fn new() -> Self {
         Self {
             #[cfg(feature = "std")]
-            function_hints: HashMap::new(),
+            function_hints:                                   HashMap::new(),
             #[cfg(all(not(feature = "std")))]
-            function_hints: BTreeMap::new(),
+            function_hints:                                   BTreeMap::new(),
         }
     }
 
@@ -231,7 +248,11 @@ impl BranchHintSection {
     }
 
     /// Get a specific branch hint
-    pub fn get_hint(&self, function_index: u32, instruction_offset: u32) -> Option<BranchHintValue> {
+    pub fn get_hint(
+        &self,
+        function_index: u32,
+        instruction_offset: u32,
+    ) -> Option<BranchHintValue> {
         self.get_function_hints(function_index)
             .and_then(|hints| hints.get_hint(instruction_offset))
     }
@@ -306,7 +327,9 @@ pub fn encode_branch_hint_section(section: &BranchHintSection) -> Result<Vec<u8>
     let mut data = Vec::new();
 
     // Write function count
-    data.extend_from_slice(&format_write_leb128_u32(usize_to_wasm_u32(section.function_count())?));
+    data.extend_from_slice(&format_write_leb128_u32(usize_to_wasm_u32(
+        section.function_count(),
+    )?));
 
     // Write each function's hints
     for (func_idx, hints) in &section.function_hints {
@@ -322,7 +345,6 @@ pub fn encode_branch_hint_section(section: &BranchHintSection) -> Result<Vec<u8>
     Ok(data)
 }
 
-
 /// Branch hint section name constant
 pub const BRANCH_HINT_SECTION_NAME: &str = "metadata.code.branch_hint";
 
@@ -332,8 +354,14 @@ mod tests {
 
     #[test]
     fn test_branch_hint_value() {
-        assert_eq!(BranchHintValue::from_byte(0x00).unwrap(), BranchHintValue::LikelyFalse);
-        assert_eq!(BranchHintValue::from_byte(0x01).unwrap(), BranchHintValue::LikelyTrue);
+        assert_eq!(
+            BranchHintValue::from_byte(0x00).unwrap(),
+            BranchHintValue::LikelyFalse
+        );
+        assert_eq!(
+            BranchHintValue::from_byte(0x01).unwrap(),
+            BranchHintValue::LikelyTrue
+        );
         assert!(BranchHintValue::from_byte(0x02).is_err());
 
         assert_eq!(BranchHintValue::LikelyFalse.to_byte(), 0x00);
@@ -402,7 +430,7 @@ mod tests {
     fn test_parse_encode_round_trip() {
         // Create a test section
         let mut section = BranchHintSection::new();
-        
+
         let mut func0_hints = FunctionBranchHints::new(0);
         func0_hints.add_hint(10, BranchHintValue::LikelyTrue).unwrap();
         func0_hints.add_hint(20, BranchHintValue::LikelyFalse).unwrap();
@@ -431,7 +459,7 @@ mod tests {
         // Empty section: just function count = 0
         let data = &[0x00];
         let section = parse_branch_hint_section(data).unwrap();
-        
+
         assert!(section.is_empty());
         assert_eq!(section.function_count(), 0);
         assert_eq!(section.total_hint_count(), 0);

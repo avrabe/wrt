@@ -8,7 +8,10 @@
 
 //! Provides implementations for platform-specific memory management.
 
-use core::{fmt::Debug, ptr::NonNull};
+use core::{
+    fmt::Debug,
+    ptr::NonNull,
+};
 
 use wrt_error::Result;
 
@@ -166,7 +169,7 @@ pub trait MemoryProvider: Send + Sync {
 #[derive(Debug)]
 pub struct NoStdProvider {
     /// The underlying buffer for storing data
-    buffer: &'static mut [u8],
+    buffer:             &'static mut [u8],
     /// The current verification level
     verification_level: VerificationLevel,
 }
@@ -181,7 +184,10 @@ impl NoStdProvider {
 
         let actual_size = core::cmp::min(size, 4096);
 
-        Self { buffer: unsafe { &mut DUMMY_BUFFER[0..actual_size] }, verification_level }
+        Self {
+            buffer: unsafe { &mut DUMMY_BUFFER[0..actual_size] },
+            verification_level,
+        }
     }
 
     /// Creates a new `NoStdProvider` with the specified verification level and
@@ -192,18 +198,31 @@ impl NoStdProvider {
 }
 
 /// Builder for `NoStdProvider` to provide a fluent configuration API.
+///
+/// # Deprecated
+/// Use `WrtProviderFactory::create_provider()` for budget-aware allocation
+/// instead.
+#[deprecated(
+    since = "0.3.0",
+    note = "Use WrtProviderFactory::create_provider() from wrt-foundation for new code"
+)]
 #[derive(Debug)]
 pub struct NoStdProviderBuilder {
-    size: usize,
+    size:               usize,
     verification_level: VerificationLevel,
 }
 
+#[allow(deprecated)]
 impl Default for NoStdProviderBuilder {
     fn default() -> Self {
-        Self { size: 4096, verification_level: VerificationLevel::Standard }
+        Self {
+            size:               4096,
+            verification_level: VerificationLevel::Standard,
+        }
     }
 }
 
+#[allow(deprecated)]
 impl NoStdProviderBuilder {
     /// Creates a new builder with default settings.
     pub fn new() -> Self {
@@ -227,7 +246,16 @@ impl NoStdProviderBuilder {
 
     /// Builds and returns a configured `NoStdProvider`.
     pub fn build(self) -> NoStdProvider {
-        NoStdProvider::new(self.size, self.verification_level)
+        // Note: This is a temporary workaround for the deprecated NoStdProvider
+        // This entire module should be migrated to use wrt-foundation's memory system
+        NoStdProvider {
+            buffer:             unsafe {
+                static mut DUMMY_BUFFER: [u8; 4096] = [0; 4096];
+                let actual_size = core::cmp::min(self.size, 4096);
+                &mut DUMMY_BUFFER[0..actual_size]
+            },
+            verification_level: self.verification_level,
+        }
     }
 }
 
@@ -246,9 +274,7 @@ impl MemoryProvider for NoStdProvider {
 
     fn write_data(&mut self, offset: usize, data: &[u8]) -> wrt_error::Result<usize> {
         if offset >= self.buffer.len() {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Memory, 
-                1,
+            return Err(wrt_error::Error::runtime_execution_error(
                 "Write offset out of bounds",
             ));
         }
@@ -284,7 +310,11 @@ impl MemoryProvider for NoStdProvider {
 #[cfg(test)]
 #[allow(clippy::panic, clippy::unwrap_used)] // Allow panic/unwrap in tests
 mod tests {
-    use wrt_error::{codes, Error, ErrorCategory};
+    use wrt_error::{
+        codes,
+        Error,
+        ErrorCategory,
+    };
 
     use super::*;
 
@@ -292,15 +322,19 @@ mod tests {
     #[cfg(not(feature = "std"))]
     #[derive(Debug)]
     struct MockAllocator {
-        allocated_ptr: Option<NonNull<u8>>,
+        allocated_ptr:  Option<NonNull<u8>>,
         allocated_size: usize,
-        max_pages: Option<u32>,
+        max_pages:      Option<u32>,
     }
 
     #[cfg(not(feature = "std"))]
     impl Default for MockAllocator {
         fn default() -> Self {
-            Self { allocated_ptr: None, allocated_size: 0, max_pages: None }
+            Self {
+                allocated_ptr:  None,
+                allocated_size: 0,
+                max_pages:      None,
+            }
         }
     }
 
@@ -319,10 +353,8 @@ mod tests {
             max_pages: Option<u32>,
         ) -> Result<(NonNull<u8>, usize)> {
             if self.allocated_ptr.is_some() {
-                return Err(wrt_error::Error::new(
-                    wrt_error::ErrorCategory::System,
-                    1,
-                    "Already allocated",
+                return Err(wrt_error::Error::runtime_execution_error(
+                    "Memory already allocated",
                 ));
             }
             let size = initial_pages as usize * WASM_PAGE_SIZE;
@@ -347,16 +379,14 @@ mod tests {
                 return Err(wrt_error::Error::new(
                     wrt_error::ErrorCategory::System,
                     1,
-                    "Not allocated",
+                    "Memory not allocated",
                 ));
             }
             let new_total_pages = current_pages + additional_pages;
             if let Some(max) = self.max_pages {
                 if new_total_pages > max {
-                    return Err(wrt_error::Error::new(
-                        wrt_error::ErrorCategory::Memory,
-                        1,
-                        "Exceeds max",
+                    return Err(wrt_error::Error::runtime_execution_error(
+                        "Memory growth would exceed maximum pages",
                     ));
                 }
             }
@@ -367,7 +397,7 @@ mod tests {
                 return Err(wrt_error::Error::new(
                     wrt_error::ErrorCategory::Memory,
                     1,
-                    "Mock OOM on grow",
+                    "Allocation exceeds limit",
                 ));
             }
 
@@ -382,9 +412,7 @@ mod tests {
                 || self.allocated_ptr.unwrap() != ptr
                 || self.allocated_size != size
             {
-                return Err(wrt_error::Error::new(
-                    wrt_error::ErrorCategory::System,
-                    1,
+                return Err(wrt_error::Error::runtime_execution_error(
                     "Deallocation mismatch",
                 ));
             }

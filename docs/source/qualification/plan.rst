@@ -189,34 +189,35 @@ Implementation Requirements
 Integration with Existing Tools
 -------------------------------
 
-xtask Integration
-^^^^^^^^^^^^^^^^^
+cargo-wrt Integration
+^^^^^^^^^^^^^^^^^^^^^
 
-The qualification process will be integrated with the existing xtask framework:
+The qualification process will be integrated with the unified cargo-wrt build system:
 
-* Add new xtask commands for qualification activities:
+* Add new cargo-wrt commands for qualification activities:
 
 .. code-block:: rust
 
-   // In xtask/src/main.rs
-   fn qualification_commands() -> Command {
-       Command::new("qualification")
-           .about("Qualification-related commands")
-           .subcommand(generate_traceability_matrix())
-           .subcommand(run_safety_analysis())
-           .subcommand(generate_qualification_report())
+   // In cargo-wrt/src/main.rs
+   pub enum QualificationCommand {
+       Traceability,
+       SafetyAnalysis,
+       Report,
    }
+   
+   // Integrated into cargo-wrt subcommands
+   cargo-wrt qualification traceability
+   cargo-wrt qualification safety-analysis
+   cargo-wrt qualification report
 
 * Implement traceability matrix generation:
 
 .. code-block:: rust
 
-   // In xtask/src/main.rs or a new file xtask/src/qualification.rs
-   fn generate_traceability_matrix() -> Command {
-       Command::new("traceability")
-           .about("Generate traceability matrix from requirements")
-           .action(|_args| {
-               // Implementation to extract requirements and tests
+   // In wrt-build-core/src/qualification.rs
+   pub fn generate_traceability_matrix() -> Result<()> {
+       // Implementation to extract requirements and tests
+       // Integrated into cargo-wrt qualification commands
                // and generate a traceability matrix
            })
    }
@@ -231,15 +232,15 @@ Add qualification-specific recipes to the justfile:
    # Generate qualification documentation
    qualification-docs: docs-common
        # Generate traceability matrix
-       cargo xtask qualification traceability
+       cargo-wrt qualification traceability
        # Build qualification documentation
        {{sphinx_build}} -M html "{{sphinx_source}}" "{{sphinx_build_dir}}" {{sphinx_opts}}
    
    # Run qualification assessment
    qualification-assessment:
-       cargo xtask qualification assess
+       cargo-wrt qualification assess
        # Report qualification status
-       cargo xtask qualification report-status
+       cargo-wrt qualification report-status
 
 Implementation Schedule
 -----------------------
@@ -247,7 +248,7 @@ Implementation Schedule
 1. **Phase 1: Documentation Structure**
    
    * Create required RST files in docs/source/
-   * Implement xtask qualification commands
+   * Implement cargo-wrt qualification commands
    * Add justfile recipes
 
 2. **Phase 2: Traceability Implementation**

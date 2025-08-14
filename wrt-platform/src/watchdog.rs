@@ -3,31 +3,52 @@
 //! This module provides a lightweight software watchdog that can monitor
 //! WASM module execution and detect hangs or excessive runtime.
 //!
-//! This module requires the `std` feature since it uses std::thread and std::time.
+//! This module requires the `std` feature since it uses std::thread and
+//! std::time.
 
+#[cfg(any(feature = "alloc", feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{
+    collections::BTreeMap,
+    string::String,
+    sync::Arc,
+};
+#[cfg(feature = "std")]
+use alloc::{
+    collections::BTreeMap,
+    string::String,
+    sync::Arc,
+};
 use core::{
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::atomic::{
+        AtomicBool,
+        AtomicU64,
+        Ordering,
+    },
     time::Duration,
 };
 
-#[cfg(not(feature = "std"))]
-use std::{collections::BTreeMap, string::String, sync::Arc};
-#[cfg(feature = "std")]
-use std::{collections::BTreeMap, string::String, sync::Arc};
-
-use wrt_sync::{WrtMutex, WrtRwLock};
-
-use wrt_error::{Error, ErrorCategory, Result};
+use wrt_error::{
+    Error,
+    ErrorCategory,
+    Result,
+};
+use wrt_sync::{
+    WrtMutex,
+    WrtRwLock,
+};
 
 /// Watchdog configuration
 #[derive(Debug, Clone)]
 pub struct WatchdogConfig {
     /// Default timeout for watched operations
-    pub default_timeout: Duration,
+    pub default_timeout:   Duration,
     /// Check interval for the watchdog thread
-    pub check_interval: Duration,
+    pub check_interval:    Duration,
     /// Whether to automatically kill timed-out tasks
-    pub auto_kill: bool,
+    pub auto_kill:         bool,
     /// Maximum number of concurrent watched tasks
     pub max_watched_tasks: usize,
 }
@@ -35,9 +56,9 @@ pub struct WatchdogConfig {
 impl Default for WatchdogConfig {
     fn default() -> Self {
         Self {
-            default_timeout: Duration::from_secs(60),
-            check_interval: Duration::from_millis(100),
-            auto_kill: false,
+            default_timeout:   Duration::from_secs(60),
+            check_interval:    Duration::from_millis(100),
+            auto_kill:         false,
             max_watched_tasks: 1000,
         }
     }
@@ -68,28 +89,28 @@ pub struct WatchedTaskId(pub u64);
 /// Information about a watched task
 #[derive(Debug)]
 struct WatchedTask {
-    id: WatchedTaskId,
-    name: String,
-    _start_time: u64, // Timestamp in milliseconds
-    timeout: Duration,
+    id:             WatchedTaskId,
+    name:           String,
+    _start_time:    u64, // Timestamp in milliseconds
+    timeout:        Duration,
     last_heartbeat: WrtMutex<u64>, // Timestamp in milliseconds
-    action: WatchdogAction,
-    active: AtomicBool,
+    action:         WatchdogAction,
+    active:         AtomicBool,
 }
 
 /// Software watchdog for monitoring WASM execution
 pub struct SoftwareWatchdog {
     /// Configuration
-    config: WatchdogConfig,
+    config:          WatchdogConfig,
     /// Watched tasks
-    tasks: Arc<WrtRwLock<BTreeMap<WatchedTaskId, Arc<WatchedTask>>>>,
+    tasks:           Arc<WrtRwLock<BTreeMap<WatchedTaskId, Arc<WatchedTask>>>>,
     /// Next task ID
-    next_task_id: AtomicU64,
+    next_task_id:    AtomicU64,
     /// Watchdog thread handle
     #[cfg(feature = "std")]
     watchdog_thread: WrtMutex<Option<std::thread::JoinHandle<()>>>,
     /// Running flag
-    running: Arc<AtomicBool>,
+    running:         Arc<AtomicBool>,
 }
 
 impl SoftwareWatchdog {
@@ -139,21 +160,23 @@ impl SoftwareWatchdog {
                     if elapsed > task.timeout {
                         // Timeout detected
                         eprintln!(
-                            "Watchdog: Task '{}' (ID: {:?}) timed out after {:?}",
-                            task.name, task.id, elapsed
+                            "Watchdog: Task '{name}' (ID: {id:?}) timed out after {elapsed:?}",
+                            name = task.name,
+                            id = task.id,
+                            elapsed = elapsed
                         );
 
                         // Execute action
                         match &task.action {
                             WatchdogAction::Log => {
                                 // Already logged above
-                            }
+                            },
                             WatchdogAction::Kill => {
                                 if auto_kill {
                                     // Platform-specific kill logic would go here
-                                    eprintln!("Watchdog: Would kill task {}", task.name);
+                                    eprintln!("Watchdog: Would kill task {name}", name = task.name);
                                 }
-                            }
+                            },
                         }
 
                         // Mark as inactive after timeout
@@ -186,7 +209,7 @@ impl SoftwareWatchdog {
         name: impl Into<String>,
         timeout: Option<Duration>,
         action: WatchdogAction,
-    ) -> Result<WatchdogHandle> {
+    ) -> Result<WatchdogHandle<'_>> {
         let task_id = WatchedTaskId(self.next_task_id.fetch_add(1, Ordering::AcqRel));
         // Get current timestamp
         let now = std::time::SystemTime::now()
@@ -208,10 +231,8 @@ impl SoftwareWatchdog {
         {
             let tasks = self.tasks.read();
             if tasks.len() >= self.config.max_watched_tasks {
-                return Err(Error::new(
-                    ErrorCategory::Resource,
-                    1,
-                    "Too many watched tasks",
+                return Err(Error::runtime_execution_error(
+                    "Maximum watched tasks limit reached",
                 ));
             }
         }
@@ -219,7 +240,7 @@ impl SoftwareWatchdog {
         self.tasks.write().insert(task_id, task.clone());
 
         Ok(WatchdogHandle {
-            task: Some(task),
+            task:     Some(task),
             watchdog: self,
         })
     }
@@ -227,16 +248,12 @@ impl SoftwareWatchdog {
     /// Send heartbeat for a task
     pub fn heartbeat(&self, task_id: WatchedTaskId) -> Result<()> {
         let tasks = self.tasks.read();
-        let task = tasks.get(&task_id).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Validation,
-                1,
-                "Task not found",
-            )
-        })?;
+        let task = tasks
+            .get(&task_id)
+            .ok_or_else(|| Error::new(ErrorCategory::Validation, 1, "Task not found"))?;
 
         if task.active.load(Ordering::Acquire) {
-            // Update heartbeat timestamp 
+            // Update heartbeat timestamp
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -244,11 +261,7 @@ impl SoftwareWatchdog {
             *task.last_heartbeat.lock() = now;
             Ok(())
         } else {
-            Err(Error::new(
-                ErrorCategory::Runtime,
-                1,
-                "Task is no longer active",
-            ))
+            Err(Error::runtime_execution_error("Task is not active"))
         }
     }
 
@@ -258,18 +271,14 @@ impl SoftwareWatchdog {
             task.active.store(false, Ordering::Release);
             Ok(())
         } else {
-            Err(Error::new(
-                ErrorCategory::Validation,
-                1,
-                "Task not found",
-            ))
+            Err(Error::new(ErrorCategory::Validation, 1, "Task not found"))
         }
     }
 }
 
 /// RAII handle for watched tasks
 pub struct WatchdogHandle<'a> {
-    task: Option<Arc<WatchedTask>>,
+    task:     Option<Arc<WatchedTask>>,
     watchdog: &'a SoftwareWatchdog,
 }
 
@@ -279,11 +288,7 @@ impl<'a> WatchdogHandle<'a> {
         if let Some(task) = &self.task {
             self.watchdog.heartbeat(task.id)
         } else {
-            Err(Error::new(
-                ErrorCategory::Runtime,
-                1,
-                "Handle already consumed",
-            ))
+            Err(Error::runtime_execution_error("Task is not active"))
         }
     }
 
@@ -313,11 +318,7 @@ impl<'a> Drop for WatchdogHandle<'a> {
 /// Integration with WASM execution
 pub trait WatchdogIntegration {
     /// Start watching a WASM module execution
-    fn watch_wasm_execution(
-        &self,
-        module_name: &str,
-        timeout: Duration,
-    ) -> Result<WatchdogHandle>;
+    fn watch_wasm_execution(&self, module_name: &str, timeout: Duration) -> Result<WatchdogHandle<'_>>;
 
     /// Create a scoped watchdog for a function
     fn watch_function<F, R>(&self, name: &str, timeout: Duration, f: F) -> Result<R>
@@ -326,13 +327,9 @@ pub trait WatchdogIntegration {
 }
 
 impl WatchdogIntegration for SoftwareWatchdog {
-    fn watch_wasm_execution(
-        &self,
-        module_name: &str,
-        timeout: Duration,
-    ) -> Result<WatchdogHandle> {
+    fn watch_wasm_execution(&self, module_name: &str, timeout: Duration) -> Result<WatchdogHandle<'_>> {
         self.watch_task(
-            format!("wasm:{module_name}"),
+            format!("WASM module: {module_name}"),
             Some(timeout),
             WatchdogAction::Log,
         )
@@ -351,15 +348,16 @@ impl WatchdogIntegration for SoftwareWatchdog {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::sync::atomic::AtomicUsize;
+
+    use super::*;
 
     #[test]
     fn test_watchdog_basic() {
         let config = WatchdogConfig {
-            default_timeout: Duration::from_millis(100),
-            check_interval: Duration::from_millis(10),
-            auto_kill: false,
+            default_timeout:   Duration::from_millis(100),
+            check_interval:    Duration::from_millis(10),
+            auto_kill:         false,
             max_watched_tasks: 10,
         };
 
@@ -367,9 +365,7 @@ mod tests {
         watchdog.start().unwrap();
 
         // Watch a task
-        let handle = watchdog
-            .watch_task("test_task", None, WatchdogAction::Log)
-            .unwrap();
+        let handle = watchdog.watch_task("test_task", None, WatchdogAction::Log).unwrap();
 
         // Send heartbeats
         for _ in 0..5 {
@@ -386,9 +382,9 @@ mod tests {
     #[test]
     fn test_watchdog_timeout() {
         let config = WatchdogConfig {
-            default_timeout: Duration::from_millis(50),
-            check_interval: Duration::from_millis(10),
-            auto_kill: true,
+            default_timeout:   Duration::from_millis(50),
+            check_interval:    Duration::from_millis(10),
+            auto_kill:         true,
             max_watched_tasks: 10,
         };
 
@@ -408,7 +404,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(100));
 
         // Task should have timed out (verified through logs)
-        
+
         watchdog.stop().unwrap();
     }
 

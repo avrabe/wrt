@@ -5,19 +5,55 @@
 //! reference counting.
 
 #[cfg(not(feature = "std"))]
-use std::sync::Arc;
+use alloc::sync::Arc;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+#[cfg(not(feature = "std"))]
+use core::{
+    any::Any,
+    cmp::{
+        Eq,
+        PartialEq,
+    },
+    fmt,
+};
 #[cfg(feature = "std")]
 use std::sync::Arc;
+#[cfg(all(feature = "std", not(feature = "safety-critical")))]
+use std::vec::Vec;
+#[cfg(feature = "std")]
 use std::{
     any::Any,
-    cmp::{Eq, PartialEq},
-    collections::HashMap,
+    cmp::{
+        Eq,
+        PartialEq,
+    },
     fmt,
 };
 
+// Conditional imports for WRT allocator
+#[cfg(all(feature = "std", feature = "safety-critical"))]
+use wrt_foundation::allocator::{
+    CrateId,
+    WrtVec,
+};
+
 use crate::{
-    error::{kinds, Error, Result},
-    prelude::{format, Mutex, String, Vec},
+    bounded_wrt_infra::{
+        new_loaded_module_vec,
+        BoundedLoadedModuleVec,
+        WrtProvider,
+    },
+    error::{
+        kinds,
+        Error,
+        Result,
+    },
+    prelude::{
+        format,
+        Mutex,
+        String,
+    },
 };
 
 /// A unique identifier for a resource instance
@@ -28,13 +64,13 @@ pub struct ResourceId(pub u32);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourceType {
     /// Name of the resource type
-    pub name: String,
+    pub name:           String,
     /// Resource representation type (typically a handle or other data)
     pub representation: ResourceRepresentation,
     /// Whether the resource is nullable
-    pub nullable: bool,
+    pub nullable:       bool,
     /// Whether the resource is borrowable
-    pub borrowable: bool,
+    pub borrowable:     bool,
 }
 
 /// Resource representation types
@@ -45,8 +81,14 @@ pub enum ResourceRepresentation {
     /// Represented as a 64-bit integer handle
     Handle64,
     /// Represented as a specific record type
+    #[cfg(all(feature = "std", feature = "safety-critical"))]
+    Record(WrtVec<String, { CrateId::Wrt as u8 }, 32>),
+    #[cfg(not(all(feature = "std", feature = "safety-critical")))]
     Record(Vec<String>),
     /// Aggregated resource (composed of other resources)
+    #[cfg(all(feature = "std", feature = "safety-critical"))]
+    Aggregate(WrtVec<ResourceType, { CrateId::Wrt as u8 }, 16>),
+    #[cfg(not(all(feature = "std", feature = "safety-critical")))]
     Aggregate(Vec<ResourceType>),
 }
 
@@ -71,7 +113,7 @@ impl PartialEq for ResourceRepresentation {
                     }
                 }
                 true
-            }
+            },
             _ => false,
         }
     }
@@ -85,11 +127,11 @@ pub struct Resource {
     /// Resource type
     pub resource_type: ResourceType,
     /// Resource ID
-    pub id: ResourceId,
+    pub id:            ResourceId,
     /// Resource data (implementation-specific)
-    pub data: Arc<dyn ResourceData>,
+    pub data:          Arc<dyn ResourceData>,
     /// Reference count
-    ref_count: usize,
+    ref_count:         usize,
 }
 
 /// Trait for resource data
@@ -101,19 +143,85 @@ pub trait ResourceData: fmt::Debug + Send + Sync {
 /// Resource table for tracking resource instances
 #[derive(Debug, Default)]
 pub struct ResourceTable {
-    /// Resources indexed by ID
-    resources: Vec<Option<Resource>>,
+    /// Resources indexed by ID using bounded collections
+    resources: BoundedLoadedModuleVec<Option<Resource>>,
     /// Next available resource ID
-    next_id: u32,
+    next_id:   u32,
+}
+
+impl ResourceRepresentation {
+    /// Create a new Record representation with bounded capacity
+    #[cfg(feature = "safety-critical")]
+    pub fn new_record() -> Result<Self> {
+        Ok(Self::Record(WrtVec::new()))
+    }
+
+    #[cfg(not(feature = "safety-critical"))]
+    pub fn new_record() -> Result<Self> {
+        Ok(Self::Record(Vec::new()))
+    }
+
+    /// Create a new Aggregate representation with bounded capacity
+    #[cfg(feature = "safety-critical")]
+    pub fn new_aggregate() -> Result<Self> {
+        Ok(Self::Aggregate(WrtVec::new()))
+    }
+
+    #[cfg(not(feature = "safety-critical"))]
+    pub fn new_aggregate() -> Result<Self> {
+        Ok(Self::Aggregate(Vec::new()))
+    }
+
+    /// Add a field to a Record representation
+    pub fn add_field(&mut self, field_name: String) -> Result<()> {
+        match self {
+            #[cfg(feature = "safety-critical")]
+            Self::Record(fields) => fields.push(field_name).map_err(|_| {
+                kinds::ExecutionError("Record field capacity exceeded (limit: 32)".to_string())
+                    .into()
+            }),
+            #[cfg(not(feature = "safety-critical"))]
+            Self::Record(fields) => {
+                fields.push(field_name);
+                Ok(())
+            },
+            _ => Err(kinds::ExecutionError(
+                "Cannot add field to non-Record representation".to_string(),
+            )
+            .into()),
+        }
+    }
+
+    /// Add a resource to an Aggregate representation
+    pub fn add_resource(&mut self, resource_type: ResourceType) -> Result<()> {
+        match self {
+            #[cfg(feature = "safety-critical")]
+            Self::Aggregate(resources) => resources.push(resource_type).map_err(|_| {
+                kinds::ExecutionError(
+                    "Aggregate resource capacity exceeded (limit: 16)".to_string(),
+                )
+                .into()
+            }),
+            #[cfg(not(feature = "safety-critical"))]
+            Self::Aggregate(resources) => {
+                resources.push(resource_type);
+                Ok(())
+            },
+            _ => Err(kinds::ExecutionError(
+                "Cannot add resource to non-Aggregate representation".to_string(),
+            )
+            .into()),
+        }
+    }
 }
 
 impl ResourceTable {
     /// Creates a new resource table
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            resources: Vec::new(),
-            next_id: 1, // Start at 1, 0 can be used as a null handle
+            resources: new_loaded_module_vec(),
+            next_id:   1, // Start at 1, 0 can be used as a null handle
         }
     }
 
@@ -126,7 +234,12 @@ impl ResourceTable {
         let id = ResourceId(self.next_id);
         self.next_id += 1;
 
-        let resource = Resource { resource_type, id, data, ref_count: 1 };
+        let resource = Resource {
+            resource_type,
+            id,
+            data,
+            ref_count: 1,
+        };
 
         // Find an empty slot or add to the end
         let index = self.resources.iter().position(std::option::Option::is_none);
@@ -220,10 +333,10 @@ mod tests {
 
     fn create_test_resource_type() -> ResourceType {
         ResourceType {
-            name: String::from("test:resource"),
+            name:           String::from("test:resource"),
             representation: ResourceRepresentation::Handle32,
-            nullable: false,
-            borrowable: true,
+            nullable:       false,
+            borrowable:     true,
         }
     }
 

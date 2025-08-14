@@ -1,22 +1,25 @@
-use wrt_error::{codes, Error, ErrorCategory};
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+};
 
 // Custom Result type for our tests
 type Result<T> = wrt_error::Result<T>;
 
 // Helper function to convert wat::Error to wrt_error::Error
 fn wat_to_wrt_error(e: wat::Error) -> Error {
-    Error::new(ErrorCategory::Runtime, codes::EXECUTION_ERROR, e.to_string())
+    Error::runtime_execution_error(&format!("WAT parse error: {}", e))
 }
 
 #[test]
-#[ignore] // Temporarily ignore this test
 fn test_basic_module_decoding() -> Result<()> {
-    // Create a simple WebAssembly module using wat
+    // Create a basic WebAssembly module
     let wasm_bytes = wat::parse_str(
         r#"
         (module
           ;; Import a function
-          (import "env" "log" (func $log (param i32)))
+          (import "env" "imported_func" (func (param i32) (result i32)))
           
           ;; Define a memory
           (memory (export "memory") 1)

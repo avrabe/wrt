@@ -9,8 +9,9 @@
 
 #[cfg(any(doc, kani))]
 pub mod kani_verification {
-    use super::*;
     use kani;
+
+    use super::*;
 
     // --- Component Type Safety ---
 
@@ -75,7 +76,7 @@ pub mod kani_verification {
                     assert_eq!(ns.elements[0], "wasi");
                     assert!(!ns.is_empty());
                 }
-            }
+            },
             1 => {
                 // Nested namespace
                 #[cfg(feature = "std")]
@@ -86,7 +87,7 @@ pub mod kani_verification {
                     assert_eq!(ns.elements[1], "http");
                     assert_eq!(ns.elements[2], "client");
                 }
-            }
+            },
             2 => {
                 // Empty namespace
                 #[cfg(feature = "std")]
@@ -95,7 +96,7 @@ pub mod kani_verification {
                     assert!(ns.is_empty());
                     assert_eq!(ns.elements.len(), 0);
                 }
-            }
+            },
             _ => {
                 // Namespace matching
                 #[cfg(feature = "std")]
@@ -107,7 +108,7 @@ pub mod kani_verification {
                     assert!(ns1.matches(&ns2), "Identical namespaces should match");
                     assert!(!ns1.matches(&ns3), "Different namespaces should not match");
                 }
-            }
+            },
         }
     }
 
@@ -131,23 +132,27 @@ pub mod kani_verification {
 
                     let mut params = Vec::new();
                     for _ in 0..param_count {
-                        params.push(ValueType::I32); // Simplified for verification
+                        params.push(ValueType::I32); // Simplified for
+                                                     // verification
                     }
 
-                    let func_type = FuncType { params, results: Vec::new() };
+                    let func_type = FuncType {
+                        params,
+                        results: Vec::new(),
+                    };
 
                     // Verify type properties
                     assert_eq!(func_type.params.len(), param_count);
 
                     // Type signature should be consistent
                     let same_func_type = FuncType {
-                        params: func_type.params.clone(),
+                        params:  func_type.params.clone(),
                         results: func_type.results.clone(),
                     };
 
                     assert_eq!(func_type.params.len(), same_func_type.params.len());
                 }
-            }
+            },
             1 => {
                 // Memory type consistency
                 let min_pages: u32 = kani::any();
@@ -161,13 +166,16 @@ pub mod kani_verification {
 
                 kani::assume(min_pages <= 65536); // WebAssembly limits
 
-                let limits = Limits { min: min_pages, max: max_pages };
+                let limits = Limits {
+                    min: min_pages,
+                    max: max_pages,
+                };
 
                 // Verify limits consistency
                 if let Some(max) = limits.max {
                     assert!(max >= limits.min, "Max should be >= min");
                 }
-            }
+            },
             _ => {
                 // Table type consistency
                 let table_min: u32 = kani::any();
@@ -181,13 +189,16 @@ pub mod kani_verification {
 
                 kani::assume(table_min <= 0xFFFF_FFFF);
 
-                let table_limits = Limits { min: table_min, max: table_max };
+                let table_limits = Limits {
+                    min: table_min,
+                    max: table_max,
+                };
 
                 // Verify table limits
                 if let Some(max) = table_limits.max {
                     assert!(max >= table_limits.min, "Table max should be >= min");
                 }
-            }
+            },
         }
     }
 
@@ -205,27 +216,27 @@ pub mod kani_verification {
                 assert!(value_type.is_numeric());
                 assert!(!value_type.is_reference());
                 assert!(!value_type.is_float());
-            }
+            },
             ValueType::I64 => {
                 assert!(value_type.is_numeric());
                 assert!(!value_type.is_reference());
                 assert!(!value_type.is_float());
-            }
+            },
             ValueType::F32 => {
                 assert!(value_type.is_numeric());
                 assert!(!value_type.is_reference());
                 assert!(value_type.is_float());
-            }
+            },
             ValueType::F64 => {
                 assert!(value_type.is_numeric());
                 assert!(!value_type.is_reference());
                 assert!(value_type.is_float());
-            }
+            },
             ValueType::FuncRef | ValueType::ExternRef => {
                 assert!(!value_type.is_numeric());
                 assert!(value_type.is_reference());
                 assert!(!value_type.is_float());
-            }
+            },
         }
     }
 

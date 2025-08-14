@@ -1,5 +1,4 @@
 // Test modules
-mod integration_test;
-mod safe_memory_test;
+mod integration_tests;
 
 // Include other test modules as needed

@@ -4,15 +4,31 @@
 //! that can be specialized for different platforms (QNX message passing,
 //! Linux domain sockets, Windows named pipes, etc.).
 
-use core::{fmt::Debug, time::Duration};
+extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use std::{boxed::Box, string::String, vec::Vec};
+use alloc::{
+    boxed::Box,
+    string::String,
+    vec::Vec,
+};
 #[cfg(feature = "std")]
-use std::{boxed::Box, string::String, vec::Vec};
-use wrt_sync::WrtMutex;
+use alloc::{
+    boxed::Box,
+    string::String,
+    vec::Vec,
+};
+use core::{
+    fmt::Debug,
+    time::Duration,
+};
 
-use wrt_error::{Error, ErrorCategory, Result};
+use wrt_error::{
+    Error,
+    ErrorCategory,
+    Result,
+};
+use wrt_sync::WrtMutex;
 
 /// IPC message types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,9 +49,9 @@ pub enum MessageType {
 #[derive(Debug, Clone)]
 pub struct Message {
     /// Message type
-    pub msg_type: MessageType,
+    pub msg_type:       MessageType,
     /// Message payload
-    pub data: Vec<u8>,
+    pub data:           Vec<u8>,
     /// Optional correlation ID for request/response
     pub correlation_id: Option<u64>,
 }
@@ -81,20 +97,20 @@ pub struct ChannelId(pub u64);
 
 /// Generic IPC server builder
 pub struct IpcServerBuilder {
-    name: String,
+    name:             String,
     max_message_size: usize,
-    max_clients: usize,
-    timeout: Duration,
+    max_clients:      usize,
+    timeout:          Duration,
 }
 
 impl IpcServerBuilder {
     /// Create new IPC server builder
     pub fn new(name: impl Into<String>) -> Self {
         Self {
-            name: name.into(),
+            name:             name.into(),
             max_message_size: 64 * 1024, // 64KB default
-            max_clients: 100,
-            timeout: Duration::from_secs(30),
+            max_clients:      100,
+            timeout:          Duration::from_secs(30),
         }
     }
 
@@ -126,28 +142,26 @@ impl IpcServerBuilder {
 pub fn create_platform_channel(_name: &str) -> Result<Box<dyn IpcChannel>> {
     #[cfg(target_os = "nto")]
     {
-        super::qnx_ipc::QnxChannel::create_server(name)
+        super::qnx_ipc::QnxChannel::create_server(_name)
             .map(|ch| Box::new(ch) as Box<dyn IpcChannel>)
     }
 
     #[cfg(target_os = "linux")]
     {
-        super::linux_ipc::LinuxDomainSocket::create_server(name)
+        super::linux_ipc::LinuxDomainSocket::create_server(_name)
             .map(|ch| Box::new(ch) as Box<dyn IpcChannel>)
     }
 
     #[cfg(target_os = "windows")]
     {
-        super::windows_ipc::WindowsNamedPipe::create_server(name)
+        super::windows_ipc::WindowsNamedPipe::create_server(_name)
             .map(|ch| Box::new(ch) as Box<dyn IpcChannel>)
     }
 
     #[cfg(not(any(target_os = "nto", target_os = "linux", target_os = "windows")))]
     {
         // Generic IPC implementation for platforms without native IPC
-        Err(Error::new(
-            ErrorCategory::System,
-            1,
+        Err(Error::runtime_execution_error(
             "IPC not supported on this platform",
         ))
     }
@@ -218,27 +232,27 @@ impl IpcServer {
                     match self.handler.handle_message(msg, client) {
                         Ok(Some(reply)) => {
                             let _ = self.channel.reply(client, &reply);
-                        }
+                        },
                         Ok(None) => {
                             // No reply needed
-                        }
+                        },
                         Err(e) => {
                             // Send error reply
                             let error_msg = Message {
-                                msg_type: MessageType::Custom(0xFFFF), // Error type
-                                data: e.to_string().into_bytes(),
+                                msg_type:       MessageType::Custom(0xFFFF), // Error type
+                                data:           e.to_string().into_bytes(),
                                 correlation_id: None,
                             };
                             let _ = self.channel.reply(client, &error_msg);
-                        }
+                        },
                     }
-                }
+                },
                 Err(e) => {
                     if *self.running.lock() {
                         // Only log error if we're still running
-                        eprintln!("IPC receive error: {e}");
+                        eprintln!("IPC server error: {e}");
                     }
-                }
+                },
             }
         }
 
@@ -258,8 +272,8 @@ mod tests {
     #[test]
     fn test_message_creation() {
         let msg = Message {
-            msg_type: MessageType::LoadModule,
-            data: vec![1, 2, 3, 4],
+            msg_type:       MessageType::LoadModule,
+            data:           vec![1, 2, 3, 4],
             correlation_id: Some(12345),
         };
 

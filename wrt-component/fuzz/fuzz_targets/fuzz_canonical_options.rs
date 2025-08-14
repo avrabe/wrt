@@ -30,13 +30,13 @@ fuzz_target!(|data: &[u8]| {
         .with_realloc(has_realloc)
         .with_post_return(has_post_return)
         .with_string_encoding(string_encoding)
-        .build();
+        .build);
     
     // Test lift/lower contexts
-    let component_id = ComponentInstanceId::new((data.get(1).copied().unwrap_or(1) as u32) % 1000);
+    let component_id = ComponentInstanceId::new((data.get(1).copied().unwrap_or(1) as u32) % 1000;
     
     // Create lift context
-    let mut lift_context = options.create_lift_context(component_id);
+    let mut lift_context = options.create_lift_context(component_id;
     
     // Test memory operations if enabled
     if has_memory && data.len() > 2 {
@@ -48,17 +48,17 @@ fuzz_target!(|data: &[u8]| {
             3 => 8,
             _ => 1,
         };
-        let _ = lift_context.allocate_memory(size, align);
+        let _ = lift_context.allocate_memory(size, align;
     }
     
     // Create lower context
-    let mut lower_context = options.create_lower_context(component_id);
+    let mut lower_context = options.create_lower_context(component_id;
     
     // Test string operations with fuzzer data
     if data.len() > 4 {
         let string_data = &data[4..];
         if let Ok(s) = std::str::from_utf8(string_data) {
-            let _ = lower_context.lower_string(s, string_encoding);
+            let _ = lower_context.lower_string(s, string_encoding;
         }
     }
     
@@ -87,12 +87,12 @@ fuzz_target!(|data: &[u8]| {
                         alloc_size,
                         alloc_align,
                         new_size
-                    );
+                    ;
                 }
                 
                 // Try deallocation
-                let _ = realloc_manager.deallocate(component_id, ptr, alloc_size, alloc_align);
+                let _ = realloc_manager.deallocate(component_id, ptr, alloc_size, alloc_align;
             }
         }
     }
-});
+};

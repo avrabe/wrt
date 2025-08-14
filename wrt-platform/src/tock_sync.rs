@@ -5,7 +5,10 @@
 //! synchronization with MPU isolation between processes.
 
 use core::{
-    sync::atomic::{AtomicU32, Ordering},
+    sync::atomic::{
+        AtomicU32,
+        Ordering,
+    },
     time::Duration,
 };
 
@@ -137,7 +140,7 @@ extern "C" fn ipc_callback() {
 #[derive(Debug)]
 pub struct TockFutex {
     /// Atomic value for futex operations
-    value: AtomicU32,
+    value:      AtomicU32,
     /// Process ID for IPC communication (for cross-process wake)
     process_id: u32,
 }
@@ -148,7 +151,30 @@ unsafe impl Sync for TockFutex {}
 impl TockFutex {
     /// Create new Tock futex
     pub fn new(initial_value: u32) -> Self {
-        Self { value: AtomicU32::new(initial_value), process_id: Self::get_process_id() }
+        Self {
+            value:      AtomicU32::new(initial_value),
+            process_id: Self::get_process_id(),
+        }
+    }
+
+    /// Load the current value
+    pub fn load(&self) -> u32 {
+        self.value.load(Ordering::Acquire)
+    }
+
+    /// Perform compare-and-exchange operation
+    pub fn compare_exchange(&self, current: u32, new: u32) -> Result<u32, u32> {
+        self.value.compare_exchange(current, new, Ordering::AcqRel, Ordering::Acquire)
+    }
+
+    /// Fetch and add operation
+    pub fn fetch_add(&self, val: u32) -> u32 {
+        self.value.fetch_add(val, Ordering::AcqRel)
+    }
+
+    /// Fetch and subtract operation
+    pub fn fetch_sub(&self, val: u32) -> u32 {
+        self.value.fetch_sub(val, Ordering::AcqRel)
     }
 
     /// Get current process ID from Tock kernel
@@ -156,7 +182,12 @@ impl TockFutex {
         // In Tock, process ID would be provided by the kernel
         // For this implementation, we use a placeholder
         unsafe {
-            let result = sync_syscall::command(sync_syscall::IPC_DRIVER_ID, sync_syscall::IPC_DISCOVER_CMD, 0, 0);
+            let result = sync_syscall::command(
+                sync_syscall::IPC_DRIVER_ID,
+                sync_syscall::IPC_DISCOVER_CMD,
+                0,
+                0,
+            );
             u32::try_from(result).unwrap_or(0)
         }
     }
@@ -207,7 +238,9 @@ impl TockFutex {
         };
 
         if result < 0 {
-            return Err(Error::resource_error("Failed to subscribe to IPC notifications"));
+            return Err(Error::resource_error(
+                "Failed to subscribe to IPC notifications",
+            ));
         }
 
         Ok(())
@@ -260,17 +293,17 @@ impl FutexLike for TockFutex {
                 x if x == CallbackState::Fired as u32 => {
                     // Wake notification received
                     return Ok(());
-                }
+                },
                 x if x == CallbackState::Timeout as u32 => {
                     // Timeout occurred
                     return Err(Error::resource_error("Wait operation timed out"));
-                }
+                },
                 _ => {
                     // Continue waiting - yield to scheduler
                     unsafe {
                         sync_syscall::yield_wait();
                     }
-                }
+                },
             }
         }
     }
@@ -292,7 +325,7 @@ impl FutexLike for TockFutex {
 #[derive(Debug)]
 pub struct TockSemaphoreFutex {
     /// Atomic value
-    value: AtomicU32,
+    value:           AtomicU32,
     /// Semaphore count for blocking operations
     semaphore_count: AtomicU32,
 }
@@ -300,7 +333,22 @@ pub struct TockSemaphoreFutex {
 impl TockSemaphoreFutex {
     /// Create new semaphore-based futex
     pub fn new(initial_value: u32) -> Self {
-        Self { value: AtomicU32::new(initial_value), semaphore_count: AtomicU32::new(0) }
+        Self {
+            value:           AtomicU32::new(initial_value),
+            semaphore_count: AtomicU32::new(0),
+        }
+    }
+
+    /// Load the current value
+    pub fn load(&self) -> u32 {
+        self.value.load(Ordering::Acquire)
+    }
+
+    /// Wake all waiters
+    pub fn wake_all(&self) -> Result<(), Error> {
+        // For simplicity, we'll set a large wake count
+        self.wake(u32::MAX)?;
+        Ok(())
     }
 
     /// Get approximate cycle count for timeout calculations
@@ -352,13 +400,16 @@ impl FutexLike for TockSemaphoreFutex {
 /// Builder for TockFutex
 pub struct TockFutexBuilder {
     initial_value: u32,
-    use_ipc: bool,
+    use_ipc:       bool,
 }
 
 impl TockFutexBuilder {
     /// Create new builder
     pub fn new() -> Self {
-        Self { initial_value: 0, use_ipc: true }
+        Self {
+            initial_value: 0,
+            use_ipc:       true,
+        }
     }
 
     /// Set initial value

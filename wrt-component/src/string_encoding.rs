@@ -52,7 +52,7 @@ pub fn string_byte_length(s: &str, encoding: StringEncoding) -> usize {
         StringEncoding::Latin1 => {
             // Latin-1 can only encode certain characters as single bytes
             s.chars().filter(|&c| (c as u32) <= 0xFF).count()
-        }
+        },
     }
 }
 
@@ -87,11 +87,7 @@ fn encode_latin1(s: &str) -> Result<Vec<u8>> {
     for c in s.chars() {
         let code_point = c as u32;
         if code_point > 0xFF {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                "Component not found",
-            ));
+            return Err(Error::component_not_found("Error occurred"));
         }
         bytes.push(code_point as u8);
     }
@@ -101,19 +97,15 @@ fn encode_latin1(s: &str) -> Result<Vec<u8>> {
 
 /// Decode from UTF-8
 fn decode_utf8(bytes: &[u8]) -> Result<String> {
-    core::str::from_utf8(bytes).map(|s| s.to_string()).map_err(|e| {
-        Error::new(ErrorCategory::Runtime, codes::INVALID_TYPE, "Component not found")
-    })
+    core::str::from_utf8(bytes)
+        .map(|s| s.to_string())
+        .map_err(|e| Error::component_not_found("Error occurred"))
 }
 
 /// Decode from UTF-16 Little Endian
 fn decode_utf16_le(bytes: &[u8]) -> Result<String> {
     if bytes.len() % 2 != 0 {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::INVALID_TYPE,
-            "UTF-16 byte sequence must have even length",
-        ));
+        return Err(Error::runtime_execution_error("Error occurred"));
     }
 
     let mut code_units = Vec::new();
@@ -122,19 +114,14 @@ fn decode_utf16_le(bytes: &[u8]) -> Result<String> {
         code_units.push(code_unit);
     }
 
-    String::from_utf16(&code_units).map_err(|e| {
-        Error::new(ErrorCategory::Runtime, codes::INVALID_TYPE, "Component not found")
-    })
+    String::from_utf16(&code_units)
+        .map_err(|e| Error::component_not_found("Unknown string encoding"))
 }
 
 /// Decode from UTF-16 Big Endian
 fn decode_utf16_be(bytes: &[u8]) -> Result<String> {
     if bytes.len() % 2 != 0 {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::INVALID_TYPE,
-            "UTF-16 byte sequence must have even length",
-        ));
+        return Err(Error::runtime_execution_error("Error occurred"));
     }
 
     let mut code_units = Vec::new();
@@ -143,9 +130,8 @@ fn decode_utf16_be(bytes: &[u8]) -> Result<String> {
         code_units.push(code_unit);
     }
 
-    String::from_utf16(&code_units).map_err(|e| {
-        Error::new(ErrorCategory::Runtime, codes::INVALID_TYPE, "Component not found")
-    })
+    String::from_utf16(&code_units)
+        .map_err(|e| Error::component_not_found("Unknown string encoding"))
 }
 
 /// Decode from Latin-1 (ISO-8859-1)
@@ -166,7 +152,10 @@ pub struct StringTranscoder {
 impl StringTranscoder {
     /// Create a new transcoder
     pub fn new(source: StringEncoding, target: StringEncoding) -> Self {
-        Self { source_encoding: source, target_encoding: target }
+        Self {
+            source_encoding: source,
+            target_encoding: target,
+        }
     }
 
     /// Transcode bytes from source encoding to target encoding
@@ -189,17 +178,17 @@ impl StringTranscoder {
             // UTF-8 to UTF-16: worst case is 4 bytes -> 4 bytes (surrogate pair)
             (StringEncoding::Utf8, StringEncoding::Utf16Le | StringEncoding::Utf16Be) => {
                 input_size * 2
-            }
+            },
             // UTF-16 to UTF-8: worst case is 2 bytes -> 4 bytes
             (StringEncoding::Utf16Le | StringEncoding::Utf16Be, StringEncoding::Utf8) => {
                 input_size * 2
-            }
+            },
             // Latin-1 to UTF-8: worst case is 1 byte -> 2 bytes
             (StringEncoding::Latin1, StringEncoding::Utf8) => input_size * 2,
             // Latin-1 to UTF-16: 1 byte -> 2 bytes
             (StringEncoding::Latin1, StringEncoding::Utf16Le | StringEncoding::Utf16Be) => {
                 input_size * 2
-            }
+            },
             // UTF-8/UTF-16 to Latin-1: may fail, but max is input size
             (
                 StringEncoding::Utf8 | StringEncoding::Utf16Le | StringEncoding::Utf16Be,
@@ -215,19 +204,19 @@ impl StringTranscoder {
 #[derive(Debug, Clone)]
 pub struct CanonicalStringOptions {
     /// String encoding to use
-    pub encoding: StringEncoding,
+    pub encoding:   StringEncoding,
     /// Maximum allowed string length in bytes
     pub max_length: Option<usize>,
     /// Whether to validate string content
-    pub validate: bool,
+    pub validate:   bool,
 }
 
 impl Default for CanonicalStringOptions {
     fn default() -> Self {
         Self {
-            encoding: StringEncoding::Utf8,
+            encoding:   StringEncoding::Utf8,
             max_length: Some(1024 * 1024), // 1MB default limit
-            validate: true,
+            validate:   true,
         }
     }
 }
@@ -240,11 +229,7 @@ pub fn lift_string_with_options(
 ) -> Result<String> {
     // Check bounds for length prefix
     if addr as usize + 4 > memory.len() {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::OUT_OF_BOUNDS_ERROR,
-            "String length prefix out of bounds",
-        ));
+        return Err(Error::runtime_out_of_bounds("Error occurred"));
     }
 
     // Read length prefix
@@ -255,22 +240,14 @@ pub fn lift_string_with_options(
     // Check length limit
     if let Some(max_len) = options.max_length {
         if length > max_len {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                "Component not found",
-            ));
+            return Err(Error::component_not_found("Error occurred"));
         }
     }
 
     // Check bounds for string data
     let data_start = addr as usize + 4;
     if data_start + length > memory.len() {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::OUT_OF_BOUNDS_ERROR,
-            "String data out of bounds",
-        ));
+        return Err(Error::runtime_out_of_bounds("Error occurred"));
     }
 
     // Extract string bytes
@@ -305,21 +282,15 @@ pub fn lower_string_with_options(
     // Check length limit
     if let Some(max_len) = options.max_length {
         if encoded.len() > max_len {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                &format!("String too long: {} > {}", encoded.len(), max_len)
-            ));
+            return Err(Error::runtime_execution_error("Error occurred"));
         }
     }
 
     // Check bounds
     let total_size = 4 + encoded.len();
     if addr as usize + total_size > memory.len() {
-        return Err(Error::new(
-            ErrorCategory::Runtime,
-            codes::OUT_OF_BOUNDS_ERROR,
-            "Not enough memory for string",
+        return Err(Error::runtime_out_of_bounds(
+            "String data exceeds memory bounds",
         ));
     }
 
@@ -338,11 +309,7 @@ fn validate_string(s: &str) -> Result<()> {
     // Check for isolated surrogates (not allowed in Component Model)
     for ch in s.chars() {
         if (0xD800..=0xDFFF).contains(&(ch as u32)) {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::INVALID_TYPE,
-                "String contains isolated surrogate",
-            ));
+            return Err(Error::runtime_execution_error("Error occurred"));
         }
     }
 
@@ -355,7 +322,7 @@ mod tests {
 
     #[test]
     fn test_utf8_encoding() {
-        let text = "Hello, 世界!";
+        let text = "Hello, world!";
         let encoded = encode_string(text, StringEncoding::Utf8).unwrap();
         let decoded = decode_string(&encoded, StringEncoding::Utf8).unwrap();
         assert_eq!(text, decoded);

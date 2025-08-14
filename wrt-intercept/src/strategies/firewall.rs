@@ -3,12 +3,28 @@
 //! This strategy enforces security rules for function calls between
 //! components and hosts. It can allow or deny calls based on various criteria.
 
-use crate::prelude::{Debug, str, Value};
-use wrt_error::{Error, ErrorCategory, Result, codes};
-
 #[cfg(feature = "std")]
-use std::{sync::{Arc, RwLock}, collections::HashSet};
-use crate::LinkInterceptorStrategy;
+use std::{
+    collections::HashSet,
+    sync::{
+        Arc,
+        RwLock,
+    },
+};
+
+use wrt_error::{
+    Error,
+    Result,
+};
+
+use crate::{
+    prelude::{
+        str,
+        Debug,
+        Value,
+    },
+    LinkInterceptorStrategy,
+};
 
 /// A rule to enforce on function calls
 #[cfg(feature = "std")]
@@ -43,9 +59,9 @@ pub enum FirewallRule {
 #[derive(Debug, Clone, Default)]
 pub struct FirewallConfig {
     /// Default policy (true = allow by default, false = deny by default)
-    pub default_allow: bool,
+    pub default_allow:    bool,
     /// Rules to enforce
-    pub rules: Vec<FirewallRule>,
+    pub rules:            Vec<FirewallRule>,
     /// Whether to check function parameters
     pub check_parameters: bool,
 }
@@ -55,7 +71,7 @@ pub struct FirewallConfig {
 #[derive(Debug, Clone, Default)]
 pub struct FirewallConfig {
     /// Default policy (true = allow by default, false = deny by default)
-    pub default_allow: bool,
+    pub default_allow:    bool,
     /// Whether to check function parameters
     pub check_parameters: bool,
 }
@@ -64,13 +80,13 @@ pub struct FirewallConfig {
 #[cfg(feature = "std")]
 pub struct FirewallStrategy {
     /// Configuration for this strategy
-    config: FirewallConfig,
+    config:            FirewallConfig,
     /// Cache of allowed function calls for performance
     #[cfg(feature = "std")]
     allowed_functions: RwLock<HashSet<String>>,
     /// Cache of denied function calls for performance
     #[cfg(feature = "std")]
-    denied_functions: RwLock<HashSet<String>>,
+    denied_functions:  RwLock<HashSet<String>>,
 }
 
 /// A strategy that enforces security rules on function calls (`no_std` version)
@@ -82,7 +98,8 @@ pub struct FirewallStrategy {
 
 impl FirewallStrategy {
     /// Create a new firewall strategy with the given configuration
-    #[must_use] pub fn new(config: FirewallConfig) -> Self {
+    #[must_use]
+    pub fn new(config: FirewallConfig) -> Self {
         Self {
             config,
             #[cfg(feature = "std")]
@@ -144,32 +161,32 @@ impl FirewallStrategy {
                     if s == source && t == target && f == function {
                         allowed = true;
                     }
-                }
+                },
                 FirewallRule::AllowSource(s, t) => {
                     if s == source && t == target {
                         allowed = true;
                     }
-                }
+                },
                 FirewallRule::AllowTarget(t) => {
                     if t == target {
                         allowed = true;
                     }
-                }
+                },
                 FirewallRule::DenyFunction(s, t, f) => {
                     if s == source && t == target && f == function {
                         allowed = false;
                     }
-                }
+                },
                 FirewallRule::DenySource(s, t) => {
                     if s == source && t == target {
                         allowed = false;
                     }
-                }
+                },
                 FirewallRule::DenyTarget(t) => {
                     if t == target {
                         allowed = false;
                     }
-                }
+                },
             }
         }
 
@@ -190,71 +207,17 @@ impl LinkInterceptorStrategy for FirewallStrategy {
         {
             // Check if the function call is allowed
             if !self.is_allowed(source, target, function) {
-                return Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::RUNTIME_ERROR,
+                return Err(Error::runtime_error(
                     "Security error: Function call not allowed by firewall policy",
                 ));
             }
         }
 
-        // Binary std/no_std choice
-                {
-            // Start with default policy
-            let mut allowed = self.config.default_allow;
-
-            // Apply rules in order
-            for rule in &self.config.rules {
-                match rule {
-                    FirewallRule::AllowFunction(s, t, f) => {
-                        if s == source && t == target && f == function {
-                            allowed = true;
-                        }
-                    }
-                    FirewallRule::AllowSource(s, t) => {
-                        if s == source && t == target {
-                            allowed = true;
-                        }
-                    }
-                    FirewallRule::AllowTarget(t) => {
-                        if t == target {
-                            allowed = true;
-                        }
-                    }
-                    FirewallRule::DenyFunction(s, t, f) => {
-                        if s == source && t == target && f == function {
-                            allowed = false;
-                        }
-                    }
-                    FirewallRule::DenySource(s, t) => {
-                        if s == source && t == target {
-                            allowed = false;
-                        }
-                    }
-                    FirewallRule::DenyTarget(t) => {
-                        if t == target {
-                            allowed = false;
-                        }
-                    }
-                }
-            }
-
-            if !allowed {
-                return Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::RUNTIME_ERROR,
-                    "Security error: Function call not allowed by firewall policy",
-                ));
-            }
-        }
-        
         // In pure no_std mode, we just use the default policy
         #[cfg(not(feature = "std"))]
         {
             if !self.config.default_allow {
-                return Err(Error::new(
-                    ErrorCategory::Runtime,
-                    codes::RUNTIME_ERROR,
+                return Err(Error::runtime_error(
                     "Security error: Function call not allowed by firewall policy",
                 ));
             }
@@ -304,9 +267,7 @@ impl LinkInterceptorStrategy for FirewallStrategy {
     ) -> Result<()> {
         // In pure no_std mode, we just use the default policy
         if !self.config.default_allow {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::RUNTIME_ERROR,
+            return Err(Error::runtime_error(
                 "Security error: Function call not allowed by firewall policy",
             ));
         }
@@ -334,8 +295,8 @@ mod tests {
     #[test]
     fn test_firewall_allow_by_default() {
         let config = FirewallConfig {
-            default_allow: true,
-            rules: vec![FirewallRule::DenyFunction(
+            default_allow:    true,
+            rules:            vec![FirewallRule::DenyFunction(
                 "source".to_string(),
                 "target".to_string(),
                 "denied_function".to_string(),
@@ -357,8 +318,8 @@ mod tests {
     #[test]
     fn test_firewall_deny_by_default() {
         let config = FirewallConfig {
-            default_allow: false,
-            rules: vec![FirewallRule::AllowFunction(
+            default_allow:    false,
+            rules:            vec![FirewallRule::AllowFunction(
                 "source".to_string(),
                 "target".to_string(),
                 "allowed_function".to_string(),
@@ -380,8 +341,11 @@ mod tests {
     #[test]
     fn test_firewall_allow_source() {
         let config = FirewallConfig {
-            default_allow: false,
-            rules: vec![FirewallRule::AllowSource("source".to_string(), "target".to_string())],
+            default_allow:    false,
+            rules:            vec![FirewallRule::AllowSource(
+                "source".to_string(),
+                "target".to_string(),
+            )],
             check_parameters: false,
         };
         let strategy = FirewallStrategy::new(config);
@@ -399,8 +363,8 @@ mod tests {
     #[test]
     fn test_firewall_rule_precedence() {
         let config = FirewallConfig {
-            default_allow: false,
-            rules: vec![
+            default_allow:    false,
+            rules:            vec![
                 FirewallRule::AllowSource("source".to_string(), "target".to_string()),
                 FirewallRule::DenyFunction(
                     "source".to_string(),

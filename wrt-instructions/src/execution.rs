@@ -67,7 +67,7 @@ pub trait PureExecutionContext {
 /// let mut context = ExecutionContext::new();
 /// context.push_value(Value::I32(42)).unwrap();
 /// let value = context.pop_value().unwrap();
-/// assert_eq!(value, Value::I32(42));
+/// assert_eq!(value, Value::I32(42;
 /// ```
 pub struct ExecutionContext {
     #[cfg(feature = "safety")]
@@ -98,9 +98,9 @@ impl ExecutionContext {
     /// Returns the current stack as a slice
     pub fn stack(&self) -> &[Value] {
         #[cfg(feature = "safety")]
-        return self.stack.as_slice();
+        return self.stack.as_slice);
         #[cfg(not(feature = "safety"))]
-        return self.stack.as_slice();
+        return self.stack.as_slice);
     }
 }
 
@@ -123,14 +123,14 @@ impl PureExecutionContext for ExecutionContext {
         #[cfg(feature = "safety")]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::core_stack_underflow("Stack underflow")
             })
         }
 
         #[cfg(not(feature = "safety"))]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::core_stack_underflow("Stack underflow")
             })
         }
     }
@@ -138,11 +138,7 @@ impl PureExecutionContext for ExecutionContext {
     fn pop_value_expected(&mut self, expected_type: ValueType) -> Result<Value> {
         let value = PureExecutionContext::pop_value(self)?;
         if value.value_type() != expected_type {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                codes::TYPE_MISMATCH,
-                "Type mismatch: unexpected value type",
-            ));
+            return Err(Error::type_error("Type mismatch: unexpected value type";
         }
         Ok(value)
     }
@@ -202,9 +198,9 @@ impl TestExecutionContext {
     /// Returns a reference to the current stack as a slice.
     pub fn stack(&self) -> &[Value] {
         #[cfg(feature = "safety")]
-        return self.stack.as_slice();
+        return self.stack.as_slice);
         #[cfg(not(feature = "safety"))]
-        return self.stack.as_slice();
+        return self.stack.as_slice);
     }
 }
 
@@ -228,14 +224,14 @@ impl PureExecutionContext for TestExecutionContext {
         #[cfg(feature = "safety")]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::core_stack_underflow("Stack underflow")
             })
         }
 
         #[cfg(not(feature = "safety"))]
         {
             self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Core, codes::STACK_UNDERFLOW, "Stack underflow")
+                Error::core_stack_underflow("Stack underflow")
             })
         }
     }
@@ -243,11 +239,7 @@ impl PureExecutionContext for TestExecutionContext {
     fn pop_value_expected(&mut self, expected_type: ValueType) -> Result<Value> {
         let value = PureExecutionContext::pop_value(self)?;
         if value.value_type() != expected_type {
-            return Err(Error::new(
-                ErrorCategory::Type,
-                codes::TYPE_MISMATCH,
-                "Type mismatch: unexpected value type",
-            ));
+            return Err(Error::type_error("Type mismatch: unexpected value type";
         }
         Ok(value)
     }
@@ -285,22 +277,22 @@ mod tests {
 
         // Test pushing and popping values
         PureExecutionContext::push_value(&mut context, Value::I32(42)).unwrap();
-        assert_eq!(context.stack(), &[Value::I32(42)]);
+        assert_eq!(context.stack(), &[Value::I32(42)];
 
         let value = PureExecutionContext::pop_value(&mut context).unwrap();
-        assert_eq!(value, Value::I32(42));
+        assert_eq!(value, Value::I32(42;
         assert!(context.stack().is_empty());
 
         // Test pop with empty stack
-        assert!(PureExecutionContext::pop_value(&mut context).is_err());
+        assert!(PureExecutionContext::pop_value(&mut context).is_err();
 
         // Test pop_value_expected
         PureExecutionContext::push_value(&mut context, Value::I32(42)).unwrap();
         let value = context.pop_value_expected(ValueType::I32).unwrap();
-        assert_eq!(value, Value::I32(42));
+        assert_eq!(value, Value::I32(42;
 
         // Test pop_value_expected with type mismatch
         PureExecutionContext::push_value(&mut context, Value::I32(42)).unwrap();
-        assert!(context.pop_value_expected(ValueType::I64).is_err());
+        assert!(context.pop_value_expected(ValueType::I64).is_err();
     }
 }

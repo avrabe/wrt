@@ -4,11 +4,22 @@
 //! It can be configured to log arguments, results, timing, etc.
 
 #[cfg(feature = "std")]
-use std::{time::Instant, sync::{Arc, Mutex}};
+use std::{
+    sync::{
+        Arc,
+        Mutex,
+    },
+    time::Instant,
+};
+
+use wrt_error::Result;
 
 // Import the prelude for unified access to standard types
-use crate::prelude::{Debug, str, Value};
-use wrt_error::Result;
+use crate::prelude::{
+    str,
+    Debug,
+    Value,
+};
 use crate::LinkInterceptorStrategy;
 
 /// Trait for formatting values in logging output
@@ -48,20 +59,26 @@ pub trait LogSink: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct LoggingConfig {
     /// Whether to log arguments
-    pub log_args: bool,
+    pub log_args:    bool,
     /// Whether to log results
     pub log_results: bool,
     /// Whether to log timing information
-    pub log_timing: bool,
+    pub log_timing:  bool,
     /// Maximum number of arguments to log (0 for unlimited)
-    pub max_args: usize,
+    pub max_args:    usize,
     /// Maximum number of results to log (0 for unlimited)
     pub max_results: usize,
 }
 
 impl Default for LoggingConfig {
     fn default() -> Self {
-        Self { log_args: true, log_results: true, log_timing: true, max_args: 10, max_results: 10 }
+        Self {
+            log_args:    true,
+            log_results: true,
+            log_timing:  true,
+            max_args:    10,
+            max_results: 10,
+        }
     }
 }
 
@@ -69,14 +86,14 @@ impl Default for LoggingConfig {
 #[cfg(feature = "std")]
 pub struct LoggingStrategy<S: LogSink, F: ValueFormatter = DefaultValueFormatter> {
     /// Log sink to write logs to
-    sink: Arc<S>,
+    sink:      Arc<S>,
     /// Value formatter
     formatter: F,
     /// Configuration
-    config: LoggingConfig,
+    config:    LoggingConfig,
     /// Thread-local storage for timing information
     #[cfg(feature = "std")]
-    timing: Arc<Mutex<Option<Instant>>>,
+    timing:    Arc<Mutex<Option<Instant>>>,
 }
 
 /// A simple logging strategy for `no_std` environments
@@ -86,7 +103,7 @@ pub struct LoggingStrategy {
     config: LoggingConfig,
 }
 
-#[cfg(all(feature = "std", ))]
+#[cfg(feature = "std")]
 impl<S: LogSink> LoggingStrategy<S> {
     /// Create a new logging strategy with default formatter
     pub fn new(sink: Arc<S>) -> Self {
@@ -99,7 +116,7 @@ impl<S: LogSink> LoggingStrategy<S> {
     }
 }
 
-#[cfg(all(feature = "std", ))]
+#[cfg(feature = "std")]
 impl<S: LogSink, F: ValueFormatter> LoggingStrategy<S, F> {
     /// Create a new logging strategy with custom formatter
     pub fn with_formatter(sink: Arc<S>, formatter: F) -> Self {
@@ -118,7 +135,7 @@ impl<S: LogSink, F: ValueFormatter> LoggingStrategy<S, F> {
     }
 }
 
-#[cfg(all(feature = "std", ))]
+#[cfg(feature = "std")]
 impl<S: LogSink + 'static, F: ValueFormatter + 'static> LinkInterceptorStrategy
     for LoggingStrategy<S, F>
 {
@@ -217,10 +234,10 @@ impl<S: LogSink + 'static, F: ValueFormatter + 'static> LinkInterceptorStrategy
                     } else {
                         log_entry.push_str(" result: []");
                     }
-                }
+                },
                 Err(e) => {
                     log_entry.push_str(&format!(" error: {}", e));
-                }
+                },
             }
         }
 
@@ -233,10 +250,10 @@ impl<S: LogSink + 'static, F: ValueFormatter + 'static> LinkInterceptorStrategy
 
     fn clone_strategy(&self) -> Arc<dyn LinkInterceptorStrategy> {
         Arc::new(Self {
-            sink: self.sink.clone(),
+            sink:      self.sink.clone(),
             formatter: self.formatter.clone(),
-            config: self.config.clone(),
-            timing: self.timing.clone(),
+            config:    self.config.clone(),
+            timing:    self.timing.clone(),
         })
     }
 }
@@ -260,16 +277,19 @@ impl Default for LoggingStrategy {
     }
 }
 
+#[cfg(not(feature = "std"))]
 impl LoggingStrategy {
     /// Create a new logging strategy for `no_std` environments
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             config: LoggingConfig::default(),
         }
     }
-    
+
     /// Configure the logging strategy
-    #[must_use] pub fn with_config(mut self, config: LoggingConfig) -> Self {
+    #[must_use]
+    pub fn with_config(mut self, config: LoggingConfig) -> Self {
         self.config = config;
         self
     }
@@ -314,7 +334,9 @@ impl FileLogSink {
     fn new(path: &std::path::Path) -> std::io::Result<Self> {
         let file = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
 
-        Ok(Self { file: Mutex::new(file) })
+        Ok(Self {
+            file: Mutex::new(file),
+        })
     }
 }
 
@@ -353,7 +375,10 @@ impl LogSink for LogCrateSink {
 
 #[cfg(all(test, feature = "std"))]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::sync::{
+        Arc,
+        Mutex,
+    };
 
     use super::*;
 
@@ -371,7 +396,9 @@ mod tests {
 
     #[test]
     fn test_logging_strategy() {
-        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) });
+        let sink = Arc::new(TestSink {
+            logs: Mutex::new(Vec::new()),
+        });
         let strategy = LoggingStrategy::new(sink.clone());
 
         // Test before_call
@@ -390,7 +417,9 @@ mod tests {
 
     #[test]
     fn test_logging_strategy_after_call() {
-        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) });
+        let sink = Arc::new(TestSink {
+            logs: Mutex::new(Vec::new()),
+        });
         let strategy = LoggingStrategy::new(sink.clone());
 
         // Test after_call with success
@@ -409,12 +438,14 @@ mod tests {
 
     #[test]
     fn test_logging_strategy_config() {
-        let sink = Arc::new(TestSink { logs: Mutex::new(Vec::new()) });
+        let sink = Arc::new(TestSink {
+            logs: Mutex::new(Vec::new()),
+        });
         let config = LoggingConfig {
-            log_args: false,
+            log_args:    false,
             log_results: true,
-            log_timing: false,
-            max_args: 5,
+            log_timing:  false,
+            max_args:    5,
             max_results: 5,
         };
         let strategy = LoggingStrategy::new(sink.clone()).with_config(config);

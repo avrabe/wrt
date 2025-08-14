@@ -5,7 +5,10 @@
 #[cfg(feature = "std")]
 use std::boxed::Box;
 
-use wrt_host::CallbackRegistry;
+use wrt_host::{
+    CallbackRegistry,
+    CallbackType,
+};
 
 use crate::operation::LogOperation;
 
@@ -35,15 +38,17 @@ pub trait LoggingExt {
 pub type LogHandler<P> = fn(LogOperation<P>);
 
 #[cfg(all(not(feature = "std"), not(feature = "std")))]
-/// Extension trait for `CallbackRegistry` to add logging-specific methods (`no_std`)
+/// Extension trait for `CallbackRegistry` to add logging-specific methods
+/// (`no_std`)
 pub trait LoggingExt {
-    /// Register a simple log handler function (`no_std` only supports function pointers)
+    /// Register a simple log handler function (`no_std` only supports function
+    /// pointers)
     fn register_log_handler<P>(&mut self, handler: LogHandler<P>)
     where
         P: wrt_foundation::MemoryProvider + Default + Clone + PartialEq + Eq;
 
     /// Handle a log operation
-    fn handle_log<P>(&self, operation: LogOperation<P>) -> wrt_foundation::Result<()>
+    fn handle_log<P>(&self, operation: LogOperation<P>) -> wrt_error::Result<()>
     where
         P: wrt_foundation::MemoryProvider + Default + Clone + PartialEq + Eq;
 
@@ -82,16 +87,17 @@ impl LoggingExt for CallbackRegistry {
         // In no_std mode, we can't store dynamic handlers
         // This is a limitation - only one handler per type can be stored
         let _ = handler; // Acknowledge the parameter
-        // Note: Actual registration would require a more complex design
+                         // Note: Actual registration would require a more
+                         // complex design
     }
 
-    fn handle_log<P>(&self, operation: LogOperation<P>) -> wrt_foundation::Result<()>
+    fn handle_log<P>(&self, operation: LogOperation<P>) -> wrt_error::Result<()>
     where
         P: wrt_foundation::MemoryProvider + Default + Clone + PartialEq + Eq,
     {
         // In no_std mode, we can't dynamically dispatch to handlers
         let _ = operation; // Acknowledge the parameter
-        // Default no-op implementation for no_std
+                           // Default no-op implementation for no_std
         Ok(())
     }
 
@@ -104,7 +110,10 @@ impl LoggingExt for CallbackRegistry {
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::sync::{
+        Arc,
+        Mutex,
+    };
 
     use super::*;
     use crate::level::LogLevel;
@@ -117,7 +126,10 @@ mod tests {
         assert!(!registry.has_log_handler());
 
         // Logging without handler should not panic
-        registry.handle_log(LogOperation::new(LogLevel::Info, "test message".to_string()));
+        registry.handle_log(LogOperation::new(
+            LogLevel::Info,
+            "test message".to_string(),
+        ));
 
         // Register handler
         let received = Arc::new(Mutex::new(Vec::new()));
@@ -132,9 +144,15 @@ mod tests {
         assert!(registry.has_log_handler());
 
         // Log some messages
-        registry.handle_log(LogOperation::new(LogLevel::Info, "info message".to_string()));
+        registry.handle_log(LogOperation::new(
+            LogLevel::Info,
+            "info message".to_string(),
+        ));
 
-        registry.handle_log(LogOperation::new(LogLevel::Error, "error message".to_string()));
+        registry.handle_log(LogOperation::new(
+            LogLevel::Error,
+            "error message".to_string(),
+        ));
 
         // Check received messages
         let received = received.lock().unwrap();
@@ -147,8 +165,8 @@ mod tests {
 // Binary std/no_std choice
 #[cfg(test)]
 mod no_std_alloc_tests {
-    use std::vec::Vec;
     use core::cell::RefCell;
+    use std::vec::Vec;
 
     use super::*;
     use crate::level::LogLevel;
@@ -161,7 +179,10 @@ mod no_std_alloc_tests {
         assert!(!registry.has_log_handler());
 
         // Logging without handler should not panic
-        registry.handle_log(LogOperation::new(LogLevel::Info, "test message".to_string()));
+        registry.handle_log(LogOperation::new(
+            LogLevel::Info,
+            "test message".to_string(),
+        ));
 
         // Use RefCell instead of Mutex for no_std
         let received = RefCell::new(Vec::new());
@@ -174,8 +195,14 @@ mod no_std_alloc_tests {
         assert!(registry.has_log_handler());
 
         // Log some messages
-        registry.handle_log(LogOperation::new(LogLevel::Info, "info message".to_string()));
-        registry.handle_log(LogOperation::new(LogLevel::Error, "error message".to_string()));
+        registry.handle_log(LogOperation::new(
+            LogLevel::Info,
+            "info message".to_string(),
+        ));
+        registry.handle_log(LogOperation::new(
+            LogLevel::Error,
+            "error message".to_string(),
+        ));
 
         // Check received messages
         let borrowed = received.borrow();

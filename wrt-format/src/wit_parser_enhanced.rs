@@ -11,7 +11,7 @@ use std::{collections::BTreeMap, vec::Vec, boxed::Box, format, vec, string::Stri
 use std::{collections::BTreeMap, vec::Vec, boxed::Box, format, vec, string::String};
 
 #[cfg(not(any(feature = "std", )))]
-compile_error!("Enhanced WIT parser requires std or alloc feature");
+compile_error!("Enhanced WIT parser requires std or alloc feature";
 
 use core::fmt;
 
@@ -91,7 +91,7 @@ struct Lexer {
 impl Lexer {
     fn new(input: &str, file_id: u32) -> Self {
         let chars: Vec<char> = input.chars().collect();
-        let current_char = chars.get(0).copied();
+        let current_char = chars.get(0).copied);
         Self {
             input: chars,
             position: 0,
@@ -115,7 +115,7 @@ impl Lexer {
         }
         
         self.position += 1;
-        self.current_char = self.input.get(self.position).copied();
+        self.current_char = self.input.get(self.position).copied);
     }
     
     fn peek(&self, offset: usize) -> Option<char> {
@@ -125,7 +125,7 @@ impl Lexer {
     fn skip_whitespace(&mut self) {
         while let Some(ch) = self.current_char {
             if ch.is_whitespace() && ch != '\n' {
-                self.advance();
+                self.advance);
             } else {
                 break;
             }
@@ -138,7 +138,7 @@ impl Lexer {
         while let Some(ch) = self.current_char {
             if ch.is_alphanumeric() || ch == '-' || ch == '_' {
                 result.push(ch);
-                self.advance();
+                self.advance);
             } else {
                 break;
             }
@@ -153,7 +153,7 @@ impl Lexer {
         while let Some(ch) = self.current_char {
             if ch.is_numeric() || ch == '.' || ch == '-' || ch.is_alphanumeric() {
                 result.push(ch);
-                self.advance();
+                self.advance);
             } else {
                 break;
             }
@@ -169,9 +169,9 @@ impl Lexer {
         while let Some(ch) = self.current_char {
             if ch == '"' {
                 self.advance(); // Skip closing quote
-                return Ok(result);
+                return Ok(result;
             } else if ch == '\\' {
-                self.advance();
+                self.advance);
                 match self.current_char {
                     Some('n') => result.push('\n'),
                     Some('r') => result.push('\r'),
@@ -182,10 +182,10 @@ impl Lexer {
                         WitBoundedString::from_str("Invalid escape sequence", NoStdProvider::default()).unwrap()
                     )),
                 }
-                self.advance();
+                self.advance);
             } else {
                 result.push(ch);
-                self.advance();
+                self.advance);
             }
         }
         
@@ -198,15 +198,15 @@ impl Lexer {
         let mut result = String::new();
         
         // Skip the // or ///
-        self.advance();
-        self.advance();
+        self.advance);
+        self.advance);
         if self.current_char == Some('/') {
-            self.advance();
+            self.advance);
         }
         
         // Skip leading space
         if self.current_char == Some(' ') {
-            self.advance();
+            self.advance);
         }
         
         while let Some(ch) = self.current_char {
@@ -214,80 +214,80 @@ impl Lexer {
                 break;
             }
             result.push(ch);
-            self.advance();
+            self.advance);
         }
         
         result
     }
     
     fn next_token(&mut self) -> Result<Token, WitParseError> {
-        self.skip_whitespace();
+        self.skip_whitespace);
         
         match self.current_char {
             None => Ok(Token::Eof),
             Some('\n') => {
-                self.advance();
+                self.advance);
                 Ok(Token::Newline)
             }
             Some('/') if self.peek(1) == Some('/') => {
-                let comment = self.read_comment();
+                let comment = self.read_comment);
                 Ok(Token::Comment(comment))
             }
             Some(':') => {
-                self.advance();
+                self.advance);
                 Ok(Token::Colon)
             }
-            Some(';') => {
-                self.advance();
+            Some(');') => {
+                self.advance);
                 Ok(Token::Semicolon)
             }
             Some(',') => {
-                self.advance();
+                self.advance);
                 Ok(Token::Comma)
             }
             Some('.') => {
-                self.advance();
+                self.advance);
                 Ok(Token::Dot)
             }
             Some('(') => {
-                self.advance();
+                self.advance);
                 Ok(Token::LeftParen)
             }
             Some(')') => {
-                self.advance();
+                self.advance);
                 Ok(Token::RightParen)
             }
             Some('{') => {
-                self.advance();
+                self.advance);
                 Ok(Token::LeftBrace)
             }
             Some('}') => {
-                self.advance();
+                self.advance);
                 Ok(Token::RightBrace)
             }
             Some('<') => {
-                self.advance();
+                self.advance);
                 Ok(Token::LeftAngle)
             }
             Some('>') => {
-                self.advance();
+                self.advance);
                 Ok(Token::RightAngle)
             }
             Some('@') => {
-                self.advance();
+                self.advance);
                 Ok(Token::At)
             }
             Some('=') => {
-                self.advance();
+                self.advance);
                 Ok(Token::Equals)
             }
             Some('/') => {
-                self.advance();
+                self.advance);
                 Ok(Token::Slash)
             }
             Some('-') if self.peek(1) == Some('>') => {
-                self.advance();
-                self.advance();
+                self.advance);
+                self.advance);
                 Ok(Token::Arrow)
             }
             Some('"') => {
@@ -295,7 +295,7 @@ impl Lexer {
                 Ok(Token::StringLiteral(s))
             }
             Some(ch) if ch.is_alphabetic() || ch == '_' => {
-                let ident = self.read_identifier();
+                let ident = self.read_identifier);
                 
                 let token = match ident.as_str() {
                     "package" => Token::Package,
@@ -324,7 +324,7 @@ impl Lexer {
                 Ok(token)
             }
             Some(ch) if ch.is_numeric() => {
-                let version = self.read_version();
+                let version = self.read_version);
                 Ok(Token::Version(version))
             }
             Some(ch) => {
@@ -359,26 +359,26 @@ impl EnhancedWitParser {
     
     /// Parse a complete WIT document
     pub fn parse_document(&mut self, source: &str, file_id: u32) -> Result<WitDocument, WitParseError> {
-        self.lexer = Lexer::new(source, file_id);
+        self.lexer = Lexer::new(source, file_id;
         self.advance()?;
         
-        let start = self.lexer.current_position();
+        let start = self.lexer.current_position);
         
         let mut package = None;
         let mut use_items = Vec::new();
         let mut items = Vec::new();
         
         // Collect any leading documentation
-        self.collect_documentation();
+        self.collect_documentation);
         
         // Parse package declaration if present
         if matches!(self.current_token, Token::Package) {
-            package = Some(self.parse_package_decl()?);
+            package = Some(self.parse_package_decl()?;
         }
         
         // Parse top-level items
         while !matches!(self.current_token, Token::Eof) {
-            self.collect_documentation();
+            self.collect_documentation);
             
             match &self.current_token {
                 Token::Use => {
@@ -387,7 +387,7 @@ impl EnhancedWitParser {
                 }
                 Token::Type => {
                     let type_decl = self.parse_type_decl()?;
-                    items.push(TopLevelItem::Type(type_decl));
+                    items.push(TopLevelItem::Type(type_decl);
                 }
                 Token::Interface => {
                     let interface = self.parse_interface_decl()?;
@@ -405,13 +405,13 @@ impl EnhancedWitParser {
                 _ => {
                     return Err(WitParseError::InvalidSyntax(
                         WitBoundedString::from_str("Expected top-level declaration", self.provider.clone()).unwrap()
-                    ));
+                    ;
                 }
             }
         }
         
-        let end = self.lexer.current_position();
-        let span = SourceSpan::new(start, end, file_id);
+        let end = self.lexer.current_position);
+        let span = SourceSpan::new(start, end, file_id;
         
         Ok(WitDocument {
             package,
@@ -432,7 +432,7 @@ impl EnhancedWitParser {
     
     fn peek(&mut self) -> Result<&Token, WitParseError> {
         if self.peek_token.is_none() {
-            self.peek_token = Some(self.lexer.next_token()?);
+            self.peek_token = Some(self.lexer.next_token()?;
         }
         Ok(self.peek_token.as_ref().unwrap())
     }
@@ -449,14 +449,14 @@ impl EnhancedWitParser {
     }
     
     fn collect_documentation(&mut self) {
-        self.documentation_buffer.clear();
+        self.documentation_buffer.clear);
         
         while let Token::Comment(text) = &self.current_token {
             if text.starts_with('/') {
                 // Doc comment
-                self.documentation_buffer.push(text.clone());
+                self.documentation_buffer.push(text.clone();
             }
-            self.advance().unwrap_or(());
+            self.advance().unwrap_or();
         }
     }
     
@@ -469,22 +469,22 @@ impl EnhancedWitParser {
                 #[cfg(feature = "std")]
                 lines: Vec::new(), // For now, just return empty vec
                 span: SourceSpan::empty(),
-            });
+            };
         }
     }
     
     fn parse_identifier(&mut self) -> Result<Identifier, WitParseError> {
-        let start = self.lexer.current_position();
+        let start = self.lexer.current_position);
         
         if let Token::Identifier(name) = &self.current_token {
             let name_str = name.clone();
             self.advance()?;
-            let end = self.lexer.current_position();
+            let end = self.lexer.current_position);
             
             Ok(Identifier {
                 name: WitBoundedString::from_str(&name_str, self.provider.clone()).unwrap(),
                 span: SourceSpan::new(start, end, self.lexer.file_id),
-            });
+            };
         } else {
             Err(WitParseError::InvalidSyntax(
                 WitBoundedString::from_str("Expected identifier", self.provider.clone()).unwrap()
@@ -493,39 +493,39 @@ impl EnhancedWitParser {
     }
     
     fn parse_package_decl(&mut self) -> Result<PackageDecl, WitParseError> {
-        let start = self.lexer.current_position();
+        let start = self.lexer.current_position);
         
-        self.expect(Token::Package)?;
+        self.expect(Token::Package)?);
         
         let namespace = self.parse_identifier()?;
-        self.expect(Token::Colon)?;
+        self.expect(Token::Colon)?);
         let name = self.parse_identifier()?;
         
         let mut version = None;
         if matches!(self.current_token, Token::At) {
             self.advance()?;
-            version = Some(self.parse_version()?);
+            version = Some(self.parse_version()?;
         }
         
-        let end = self.lexer.current_position();
+        let end = self.lexer.current_position);
         
         Ok(PackageDecl {
             namespace,
             name,
             version,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_version(&mut self) -> Result<Version, WitParseError> {
-        let start = self.lexer.current_position();
+        let start = self.lexer.current_position);
         
         if let Token::Version(v) = &self.current_token {
             let parts: Vec<&str> = v.split('.').collect();
             if parts.len() < 3 {
                 return Err(WitParseError::InvalidSyntax(
                     WitBoundedString::from_str("Invalid version format", self.provider.clone()).unwrap()
-                ));
+                ;
             }
             
             let major = parts[0].parse().map_err(|_| WitParseError::InvalidSyntax(
@@ -536,7 +536,7 @@ impl EnhancedWitParser {
             ))?;
             
             let (patch_str, pre) = if let Some(dash_pos) = parts[2].find('-') {
-                let (patch, pre) = parts[2].split_at(dash_pos);
+                let (patch, pre) = parts[2].split_at(dash_pos;
                 (patch, Some(WitBoundedStringSmall::from_str(&pre[1..], self.provider.clone()).unwrap()))
             } else {
                 (parts[2], None)
@@ -547,7 +547,7 @@ impl EnhancedWitParser {
             ))?;
             
             self.advance()?;
-            let end = self.lexer.current_position();
+            let end = self.lexer.current_position);
             
             Ok(Version {
                 major,
@@ -555,7 +555,7 @@ impl EnhancedWitParser {
                 patch,
                 pre,
                 span: SourceSpan::new(start, end, self.lexer.file_id),
-            });
+            };
         } else {
             Err(WitParseError::InvalidSyntax(
                 WitBoundedString::from_str("Expected version", self.provider.clone()).unwrap()
@@ -564,14 +564,14 @@ impl EnhancedWitParser {
     }
     
     fn parse_use_decl(&mut self) -> Result<UseDecl, WitParseError> {
-        let start = self.lexer.current_position();
+        let start = self.lexer.current_position);
         
-        self.expect(Token::Use)?;
+        self.expect(Token::Use)?);
         
         let path = self.parse_use_path()?;
         let names = if matches!(self.current_token, Token::Dot) {
             self.advance()?;
-            self.expect(Token::LeftBrace)?;
+            self.expect(Token::LeftBrace)?);
             
             let mut items = Vec::new();
             
@@ -581,20 +581,20 @@ impl EnhancedWitParser {
                 
                 if matches!(self.current_token, Token::As) {
                     self.advance()?;
-                    as_name = Some(self.parse_identifier()?);
+                    as_name = Some(self.parse_identifier()?;
                 }
                 
                 let item_span = SourceSpan::new(
                     name.span.start,
                     as_name.as_ref().map(|n| n.span.end).unwrap_or(name.span.end),
                     self.lexer.file_id
-                );
+                ;
                 
                 items.push(UseItem {
                     name,
                     as_name,
                     span: item_span,
-                });
+                };
                 
                 if !matches!(self.current_token, Token::Comma) {
                     break;
@@ -602,23 +602,23 @@ impl EnhancedWitParser {
                 self.advance()?;
             }
             
-            self.expect(Token::RightBrace)?;
+            self.expect(Token::RightBrace)?);
             UseNames::Items(items)
         } else {
             UseNames::All
         };
         
-        let end = self.lexer.current_position();
+        let end = self.lexer.current_position);
         
         Ok(UseDecl {
             path,
             names,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_use_path(&mut self) -> Result<UsePath, WitParseError> {
-        let start = self.lexer.current_position();
+        let start = self.lexer.current_position);
         
         let first_ident = self.parse_identifier()?;
         
@@ -629,10 +629,10 @@ impl EnhancedWitParser {
             let mut version = None;
             if matches!(self.current_token, Token::At) {
                 self.advance()?;
-                version = Some(self.parse_version()?);
+                version = Some(self.parse_version()?;
             }
             
-            self.expect(Token::Slash)?;
+            self.expect(Token::Slash)?);
             let interface = self.parse_identifier()?;
             
             let package_ref = PackageRef {
@@ -647,30 +647,30 @@ impl EnhancedWitParser {
             (None, first_ident)
         };
         
-        let end = self.lexer.current_position();
+        let end = self.lexer.current_position);
         
         Ok(UsePath {
             package,
             interface,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_type_decl(&mut self) -> Result<TypeDecl, WitParseError> {
-        let start = self.lexer.current_position();
-        let docs = self.take_documentation();
+        let start = self.lexer.current_position);
+        let docs = self.take_documentation);
         
-        self.expect(Token::Type)?;
+        self.expect(Token::Type)?);
         let name = self.parse_identifier()?;
         
         // TODO: Parse generic parameters
         let generics = None;
         
-        self.expect(Token::Equals)?;
+        self.expect(Token::Equals)?);
         
         let def = self.parse_type_def()?;
         
-        let end = self.lexer.current_position();
+        let end = self.lexer.current_position);
         
         Ok(TypeDecl {
             name,
@@ -678,7 +678,7 @@ impl EnhancedWitParser {
             def,
             docs,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_type_def(&mut self) -> Result<TypeDef, WitParseError> {
@@ -712,166 +712,166 @@ impl EnhancedWitParser {
     }
     
     fn parse_record_type(&mut self) -> Result<RecordType, WitParseError> {
-        let start = self.lexer.current_position();
-        self.expect(Token::LeftBrace)?;
+        let start = self.lexer.current_position);
+        self.expect(Token::LeftBrace)?);
         
         let mut fields = Vec::new();
         
         while !matches!(self.current_token, Token::RightBrace) {
-            self.collect_documentation();
-            let docs = self.take_documentation();
+            self.collect_documentation);
+            let docs = self.take_documentation);
             
-            let field_start = self.lexer.current_position();
+            let field_start = self.lexer.current_position);
             let name = self.parse_identifier()?;
-            self.expect(Token::Colon)?;
+            self.expect(Token::Colon)?);
             let ty = self.parse_type_expr()?;
-            let field_end = self.lexer.current_position();
+            let field_end = self.lexer.current_position);
             
             fields.push(RecordField {
                 name,
                 ty,
                 docs,
                 span: SourceSpan::new(field_start, field_end, self.lexer.file_id),
-            });
+            };
             
             if matches!(self.current_token, Token::Comma) {
                 self.advance()?;
             }
         }
         
-        self.expect(Token::RightBrace)?;
-        let end = self.lexer.current_position();
+        self.expect(Token::RightBrace)?);
+        let end = self.lexer.current_position);
         
         Ok(RecordType {
             fields,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_variant_type(&mut self) -> Result<VariantType, WitParseError> {
-        let start = self.lexer.current_position();
-        self.expect(Token::LeftBrace)?;
+        let start = self.lexer.current_position);
+        self.expect(Token::LeftBrace)?);
         
         let mut cases = Vec::new();
         
         while !matches!(self.current_token, Token::RightBrace) {
-            self.collect_documentation();
-            let docs = self.take_documentation();
+            self.collect_documentation);
+            let docs = self.take_documentation);
             
-            let case_start = self.lexer.current_position();
+            let case_start = self.lexer.current_position);
             let name = self.parse_identifier()?;
             
             let ty = if matches!(self.current_token, Token::LeftParen) {
                 self.advance()?;
                 let t = self.parse_type_expr()?;
-                self.expect(Token::RightParen)?;
+                self.expect(Token::RightParen)?);
                 Some(t)
             } else {
                 None
             };
             
-            let case_end = self.lexer.current_position();
+            let case_end = self.lexer.current_position);
             
             cases.push(VariantCase {
                 name,
                 ty,
                 docs,
                 span: SourceSpan::new(case_start, case_end, self.lexer.file_id),
-            });
+            };
             
             if matches!(self.current_token, Token::Comma) {
                 self.advance()?;
             }
         }
         
-        self.expect(Token::RightBrace)?;
-        let end = self.lexer.current_position();
+        self.expect(Token::RightBrace)?);
+        let end = self.lexer.current_position);
         
         Ok(VariantType {
             cases,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_enum_type(&mut self) -> Result<EnumType, WitParseError> {
-        let start = self.lexer.current_position();
-        self.expect(Token::LeftBrace)?;
+        let start = self.lexer.current_position);
+        self.expect(Token::LeftBrace)?);
         
         let mut cases = Vec::new();
         
         while !matches!(self.current_token, Token::RightBrace) {
-            self.collect_documentation();
-            let docs = self.take_documentation();
+            self.collect_documentation);
+            let docs = self.take_documentation);
             
-            let case_start = self.lexer.current_position();
+            let case_start = self.lexer.current_position);
             let name = self.parse_identifier()?;
-            let case_end = self.lexer.current_position();
+            let case_end = self.lexer.current_position);
             
             cases.push(EnumCase {
                 name,
                 docs,
                 span: SourceSpan::new(case_start, case_end, self.lexer.file_id),
-            });
+            };
             
             if matches!(self.current_token, Token::Comma) {
                 self.advance()?;
             }
         }
         
-        self.expect(Token::RightBrace)?;
-        let end = self.lexer.current_position();
+        self.expect(Token::RightBrace)?);
+        let end = self.lexer.current_position);
         
         Ok(EnumType {
             cases,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_flags_type(&mut self) -> Result<FlagsType, WitParseError> {
-        let start = self.lexer.current_position();
-        self.expect(Token::LeftBrace)?;
+        let start = self.lexer.current_position);
+        self.expect(Token::LeftBrace)?);
         
         let mut flags = Vec::new();
         
         while !matches!(self.current_token, Token::RightBrace) {
-            self.collect_documentation();
-            let docs = self.take_documentation();
+            self.collect_documentation);
+            let docs = self.take_documentation);
             
-            let flag_start = self.lexer.current_position();
+            let flag_start = self.lexer.current_position);
             let name = self.parse_identifier()?;
-            let flag_end = self.lexer.current_position();
+            let flag_end = self.lexer.current_position);
             
             flags.push(FlagValue {
                 name,
                 docs,
                 span: SourceSpan::new(flag_start, flag_end, self.lexer.file_id),
-            });
+            };
             
             if matches!(self.current_token, Token::Comma) {
                 self.advance()?;
             }
         }
         
-        self.expect(Token::RightBrace)?;
-        let end = self.lexer.current_position();
+        self.expect(Token::RightBrace)?);
+        let end = self.lexer.current_position);
         
         Ok(FlagsType {
             flags,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_resource_type(&mut self) -> Result<ResourceType, WitParseError> {
-        let start = self.lexer.current_position();
-        self.expect(Token::LeftBrace)?;
+        let start = self.lexer.current_position);
+        self.expect(Token::LeftBrace)?);
         
         let mut methods = Vec::new();
         
         while !matches!(self.current_token, Token::RightBrace) {
-            self.collect_documentation();
-            let docs = self.take_documentation();
+            self.collect_documentation);
+            let docs = self.take_documentation);
             
-            let method_start = self.lexer.current_position();
+            let method_start = self.lexer.current_position);
             
             let kind = match &self.current_token {
                 Token::Constructor => {
@@ -890,10 +890,10 @@ impl EnhancedWitParser {
             };
             
             let name = self.parse_identifier()?;
-            self.expect(Token::Colon)?;
+            self.expect(Token::Colon)?);
             let func = self.parse_function_signature()?;
             
-            let method_end = self.lexer.current_position();
+            let method_end = self.lexer.current_position);
             
             methods.push(ResourceMethod {
                 name,
@@ -901,24 +901,24 @@ impl EnhancedWitParser {
                 func,
                 docs,
                 span: SourceSpan::new(method_start, method_end, self.lexer.file_id),
-            });
+            };
             
             if matches!(self.current_token, Token::Semicolon) {
                 self.advance()?;
             }
         }
         
-        self.expect(Token::RightBrace)?;
-        let end = self.lexer.current_position();
+        self.expect(Token::RightBrace)?);
+        let end = self.lexer.current_position);
         
         Ok(ResourceType {
             methods,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_type_expr(&mut self) -> Result<TypeExpr, WitParseError> {
-        let start = self.lexer.current_position();
+        let start = self.lexer.current_position);
         
         match &self.current_token.clone() {
             Token::Identifier(name) => {
@@ -1018,18 +1018,18 @@ impl EnhancedWitParser {
                     // Parameterized types
                     "list" => {
                         self.advance()?;
-                        self.expect(Token::LeftAngle)?;
+                        self.expect(Token::LeftAngle)?);
                         let inner = self.parse_type_expr()?;
-                        self.expect(Token::RightAngle)?;
-                        let end = self.lexer.current_position();
+                        self.expect(Token::RightAngle)?);
+                        let end = self.lexer.current_position);
                         Ok(TypeExpr::List(Box::new(inner), SourceSpan::new(start, end, self.lexer.file_id)))
                     }
                     "option" => {
                         self.advance()?;
-                        self.expect(Token::LeftAngle)?;
+                        self.expect(Token::LeftAngle)?);
                         let inner = self.parse_type_expr()?;
-                        self.expect(Token::RightAngle)?;
-                        let end = self.lexer.current_position();
+                        self.expect(Token::RightAngle)?);
+                        let end = self.lexer.current_position);
                         Ok(TypeExpr::Option(Box::new(inner), SourceSpan::new(start, end, self.lexer.file_id)))
                     }
                     "result" => {
@@ -1051,13 +1051,13 @@ impl EnhancedWitParser {
                                 None
                             };
                             
-                            self.expect(Token::RightAngle)?;
+                            self.expect(Token::RightAngle)?);
                             (ok, err)
                         } else {
                             (None, None)
                         };
                         
-                        let end = self.lexer.current_position();
+                        let end = self.lexer.current_position);
                         Ok(TypeExpr::Result(ResultType {
                             ok,
                             err,
@@ -1066,7 +1066,7 @@ impl EnhancedWitParser {
                     }
                     "tuple" => {
                         self.advance()?;
-                        self.expect(Token::LeftAngle)?;
+                        self.expect(Token::LeftAngle)?);
                         
                         let mut types = Vec::new();
                         
@@ -1080,8 +1080,8 @@ impl EnhancedWitParser {
                             self.advance()?;
                         }
                         
-                        self.expect(Token::RightAngle)?;
-                        let end = self.lexer.current_position();
+                        self.expect(Token::RightAngle)?);
+                        let end = self.lexer.current_position);
                         
                         Ok(TypeExpr::Tuple(TupleType {
                             types,
@@ -1090,34 +1090,34 @@ impl EnhancedWitParser {
                     }
                     "stream" => {
                         self.advance()?;
-                        self.expect(Token::LeftAngle)?;
+                        self.expect(Token::LeftAngle)?);
                         let inner = self.parse_type_expr()?;
-                        self.expect(Token::RightAngle)?;
-                        let end = self.lexer.current_position();
+                        self.expect(Token::RightAngle)?);
+                        let end = self.lexer.current_position);
                         Ok(TypeExpr::Stream(Box::new(inner), SourceSpan::new(start, end, self.lexer.file_id)))
                     }
                     "future" => {
                         self.advance()?;
-                        self.expect(Token::LeftAngle)?;
+                        self.expect(Token::LeftAngle)?);
                         let inner = self.parse_type_expr()?;
-                        self.expect(Token::RightAngle)?;
-                        let end = self.lexer.current_position();
+                        self.expect(Token::RightAngle)?);
+                        let end = self.lexer.current_position);
                         Ok(TypeExpr::Future(Box::new(inner), SourceSpan::new(start, end, self.lexer.file_id)))
                     }
                     "own" => {
                         self.advance()?;
-                        self.expect(Token::LeftAngle)?;
+                        self.expect(Token::LeftAngle)?);
                         let resource = self.parse_identifier()?;
-                        self.expect(Token::RightAngle)?;
-                        let end = self.lexer.current_position();
+                        self.expect(Token::RightAngle)?);
+                        let end = self.lexer.current_position);
                         Ok(TypeExpr::Own(resource, SourceSpan::new(start, end, self.lexer.file_id)))
                     }
                     "borrow" => {
                         self.advance()?;
-                        self.expect(Token::LeftAngle)?;
+                        self.expect(Token::LeftAngle)?);
                         let resource = self.parse_identifier()?;
-                        self.expect(Token::RightAngle)?;
-                        let end = self.lexer.current_position();
+                        self.expect(Token::RightAngle)?);
+                        let end = self.lexer.current_position);
                         Ok(TypeExpr::Borrow(resource, SourceSpan::new(start, end, self.lexer.file_id)))
                     }
                     // Named type reference
@@ -1126,7 +1126,7 @@ impl EnhancedWitParser {
                         
                         // TODO: Parse generic arguments if present
                         
-                        let end = self.lexer.current_position();
+                        let end = self.lexer.current_position);
                         Ok(TypeExpr::Named(NamedType {
                             package: None,
                             name,
@@ -1143,17 +1143,17 @@ impl EnhancedWitParser {
     }
     
     fn parse_interface_decl(&mut self) -> Result<InterfaceDecl, WitParseError> {
-        let start = self.lexer.current_position();
-        let docs = self.take_documentation();
+        let start = self.lexer.current_position);
+        let docs = self.take_documentation);
         
-        self.expect(Token::Interface)?;
+        self.expect(Token::Interface)?);
         let name = self.parse_identifier()?;
-        self.expect(Token::LeftBrace)?;
+        self.expect(Token::LeftBrace)?);
         
         let mut items = Vec::new();
         
         while !matches!(self.current_token, Token::RightBrace) {
-            self.collect_documentation();
+            self.collect_documentation);
             
             match &self.current_token {
                 Token::Use => {
@@ -1177,42 +1177,42 @@ impl EnhancedWitParser {
                 _ => {
                     return Err(WitParseError::InvalidSyntax(
                         WitBoundedString::from_str("Expected interface item", self.provider.clone()).unwrap()
-                    ));
+                    ;
                 }
             }
         }
         
-        self.expect(Token::RightBrace)?;
-        let end = self.lexer.current_position();
+        self.expect(Token::RightBrace)?);
+        let end = self.lexer.current_position);
         
         Ok(InterfaceDecl {
             name,
             items,
             docs,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_function_decl(&mut self) -> Result<FunctionDecl, WitParseError> {
-        let start = self.lexer.current_position();
-        let docs = self.take_documentation();
+        let start = self.lexer.current_position);
+        let docs = self.take_documentation);
         
         let name = self.parse_identifier()?;
-        self.expect(Token::Colon)?;
+        self.expect(Token::Colon)?);
         let func = self.parse_function_signature()?;
         
-        let end = self.lexer.current_position();
+        let end = self.lexer.current_position);
         
         Ok(FunctionDecl {
             name,
             func,
             docs,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_function_signature(&mut self) -> Result<Function, WitParseError> {
-        let start = self.lexer.current_position();
+        let start = self.lexer.current_position);
         
         let is_async = if let Token::Identifier(s) = &self.current_token {
             if s == "async" {
@@ -1225,30 +1225,30 @@ impl EnhancedWitParser {
             false
         };
         
-        self.expect(Token::Func)?;
-        self.expect(Token::LeftParen)?;
+        self.expect(Token::Func)?);
+        self.expect(Token::LeftParen)?);
         
         let mut params = Vec::new();
         
         while !matches!(self.current_token, Token::RightParen) {
-            let param_start = self.lexer.current_position();
+            let param_start = self.lexer.current_position);
             let name = self.parse_identifier()?;
-            self.expect(Token::Colon)?;
+            self.expect(Token::Colon)?);
             let ty = self.parse_type_expr()?;
-            let param_end = self.lexer.current_position();
+            let param_end = self.lexer.current_position);
             
             params.push(Param {
                 name,
                 ty,
                 span: SourceSpan::new(param_start, param_end, self.lexer.file_id),
-            });
+            };
             
             if matches!(self.current_token, Token::Comma) {
                 self.advance()?;
             }
         }
         
-        self.expect(Token::RightParen)?;
+        self.expect(Token::RightParen)?);
         
         let results = if matches!(self.current_token, Token::Arrow) {
             self.advance()?;
@@ -1259,24 +1259,24 @@ impl EnhancedWitParser {
                 let mut named = Vec::new();
                 
                 while !matches!(self.current_token, Token::RightParen) {
-                    let result_start = self.lexer.current_position();
+                    let result_start = self.lexer.current_position);
                     let name = self.parse_identifier()?;
-                    self.expect(Token::Colon)?;
+                    self.expect(Token::Colon)?);
                     let ty = self.parse_type_expr()?;
-                    let result_end = self.lexer.current_position();
+                    let result_end = self.lexer.current_position);
                     
                     named.push(NamedResult {
                         name,
                         ty,
                         span: SourceSpan::new(result_start, result_end, self.lexer.file_id),
-                    });
+                    };
                     
                     if matches!(self.current_token, Token::Comma) {
                         self.advance()?;
                     }
                 }
                 
-                self.expect(Token::RightParen)?;
+                self.expect(Token::RightParen)?);
                 FunctionResults::Named(named)
             } else {
                 // Single result
@@ -1287,28 +1287,28 @@ impl EnhancedWitParser {
             FunctionResults::None
         };
         
-        let end = self.lexer.current_position();
+        let end = self.lexer.current_position);
         
         Ok(Function {
             params,
             results,
             is_async,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_world_decl(&mut self) -> Result<WorldDecl, WitParseError> {
-        let start = self.lexer.current_position();
-        let docs = self.take_documentation();
+        let start = self.lexer.current_position);
+        let docs = self.take_documentation);
         
-        self.expect(Token::World)?;
+        self.expect(Token::World)?);
         let name = self.parse_identifier()?;
-        self.expect(Token::LeftBrace)?;
+        self.expect(Token::LeftBrace)?);
         
         let mut items = Vec::new();
         
         while !matches!(self.current_token, Token::RightBrace) {
-            self.collect_documentation();
+            self.collect_documentation);
             
             match &self.current_token {
                 Token::Use => {
@@ -1342,56 +1342,56 @@ impl EnhancedWitParser {
                 _ => {
                     return Err(WitParseError::InvalidSyntax(
                         WitBoundedString::from_str("Expected world item", self.provider.clone()).unwrap()
-                    ));
+                    ;
                 }
             }
         }
         
-        self.expect(Token::RightBrace)?;
-        let end = self.lexer.current_position();
+        self.expect(Token::RightBrace)?);
+        let end = self.lexer.current_position);
         
         Ok(WorldDecl {
             name,
             items,
             docs,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_import_item(&mut self) -> Result<ImportItem, WitParseError> {
-        let start = self.lexer.current_position();
+        let start = self.lexer.current_position);
         
-        self.expect(Token::Import)?;
+        self.expect(Token::Import)?);
         let name = self.parse_identifier()?;
-        self.expect(Token::Colon)?;
+        self.expect(Token::Colon)?);
         
         let kind = self.parse_import_export_kind()?;
         
-        let end = self.lexer.current_position();
+        let end = self.lexer.current_position);
         
         Ok(ImportItem {
             name,
             kind,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_export_item(&mut self) -> Result<ExportItem, WitParseError> {
-        let start = self.lexer.current_position();
+        let start = self.lexer.current_position);
         
-        self.expect(Token::Export)?;
+        self.expect(Token::Export)?);
         let name = self.parse_identifier()?;
-        self.expect(Token::Colon)?;
+        self.expect(Token::Colon)?);
         
         let kind = self.parse_import_export_kind()?;
         
-        let end = self.lexer.current_position();
+        let end = self.lexer.current_position);
         
         Ok(ExportItem {
             name,
             kind,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
     
     fn parse_import_export_kind(&mut self) -> Result<ImportExportKind, WitParseError> {
@@ -1417,9 +1417,9 @@ impl EnhancedWitParser {
     }
     
     fn parse_include_item(&mut self) -> Result<IncludeItem, WitParseError> {
-        let start = self.lexer.current_position();
+        let start = self.lexer.current_position);
         
-        self.expect(Token::Include)?;
+        self.expect(Token::Include)?);
         
         // Parse world reference (like a named type)
         let world_name = self.parse_identifier()?;
@@ -1432,43 +1432,43 @@ impl EnhancedWitParser {
         
         let with = if matches!(self.current_token, Token::With) {
             self.advance()?;
-            self.expect(Token::LeftBrace)?;
+            self.expect(Token::LeftBrace)?);
             
             let mut items = Vec::new();
             
             while !matches!(self.current_token, Token::RightBrace) {
                 let from = self.parse_identifier()?;
-                self.expect(Token::As)?;
+                self.expect(Token::As)?);
                 let to = self.parse_identifier()?;
                 
                 items.push(IncludeRename {
                     from: from.clone(),
                     to: to.clone(),
                     span: SourceSpan::new(from.span.start, to.span.end, self.lexer.file_id),
-                });
+                };
                 
                 if matches!(self.current_token, Token::Comma) {
                     self.advance()?;
                 }
             }
             
-            self.expect(Token::RightBrace)?;
+            self.expect(Token::RightBrace)?);
             
             Some(IncludeWith {
                 items,
                 span: SourceSpan::new(start, self.lexer.current_position(), self.lexer.file_id),
-            });
+            };
         } else {
             None
         };
         
-        let end = self.lexer.current_position();
+        let end = self.lexer.current_position);
         
         Ok(IncludeItem {
             world,
             with,
             span: SourceSpan::new(start, end, self.lexer.file_id),
-        });
+        };
     }
 }
 
@@ -1529,7 +1529,7 @@ interface files {
     resource file {
         read: func(offset: u64, len: u64) -> result<list<u8>, error>;
         write: func(offset: u64, data: list<u8>) -> result<u64, error>;
-        close: func();
+        close: func);
     }
 }
 "#;

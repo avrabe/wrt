@@ -16,10 +16,13 @@
 //! on bounded collections and memory, supporting WCET analysis and fuel
 //! consumption calculations.
 
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{
+    AtomicU64,
+    Ordering,
+};
 
 use wrt_error::Error as WrtError; // Added for the Result return type
-// Use WrtOnce from wrt-sync crate
+use wrt_error::Result; // Use WrtOnce from wrt-sync crate
 use wrt_sync::once::WrtOnce;
 
 use crate::traits::importance; // Added this import
@@ -83,6 +86,48 @@ pub enum Type {
     CollectionWrite,
     /// Collection peek operation
     CollectionPeek,
+
+    // WebAssembly-specific operation types
+    /// Simple WebAssembly constants (i32.const, nop)
+    WasmSimpleConstant,
+    /// Local variable access (local.get, local.set, local.tee)
+    WasmLocalAccess,
+    /// Global variable access (global.get, global.set)
+    WasmGlobalAccess,
+    /// Simple arithmetic (i32.add, i32.sub, i32.and, i32.or)
+    WasmSimpleArithmetic,
+    /// Complex arithmetic (i32.mul, i32.div, i32.rem)
+    WasmComplexArithmetic,
+    /// Floating point arithmetic (f32.add, f64.mul)
+    WasmFloatArithmetic,
+    /// Comparison operations (i32.eq, i32.lt, f32.gt)
+    WasmComparison,
+    /// Simple control flow (br, br_if, return)
+    WasmSimpleControl,
+    /// Complex control flow (br_table, call_indirect)
+    WasmComplexControl,
+    /// Function calls (call)
+    WasmFunctionCall,
+    /// Memory load operations (i32.load, f32.load)
+    WasmMemoryLoad,
+    /// Memory store operations (i32.store, f32.store)
+    WasmMemoryStore,
+    /// Memory management (memory.grow, memory.size)
+    WasmMemoryManagement,
+    /// Table access operations (table.get, table.set)
+    WasmTableAccess,
+    /// Type conversion operations (i32.wrap_i64, f32.convert_i32_s)
+    WasmTypeConversion,
+    /// SIMD operations (v128.add, i32x4.splat)
+    WasmSimdOperation,
+    /// Atomic operations (i32.atomic.load, i32.atomic.rmw.add)
+    WasmAtomicOperation,
+    /// Stream operations (create, poll, yield, close)
+    StreamOperation,
+    /// Stream creation
+    StreamCreate,
+    /// Future operations (compose, chain, select)
+    FutureOperation,
 }
 
 impl Type {
@@ -116,6 +161,28 @@ impl Type {
             Type::CollectionRead => 3,
             Type::CollectionWrite => 7,
             Type::CollectionPeek => 3,
+
+            // WebAssembly instruction costs based on execution complexity
+            Type::WasmSimpleConstant => 1, // i32.const, nop - very fast
+            Type::WasmLocalAccess => 1,    // local.get/set - register access
+            Type::WasmGlobalAccess => 2,   // global.get/set - memory access
+            Type::WasmSimpleArithmetic => 1, // i32.add, i32.sub, bitwise ops
+            Type::WasmComplexArithmetic => 3, // i32.mul, i32.div - more cycles
+            Type::WasmFloatArithmetic => 4, // f32/f64 operations - FPU
+            Type::WasmComparison => 1,     // i32.eq, i32.lt - simple compare
+            Type::WasmSimpleControl => 2,  // br, br_if, return - branch
+            Type::WasmComplexControl => 8, // br_table, call_indirect - complex dispatch
+            Type::WasmFunctionCall => 10,  // call - function call overhead
+            Type::WasmMemoryLoad => 5,     // i32.load - memory access + decode
+            Type::WasmMemoryStore => 6,    // i32.store - memory write + encode
+            Type::WasmMemoryManagement => 50, // memory.grow - expensive allocation
+            Type::WasmTableAccess => 3,    // table.get/set - indirect access
+            Type::WasmTypeConversion => 2, // type casts and conversions
+            Type::WasmSimdOperation => 6,  // SIMD operations - parallel execution
+            Type::WasmAtomicOperation => 15, // atomic ops - synchronization overhead
+            Type::StreamOperation => 5,    // General stream operations
+            Type::StreamCreate => 10,      // Stream creation
+            Type::FutureOperation => 8,    // Future composition operations
         }
     }
 
@@ -148,6 +215,31 @@ impl Type {
             | Type::Other => importance::READ,
             Type::CollectionRead | Type::CollectionPeek => importance::READ,
             Type::CollectionWrite => importance::MUTATION,
+
+            // WebAssembly instruction importance levels
+            Type::WasmSimpleConstant
+            | Type::WasmLocalAccess
+            | Type::WasmSimpleArithmetic
+            | Type::WasmComparison
+            | Type::WasmSimpleControl => importance::READ,
+
+            Type::WasmGlobalAccess
+            | Type::WasmComplexArithmetic
+            | Type::WasmFloatArithmetic
+            | Type::WasmComplexControl
+            | Type::WasmFunctionCall
+            | Type::WasmMemoryLoad
+            | Type::WasmTableAccess
+            | Type::WasmTypeConversion
+            | Type::WasmSimdOperation => importance::MUTATION,
+
+            Type::WasmMemoryStore | Type::WasmMemoryManagement | Type::WasmAtomicOperation => {
+                importance::CRITICAL
+            },
+
+            Type::StreamOperation | Type::StreamCreate | Type::FutureOperation => {
+                importance::MUTATION
+            },
         }
     }
 
@@ -161,7 +253,7 @@ impl Type {
     pub fn fuel_cost_for_operation(
         op_type: Type,
         verification_level: VerificationLevel,
-    ) -> Result<u64, WrtError> {
+    ) -> wrt_error::Result<u64> {
         let base_cost = u64::from(op_type.cost());
 
         // Adjust cost based on verification level using scaled integer math
@@ -179,46 +271,46 @@ impl Type {
 #[derive(Debug)]
 pub struct Counter {
     /// Counter for memory read operations
-    memory_reads: AtomicU64,
+    memory_reads:          AtomicU64,
     /// Counter for memory write operations
-    memory_writes: AtomicU64,
+    memory_writes:         AtomicU64,
     /// Counter for memory grow operations
-    memory_grows: AtomicU64,
+    memory_grows:          AtomicU64,
     /// Binary std/no_std choice
-    memory_allocations: AtomicU64,
+    memory_allocations:    AtomicU64,
     /// Binary std/no_std choice
-    memory_deallocations: AtomicU64,
+    memory_deallocations:  AtomicU64,
     /// Counter for collection push operations
-    collection_pushes: AtomicU64,
+    collection_pushes:     AtomicU64,
     /// Counter for collection pop operations
-    collection_pops: AtomicU64,
+    collection_pops:       AtomicU64,
     /// Counter for collection lookup operations
-    collection_lookups: AtomicU64,
+    collection_lookups:    AtomicU64,
     /// Counter for collection insert operations
-    collection_inserts: AtomicU64,
+    collection_inserts:    AtomicU64,
     /// Counter for collection remove operations
-    collection_removes: AtomicU64,
+    collection_removes:    AtomicU64,
     /// Counter for collection validate operations
-    collection_validates: AtomicU64,
+    collection_validates:  AtomicU64,
     /// Counter for collection mutate operations
-    collection_mutates: AtomicU64,
+    collection_mutates:    AtomicU64,
     /// Counter for checksum calculations
     checksum_calculations: AtomicU64,
     /// Counter for function calls
-    function_calls: AtomicU64,
+    function_calls:        AtomicU64,
     /// Counter for control flow operations
-    control_flows: AtomicU64,
+    control_flows:         AtomicU64,
     /// Counter for arithmetic operations
-    arithmetic_ops: AtomicU64,
+    arithmetic_ops:        AtomicU64,
     /// Counter for other operations
-    other_ops: AtomicU64,
+    other_ops:             AtomicU64,
     /// New counters
-    collection_creates: AtomicU64,
-    collection_clears: AtomicU64,
-    collection_truncates: AtomicU64,
-    collection_iterates: AtomicU64,
+    collection_creates:    AtomicU64,
+    collection_clears:     AtomicU64,
+    collection_truncates:  AtomicU64,
+    collection_iterates:   AtomicU64,
     /// Total fuel consumed by operations
-    fuel_consumed: AtomicU64,
+    fuel_consumed:         AtomicU64,
 }
 
 // Manual implementation of Clone for Counter since AtomicU64 doesn't
@@ -226,30 +318,36 @@ pub struct Counter {
 impl Clone for Counter {
     fn clone(&self) -> Self {
         Self {
-            memory_reads: AtomicU64::new(self.memory_reads.load(Ordering::Relaxed)),
-            memory_writes: AtomicU64::new(self.memory_writes.load(Ordering::Relaxed)),
-            memory_grows: AtomicU64::new(self.memory_grows.load(Ordering::Relaxed)),
-            memory_allocations: AtomicU64::new(self.memory_allocations.load(Ordering::Relaxed)),
-            memory_deallocations: AtomicU64::new(self.memory_deallocations.load(Ordering::Relaxed)),
-            collection_pushes: AtomicU64::new(self.collection_pushes.load(Ordering::Relaxed)),
-            collection_pops: AtomicU64::new(self.collection_pops.load(Ordering::Relaxed)),
-            collection_lookups: AtomicU64::new(self.collection_lookups.load(Ordering::Relaxed)),
-            collection_inserts: AtomicU64::new(self.collection_inserts.load(Ordering::Relaxed)),
-            collection_removes: AtomicU64::new(self.collection_removes.load(Ordering::Relaxed)),
-            collection_validates: AtomicU64::new(self.collection_validates.load(Ordering::Relaxed)),
-            collection_mutates: AtomicU64::new(self.collection_mutates.load(Ordering::Relaxed)),
+            memory_reads:          AtomicU64::new(self.memory_reads.load(Ordering::Relaxed)),
+            memory_writes:         AtomicU64::new(self.memory_writes.load(Ordering::Relaxed)),
+            memory_grows:          AtomicU64::new(self.memory_grows.load(Ordering::Relaxed)),
+            memory_allocations:    AtomicU64::new(self.memory_allocations.load(Ordering::Relaxed)),
+            memory_deallocations:  AtomicU64::new(
+                self.memory_deallocations.load(Ordering::Relaxed),
+            ),
+            collection_pushes:     AtomicU64::new(self.collection_pushes.load(Ordering::Relaxed)),
+            collection_pops:       AtomicU64::new(self.collection_pops.load(Ordering::Relaxed)),
+            collection_lookups:    AtomicU64::new(self.collection_lookups.load(Ordering::Relaxed)),
+            collection_inserts:    AtomicU64::new(self.collection_inserts.load(Ordering::Relaxed)),
+            collection_removes:    AtomicU64::new(self.collection_removes.load(Ordering::Relaxed)),
+            collection_validates:  AtomicU64::new(
+                self.collection_validates.load(Ordering::Relaxed),
+            ),
+            collection_mutates:    AtomicU64::new(self.collection_mutates.load(Ordering::Relaxed)),
             checksum_calculations: AtomicU64::new(
                 self.checksum_calculations.load(Ordering::Relaxed),
             ),
-            function_calls: AtomicU64::new(self.function_calls.load(Ordering::Relaxed)),
-            control_flows: AtomicU64::new(self.control_flows.load(Ordering::Relaxed)),
-            arithmetic_ops: AtomicU64::new(self.arithmetic_ops.load(Ordering::Relaxed)),
-            other_ops: AtomicU64::new(self.other_ops.load(Ordering::Relaxed)),
-            collection_creates: AtomicU64::new(self.collection_creates.load(Ordering::Relaxed)),
-            collection_clears: AtomicU64::new(self.collection_clears.load(Ordering::Relaxed)),
-            collection_truncates: AtomicU64::new(self.collection_truncates.load(Ordering::Relaxed)),
-            collection_iterates: AtomicU64::new(self.collection_iterates.load(Ordering::Relaxed)),
-            fuel_consumed: AtomicU64::new(self.fuel_consumed.load(Ordering::Relaxed)),
+            function_calls:        AtomicU64::new(self.function_calls.load(Ordering::Relaxed)),
+            control_flows:         AtomicU64::new(self.control_flows.load(Ordering::Relaxed)),
+            arithmetic_ops:        AtomicU64::new(self.arithmetic_ops.load(Ordering::Relaxed)),
+            other_ops:             AtomicU64::new(self.other_ops.load(Ordering::Relaxed)),
+            collection_creates:    AtomicU64::new(self.collection_creates.load(Ordering::Relaxed)),
+            collection_clears:     AtomicU64::new(self.collection_clears.load(Ordering::Relaxed)),
+            collection_truncates:  AtomicU64::new(
+                self.collection_truncates.load(Ordering::Relaxed),
+            ),
+            collection_iterates:   AtomicU64::new(self.collection_iterates.load(Ordering::Relaxed)),
+            fuel_consumed:         AtomicU64::new(self.fuel_consumed.load(Ordering::Relaxed)),
         }
     }
 }
@@ -265,28 +363,28 @@ impl Counter {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            memory_reads: AtomicU64::new(0),
-            memory_writes: AtomicU64::new(0),
-            memory_grows: AtomicU64::new(0),
-            memory_allocations: AtomicU64::new(0),
-            memory_deallocations: AtomicU64::new(0),
-            collection_pushes: AtomicU64::new(0),
-            collection_pops: AtomicU64::new(0),
-            collection_lookups: AtomicU64::new(0),
-            collection_inserts: AtomicU64::new(0),
-            collection_removes: AtomicU64::new(0),
-            collection_validates: AtomicU64::new(0),
-            collection_mutates: AtomicU64::new(0),
+            memory_reads:          AtomicU64::new(0),
+            memory_writes:         AtomicU64::new(0),
+            memory_grows:          AtomicU64::new(0),
+            memory_allocations:    AtomicU64::new(0),
+            memory_deallocations:  AtomicU64::new(0),
+            collection_pushes:     AtomicU64::new(0),
+            collection_pops:       AtomicU64::new(0),
+            collection_lookups:    AtomicU64::new(0),
+            collection_inserts:    AtomicU64::new(0),
+            collection_removes:    AtomicU64::new(0),
+            collection_validates:  AtomicU64::new(0),
+            collection_mutates:    AtomicU64::new(0),
             checksum_calculations: AtomicU64::new(0),
-            function_calls: AtomicU64::new(0),
-            control_flows: AtomicU64::new(0),
-            arithmetic_ops: AtomicU64::new(0),
-            other_ops: AtomicU64::new(0),
-            collection_creates: AtomicU64::new(0),
-            collection_clears: AtomicU64::new(0),
-            collection_truncates: AtomicU64::new(0),
-            collection_iterates: AtomicU64::new(0),
-            fuel_consumed: AtomicU64::new(0),
+            function_calls:        AtomicU64::new(0),
+            control_flows:         AtomicU64::new(0),
+            arithmetic_ops:        AtomicU64::new(0),
+            other_ops:             AtomicU64::new(0),
+            collection_creates:    AtomicU64::new(0),
+            collection_clears:     AtomicU64::new(0),
+            collection_truncates:  AtomicU64::new(0),
+            collection_iterates:   AtomicU64::new(0),
+            fuel_consumed:         AtomicU64::new(0),
         }
     }
 
@@ -300,73 +398,131 @@ impl Counter {
         match op_type {
             Type::MemoryAllocation => {
                 self.memory_allocations.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::MemoryDeallocation => {
                 self.memory_deallocations.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::MemoryRead => {
                 self.memory_reads.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::MemoryWrite => {
                 self.memory_writes.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::MemoryCopy => {
                 self.memory_writes.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::MemoryGrow => {
                 self.memory_grows.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::CollectionPush => {
                 self.collection_pushes.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::CollectionPop => {
                 self.collection_pops.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             // Merged CollectionLookup, CollectionRead, CollectionPeek
             Type::CollectionLookup | Type::CollectionRead | Type::CollectionPeek => {
                 self.collection_lookups.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             // Merged CollectionInsert, CollectionWrite
             Type::CollectionInsert | Type::CollectionWrite => {
                 self.collection_inserts.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::CollectionRemove => {
                 self.collection_removes.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::CollectionValidate => {
                 self.collection_validates.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::CollectionMutate => {
                 self.collection_mutates.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             // Merged ChecksumCalculation, ChecksumFullRecalculation
             Type::ChecksumCalculation | Type::ChecksumFullRecalculation => {
                 self.checksum_calculations.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::FunctionCall => {
                 self.function_calls.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::ControlFlow => {
                 self.control_flows.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::Arithmetic => {
                 self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::Other => {
                 self.other_ops.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::CollectionCreate => {
                 self.collection_creates.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::CollectionClear => {
                 self.collection_clears.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::CollectionTruncate => {
                 self.collection_truncates.fetch_add(1, Ordering::Relaxed);
-            }
+            },
             Type::CollectionIterate => {
                 self.collection_iterates.fetch_add(1, Ordering::Relaxed);
-            }
+            },
+            // WASM-specific operations
+            Type::WasmSimpleConstant => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmLocalAccess => {
+                self.memory_reads.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmGlobalAccess => {
+                self.memory_reads.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmSimpleArithmetic => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmComplexArithmetic => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmFloatArithmetic => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmComparison => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmSimpleControl => {
+                self.control_flows.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmComplexControl => {
+                self.control_flows.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmFunctionCall => {
+                self.function_calls.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmMemoryLoad => {
+                self.memory_reads.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmMemoryStore => {
+                self.memory_writes.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmMemoryManagement => {
+                self.memory_grows.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmTableAccess => {
+                self.memory_reads.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmTypeConversion => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmSimdOperation => {
+                self.arithmetic_ops.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::WasmAtomicOperation => {
+                self.memory_writes.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::StreamOperation | Type::StreamCreate => {
+                self.other_ops.fetch_add(1, Ordering::Relaxed);
+            },
+            Type::FutureOperation => {
+                self.other_ops.fetch_add(1, Ordering::Relaxed);
+            },
         };
 
         // Calculate and add fuel cost
@@ -375,13 +531,13 @@ impl Counter {
         match Type::fuel_cost_for_operation(op_type, verification_level) {
             Ok(cost) => {
                 self.fuel_consumed.fetch_add(cost, Ordering::Relaxed);
-            }
+            },
             Err(_e) => {
                 // Log error if fuel calculation fails (should not happen
                 // currently)
                 // Consider using a proper logging facade if available
                 // eprintln!("Error calculating fuel cost: {}", e);
-            }
+            },
         }
     }
 
@@ -421,28 +577,28 @@ impl Counter {
     #[must_use]
     pub fn get_summary(&self) -> Summary {
         Summary {
-            memory_reads: self.memory_reads.load(Ordering::Relaxed),
-            memory_writes: self.memory_writes.load(Ordering::Relaxed),
-            memory_grows: self.memory_grows.load(Ordering::Relaxed),
-            memory_allocations: self.memory_allocations.load(Ordering::Relaxed),
-            memory_deallocations: self.memory_deallocations.load(Ordering::Relaxed),
-            collection_pushes: self.collection_pushes.load(Ordering::Relaxed),
-            collection_pops: self.collection_pops.load(Ordering::Relaxed),
-            collection_lookups: self.collection_lookups.load(Ordering::Relaxed),
-            collection_inserts: self.collection_inserts.load(Ordering::Relaxed),
-            collection_removes: self.collection_removes.load(Ordering::Relaxed),
-            collection_validates: self.collection_validates.load(Ordering::Relaxed),
-            collection_mutates: self.collection_mutates.load(Ordering::Relaxed),
+            memory_reads:          self.memory_reads.load(Ordering::Relaxed),
+            memory_writes:         self.memory_writes.load(Ordering::Relaxed),
+            memory_grows:          self.memory_grows.load(Ordering::Relaxed),
+            memory_allocations:    self.memory_allocations.load(Ordering::Relaxed),
+            memory_deallocations:  self.memory_deallocations.load(Ordering::Relaxed),
+            collection_pushes:     self.collection_pushes.load(Ordering::Relaxed),
+            collection_pops:       self.collection_pops.load(Ordering::Relaxed),
+            collection_lookups:    self.collection_lookups.load(Ordering::Relaxed),
+            collection_inserts:    self.collection_inserts.load(Ordering::Relaxed),
+            collection_removes:    self.collection_removes.load(Ordering::Relaxed),
+            collection_validates:  self.collection_validates.load(Ordering::Relaxed),
+            collection_mutates:    self.collection_mutates.load(Ordering::Relaxed),
             checksum_calculations: self.checksum_calculations.load(Ordering::Relaxed),
-            function_calls: self.function_calls.load(Ordering::Relaxed),
-            control_flows: self.control_flows.load(Ordering::Relaxed),
-            arithmetic_ops: self.arithmetic_ops.load(Ordering::Relaxed),
-            other_ops: self.other_ops.load(Ordering::Relaxed),
-            collection_creates: self.collection_creates.load(Ordering::Relaxed),
-            collection_clears: self.collection_clears.load(Ordering::Relaxed),
-            collection_truncates: self.collection_truncates.load(Ordering::Relaxed),
-            collection_iterates: self.collection_iterates.load(Ordering::Relaxed),
-            fuel_consumed: self.fuel_consumed.load(Ordering::Relaxed),
+            function_calls:        self.function_calls.load(Ordering::Relaxed),
+            control_flows:         self.control_flows.load(Ordering::Relaxed),
+            arithmetic_ops:        self.arithmetic_ops.load(Ordering::Relaxed),
+            other_ops:             self.other_ops.load(Ordering::Relaxed),
+            collection_creates:    self.collection_creates.load(Ordering::Relaxed),
+            collection_clears:     self.collection_clears.load(Ordering::Relaxed),
+            collection_truncates:  self.collection_truncates.load(Ordering::Relaxed),
+            collection_iterates:   self.collection_iterates.load(Ordering::Relaxed),
+            fuel_consumed:         self.fuel_consumed.load(Ordering::Relaxed),
         }
     }
 }
@@ -451,49 +607,49 @@ impl Counter {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Summary {
     /// Number of memory read operations
-    pub memory_reads: u64,
+    pub memory_reads:          u64,
     /// Number of memory write operations
-    pub memory_writes: u64,
+    pub memory_writes:         u64,
     /// Number of memory grow operations
-    pub memory_grows: u64,
+    pub memory_grows:          u64,
     /// Binary std/no_std choice
-    pub memory_allocations: u64,
+    pub memory_allocations:    u64,
     /// Binary std/no_std choice
-    pub memory_deallocations: u64,
+    pub memory_deallocations:  u64,
     /// Number of collection push operations
-    pub collection_pushes: u64,
+    pub collection_pushes:     u64,
     /// Number of collection pop operations
-    pub collection_pops: u64,
+    pub collection_pops:       u64,
     /// Number of collection lookup operations
-    pub collection_lookups: u64,
+    pub collection_lookups:    u64,
     /// Number of collection insert operations
-    pub collection_inserts: u64,
+    pub collection_inserts:    u64,
     /// Number of collection remove operations
-    pub collection_removes: u64,
+    pub collection_removes:    u64,
     /// Number of collection validate operations
-    pub collection_validates: u64,
+    pub collection_validates:  u64,
     /// Number of collection mutate operations
-    pub collection_mutates: u64,
+    pub collection_mutates:    u64,
     /// Number of checksum calculations
     pub checksum_calculations: u64,
     /// Number of function calls
-    pub function_calls: u64,
+    pub function_calls:        u64,
     /// Number of control flow operations
-    pub control_flows: u64,
+    pub control_flows:         u64,
     /// Number of arithmetic operations
-    pub arithmetic_ops: u64,
+    pub arithmetic_ops:        u64,
     /// Number of other operations
-    pub other_ops: u64,
+    pub other_ops:             u64,
     /// Number of collection create operations
-    pub collection_creates: u64,
+    pub collection_creates:    u64,
     /// Number of collection clear operations
-    pub collection_clears: u64,
+    pub collection_clears:     u64,
     /// Number of collection truncate operations
-    pub collection_truncates: u64,
+    pub collection_truncates:  u64,
     /// Number of collection iterate operations
-    pub collection_iterates: u64,
+    pub collection_iterates:   u64,
     /// Total fuel consumed by operations
-    pub fuel_consumed: u64,
+    pub fuel_consumed:         u64,
 }
 
 /// Trait for objects that can track operations
@@ -514,21 +670,48 @@ fn global_counter() -> &'static Counter {
 }
 
 /// Record an operation using the global counter.
+///
+/// This function records an operation type with a verification level using the
+/// global operation counter. It's useful for tracking operations when a local
+/// counter isn't available or when global statistics are needed.
+///
+/// # Arguments
+///
+/// * `op_type` - The type of operation being performed
+/// * `level` - The verification level for cost calculation
 pub fn record_global_operation(op_type: Type, level: VerificationLevel) {
     global_counter().record_operation(op_type, level);
 }
 
 /// Get a summary from the global operation counter.
+///
+/// Returns a snapshot of all operation counts and fuel consumption
+/// from the global counter. This provides aggregate statistics
+/// across all operations recorded globally.
+///
+/// # Returns
+///
+/// A `Summary` containing operation counts and total fuel consumed
 pub fn global_operation_summary() -> Summary {
     global_counter().get_summary()
 }
 
 /// Reset the global operation counter.
+///
+/// Clears all operation counts and fuel consumption in the global counter.
+/// This is useful for benchmarking or when starting a new measurement period.
 pub fn reset_global_operations() {
     global_counter().reset();
 }
 
 /// Get the global fuel consumed count.
+///
+/// Returns the total fuel consumed across all operations recorded
+/// in the global counter. This is useful for fuel-based execution limits.
+///
+/// # Returns
+///
+/// Total fuel consumed as a u64 value
 pub fn global_fuel_consumed() -> u64 {
     global_counter().get_fuel_consumed()
 }

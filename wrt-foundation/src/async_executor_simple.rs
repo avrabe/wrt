@@ -1,10 +1,16 @@
 //! Simple async executor support for no_std environments
 //!
-//! This is a simplified version that avoids unsafe code and complex initialization.
+//! This is a simplified version that avoids unsafe code and complex
+//! initialization.
 
-use core::future::Future;
-use core::pin::Pin;
-use core::task::{Context, Poll};
+use core::{
+    future::Future,
+    pin::Pin,
+    task::{
+        Context,
+        Poll,
+    },
+};
 
 /// Simple executor error type
 #[derive(Debug, Clone, PartialEq)]
@@ -31,17 +37,20 @@ impl AsyncRuntime {
     pub fn new() -> Self {
         Self
     }
-    
+
     /// Block on a future until completion (simplified version)
-    pub fn block_on<F: Future + core::marker::Unpin>(&self, mut future: F) -> Result<F::Output, ExecutorError> {
+    pub fn block_on<F: Future + core::marker::Unpin>(
+        &self,
+        mut future: F,
+    ) -> Result<F::Output, ExecutorError> {
         // For the simple version, we just poll once
         // This is not a real async executor, but enough for basic usage
         let waker = create_noop_waker();
         let mut cx = Context::from_waker(&waker);
-        
+
         // Pin the future safely
         let future = Pin::new(&mut future);
-        
+
         // Poll the future
         match future.poll(&mut cx) {
             Poll::Ready(output) => Ok(output),
@@ -66,31 +75,37 @@ pub fn is_using_fallback() -> bool {
 
 /// Create a no-op waker for simple polling
 fn create_noop_waker() -> core::task::Waker {
-    use core::task::{RawWaker, RawWakerVTable, Waker};
-    
+    use core::task::{
+        RawWaker,
+        RawWakerVTable,
+        Waker,
+    };
+
     const VTABLE: RawWakerVTable = RawWakerVTable::new(
         |_| RawWaker::new(core::ptr::null(), &VTABLE), // clone
-        |_| {},                                         // wake
-        |_| {},                                         // wake_by_ref
-        |_| {},                                         // drop
+        |_| {},                                        // wake
+        |_| {},                                        // wake_by_ref
+        |_| {},                                        // drop
     );
-    
+
     let raw_waker = RawWaker::new(core::ptr::null(), &VTABLE);
     // SAFETY: The vtable functions are valid no-ops and meet the requirements
     #[allow(unsafe_code)]
-    unsafe { Waker::from_raw(raw_waker) }
+    unsafe {
+        Waker::from_raw(raw_waker)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_simple_async() {
         async fn test_future() -> u32 {
             42
         }
-        
+
         let result = with_async(test_future()).unwrap();
         assert_eq!(result, 42);
     }

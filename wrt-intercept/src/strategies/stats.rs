@@ -5,35 +5,204 @@
 //!
 //! Note: This strategy requires the `std` feature.
 
-#[cfg(feature = "std")]
-use std::time::Instant;
 #[cfg(all(feature = "std", test))]
 use std::time::Duration;
+#[cfg(feature = "std")]
+use std::{
+    sync::{
+        Arc,
+        Mutex,
+        RwLock,
+    },
+    time::Instant,
+};
 
 #[cfg(feature = "std")]
-use crate::prelude::{Debug, str, Value, HashMap};
-#[cfg(feature = "std")]
-use wrt_error::{Error, ErrorCategory, Result, codes};
-use crate::LinkInterceptorStrategy;
+use wrt_error::Result;
 
-/// Statistics collected for a function
 #[cfg(feature = "std")]
-#[derive(Debug, Clone, Default)]
+use crate::{
+    prelude::{
+        str,
+        Debug,
+        HashMap,
+        Value,
+    },
+    LinkInterceptorStrategy,
+};
+
+/// Statistics collected for a function (no_std version - simplified)
+#[cfg(not(feature = "std"))]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FunctionStats {
     /// Number of times the function was called
-    pub call_count: u64,
+    pub call_count:    u64,
     /// Number of successful calls
     pub success_count: u64,
     /// Number of failed calls
-    pub error_count: u64,
+    pub error_count:   u64,
+}
+
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::Checksummable for FunctionStats {
+    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
+        for byte in self.call_count.to_le_bytes() {
+            checksum.update(byte);
+        }
+        for byte in self.success_count.to_le_bytes() {
+            checksum.update(byte);
+        }
+        for byte in self.error_count.to_le_bytes() {
+            checksum.update(byte);
+        }
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::ToBytes for FunctionStats {
+    fn serialized_size(&self) -> usize {
+        24 // 3 * u64 = 24 bytes
+    }
+
+    fn to_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
+        &self,
+        writer: &mut wrt_foundation::traits::WriteStream<'a>,
+        _provider: &PStream,
+    ) -> wrt_error::Result<()> {
+        writer.write_u64_le(self.call_count)?;
+        writer.write_u64_le(self.success_count)?;
+        writer.write_u64_le(self.error_count)?;
+        Ok(())
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::FromBytes for FunctionStats {
+    fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
+        reader: &mut wrt_foundation::traits::ReadStream<'a>,
+        _provider: &PStream,
+    ) -> wrt_error::Result<Self> {
+        let call_count = reader.read_u64_le()?;
+        let success_count = reader.read_u64_le()?;
+        let error_count = reader.read_u64_le()?;
+
+        Ok(Self {
+            call_count,
+            success_count,
+            error_count,
+        })
+    }
+}
+
+/// Statistics collected for a function
+#[cfg(feature = "std")]
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct FunctionStats {
+    /// Number of times the function was called
+    pub call_count:    u64,
+    /// Number of successful calls
+    pub success_count: u64,
+    /// Number of failed calls
+    pub error_count:   u64,
     /// Total execution time in milliseconds
     pub total_time_ms: f64,
     /// Minimum execution time in milliseconds
-    pub min_time_ms: Option<f64>,
+    pub min_time_ms:   Option<f64>,
     /// Maximum execution time in milliseconds
-    pub max_time_ms: Option<f64>,
+    pub max_time_ms:   Option<f64>,
     /// Average execution time in milliseconds
-    pub avg_time_ms: f64,
+    pub avg_time_ms:   f64,
+}
+
+#[cfg(feature = "std")]
+impl Eq for FunctionStats {}
+
+#[cfg(feature = "std")]
+impl wrt_foundation::traits::Checksummable for FunctionStats {
+    fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
+        for byte in self.call_count.to_le_bytes() {
+            checksum.update(byte);
+        }
+        for byte in self.success_count.to_le_bytes() {
+            checksum.update(byte);
+        }
+        for byte in self.error_count.to_le_bytes() {
+            checksum.update(byte);
+        }
+        for byte in self.total_time_ms.to_le_bytes() {
+            checksum.update(byte);
+        }
+        if let Some(min) = self.min_time_ms {
+            for byte in min.to_le_bytes() {
+                checksum.update(byte);
+            }
+        }
+        if let Some(max) = self.max_time_ms {
+            for byte in max.to_le_bytes() {
+                checksum.update(byte);
+            }
+        }
+        for byte in self.avg_time_ms.to_le_bytes() {
+            checksum.update(byte);
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl wrt_foundation::traits::ToBytes for FunctionStats {
+    fn serialized_size(&self) -> usize {
+        // 5 * u64 + 2 * Option<f64> + f64 = approximately 56 bytes max
+        56
+    }
+
+    fn to_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
+        &self,
+        writer: &mut wrt_foundation::traits::WriteStream<'a>,
+        _provider: &PStream,
+    ) -> wrt_error::Result<()> {
+        writer.write_u64_le(self.call_count)?;
+        writer.write_u64_le(self.success_count)?;
+        writer.write_u64_le(self.error_count)?;
+        writer.write_f64_le(self.total_time_ms)?;
+        writer.write_u8(if self.min_time_ms.is_some() { 1 } else { 0 })?;
+        if let Some(min) = self.min_time_ms {
+            writer.write_f64_le(min)?;
+        }
+        writer.write_u8(if self.max_time_ms.is_some() { 1 } else { 0 })?;
+        if let Some(max) = self.max_time_ms {
+            writer.write_f64_le(max)?;
+        }
+        writer.write_f64_le(self.avg_time_ms)?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "std")]
+impl wrt_foundation::traits::FromBytes for FunctionStats {
+    fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
+        reader: &mut wrt_foundation::traits::ReadStream<'a>,
+        _provider: &PStream,
+    ) -> wrt_error::Result<Self> {
+        let call_count = reader.read_u64_le()?;
+        let success_count = reader.read_u64_le()?;
+        let error_count = reader.read_u64_le()?;
+        let total_time_ms = reader.read_f64_le()?;
+        let has_min = reader.read_u8()? != 0;
+        let min_time_ms = if has_min { Some(reader.read_f64_le()?) } else { None };
+        let has_max = reader.read_u8()? != 0;
+        let max_time_ms = if has_max { Some(reader.read_f64_le()?) } else { None };
+        let avg_time_ms = reader.read_f64_le()?;
+
+        Ok(Self {
+            call_count,
+            success_count,
+            error_count,
+            total_time_ms,
+            min_time_ms,
+            max_time_ms,
+            avg_time_ms,
+        })
+    }
 }
 
 /// Configuration for the statistics strategy
@@ -41,9 +210,9 @@ pub struct FunctionStats {
 #[derive(Debug, Clone)]
 pub struct StatisticsConfig {
     /// Whether to track timings
-    pub track_timing: bool,
+    pub track_timing:  bool,
     /// Whether to track errors
-    pub track_errors: bool,
+    pub track_errors:  bool,
     /// Maximum number of functions to track (0 for unlimited)
     pub max_functions: usize,
 }
@@ -51,7 +220,11 @@ pub struct StatisticsConfig {
 #[cfg(feature = "std")]
 impl Default for StatisticsConfig {
     fn default() -> Self {
-        Self { track_timing: true, track_errors: true, max_functions: 1000 }
+        Self {
+            track_timing:  true,
+            track_errors:  true,
+            max_functions: 1000,
+        }
     }
 }
 
@@ -59,9 +232,9 @@ impl Default for StatisticsConfig {
 #[cfg(feature = "std")]
 pub struct StatisticsStrategy {
     /// Configuration for this strategy
-    config: StatisticsConfig,
+    config:    StatisticsConfig,
     /// Statistics for each function
-    stats: std::sync::RwLock<HashMap<String, FunctionStats>>,
+    stats:     RwLock<HashMap<String, FunctionStats>>,
     /// Cache of currently executing functions with their start times
     executing: std::sync::Mutex<HashMap<String, std::time::Instant>>,
 }
@@ -78,8 +251,8 @@ impl StatisticsStrategy {
     /// Create a new statistics strategy with default configuration
     pub fn new() -> Self {
         Self {
-            config: StatisticsConfig::default(),
-            stats: std::sync::RwLock::new(HashMap::new()),
+            config:    StatisticsConfig::default(),
+            stats:     RwLock::new(HashMap::new()),
             executing: std::sync::Mutex::new(HashMap::new()),
         }
     }
@@ -88,7 +261,7 @@ impl StatisticsStrategy {
     pub fn with_config(config: StatisticsConfig) -> Self {
         Self {
             config,
-            stats: std::sync::RwLock::new(HashMap::new()),
+            stats: RwLock::new(HashMap::new()),
             executing: std::sync::Mutex::new(HashMap::new()),
         }
     }
@@ -165,7 +338,7 @@ impl LinkInterceptorStrategy for StatisticsStrategy {
             match self.executing.lock() {
                 Ok(mut executing) => {
                     executing.remove(&key).map(|start| start.elapsed().as_secs_f64() * 1000.0)
-                }
+                },
                 _ => None,
             }
         } else {
@@ -223,8 +396,8 @@ impl LinkInterceptorStrategy for StatisticsStrategy {
 
     fn clone_strategy(&self) -> Arc<dyn LinkInterceptorStrategy> {
         Arc::new(Self {
-            config: self.config.clone(),
-            stats: RwLock::new(HashMap::new()),
+            config:    self.config.clone(),
+            stats:     RwLock::new(HashMap::new()),
             executing: Mutex::new(HashMap::new()),
         })
     }
@@ -255,11 +428,7 @@ mod tests {
         // Second call (error)
         strategy.before_call(source, target, function, &args).unwrap();
         thread::sleep(Duration::from_millis(5)); // Simulate some work
-        let result = Err(wrt_error::Error::new(
-            wrt_error::ErrorCategory::Runtime,
-            wrt_error::codes::RUNTIME_ERROR,
-            "Test error",
-        ));
+        let result = Err(wrt_error::Error::runtime_error("Test error"));
         let _ = strategy.after_call(source, target, function, &args, result);
 
         // Check statistics
@@ -279,8 +448,11 @@ mod tests {
 
     #[test]
     fn test_statistics_config() {
-        let config =
-            StatisticsConfig { track_timing: false, track_errors: true, max_functions: 10 };
+        let config = StatisticsConfig {
+            track_timing:  false,
+            track_errors:  true,
+            max_functions: 10,
+        };
         let strategy = StatisticsStrategy::with_config(config);
 
         let source = "source";

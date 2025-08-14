@@ -35,6 +35,7 @@ extern crate alloc;
 pub mod float_bits;
 pub mod ops;
 pub mod prelude;
+pub mod safety;
 pub mod traits;
 
 // SIMD operations module (requires platform feature)
@@ -42,21 +43,31 @@ pub mod traits;
 pub mod simd;
 
 // Re-export key types and potentially functions for easier access
-pub use float_bits::{FloatBits32, FloatBits64};
+pub use float_bits::{
+    FloatBits32,
+    FloatBits64,
+};
 // Re-export all operations from the ops module
 pub use ops::*; // Consider selectively exporting if API needs to be controlled
+// Re-export safety operations
+pub use safety::{
+    check_simd_bounds,
+    RoundingMode,
+    SafeArithmetic,
+    SafeFloat,
+    SafeRounding,
+};
+// Re-export SIMD operations when platform feature is enabled
+#[cfg(feature = "platform")]
+pub use simd::SimdOperations;
 // Re-export error type from wrt-error for convenience
 pub use wrt_error::Error as WrtMathError; // Alias specific to this crate context
 pub use wrt_error::Result as WrtMathResult; // Alias specific to this crate context
 
-// Re-export SIMD operations when platform feature is enabled
-#[cfg(feature = "platform")]
-pub use simd::SimdOperations;
-
 // Panic handler disabled to avoid conflicts with other crates
 // // Provide a panic handler only when wrt-math is being tested in isolation
-// #[cfg(all(not(feature = "std"), not(test), not(feature = "disable-panic-handler")))]
-// #[panic_handler]
+// #[cfg(all(not(feature = "std"), not(test), not(feature =
+// "disable-panic-handler")))] #[panic_handler]
 // fn panic(_info: &core::panic::PanicInfo) -> ! {
 //     loop {}
 // }

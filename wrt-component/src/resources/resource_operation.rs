@@ -1,6 +1,5 @@
 // Re-export ResourceOperation for convenience
 pub use wrt_foundation::resource::ResourceOperation;
-use wrt_foundation::ResourceOperation;
 
 use crate::prelude::*;
 
@@ -8,37 +7,35 @@ use crate::prelude::*;
 pub fn to_format_resource_operation(
     op: ResourceOperation,
     type_idx: u32,
-) -> wrt_format::component::ResourceOperation {
-    use wrt_format::component::ResourceOperation as FormatOp;
-    use wrt_foundation::resource::{ResourceDrop, ResourceNew, ResourceRep};
+) -> wrt_format::component::FormatResourceOperation {
+    use wrt_format::component::FormatResourceOperation as FormatOp;
+    use wrt_foundation::resource::{
+        ResourceDrop,
+        ResourceNew,
+        ResourceRep,
+    };
 
     match op {
         ResourceOperation::Read => FormatOp::Rep(ResourceRep { type_idx }),
-        ResourceOperation::Write => FormatOp::Transfer,
-        ResourceOperation::Execute => FormatOp::Execute,
+        ResourceOperation::Write => FormatOp::Rep(ResourceRep { type_idx }), // Map to Rep
+        ResourceOperation::Execute => FormatOp::Rep(ResourceRep { type_idx }), // Map to Rep
         ResourceOperation::Create => FormatOp::New(ResourceNew { type_idx }),
         ResourceOperation::Delete => FormatOp::Drop(ResourceDrop { type_idx }),
-        ResourceOperation::Reference => FormatOp::Borrow,
-        ResourceOperation::Dereference => FormatOp::Dereference,
+        ResourceOperation::Reference => FormatOp::Rep(ResourceRep { type_idx }), // Map to Rep
+        ResourceOperation::Dereference => FormatOp::Rep(ResourceRep { type_idx }), // Map to Rep
     }
 }
 
 /// Convert from format ResourceOperation to local ResourceOperation
 pub fn from_format_resource_operation(
-    op: &wrt_format::component::ResourceOperation,
+    op: &wrt_format::component::FormatResourceOperation,
 ) -> ResourceOperation {
-    use wrt_format::component::ResourceOperation as FormatOp;
+    use wrt_format::component::FormatResourceOperation as FormatOp;
 
     match op {
         FormatOp::Rep(_) => ResourceOperation::Read,
-        FormatOp::Transfer => ResourceOperation::Write,
-        FormatOp::Execute => ResourceOperation::Execute,
         FormatOp::New(_) => ResourceOperation::Create,
         FormatOp::Drop(_) => ResourceOperation::Delete,
-        FormatOp::Destroy(_) => ResourceOperation::Delete,
-        FormatOp::Borrow => ResourceOperation::Reference,
-        FormatOp::Dereference => ResourceOperation::Dereference,
-        _ => ResourceOperation::Read, // Default to read for unknown operations
     }
 }
 
@@ -93,8 +90,12 @@ mod safe_memory {
 
 #[cfg(test)]
 mod tests {
-    use wrt_format::component::ResourceOperation as FormatOp;
-    use wrt_foundation::resource::{ResourceDrop, ResourceNew, ResourceRep};
+    use wrt_format::component::FormatResourceOperation as FormatOp;
+    use wrt_foundation::resource::{
+        ResourceDrop,
+        ResourceNew,
+        ResourceRep,
+    };
 
     use super::*;
 

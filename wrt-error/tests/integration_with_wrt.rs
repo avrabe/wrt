@@ -19,7 +19,10 @@ extern crate alloc;
     clippy::uninlined_format_args
 )]
 mod tests {
-    use wrt_error::{Error, Result};
+    use wrt_error::{
+        Error,
+        Result,
+    };
 
     // Binary std/no_std choice
     // Binary std/no_std choice
@@ -36,12 +39,15 @@ mod tests {
         // Binary std/no_std choice
         // Binary std/no_std choice
         // #[cfg(feature = "std")]
-        // let _ = std::format!("{}", error_result.as_ref().err().unwrap());
+        // let _ = std::format!("{}", error_result.as_ref().err().unwrap();
     }
 
-    #[cfg(all(feature = "std"))]
+    #[cfg(feature = "std")]
     mod std_alloc_tests {
-        use wrt_error::{kinds, Error};
+        use wrt_error::{
+            kinds,
+            Error,
+        };
         // Re-import necessary items if not directly available or for clarity
         // use crate::Error; // Assuming Error is pub from lib.rs
 
@@ -53,7 +59,10 @@ mod tests {
             let error = Error::memory_error("Test memory access out of bounds: addr 100, len 32");
             assert!(error.is_memory_error());
             // Optionally, assert the message if it needs to be specific and static
-            assert_eq!(error.message, "Test memory access out of bounds: addr 100, len 32");
+            assert_eq!(
+                error.message,
+                "Test memory access out of bounds: addr 100, len 32"
+            );
         }
 
         #[test]

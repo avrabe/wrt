@@ -4,8 +4,13 @@
 //! including ARM BTI, RISC-V CFI, and x86 CET support.
 
 use wrt_platform::{
-    BranchTargetIdentification, BtiExceptionLevel, BtiMode, CfiExceptionMode, ControlFlowIntegrity,
-    HardwareOptimization, SecurityLevel,
+    BranchTargetIdentification,
+    BtiExceptionLevel,
+    BtiMode,
+    CfiExceptionMode,
+    ControlFlowIntegrity,
+    HardwareOptimization,
+    SecurityLevel,
 };
 
 #[test]
@@ -15,7 +20,10 @@ fn test_arm_bti_availability() {
 
     // On non-ARM64 platforms, BTI should not be available
     #[cfg(not(target_arch = "aarch64"))]
-    assert!(!bti_available, "BTI should not be available on non-ARM64 platforms");
+    assert!(
+        !bti_available,
+        "BTI should not be available on non-ARM64 platforms"
+    );
 
     // On ARM64 platforms, BTI may or may not be available depending on hardware
     #[cfg(target_arch = "aarch64")]
@@ -28,7 +36,12 @@ fn test_arm_bti_availability() {
 #[test]
 fn test_arm_bti_modes() {
     // Test all BTI modes are properly defined
-    let modes = [BtiMode::Standard, BtiMode::CallOnly, BtiMode::JumpOnly, BtiMode::CallAndJump];
+    let modes = [
+        BtiMode::Standard,
+        BtiMode::CallOnly,
+        BtiMode::JumpOnly,
+        BtiMode::CallAndJump,
+    ];
 
     for mode in modes {
         println!("Testing BTI mode: {:?}", mode);
@@ -64,7 +77,10 @@ fn test_riscv_cfi_availability() {
 
     // On non-RISC-V platforms, CFI should not be available
     #[cfg(not(target_arch = "riscv64"))]
-    assert!(!cfi_available, "RISC-V CFI should not be available on non-RISC-V platforms");
+    assert!(
+        !cfi_available,
+        "RISC-V CFI should not be available on non-RISC-V platforms"
+    );
 
     // On RISC-V platforms, CFI may or may not be available depending on hardware
     #[cfg(target_arch = "riscv64")]
@@ -76,8 +92,11 @@ fn test_riscv_cfi_availability() {
 
 #[test]
 fn test_riscv_cfi_modes() {
-    let modes =
-        [CfiExceptionMode::Synchronous, CfiExceptionMode::Asynchronous, CfiExceptionMode::Deferred];
+    let modes = [
+        CfiExceptionMode::Synchronous,
+        CfiExceptionMode::Asynchronous,
+        CfiExceptionMode::Deferred,
+    ];
 
     for mode in modes {
         println!("Testing RISC-V CFI mode: {:?}", mode);
@@ -101,7 +120,10 @@ fn test_hardware_optimization_interface() {
 
     // Test overhead estimation
     let overhead = bti.estimated_overhead_percentage();
-    assert!(overhead >= 0.0 && overhead <= 10.0, "BTI overhead should be reasonable (0-10%)");
+    assert!(
+        overhead >= 0.0 && overhead <= 10.0,
+        "BTI overhead should be reasonable (0-10%)"
+    );
 
     // Test description
     let description = bti.description();
@@ -122,7 +144,10 @@ fn test_cfi_hardware_optimization_interface() {
 
     // Test overhead estimation
     let overhead = cfi.estimated_overhead_percentage();
-    assert!(overhead >= 0.0 && overhead <= 15.0, "CFI overhead should be reasonable (0-15%)");
+    assert!(
+        overhead >= 0.0 && overhead <= 15.0,
+        "CFI overhead should be reasonable (0-15%)"
+    );
 
     // Test description
     let description = cfi.description();
@@ -148,7 +173,10 @@ fn test_bti_enable_disable() {
     #[cfg(not(target_arch = "aarch64"))]
     {
         // On non-ARM64, enable should fail
-        assert!(enable_result.is_err(), "BTI enable should fail on non-ARM64 platforms");
+        assert!(
+            enable_result.is_err(),
+            "BTI enable should fail on non-ARM64 platforms"
+        );
     }
 
     // Test disable operation
@@ -166,7 +194,10 @@ fn test_bti_enable_disable() {
     #[cfg(not(target_arch = "aarch64"))]
     {
         // On non-ARM64, disable should fail
-        assert!(disable_result.is_err(), "BTI disable should fail on non-ARM64 platforms");
+        assert!(
+            disable_result.is_err(),
+            "BTI disable should fail on non-ARM64 platforms"
+        );
     }
 }
 
@@ -189,7 +220,10 @@ fn test_cfi_enable_disable() {
     #[cfg(not(target_arch = "riscv64"))]
     {
         // On non-RISC-V, enable should fail
-        assert!(enable_result.is_err(), "CFI enable should fail on non-RISC-V platforms");
+        assert!(
+            enable_result.is_err(),
+            "CFI enable should fail on non-RISC-V platforms"
+        );
     }
 
     // Test disable operation
@@ -207,7 +241,10 @@ fn test_cfi_enable_disable() {
     #[cfg(not(target_arch = "riscv64"))]
     {
         // On non-RISC-V, disable should fail
-        assert!(disable_result.is_err(), "CFI disable should fail on non-RISC-V platforms");
+        assert!(
+            disable_result.is_err(),
+            "CFI disable should fail on non-RISC-V platforms"
+        );
     }
 }
 
@@ -232,8 +269,11 @@ fn test_cfi_configuration_combinations() {
     }
 
     // Test various CFI configurations
-    let cfi_configs =
-        [CfiExceptionMode::Synchronous, CfiExceptionMode::Asynchronous, CfiExceptionMode::Deferred];
+    let cfi_configs = [
+        CfiExceptionMode::Synchronous,
+        CfiExceptionMode::Asynchronous,
+        CfiExceptionMode::Deferred,
+    ];
 
     for mode in cfi_configs {
         let cfi = ControlFlowIntegrity::new(mode);
@@ -298,7 +338,10 @@ fn test_cross_platform_cfi_detection() {
     // At least one of these should work on any platform that supports CFI
     // (though none may be available in test environments)
     let total_features = cfi_features.len();
-    assert!(total_features >= 0, "CFI feature detection should complete successfully");
+    assert!(
+        total_features >= 0,
+        "CFI feature detection should complete successfully"
+    );
 }
 
 #[test]
@@ -306,10 +349,10 @@ fn test_security_level_ordering() {
     use wrt_platform::SecurityLevel;
 
     // Test that security levels are properly ordered
-    assert!(SecurityLevel::None as u8 < SecurityLevel::Low as u8);
-    assert!(SecurityLevel::Low as u8 < SecurityLevel::Medium as u8);
-    assert!(SecurityLevel::Medium as u8 < SecurityLevel::High as u8);
-    assert!(SecurityLevel::High as u8 < SecurityLevel::Maximum as u8);
+    assert!((SecurityLevel::None as u8) < (SecurityLevel::Low as u8));
+    assert!((SecurityLevel::Low as u8) < (SecurityLevel::Medium as u8));
+    assert!((SecurityLevel::Medium as u8) < (SecurityLevel::High as u8));
+    assert!((SecurityLevel::High as u8) < (SecurityLevel::Maximum as u8));
 
     // Both BTI and CFI should provide high security
     let bti = BranchTargetIdentification::new(BtiMode::CallAndJump, BtiExceptionLevel::El1);

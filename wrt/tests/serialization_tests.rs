@@ -1,6 +1,9 @@
 #[cfg(feature = "serialization")]
 mod serialization_tests {
-    use wrt::{error::Result, serialization};
+    use wrt::{
+        error::Result,
+        serialization,
+    };
 
     #[test]
     fn test_placeholder_serialization() {

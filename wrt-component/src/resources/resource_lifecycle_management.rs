@@ -1,5 +1,7 @@
 //! Resource Lifecycle Management for WebAssembly Component Model
 //!
+//! SW-REQ-ID: REQ_CMP_020 - Component Resource Lifecycle Management
+//!
 //! This module implements comprehensive resource lifecycle management with
 //! drop handlers, lifetime validation, and automatic cleanup for the Component Model.
 
@@ -14,6 +16,9 @@ use std::{boxed::Box, vec::Vec};
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
     prelude::*,
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
 };
 
 use crate::{
@@ -33,20 +38,23 @@ const MAX_DROP_HANDLERS: usize = 8;
 /// Maximum call stack depth for drop operations
 const MAX_DROP_STACK_DEPTH: usize = 32;
 
+// Type alias for resource management
+type ResourceProvider = NoStdProvider<65536>;
+
 /// Resource lifecycle manager
 #[derive(Debug)]
 pub struct ResourceLifecycleManager {
     /// Active resources
     #[cfg(feature = "std")]
     resources: Vec<ResourceEntry>,
-    #[cfg(not(any(feature = "std", )))]
-    resources: BoundedVec<ResourceEntry, MAX_RESOURCES, NoStdProvider<65536>>,
+    #[cfg(not(feature = "std"))]
+    resources: BoundedVec<ResourceEntry, MAX_RESOURCES, ResourceProvider>,
     
     /// Drop handlers registry
     #[cfg(feature = "std")]
     drop_handlers: Vec<DropHandler>,
-    #[cfg(not(any(feature = "std", )))]
-    drop_handlers: BoundedVec<DropHandler, MAX_RESOURCES, NoStdProvider<65536>>,
+    #[cfg(not(feature = "std"))]
+    drop_handlers: BoundedVec<DropHandler, MAX_RESOURCES, ResourceProvider>,
     
     /// Lifecycle policies
     policies: LifecyclePolicies,
@@ -77,8 +85,8 @@ pub struct ResourceEntry {
     /// Associated handlers
     #[cfg(feature = "std")]
     pub handlers: Vec<DropHandlerId>,
-    #[cfg(not(any(feature = "std", )))]
-    pub handlers: BoundedVec<DropHandlerId, MAX_DROP_HANDLERS, NoStdProvider<65536>>,
+    #[cfg(not(feature = "std"))]
+    pub handlers: BoundedVec<DropHandlerId, MAX_DROP_HANDLERS, ResourceProvider>,
     /// Creation time (for debugging)
     pub created_at: u64,
     /// Last access time (for GC)
@@ -185,19 +193,19 @@ pub enum ResourceState {
 #[derive(Debug, Clone)]
 pub struct ResourceMetadata {
     /// Resource name for debugging
-    pub name: BoundedString<64, NoStdProvider<65536>>,
+    pub name: BoundedString<64, ResourceProvider>,
     /// Resource size in bytes
     pub size_bytes: usize,
     /// Tags for categorization
     #[cfg(feature = "std")]
-    pub tags: Vec<BoundedString<32, NoStdProvider<65536>>>,
-    #[cfg(not(any(feature = "std", )))]
-    pub tags: BoundedVec<BoundedString<32, NoStdProvider<65536>>, 8, NoStdProvider<65536>>,
+    pub tags: Vec<BoundedString<32, ResourceProvider>>,
+    #[cfg(not(feature = "std"))]
+    pub tags: BoundedVec<BoundedString<32, ResourceProvider>, 8, ResourceProvider>,
     /// Additional properties
     #[cfg(feature = "std")]
-    pub properties: Vec<(BoundedString<32, NoStdProvider<65536>>, Value)>,
-    #[cfg(not(any(feature = "std", )))]
-    pub properties: BoundedVec<(BoundedString<32, NoStdProvider<65536>>, Value), 16>,
+    pub properties: Vec<(BoundedString<32, ResourceProvider>, Value)>,
+    #[cfg(not(feature = "std"))]
+    pub properties: BoundedVec<(BoundedString<32, ResourceProvider>, Value), 16, ResourceProvider>,
 }
 
 /// Drop handler function type
@@ -211,7 +219,7 @@ pub enum DropHandlerFunction {
     MemoryCleanup,
     /// Custom cleanup function
     Custom {
-        name: BoundedString<64, NoStdProvider<65536>>,
+        name: BoundedString<64, ResourceProvider>,
         // In a real implementation, this would be a function pointer
         placeholder: u32,
     },
@@ -229,8 +237,8 @@ pub struct ResourceCreateRequest {
     /// Custom drop handlers
     #[cfg(feature = "std")]
     pub custom_handlers: Vec<DropHandlerFunction>,
-    #[cfg(not(any(feature = "std", )))]
-    pub custom_handlers: BoundedVec<DropHandlerFunction, MAX_DROP_HANDLERS, NoStdProvider<65536>>,
+    #[cfg(not(feature = "std"))]
+    pub custom_handlers: BoundedVec<DropHandlerFunction, MAX_DROP_HANDLERS, ResourceProvider>,
 }
 
 /// Drop operation result
@@ -261,15 +269,15 @@ pub struct GcResult {
 
 /// Resource ID type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ResourceId(pub u32);
+pub struct ResourceId(pub u32;
 
 /// Drop handler ID type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DropHandlerId(pub u32);
+pub struct DropHandlerId(pub u32;
 
 /// Component ID type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ComponentId(pub u32);
+pub struct ComponentId(pub u32;
 
 impl ResourceLifecycleManager {
     /// Create new resource lifecycle manager
@@ -277,12 +285,20 @@ impl ResourceLifecycleManager {
         Self {
             #[cfg(feature = "std")]
             resources: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            resources: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            resources: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)
+                    .expect(".expect("Failed to allocate memory for resources"));")
+                BoundedVec::new(provider).unwrap()
+            },
             #[cfg(feature = "std")]
             drop_handlers: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            drop_handlers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            drop_handlers: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)
+                    .expect(".expect("Failed to allocate memory for drop handlers"));")
+                BoundedVec::new(provider).unwrap()
+            },
             policies: LifecyclePolicies::default(),
             stats: LifecycleStats::new(),
             next_resource_id: 1,
@@ -299,14 +315,17 @@ impl ResourceLifecycleManager {
 
     /// Create a new resource
     pub fn create_resource(&mut self, request: ResourceCreateRequest) -> Result<ResourceId> {
-        let resource_id = ResourceId(self.next_resource_id);
+        let resource_id = ResourceId(self.next_resource_id;
         self.next_resource_id += 1;
 
         // Register drop handlers for this resource
         #[cfg(feature = "std")]
         let mut handler_ids = Vec::new();
         #[cfg(not(any(feature = "std", )))]
-        let mut handler_ids = BoundedVec::<DropHandlerId, MAX_DROP_HANDLERS>::new();
+        let mut handler_ids = {
+            let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+            BoundedVec::<DropHandlerId, MAX_DROP_HANDLERS, ResourceProvider>::new(provider).unwrap()
+        };
         
         for handler_fn in request.custom_handlers.iter() {
             let handler_id = self.register_drop_handler(
@@ -319,11 +338,7 @@ impl ResourceLifecycleManager {
             handler_ids.push(handler_id);
             #[cfg(not(any(feature = "std", )))]
             handler_ids.push(handler_id).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    wrt_error::codes::RESOURCE_EXHAUSTED,
-                    "Too many handlers for resource"
-                )
+                Error::runtime_execution_error("Error occurred")
             })?;
         }
 
@@ -343,8 +358,7 @@ impl ResourceLifecycleManager {
             Error::new(
                 ErrorCategory::Resource,
                 wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many active resources"
-            )
+                "Too many resources")
         })?;
 
         // Update statistics
@@ -363,15 +377,11 @@ impl ResourceLifecycleManager {
         let resource = self.get_resource_mut(resource_id)?;
         
         if resource.state != ResourceState::Active {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                wrt_error::codes::EXECUTION_ERROR,
-                "Cannot reference inactive resource"
-            ));
+            return Err(Error::runtime_execution_error("Error occurred"))
         }
 
         resource.ref_count += 1;
-        resource.last_access = self.get_current_time();
+        resource.last_access = self.get_current_time);
         Ok(resource.ref_count)
     }
 
@@ -384,12 +394,11 @@ impl ResourceLifecycleManager {
                 return Err(Error::new(
                     ErrorCategory::Runtime,
                     wrt_error::codes::EXECUTION_ERROR,
-                    "Resource has no references to remove"
-                ));
+                    "Reference count already zero";
             }
 
             resource.ref_count -= 1;
-            resource.last_access = self.get_current_time();
+            resource.last_access = self.get_current_time);
             
             resource.ref_count == 0
         };
@@ -406,7 +415,7 @@ impl ResourceLifecycleManager {
         let resource = self.get_resource_mut(resource_id)?;
         
         if resource.state == ResourceState::Destroyed {
-            return Ok(DropResult::Skipped);
+            return Ok(DropResult::Skipped;
         }
 
         // Mark as destroying
@@ -424,7 +433,7 @@ impl ResourceLifecycleManager {
                 // If a required handler fails, mark resource as error state
                 if self.is_handler_required(handler_id)? {
                     self.update_resource_state(resource_id, ResourceState::Error)?;
-                    return Ok(DropResult::Failed(error));
+                    return Ok(DropResult::Failed(error;
                 }
             }
         }
@@ -448,7 +457,7 @@ impl ResourceLifecycleManager {
         priority: u8,
         required: bool,
     ) -> Result<DropHandlerId> {
-        let handler_id = DropHandlerId(self.drop_handlers.len() as u32);
+        let handler_id = DropHandlerId(self.drop_handlers.len() as u32;
         
         let handler = DropHandler {
             id: handler_id,
@@ -459,11 +468,7 @@ impl ResourceLifecycleManager {
         };
 
         self.drop_handlers.push(handler).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many drop handlers"
-            )
+            Error::runtime_execution_error("Error occurred")
         })?;
 
         Ok(handler_id)
@@ -475,11 +480,10 @@ impl ResourceLifecycleManager {
             return Err(Error::new(
                 ErrorCategory::Runtime,
                 wrt_error::codes::EXECUTION_ERROR,
-                "Garbage collection already running"
-            ));
+                "Garbage collection already running";
         }
 
-        let start_time = self.get_current_time();
+        let start_time = self.get_current_time);
         self.gc_state.gc_running = true;
         
         let mut collected_count = 0;
@@ -489,7 +493,10 @@ impl ResourceLifecycleManager {
         #[cfg(feature = "std")]
         let mut resources_to_drop = Vec::new();
         #[cfg(not(any(feature = "std", )))]
-        let mut resources_to_drop = BoundedVec::<ResourceId, 64>::new();
+        let mut resources_to_drop = {
+            let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+            BoundedVec::<ResourceId, 64, ResourceProvider>::new(provider).unwrap()
+        };
         
         for resource in &self.resources {
             let should_collect = if force_full_gc {
@@ -517,14 +524,14 @@ impl ResourceLifecycleManager {
         // Remove destroyed resources from list
         #[cfg(feature = "std")]
         {
-            self.resources.retain(|r| r.state != ResourceState::Destroyed);
+            self.resources.retain(|r| r.state != ResourceState::Destroyed;
         }
         #[cfg(not(any(feature = "std", )))]
         {
             let mut i = 0;
             while i < self.resources.len() {
                 if self.resources[i].state == ResourceState::Destroyed {
-                    self.resources.remove(i);
+                    self.resources.remove(i;
                 } else {
                     i += 1;
                 }
@@ -534,7 +541,7 @@ impl ResourceLifecycleManager {
         // Update GC state
         let gc_time = self.get_current_time() - start_time;
         self.gc_state.gc_running = false;
-        self.gc_state.last_gc_time = self.get_current_time();
+        self.gc_state.last_gc_time = self.get_current_time);
         self.gc_state.gc_cycles += 1;
         self.gc_state.last_collected = collected_count;
 
@@ -552,11 +559,7 @@ impl ResourceLifecycleManager {
             .iter()
             .find(|r| r.id == resource_id)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::EXECUTION_ERROR,
-                    "Resource not found"
-                )
+                Error::runtime_execution_error("Error occurred")
             })
     }
 
@@ -569,8 +572,7 @@ impl ResourceLifecycleManager {
                 Error::new(
                     ErrorCategory::Runtime,
                     wrt_error::codes::EXECUTION_ERROR,
-                    "Resource not found"
-                )
+                    "Resource not found")
             })
     }
 
@@ -593,11 +595,11 @@ impl ResourceLifecycleManager {
     #[cfg(feature = "std")]
     pub fn check_for_leaks(&mut self) -> Result<Vec<ResourceId>> {
         if !self.policies.leak_detection {
-            return Ok(Vec::new());
+            return Ok(Vec::new();
         }
 
         let mut leaked_resources = Vec::new();
-        let current_time = self.get_current_time();
+        let current_time = self.get_current_time);
 
         for resource in &self.resources {
             if let Some(max_lifetime) = self.policies.max_lifetime_ms {
@@ -613,14 +615,16 @@ impl ResourceLifecycleManager {
     }
     
     /// Check for resource leaks (no_std version)
-    #[cfg(not(any(feature = "std", )))]
-    pub fn check_for_leaks(&mut self) -> Result<BoundedVec<ResourceId, 64>, NoStdProvider<65536>> {
+    #[cfg(not(feature = "std"))]
+    pub fn check_for_leaks(&mut self) -> core::result::Result<BoundedVec<ResourceId, 64, ResourceProvider>, Error> {
         if !self.policies.leak_detection {
-            return Ok(BoundedVec::new(DefaultMemoryProvider::default()).unwrap());
+            let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+            return Ok(BoundedVec::new(provider).unwrap();
         }
 
-        let mut leaked_resources = BoundedVec::new(DefaultMemoryProvider::default()).unwrap();
-        let current_time = self.get_current_time();
+        let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+        let mut leaked_resources = BoundedVec::new(provider).unwrap();
+        let current_time = self.get_current_time);
 
         for resource in &self.resources {
             if let Some(max_lifetime) = self.policies.max_lifetime_ms {
@@ -640,7 +644,7 @@ impl ResourceLifecycleManager {
     fn update_resource_state(&mut self, resource_id: ResourceId, new_state: ResourceState) -> Result<()> {
         let resource = self.get_resource_mut(resource_id)?;
         resource.state = new_state;
-        Ok(())
+        Ok(()
     }
 
     fn execute_drop_handler(&mut self, handler_id: DropHandlerId, resource_id: ResourceId) -> Result<DropResult> {
@@ -648,11 +652,7 @@ impl ResourceLifecycleManager {
             .iter()
             .find(|h| h.id == handler_id)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::EXECUTION_ERROR,
-                    "Drop handler not found"
-                )
+                Error::runtime_execution_error("Error occurred")
             })?;
 
         // Simplified handler execution - in real implementation this would
@@ -689,8 +689,7 @@ impl ResourceLifecycleManager {
                 Error::new(
                     ErrorCategory::Runtime,
                     wrt_error::codes::EXECUTION_ERROR,
-                    "Drop handler not found"
-                )
+                    "Drop handler not found")
             })?;
         
         Ok(handler.required)
@@ -722,56 +721,52 @@ impl ResourceLifecycleManager {
 
 impl ResourceMetadata {
     /// Create new resource metadata
-    pub fn new(name: &str) -> Self {
-        Self {
+    pub fn new(name: &str) -> Result<Self> {
+        Ok(Self {
             name: BoundedString::from_str(name).unwrap_or_default(),
             size_bytes: 0,
             #[cfg(feature = "std")]
             tags: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            tags: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            tags: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).unwrap()
+            },
             #[cfg(feature = "std")]
             properties: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            properties: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
-        }
+            #[cfg(not(feature = "std"))]
+            properties: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).unwrap()
+            },
+        })
     }
 
     /// Add a tag to the metadata
     pub fn add_tag(&mut self, tag: &str) -> Result<()> {
         let bounded_tag = BoundedString::from_str(tag).map_err(|_| {
-            Error::new(
-                ErrorCategory::Parse,
-                wrt_error::codes::PARSE_ERROR,
-                "Tag too long"
-            )
+            Error::runtime_execution_error("Error occurred")
         })?;
         
         self.tags.push(bounded_tag).map_err(|_| {
             Error::new(
                 ErrorCategory::Resource,
                 wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many tags"
-            )
+                "Too many tags")
         })
     }
 
     /// Add a property to the metadata
     pub fn add_property(&mut self, key: &str, value: Value) -> Result<()> {
         let bounded_key = BoundedString::from_str(key).map_err(|_| {
-            Error::new(
-                ErrorCategory::Parse,
-                wrt_error::codes::PARSE_ERROR,
-                "Property key too long"
-            )
+            Error::runtime_execution_error("Error occurred")
         })?;
         
         self.properties.push((bounded_key, value)).map_err(|_| {
             Error::new(
                 ErrorCategory::Resource,
                 wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many properties"
-            )
+                "Too many properties")
         })
     }
 }
@@ -864,12 +859,15 @@ mod tests {
         
         let request = ResourceCreateRequest {
             resource_type: ResourceType::Stream,
-            metadata: ResourceMetadata::new("test-stream"),
+            metadata: ResourceMetadata::new("test-stream").unwrap(),
             owner: ComponentId(1),
             #[cfg(feature = "std")]
             custom_handlers: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            custom_handlers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            custom_handlers: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component).unwrap();
+                BoundedVec::new(provider).unwrap()
+            },
         };
         
         let resource_id = manager.create_resource(request).unwrap();
@@ -884,19 +882,22 @@ mod tests {
         
         let request = ResourceCreateRequest {
             resource_type: ResourceType::Future,
-            metadata: ResourceMetadata::new("test-future"),
+            metadata: ResourceMetadata::new("test-future").unwrap(),
             owner: ComponentId(1),
             #[cfg(feature = "std")]
             custom_handlers: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            custom_handlers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            custom_handlers: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component).unwrap();
+                BoundedVec::new(provider).unwrap()
+            },
         };
         
         let resource_id = manager.create_resource(request).unwrap();
         
         // Add reference
         let ref_count = manager.add_reference(resource_id).unwrap();
-        assert_eq!(ref_count, 2);
+        assert_eq!(ref_count, 2;
         
         // Remove reference
         let ref_count = manager.remove_reference(resource_id).unwrap();
@@ -907,7 +908,7 @@ mod tests {
         assert_eq!(ref_count, 0);
         
         let resource = manager.get_resource(resource_id).unwrap();
-        assert_eq!(resource.state, ResourceState::Destroyed);
+        assert_eq!(resource.state, ResourceState::Destroyed;
     }
 
     #[test]
@@ -932,16 +933,19 @@ mod tests {
         // Create a resource with zero references
         let request = ResourceCreateRequest {
             resource_type: ResourceType::MemoryBuffer,
-            metadata: ResourceMetadata::new("gc-test"),
+            metadata: ResourceMetadata::new("gc-test").unwrap(),
             owner: ComponentId(1),
             #[cfg(feature = "std")]
             custom_handlers: Vec::new(),
-            #[cfg(not(any(feature = "std", )))]
-            custom_handlers: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            #[cfg(not(feature = "std"))]
+            custom_handlers: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component).unwrap();
+                BoundedVec::new(provider).unwrap()
+            },
         };
         
         let resource_id = manager.create_resource(request).unwrap();
-        manager.remove_reference(resource_id).unwrap(); // Drop to 0 references
+        manager.remove_reference(resource_id).unwrap()); // Drop to 0 references
         
         let gc_result = manager.run_garbage_collection(true).unwrap();
         assert_eq!(gc_result.collected_count, 1);
@@ -950,7 +954,7 @@ mod tests {
 
     #[test]
     fn test_resource_metadata() {
-        let mut metadata = ResourceMetadata::new("test-resource");
+        let mut metadata = ResourceMetadata::new("test-resource").unwrap();
         
         metadata.add_tag("important").unwrap();
         metadata.add_property("version", Value::U32(1)).unwrap();
@@ -961,19 +965,19 @@ mod tests {
 
     #[test]
     fn test_lifecycle_policies() {
-        let policies = LifecyclePolicies::default();
+        let policies = LifecyclePolicies::default());
         assert!(policies.enable_gc);
         assert!(policies.strict_ref_counting);
         assert!(policies.leak_detection);
         
-        let manager = ResourceLifecycleManager::with_policies(policies);
+        let manager = ResourceLifecycleManager::with_policies(policies;
         assert!(manager.policies.enable_gc);
     }
 
     #[test]
     fn test_resource_type_display() {
-        assert_eq!(ResourceType::Stream.to_string(), "stream");
-        assert_eq!(ResourceType::Custom(42).to_string(), "custom-42");
-        assert_eq!(ResourceState::Active.to_string(), "active");
+        assert_eq!(ResourceType::Stream.to_string(), "stream";
+        assert_eq!(ResourceType::Custom(42).to_string(), "custom-42";
+        assert_eq!(ResourceState::Active.to_string(), "active";
     }
 }

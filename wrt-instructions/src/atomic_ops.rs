@@ -1,5 +1,5 @@
 //! WebAssembly 3.0 atomic operations implementation
-//! 
+//!
 //! This module provides support for atomic memory operations including:
 //! - Atomic loads and stores
 //! - Read-modify-write operations
@@ -7,8 +7,14 @@
 //! - Wait and notify operations
 //! - Memory fences
 
-use crate::prelude::{Debug, Eq, PartialEq, Result};
 use wrt_foundation::MemArg;
+
+use crate::prelude::{
+    Debug,
+    Eq,
+    PartialEq,
+    Result,
+};
 
 /// Memory ordering for atomic operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,7 +111,7 @@ pub enum AtomicRMWInstr {
     I64AtomicRmw16AddU { memarg: MemArg },
     /// `i64.atomic.rmw32.add_u`
     I64AtomicRmw32AddU { memarg: MemArg },
-    
+
     /// i32.atomic.rmw.sub
     I32AtomicRmwSub { memarg: MemArg },
     /// i64.atomic.rmw.sub
@@ -120,7 +126,7 @@ pub enum AtomicRMWInstr {
     I64AtomicRmw16SubU { memarg: MemArg },
     /// `i64.atomic.rmw32.sub_u`
     I64AtomicRmw32SubU { memarg: MemArg },
-    
+
     /// i32.atomic.rmw.and
     I32AtomicRmwAnd { memarg: MemArg },
     /// i64.atomic.rmw.and
@@ -135,7 +141,7 @@ pub enum AtomicRMWInstr {
     I64AtomicRmw16AndU { memarg: MemArg },
     /// `i64.atomic.rmw32.and_u`
     I64AtomicRmw32AndU { memarg: MemArg },
-    
+
     /// i32.atomic.rmw.or
     I32AtomicRmwOr { memarg: MemArg },
     /// i64.atomic.rmw.or
@@ -150,7 +156,7 @@ pub enum AtomicRMWInstr {
     I64AtomicRmw16OrU { memarg: MemArg },
     /// `i64.atomic.rmw32.or_u`
     I64AtomicRmw32OrU { memarg: MemArg },
-    
+
     /// i32.atomic.rmw.xor
     I32AtomicRmwXor { memarg: MemArg },
     /// i64.atomic.rmw.xor
@@ -165,7 +171,7 @@ pub enum AtomicRMWInstr {
     I64AtomicRmw16XorU { memarg: MemArg },
     /// `i64.atomic.rmw32.xor_u`
     I64AtomicRmw32XorU { memarg: MemArg },
-    
+
     /// i32.atomic.rmw.xchg
     I32AtomicRmwXchg { memarg: MemArg },
     /// i64.atomic.rmw.xchg
@@ -240,21 +246,21 @@ pub enum AtomicOp {
 pub trait AtomicOperations {
     /// Atomic wait on 32-bit value
     fn atomic_wait32(&mut self, addr: u32, expected: i32, timeout_ns: Option<u64>) -> Result<i32>;
-    
+
     /// Atomic wait on 64-bit value  
     fn atomic_wait64(&mut self, addr: u32, expected: i64, timeout_ns: Option<u64>) -> Result<i32>;
-    
+
     /// Notify waiters on memory address
     fn atomic_notify(&mut self, addr: u32, count: u32) -> Result<u32>;
-    
+
     /// Atomic load operations
     fn atomic_load_i32(&self, addr: u32) -> Result<i32>;
     fn atomic_load_i64(&self, addr: u32) -> Result<i64>;
-    
+
     /// Atomic store operations
     fn atomic_store_i32(&mut self, addr: u32, value: i32) -> Result<()>;
     fn atomic_store_i64(&mut self, addr: u32, value: i64) -> Result<()>;
-    
+
     /// Atomic read-modify-write operations
     fn atomic_rmw_add_i32(&mut self, addr: u32, value: i32) -> Result<i32>;
     fn atomic_rmw_add_i64(&mut self, addr: u32, value: i64) -> Result<i64>;
@@ -268,14 +274,17 @@ pub trait AtomicOperations {
     fn atomic_rmw_xor_i64(&mut self, addr: u32, value: i64) -> Result<i64>;
     fn atomic_rmw_xchg_i32(&mut self, addr: u32, value: i32) -> Result<i32>;
     fn atomic_rmw_xchg_i64(&mut self, addr: u32, value: i64) -> Result<i64>;
-    
+
     /// Atomic compare and exchange operations
     fn atomic_cmpxchg_i32(&mut self, addr: u32, expected: i32, replacement: i32) -> Result<i32>;
     fn atomic_cmpxchg_i64(&mut self, addr: u32, expected: i64, replacement: i64) -> Result<i64>;
-    
-    /// Atomic read-modify-write compare and exchange operations (additional variants)
-    fn atomic_rmw_cmpxchg_i32(&mut self, addr: u32, expected: i32, replacement: i32) -> Result<i32>;
-    fn atomic_rmw_cmpxchg_i64(&mut self, addr: u32, expected: i64, replacement: i64) -> Result<i64>;
+
+    /// Atomic read-modify-write compare and exchange operations (additional
+    /// variants)
+    fn atomic_rmw_cmpxchg_i32(&mut self, addr: u32, expected: i32, replacement: i32)
+        -> Result<i32>;
+    fn atomic_rmw_cmpxchg_i64(&mut self, addr: u32, expected: i64, replacement: i64)
+        -> Result<i64>;
 }
 
 /// WebAssembly opcodes for atomic operations
@@ -370,9 +379,78 @@ pub mod opcodes {
 
 impl AtomicOp {
     /// Get the opcode for this atomic operation
-    #[must_use] pub fn opcode(&self) -> u8 {
-        use opcodes::{ATOMIC_FENCE, I32_ATOMIC_LOAD, I32_ATOMIC_LOAD16_U, I32_ATOMIC_LOAD8_U, I32_ATOMIC_RMW16_ADD_U, I32_ATOMIC_RMW16_AND_U, I32_ATOMIC_RMW16_CMPXCHG_U, I32_ATOMIC_RMW16_OR_U, I32_ATOMIC_RMW16_SUB_U, I32_ATOMIC_RMW16_XCHG_U, I32_ATOMIC_RMW16_XOR_U, I32_ATOMIC_RMW8_ADD_U, I32_ATOMIC_RMW8_AND_U, I32_ATOMIC_RMW8_CMPXCHG_U, I32_ATOMIC_RMW8_OR_U, I32_ATOMIC_RMW8_SUB_U, I32_ATOMIC_RMW8_XCHG_U, I32_ATOMIC_RMW8_XOR_U, I32_ATOMIC_RMW_ADD, I32_ATOMIC_RMW_AND, I32_ATOMIC_RMW_CMPXCHG, I32_ATOMIC_RMW_OR, I32_ATOMIC_RMW_SUB, I32_ATOMIC_RMW_XCHG, I32_ATOMIC_RMW_XOR, I32_ATOMIC_STORE, I32_ATOMIC_STORE16, I32_ATOMIC_STORE8, I64_ATOMIC_LOAD, I64_ATOMIC_LOAD16_U, I64_ATOMIC_LOAD32_U, I64_ATOMIC_LOAD8_U, I64_ATOMIC_RMW16_ADD_U, I64_ATOMIC_RMW16_AND_U, I64_ATOMIC_RMW16_CMPXCHG_U, I64_ATOMIC_RMW16_OR_U, I64_ATOMIC_RMW16_SUB_U, I64_ATOMIC_RMW16_XCHG_U, I64_ATOMIC_RMW16_XOR_U, I64_ATOMIC_RMW32_ADD_U, I64_ATOMIC_RMW32_AND_U, I64_ATOMIC_RMW32_CMPXCHG_U, I64_ATOMIC_RMW32_OR_U, I64_ATOMIC_RMW32_SUB_U, I64_ATOMIC_RMW32_XCHG_U, I64_ATOMIC_RMW32_XOR_U, I64_ATOMIC_RMW8_ADD_U, I64_ATOMIC_RMW8_AND_U, I64_ATOMIC_RMW8_CMPXCHG_U, I64_ATOMIC_RMW8_OR_U, I64_ATOMIC_RMW8_SUB_U, I64_ATOMIC_RMW8_XCHG_U, I64_ATOMIC_RMW8_XOR_U, I64_ATOMIC_RMW_ADD, I64_ATOMIC_RMW_AND, I64_ATOMIC_RMW_CMPXCHG, I64_ATOMIC_RMW_OR, I64_ATOMIC_RMW_SUB, I64_ATOMIC_RMW_XCHG, I64_ATOMIC_RMW_XOR, I64_ATOMIC_STORE, I64_ATOMIC_STORE16, I64_ATOMIC_STORE32, I64_ATOMIC_STORE8, MEMORY_ATOMIC_NOTIFY, MEMORY_ATOMIC_WAIT32, MEMORY_ATOMIC_WAIT64};
-        
+    #[must_use]
+    pub fn opcode(&self) -> u8 {
+        use opcodes::{
+            ATOMIC_FENCE,
+            I32_ATOMIC_LOAD,
+            I32_ATOMIC_LOAD16_U,
+            I32_ATOMIC_LOAD8_U,
+            I32_ATOMIC_RMW16_ADD_U,
+            I32_ATOMIC_RMW16_AND_U,
+            I32_ATOMIC_RMW16_CMPXCHG_U,
+            I32_ATOMIC_RMW16_OR_U,
+            I32_ATOMIC_RMW16_SUB_U,
+            I32_ATOMIC_RMW16_XCHG_U,
+            I32_ATOMIC_RMW16_XOR_U,
+            I32_ATOMIC_RMW8_ADD_U,
+            I32_ATOMIC_RMW8_AND_U,
+            I32_ATOMIC_RMW8_CMPXCHG_U,
+            I32_ATOMIC_RMW8_OR_U,
+            I32_ATOMIC_RMW8_SUB_U,
+            I32_ATOMIC_RMW8_XCHG_U,
+            I32_ATOMIC_RMW8_XOR_U,
+            I32_ATOMIC_RMW_ADD,
+            I32_ATOMIC_RMW_AND,
+            I32_ATOMIC_RMW_CMPXCHG,
+            I32_ATOMIC_RMW_OR,
+            I32_ATOMIC_RMW_SUB,
+            I32_ATOMIC_RMW_XCHG,
+            I32_ATOMIC_RMW_XOR,
+            I32_ATOMIC_STORE,
+            I32_ATOMIC_STORE16,
+            I32_ATOMIC_STORE8,
+            I64_ATOMIC_LOAD,
+            I64_ATOMIC_LOAD16_U,
+            I64_ATOMIC_LOAD32_U,
+            I64_ATOMIC_LOAD8_U,
+            I64_ATOMIC_RMW16_ADD_U,
+            I64_ATOMIC_RMW16_AND_U,
+            I64_ATOMIC_RMW16_CMPXCHG_U,
+            I64_ATOMIC_RMW16_OR_U,
+            I64_ATOMIC_RMW16_SUB_U,
+            I64_ATOMIC_RMW16_XCHG_U,
+            I64_ATOMIC_RMW16_XOR_U,
+            I64_ATOMIC_RMW32_ADD_U,
+            I64_ATOMIC_RMW32_AND_U,
+            I64_ATOMIC_RMW32_CMPXCHG_U,
+            I64_ATOMIC_RMW32_OR_U,
+            I64_ATOMIC_RMW32_SUB_U,
+            I64_ATOMIC_RMW32_XCHG_U,
+            I64_ATOMIC_RMW32_XOR_U,
+            I64_ATOMIC_RMW8_ADD_U,
+            I64_ATOMIC_RMW8_AND_U,
+            I64_ATOMIC_RMW8_CMPXCHG_U,
+            I64_ATOMIC_RMW8_OR_U,
+            I64_ATOMIC_RMW8_SUB_U,
+            I64_ATOMIC_RMW8_XCHG_U,
+            I64_ATOMIC_RMW8_XOR_U,
+            I64_ATOMIC_RMW_ADD,
+            I64_ATOMIC_RMW_AND,
+            I64_ATOMIC_RMW_CMPXCHG,
+            I64_ATOMIC_RMW_OR,
+            I64_ATOMIC_RMW_SUB,
+            I64_ATOMIC_RMW_XCHG,
+            I64_ATOMIC_RMW_XOR,
+            I64_ATOMIC_STORE,
+            I64_ATOMIC_STORE16,
+            I64_ATOMIC_STORE32,
+            I64_ATOMIC_STORE8,
+            MEMORY_ATOMIC_NOTIFY,
+            MEMORY_ATOMIC_WAIT32,
+            MEMORY_ATOMIC_WAIT64,
+        };
+
         match self {
             AtomicOp::Load(load) => match load {
                 AtomicLoadOp::I32AtomicLoad { .. } => I32_ATOMIC_LOAD,
@@ -400,7 +478,7 @@ impl AtomicOp {
                 AtomicRMWInstr::I64AtomicRmw8AddU { .. } => I64_ATOMIC_RMW8_ADD_U,
                 AtomicRMWInstr::I64AtomicRmw16AddU { .. } => I64_ATOMIC_RMW16_ADD_U,
                 AtomicRMWInstr::I64AtomicRmw32AddU { .. } => I64_ATOMIC_RMW32_ADD_U,
-                
+
                 AtomicRMWInstr::I32AtomicRmwSub { .. } => I32_ATOMIC_RMW_SUB,
                 AtomicRMWInstr::I64AtomicRmwSub { .. } => I64_ATOMIC_RMW_SUB,
                 AtomicRMWInstr::I32AtomicRmw8SubU { .. } => I32_ATOMIC_RMW8_SUB_U,
@@ -408,7 +486,7 @@ impl AtomicOp {
                 AtomicRMWInstr::I64AtomicRmw8SubU { .. } => I64_ATOMIC_RMW8_SUB_U,
                 AtomicRMWInstr::I64AtomicRmw16SubU { .. } => I64_ATOMIC_RMW16_SUB_U,
                 AtomicRMWInstr::I64AtomicRmw32SubU { .. } => I64_ATOMIC_RMW32_SUB_U,
-                
+
                 AtomicRMWInstr::I32AtomicRmwAnd { .. } => I32_ATOMIC_RMW_AND,
                 AtomicRMWInstr::I64AtomicRmwAnd { .. } => I64_ATOMIC_RMW_AND,
                 AtomicRMWInstr::I32AtomicRmw8AndU { .. } => I32_ATOMIC_RMW8_AND_U,
@@ -416,7 +494,7 @@ impl AtomicOp {
                 AtomicRMWInstr::I64AtomicRmw8AndU { .. } => I64_ATOMIC_RMW8_AND_U,
                 AtomicRMWInstr::I64AtomicRmw16AndU { .. } => I64_ATOMIC_RMW16_AND_U,
                 AtomicRMWInstr::I64AtomicRmw32AndU { .. } => I64_ATOMIC_RMW32_AND_U,
-                
+
                 AtomicRMWInstr::I32AtomicRmwOr { .. } => I32_ATOMIC_RMW_OR,
                 AtomicRMWInstr::I64AtomicRmwOr { .. } => I64_ATOMIC_RMW_OR,
                 AtomicRMWInstr::I32AtomicRmw8OrU { .. } => I32_ATOMIC_RMW8_OR_U,
@@ -424,7 +502,7 @@ impl AtomicOp {
                 AtomicRMWInstr::I64AtomicRmw8OrU { .. } => I64_ATOMIC_RMW8_OR_U,
                 AtomicRMWInstr::I64AtomicRmw16OrU { .. } => I64_ATOMIC_RMW16_OR_U,
                 AtomicRMWInstr::I64AtomicRmw32OrU { .. } => I64_ATOMIC_RMW32_OR_U,
-                
+
                 AtomicRMWInstr::I32AtomicRmwXor { .. } => I32_ATOMIC_RMW_XOR,
                 AtomicRMWInstr::I64AtomicRmwXor { .. } => I64_ATOMIC_RMW_XOR,
                 AtomicRMWInstr::I32AtomicRmw8XorU { .. } => I32_ATOMIC_RMW8_XOR_U,
@@ -432,7 +510,7 @@ impl AtomicOp {
                 AtomicRMWInstr::I64AtomicRmw8XorU { .. } => I64_ATOMIC_RMW8_XOR_U,
                 AtomicRMWInstr::I64AtomicRmw16XorU { .. } => I64_ATOMIC_RMW16_XOR_U,
                 AtomicRMWInstr::I64AtomicRmw32XorU { .. } => I64_ATOMIC_RMW32_XOR_U,
-                
+
                 AtomicRMWInstr::I32AtomicRmwXchg { .. } => I32_ATOMIC_RMW_XCHG,
                 AtomicRMWInstr::I64AtomicRmwXchg { .. } => I64_ATOMIC_RMW_XCHG,
                 AtomicRMWInstr::I32AtomicRmw8XchgU { .. } => I32_ATOMIC_RMW8_XCHG_U,
@@ -471,8 +549,11 @@ mod tests {
 
     #[test]
     fn test_atomic_load_opcodes() {
-        let memarg = MemArg { offset: 0, align: 2 };
-        
+        let memarg = MemArg {
+            offset: 0,
+            align:  2,
+        };
+
         let tests = vec![
             (
                 AtomicOp::Load(AtomicLoadOp::I32AtomicLoad { memarg }),
@@ -499,8 +580,11 @@ mod tests {
 
     #[test]
     fn test_atomic_store_opcodes() {
-        let memarg = MemArg { offset: 0, align: 2 };
-        
+        let memarg = MemArg {
+            offset: 0,
+            align:  2,
+        };
+
         let tests = vec![
             (
                 AtomicOp::Store(AtomicStoreOp::I32AtomicStore { memarg }),
@@ -527,8 +611,11 @@ mod tests {
 
     #[test]
     fn test_atomic_rmw_opcodes() {
-        let memarg = MemArg { offset: 0, align: 2 };
-        
+        let memarg = MemArg {
+            offset: 0,
+            align:  2,
+        };
+
         let tests = vec![
             (
                 AtomicOp::RMW(AtomicRMWInstr::I32AtomicRmwAdd { memarg }),
@@ -563,8 +650,11 @@ mod tests {
 
     #[test]
     fn test_atomic_cmpxchg_opcodes() {
-        let memarg = MemArg { offset: 0, align: 2 };
-        
+        let memarg = MemArg {
+            offset: 0,
+            align:  2,
+        };
+
         let tests = vec![
             (
                 AtomicOp::Cmpxchg(AtomicCmpxchgInstr::I32AtomicRmwCmpxchg { memarg }),
@@ -587,8 +677,11 @@ mod tests {
 
     #[test]
     fn test_wait_notify_opcodes() {
-        let memarg = MemArg { offset: 0, align: 2 };
-        
+        let memarg = MemArg {
+            offset: 0,
+            align:  2,
+        };
+
         let tests = vec![
             (
                 AtomicOp::WaitNotify(AtomicWaitNotifyOp::MemoryAtomicWait32 { memarg }),
@@ -628,9 +721,9 @@ mod tests {
             AtomicRMWOp::Xor,
             AtomicRMWOp::Xchg,
         ];
-        
+
         assert_eq!(ops.len(), 6);
-        
+
         // Test that each variant is distinct
         for (i, op1) in ops.iter().enumerate() {
             for (j, op2) in ops.iter().enumerate() {

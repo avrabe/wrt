@@ -12,16 +12,19 @@
 // Binary std/no_std choice - conditional imports only
 
 // Binary std/no_std choice
-#[cfg(not(feature = "std"))]
-pub use wrt_foundation::{
-    bounded::{BoundedVec as Vec, BoundedString as String},
-    BoundedMap as HashMap,
-    BoundedSet as HashSet,
-};
-
 // Additional imports for pure no_std
 #[cfg(not(feature = "std"))]
 pub use core::fmt::Write as FmtWrite;
+
+#[cfg(not(feature = "std"))]
+pub use wrt_foundation::{
+    bounded::{
+        BoundedString as String,
+        BoundedVec as Vec,
+    },
+    BoundedMap as HashMap,
+    BoundedSet as HashSet,
+};
 
 // Arc is not available in pure no_std, use a reference wrapper
 #[cfg(not(feature = "std"))]
@@ -42,6 +45,7 @@ impl<T> Arc<T> {
 #[cfg(not(feature = "std"))]
 impl<T> core::ops::Deref for Arc<T> {
     type Target = T;
+
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
@@ -50,9 +54,9 @@ impl<T> core::ops::Deref for Arc<T> {
 // In pure no_std mode, we need a minimal Box implementation for trait objects
 /// Simple Box implementation for `no_std` environments
 ///
-/// This provides API compatibility with `std::boxed::Box` in `no_std` environments.
-/// Unlike the standard Box, this does not allocate on the heap but provides
-/// the same interface for trait object storage.
+/// This provides API compatibility with `std::boxed::Box` in `no_std`
+/// environments. Unlike the standard Box, this does not allocate on the heap
+/// but provides the same interface for trait object storage.
 #[cfg(not(feature = "std"))]
 #[derive(Debug)]
 pub struct Box<T> {
@@ -74,6 +78,7 @@ impl<T> Box<T> {
 #[cfg(not(feature = "std"))]
 impl<T> core::ops::Deref for Box<T> {
     type Target = T;
+
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
@@ -89,59 +94,124 @@ impl<T> core::ops::DerefMut for Box<T> {
 // Drop and Debug are automatically derived for our simple Box implementation
 pub use core::{
     any::Any,
-    cmp::{Eq, Ord, PartialEq, PartialOrd},
-    convert::{TryFrom, TryInto},
+    cmp::{
+        Eq,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    },
+    convert::{
+        TryFrom,
+        TryInto,
+    },
     fmt,
-    fmt::{Debug, Display},
+    fmt::{
+        Debug,
+        Display,
+    },
     marker::PhantomData,
     mem,
-    ops::{Deref, DerefMut},
-    slice, str,
+    ops::{
+        Deref,
+        DerefMut,
+    },
+    slice,
+    str,
 };
 // Re-export from std when the std feature is enabled
 #[cfg(feature = "std")]
 pub use std::{
     boxed::Box,
-    collections::{HashMap, HashSet},
+    collections::{
+        HashMap,
+        HashSet,
+    },
+    fmt::Write as FmtWrite,
     format,
-    string::{String, ToString},
-    sync::{Arc, Mutex, RwLock},
+    string::{
+        String,
+        ToString,
+    },
+    sync::{
+        Arc,
+        Mutex,
+        RwLock,
+    },
     vec,
     vec::Vec,
 };
 
 // Re-export from wrt-error
-pub use wrt_error::{codes, kinds, Error, ErrorCategory, Result};
+pub use wrt_error::{
+    codes,
+    kinds,
+    Error,
+    ErrorCategory,
+    Result,
+};
+// Binary std/no_std choice
+#[cfg(feature = "std")]
+pub use wrt_foundation::component_value::ComponentValue;
 // Re-export from wrt-foundation
 pub use wrt_foundation::{
     // Builtin types
     builtin::BuiltinType,
+    // Memory allocation
+    safe_managed_alloc,
     // SafeMemory types
-    safe_memory::{SafeMemoryHandler, SafeSlice, SafeStack},
+    safe_memory::{
+        SafeMemoryHandler,
+        SafeSlice,
+        SafeStack,
+    },
     // Common types
-    types::{BlockType, FuncType, GlobalType, MemoryType, TableType, ValueType},
+    types::{
+        BlockType,
+        FuncType,
+        GlobalType,
+        MemoryType,
+        TableType,
+        ValueType,
+    },
     values::Value,
     // Verification types
     verification::VerificationLevel,
+    // CrateId for budget allocation
+    CrateId,
 };
-
-// Binary std/no_std choice
-#[cfg(feature = "std")]
-pub use wrt_foundation::component_value::ComponentValue;
 // Binary std/no_std choice
 #[cfg(feature = "std")]
 pub use wrt_intercept::{
-    BeforeBuiltinResult, BuiltinInterceptor, InterceptContext, LinkInterceptor,
+    BeforeBuiltinResult,
+    BuiltinInterceptor,
+    InterceptContext,
+    LinkInterceptor,
     LinkInterceptorStrategy,
 };
 // Import synchronization primitives for no_std
 #[cfg(not(feature = "std"))]
-pub use wrt_sync::{Mutex, RwLock};
+pub use wrt_sync::{
+    Mutex,
+    RwLock,
+};
+
+/// Memory size for host function allocations in no_std mode
+///
+/// This constant defines the memory budget for host functions when running
+/// in no_std environments. It provides 64KB of memory for host function
+/// operations including callback storage and temporary data structures.
+pub const HOST_MEMORY_SIZE: usize = 65536; // 64KB for host functions
 
 // Re-export from this crate
 pub use crate::{
     builder::HostBuilder,
-    callback::{CallbackRegistry, CallbackType},
-    function::{CloneableFn, HostFunctionHandler},
+    callback::{
+        CallbackRegistry,
+        CallbackType,
+    },
+    function::{
+        CloneableFn,
+        HostFunctionHandler,
+    },
     host::BuiltinHost,
 };

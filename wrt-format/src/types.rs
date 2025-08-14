@@ -12,7 +12,12 @@ use std::vec::Vec;
 
 use wrt_error::Result;
 // Import types from wrt-foundation
-pub use wrt_foundation::{BlockType, FuncType, RefType, ValueType};
+pub use wrt_foundation::{
+    BlockType,
+    FuncType,
+    RefType,
+    ValueType,
+};
 
 /// WebAssembly memory index type (standard or 64-bit)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,13 +45,13 @@ pub enum MemoryIndexType {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Limits {
     /// Minimum size (pages for memory, elements for table)
-    pub min: u64,
+    pub min:      u64,
     /// Maximum size (optional, required for shared memories)
-    pub max: Option<u64>,
+    pub max:      Option<u64>,
     /// Shared memory flag, used for memory types
     /// When true, memory can be shared between threads and requires max to be
     /// set
-    pub shared: bool,
+    pub shared:   bool,
     /// Whether this limit is for a 64-bit memory
     pub memory64: bool,
 }
@@ -61,10 +66,8 @@ pub enum FormatBlockType {
     /// Function type reference
     TypeIndex(u32),
     /// Function type (used for complex block types)
-    #[cfg(feature = "std")]
-    FuncType(wrt_foundation::FuncType<wrt_foundation::traits::DefaultMemoryProvider>),
-    #[cfg(not(any(feature = "std")))]
-    FuncType(wrt_foundation::FuncType<wrt_foundation::NoStdProvider<1024>>),
+    #[cfg(any(feature = "std", feature = "alloc"))]
+    FuncType(wrt_foundation::CleanFuncType),
 }
 
 impl From<FormatBlockType> for BlockType {
@@ -73,8 +76,9 @@ impl From<FormatBlockType> for BlockType {
             FormatBlockType::Empty => BlockType::Value(None),
             FormatBlockType::ValueType(vt) => BlockType::Value(Some(vt)),
             FormatBlockType::TypeIndex(idx) => BlockType::FuncType(idx),
+            #[cfg(any(feature = "std", feature = "alloc"))]
             FormatBlockType::FuncType(_func_type) => BlockType::FuncType(0), /* TODO: proper type
-                                                                              * index mapping */
+                                                                              * index mapping with clean types */
         }
     }
 }
@@ -93,7 +97,7 @@ pub fn value_type_to_byte(value_type: ValueType) -> u8 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct FormatGlobalType {
     pub value_type: ValueType, // This is wrt_foundation::ValueType re-exported in this file
-    pub mutable: bool,
+    pub mutable:    bool,
 }
 
 impl wrt_foundation::traits::Checksummable for FormatGlobalType {
@@ -112,7 +116,7 @@ impl wrt_foundation::traits::ToBytes for FormatGlobalType {
         &self,
         stream: &mut wrt_foundation::traits::WriteStream,
         provider: &PStream,
-    ) -> wrt_foundation::Result<()> {
+    ) -> wrt_error::Result<()> {
         self.value_type.to_bytes_with_provider(stream, provider)?;
         stream.write_u8(if self.mutable { 1 } else { 0 })?;
         Ok(())
@@ -123,19 +127,22 @@ impl wrt_foundation::traits::FromBytes for FormatGlobalType {
     fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
         stream: &mut wrt_foundation::traits::ReadStream<'a>,
         provider: &PStream,
-    ) -> wrt_foundation::Result<Self> {
+    ) -> wrt_error::Result<Self> {
         let value_type = ValueType::from_bytes_with_provider(stream, provider)?;
         let mutable_byte = stream.read_u8()?;
         let mutable = match mutable_byte {
             0 => false,
             1 => true,
-            _ => return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Invalid mutability byte"
-            )),
+            _ => {
+                return Err(wrt_error::Error::runtime_execution_error(
+                    "Invalid mutable byte value: expected 0 or 1",
+                ))
+            },
         };
-        Ok(FormatGlobalType { value_type, mutable })
+        Ok(FormatGlobalType {
+            value_type,
+            mutable,
+        })
     }
 }
 
@@ -173,7 +180,6 @@ impl CoreWasmVersion {
 // Serialization helpers for Limits
 impl Limits {
     /// Serialize to bytes
-    #[cfg(feature = "std")]
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         #[cfg(feature = "std")]
         {
@@ -200,10 +206,8 @@ impl Limits {
                 wrt_foundation::NoStdProvider::default(),
             )
             .map_err(|_| {
-                wrt_error::Error::new(
-                    wrt_error::ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ERROR,
-                    "Failed to create bytes buffer",
+                wrt_error::Error::runtime_execution_error(
+                    "Failed to allocate BoundedVec for limits encoding",
                 )
             })?;
             // Encode min
@@ -212,35 +216,27 @@ impl Limits {
                     wrt_error::Error::new(
                         wrt_error::ErrorCategory::Memory,
                         wrt_error::codes::MEMORY_ERROR,
-                        "Buffer overflow",
+                        "Failed to push min limit bytes",
                     )
                 })?;
             }
             // Encode max
             if let Some(max) = self.max {
                 bytes.push(1).map_err(|_| {
-                    wrt_error::Error::new(
-                        wrt_error::ErrorCategory::Memory,
-                        wrt_error::codes::MEMORY_ERROR,
-                        "Buffer overflow",
-                    )
+                    wrt_error::Error::runtime_execution_error("Failed to push max limit flag")
                 })?;
                 for &b in max.to_le_bytes().iter() {
                     bytes.push(b).map_err(|_| {
                         wrt_error::Error::new(
                             wrt_error::ErrorCategory::Memory,
                             wrt_error::codes::MEMORY_ERROR,
-                            "Buffer overflow",
+                            "Failed to push max limit bytes",
                         )
                     })?;
                 }
             } else {
                 bytes.push(0).map_err(|_| {
-                    wrt_error::Error::new(
-                        wrt_error::ErrorCategory::Memory,
-                        wrt_error::codes::MEMORY_ERROR,
-                        "Buffer overflow",
-                    )
+                    wrt_error::Error::runtime_execution_error("Failed to push no-max-limit flag")
                 })?;
             }
             // Encode flags
@@ -248,20 +244,16 @@ impl Limits {
                 wrt_error::Error::new(
                     wrt_error::ErrorCategory::Memory,
                     wrt_error::codes::MEMORY_ERROR,
-                    "Buffer overflow",
+                    "Failed to push limit flag",
                 )
             })?;
             bytes.push(self.memory64 as u8).map_err(|_| {
-                wrt_error::Error::new(
-                    wrt_error::ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ERROR,
-                    "Buffer overflow",
-                )
+                wrt_error::Error::runtime_execution_error("Failed to push memory64 flag")
             })?;
             Err(wrt_error::Error::new(
                 wrt_error::ErrorCategory::Runtime,
                 wrt_error::codes::UNSUPPORTED_OPERATION,
-                "to_bytes not supported in no_std without alloc",
+                "Limits encoding not supported",
             ))
         }
     }
@@ -270,10 +262,8 @@ impl Limits {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 10 {
             // 8 for min + 1 for max flag + 1 for shared
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Insufficient bytes for Limits",
+            return Err(wrt_error::Error::runtime_execution_error(
+                "Insufficient bytes for limit deserialization: minimum 10 bytes required",
             ));
         }
 
@@ -288,7 +278,7 @@ impl Limits {
                 return Err(wrt_error::Error::new(
                     wrt_error::ErrorCategory::Validation,
                     wrt_error::codes::PARSE_ERROR,
-                    "Insufficient bytes for max value",
+                    "Insufficient bytes for max limit value deserialization",
                 ));
             }
             let max_val = u64::from_le_bytes([
@@ -309,9 +299,7 @@ impl Limits {
         };
 
         if bytes.len() < offset + 2 {
-            return Err(wrt_error::Error::new(
-                wrt_error::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
+            return Err(wrt_error::Error::runtime_execution_error(
                 "Insufficient bytes for flags",
             ));
         }
@@ -319,7 +307,12 @@ impl Limits {
         let shared = bytes[offset] != 0;
         let memory64 = bytes[offset + 1] != 0;
 
-        Ok(Self { min, max, shared, memory64 })
+        Ok(Self {
+            min,
+            max,
+            shared,
+            memory64,
+        })
     }
 }
 
@@ -343,40 +336,43 @@ impl wrt_foundation::traits::FromBytes for Limits {
     fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
         reader: &mut wrt_foundation::traits::ReadStream<'a>,
         _provider: &PStream,
-    ) -> wrt_foundation::Result<Self> {
+    ) -> wrt_error::Result<Self> {
         // Read the minimum size (8 bytes)
         let min = reader.read_u64_le()?;
-        
+
         // Read max flag (1 byte)
         let has_max = reader.read_u8()? != 0;
-        let max = if has_max {
-            Some(reader.read_u64_le()?)
-        } else {
-            None
-        };
-        
+        let max = if has_max { Some(reader.read_u64_le()?) } else { None };
+
         // Read flags (2 bytes)
         let shared = reader.read_u8()? != 0;
         let memory64 = reader.read_u8()? != 0;
-        
-        Ok(Self { min, max, shared, memory64 })
+
+        Ok(Self {
+            min,
+            max,
+            shared,
+            memory64,
+        })
     }
 }
 
 // Implement ToBytes trait for Limits
 impl wrt_foundation::traits::ToBytes for Limits {
     fn serialized_size(&self) -> usize {
-        8 + if self.max.is_some() { 1 + 8 } else { 1 } + 2 // min + max_flag + max + shared + memory64
+        8 + if self.max.is_some() { 1 + 8 } else { 1 } + 2 // min + max_flag +
+                                                           // max + shared +
+                                                           // memory64
     }
 
     fn to_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
         &self,
         writer: &mut wrt_foundation::traits::WriteStream<'a>,
         _provider: &PStream,
-    ) -> wrt_foundation::Result<()> {
+    ) -> wrt_error::Result<()> {
         // Write the minimum size (8 bytes)
         writer.write_all(&self.min.to_le_bytes())?;
-        
+
         // Write max flag and value
         if let Some(max) = self.max {
             writer.write_u8(1)?;
@@ -384,11 +380,11 @@ impl wrt_foundation::traits::ToBytes for Limits {
         } else {
             writer.write_u8(0)?;
         }
-        
+
         // Write flags
         writer.write_u8(self.shared as u8)?;
         writer.write_u8(self.memory64 as u8)?;
-        
+
         Ok(())
     }
 }

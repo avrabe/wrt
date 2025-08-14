@@ -4,10 +4,19 @@
 //! and how to configure the verification level for different safety/performance
 //! tradeoffs.
 
-use wrt::{stackless::StacklessEngine, values::Value, Module, Result};
+use wrt::{
+    stackless::StacklessEngine,
+    values::Value,
+    Module,
+    Result,
+};
 use wrt_foundation::VerificationLevel;
 
 fn main() -> Result<()> {
+    // Initialize global memory system for examples
+    wrt_foundation::memory_system_initializer::presets::development()
+        .map_err(|e| wrt::Error::Instantiation(format!("Memory system init failed: {}", e)))?;
+
     println!("Bounded Collections Example");
     println!("==========================\n");
 
@@ -67,7 +76,10 @@ fn main() -> Result<()> {
     // Example of how to modify the verification level after engine creation
     println!("Changing verification level on an existing engine");
     let mut engine = StacklessEngine::new();
-    println!("Default verification level: {:?}", engine.verification_level);
+    println!(
+        "Default verification level: {:?}",
+        engine.verification_level
+    );
 
     // Change to Full verification for maximum safety
     engine.set_verification_level(VerificationLevel::Full);

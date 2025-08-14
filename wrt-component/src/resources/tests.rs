@@ -4,12 +4,20 @@
 // SPDX-License-Identifier: MIT
 
 use std::{
-    sync::{Arc, Mutex},
+    sync::{
+        Arc,
+        Mutex,
+    },
     time::Instant,
 };
 
 use super::{
-    Resource, ResourceArena, ResourceId, ResourceManager, ResourceTable, SizeClassBufferPool,
+    Resource,
+    ResourceArena,
+    ResourceId,
+    ResourceManager,
+    ResourceTable,
+    SizeClassBufferPool,
 };
 use crate::prelude::*;
 
@@ -41,14 +49,20 @@ fn test_size_class_buffer_pool() {
 
     // Pool should now have buffers
     let stats = pool.stats();
-    assert!(stats.total_buffers > 0, "Buffer pool should contain returned buffers");
+    assert!(
+        stats.total_buffers > 0,
+        "Buffer pool should contain returned buffers"
+    );
 
     // Reset the pool
     pool.reset();
 
     // Verify pool is empty
     let stats_after = pool.stats();
-    assert_eq!(stats_after.total_buffers, 0, "Buffer pool should be empty after reset");
+    assert_eq!(
+        stats_after.total_buffers, 0,
+        "Buffer pool should be empty after reset"
+    );
 }
 
 #[test]

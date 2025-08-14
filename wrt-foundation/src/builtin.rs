@@ -7,16 +7,25 @@
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-use core::{fmt, str::FromStr};
+use core::{
+    fmt,
+    str::FromStr,
+};
 
 // Error types are imported through crate root
 use crate::{
     bounded::BoundedVec,
     prelude::*,
     safe_memory::NoStdProvider,
-    traits::{Checksummable, FromBytes, ReadStream, SerializationError, ToBytes, WriteStream},
+    traits::{
+        Checksummable,
+        FromBytes,
+        ReadStream,
+        SerializationError,
+        ToBytes,
+        WriteStream,
+    },
     verification::Checksum,
-    WrtResult,
 };
 
 /// Maximum number of `BuiltinType` variants, used for `BoundedVec` capacity.
@@ -118,7 +127,7 @@ impl ToBytes for BuiltinType {
         &self,
         writer: &mut WriteStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         let byte_val = match self {
             BuiltinType::ResourceCreate => 0,
             BuiltinType::ResourceDrop => 1,
@@ -151,7 +160,7 @@ impl FromBytes for BuiltinType {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let val = reader.read_u8()?;
         match val {
             0 => Ok(BuiltinType::ResourceCreate),
@@ -282,7 +291,7 @@ impl BuiltinType {
             // Resource built-ins are always available
             Self::ResourceCreate | Self::ResourceDrop | Self::ResourceRep | Self::ResourceGet => {
                 true
-            }
+            },
 
             // Feature-gated built-ins
             #[cfg(feature = "component-model-async")]
@@ -365,14 +374,32 @@ mod tests {
 
     #[test]
     fn test_builtin_from_str() {
-        assert_eq!(BuiltinType::from_str("resource.create"), Ok(BuiltinType::ResourceCreate));
-        assert_eq!(BuiltinType::from_str("resource.drop"), Ok(BuiltinType::ResourceDrop));
-        assert_eq!(BuiltinType::from_str("resource.rep"), Ok(BuiltinType::ResourceRep));
-        assert_eq!(BuiltinType::from_str("resource.get"), Ok(BuiltinType::ResourceGet));
-        assert_eq!(BuiltinType::from_str("unknown.builtin"), Err(ParseBuiltinError));
+        assert_eq!(
+            BuiltinType::from_str("resource.create"),
+            Ok(BuiltinType::ResourceCreate)
+        );
+        assert_eq!(
+            BuiltinType::from_str("resource.drop"),
+            Ok(BuiltinType::ResourceDrop)
+        );
+        assert_eq!(
+            BuiltinType::from_str("resource.rep"),
+            Ok(BuiltinType::ResourceRep)
+        );
+        assert_eq!(
+            BuiltinType::from_str("resource.get"),
+            Ok(BuiltinType::ResourceGet)
+        );
+        assert_eq!(
+            BuiltinType::from_str("unknown.builtin"),
+            Err(ParseBuiltinError)
+        );
 
         // Also test the parse convenience method
-        assert_eq!(BuiltinType::parse("resource.create"), Some(BuiltinType::ResourceCreate));
+        assert_eq!(
+            BuiltinType::parse("resource.create"),
+            Some(BuiltinType::ResourceCreate)
+        );
         assert_eq!(BuiltinType::parse("unknown.builtin"), None);
     }
 
@@ -389,9 +416,9 @@ mod tests {
     fn test_all_available() {
         // Should at least contain the resource built-ins
         let available = BuiltinType::all_available();
-        assert!(available.contains(&BuiltinType::ResourceCreate));
-        assert!(available.contains(&BuiltinType::ResourceDrop));
-        assert!(available.contains(&BuiltinType::ResourceRep));
-        assert!(available.contains(&BuiltinType::ResourceGet));
+        assert!(available.contains(&BuiltinType::ResourceCreate).unwrap());
+        assert!(available.contains(&BuiltinType::ResourceDrop).unwrap());
+        assert!(available.contains(&BuiltinType::ResourceRep).unwrap());
+        assert!(available.contains(&BuiltinType::ResourceGet).unwrap());
     }
 }

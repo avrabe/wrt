@@ -8,35 +8,99 @@
 // Core imports for both std and no_std environments
 pub use core::{
     any::Any,
-    cmp::{Eq, Ord, PartialEq, PartialOrd},
-    convert::{TryFrom, TryInto},
+    cmp::{
+        Eq,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    },
+    convert::{
+        TryFrom,
+        TryInto,
+    },
     fmt,
-    fmt::{Debug, Display},
+    fmt::{
+        Debug,
+        Display,
+    },
     marker::PhantomData,
     mem,
-    ops::{Deref, DerefMut},
-    slice, str,
-    sync::atomic::{AtomicUsize, Ordering},
+    ops::{
+        Deref,
+        DerefMut,
+    },
+    slice,
+    str,
+    sync::atomic::{
+        AtomicUsize,
+        Ordering,
+    },
 };
-
-// Re-export from std when the std feature is enabled
-#[cfg(feature = "std")]
+// HashSet for safety-critical mode (simplified as it's less commonly used)
+#[cfg(all(feature = "std", feature = "safety-critical"))]
+pub use std::collections::HashSet; /* Using std HashSet - bounded alternative is BoundedSet
+                                    * in no_std mode */
+// Re-export from std when the std feature is enabled (non-safety-critical)
+#[cfg(all(feature = "std", not(feature = "safety-critical")))]
 pub use std::{
     boxed::Box,
-    collections::{HashMap, HashSet},
-    format, println,
-    string::{String, ToString},
-    sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    collections::{
+        HashMap,
+        HashSet,
+    },
+    format,
+    println,
+    string::{
+        String,
+        ToString,
+    },
+    sync::{
+        Arc,
+        Mutex,
+        MutexGuard,
+        RwLock,
+        RwLockReadGuard,
+        RwLockWriteGuard,
+    },
     vec,
     vec::Vec,
 };
+// Re-export WRT allocator collections for safety-critical mode
+#[cfg(all(feature = "std", feature = "safety-critical"))]
+pub use std::{
+    boxed::Box,
+    format,
+    println,
+    string::{
+        String,
+        ToString,
+    },
+    sync::{
+        Arc,
+        Mutex,
+        MutexGuard,
+        RwLock,
+        RwLockReadGuard,
+        RwLockWriteGuard,
+    },
+};
 
+#[cfg(all(feature = "std", feature = "safety-critical"))]
+pub use wrt_foundation::allocator::{
+    WrtHashMap as HashMap,
+    WrtVec as Vec,
+};
 // Binary std/no_std choice - use our own memory management
 #[cfg(not(feature = "std"))]
 pub use wrt_foundation::{
-    bounded::{BoundedString as String, BoundedVec as Vec},
-    no_std_hashmap::BoundedHashMap as HashMap,
-    bounded_collections::BoundedSet as HashSet,
+    bounded::{
+        BoundedString as String,
+        BoundedVec as Vec,
+    },
+    bounded_collections::{
+        BoundedMap as HashMap,
+        BoundedSet as HashSet,
+    },
 };
 
 // Binary std/no_std choice - format macro not available without alloc
@@ -52,139 +116,174 @@ macro_rules! format {
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! vec {
-    () => {
-        wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap()
-    };
+    () => {{
+        use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
+        let guard = safe_managed_alloc!(1024, CrateId::Runtime).unwrap();
+        wrt_foundation::bounded::BoundedVec::new(guard.provider().clone()).unwrap()
+    }};
     ($($x:expr),*) => {{
-        let mut v = wrt_foundation::bounded::BoundedVec::new(wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap();
+        use wrt_foundation::{safe_managed_alloc, budget_aware_provider::CrateId};
+        let guard = safe_managed_alloc!(1024, CrateId::Runtime).unwrap();
+        let mut v = wrt_foundation::bounded::BoundedVec::new(guard.provider().clone()).unwrap();
         $(v.push($x).unwrap();)*
         v
     }};
 }
 
-// Re-export from wrt-component (component model)
-pub use wrt_component::{
-    instance::ComponentInstance,
-    interface::{Interface, InterfaceMapping},
-    module::ComponentModule,
-};
-// Re-export from wrt-decoder (binary parsing)
-pub use wrt_decoder::{
-    // Standard decoder exports
-    create_engine_state_section,
-    from_binary,
-    get_data_from_state_section,
-    module::Module as DecoderModule,
-    parse,
-    section_reader,
-    // CFI-related exports
-    CfiMetadata,
-    CfiMetadataGenerator,
-    CfiProtectionConfig,
-};
+// Safety-critical vec! macro that uses WRT allocator
+#[cfg(all(feature = "std", feature = "safety-critical"))]
+#[macro_export]
+macro_rules! vec {
+    () => {
+        wrt_foundation::allocator::WrtVec::<_, {wrt_foundation::allocator::CrateId::Wrt as u8}, 256>::new()
+    };
+    ($($x:expr),*) => {{
+        let mut v = wrt_foundation::allocator::WrtVec::<_, {wrt_foundation::allocator::CrateId::Wrt as u8}, 256>::new();
+        $(let _ = v.push($x);)*
+        v
+    }};
+}
+
+// Standard vec! macro for non-safety-critical std mode
+#[cfg(all(feature = "std", not(feature = "safety-critical")))]
+pub use std::vec;
+
+// Note: wrt-component exports would go here if available
+// Note: wrt-decoder exports would go here if available
 // Re-export from wrt-error (foundation crate)
 pub use wrt_error::{
-    codes, context, helpers, kinds, Error, ErrorCategory, ErrorSource, FromError, Result,
+    codes,
+    context,
+    helpers,
+    kinds,
+    Error,
+    ErrorCategory,
+    ErrorSource,
+    FromError,
+    Result,
     ToErrorCategory,
 };
-// Re-export from wrt-format (format specifications)
-pub use wrt_format::{
-    binary, component::Component as FormatComponent, is_state_section_name,
-    module::Module as FormatModule, validation::Validatable as FormatValidatable, StateSection,
+// Re-export clean types from wrt-foundation (when available)
+#[cfg(any(feature = "std", feature = "alloc"))]
+pub use wrt_foundation::clean_types::{
+    Case,
+    ComponentType as CleanComponentType,
+    Enum,
+    ExternType as CleanExternType,
+    // Nested types
+    Field,
+    Flags,
+    FuncType as CleanFuncType,
+    GlobalType as CleanGlobalType,
+    InstanceType as CleanInstanceType,
+    Limits as CleanLimits,
+    MemoryType as CleanMemoryType,
+    Record,
+    RefType as CleanRefType,
+    Result_ as CleanResult,
+    TableType as CleanTableType,
+    Tuple,
+    ValType as CleanValType,
+    Value as CleanValue,
+    Variant,
 };
+// Note: wrt-format exports would go here if available
 // Remove duplicate imports - already handled above
 // Re-export from wrt-foundation (core foundation library)
 pub use wrt_foundation::{
     // Bounded collections (safety-first alternatives to standard collections)
-    bounded::{BoundedError, BoundedHashMap, BoundedStack, BoundedVec, CapacityError},
-    component::{
-        ComponentType, ExternType, GlobalType as ComponentGlobalType, InstanceType,
-        MemoryType as ComponentMemoryType, TableType as ComponentTableType,
+    bounded::{
+        BoundedError,
+        BoundedStack,
+        BoundedVec,
+        CapacityError,
     },
-    component_value::{ComponentValue, ValType},
+    component::{
+        ComponentType,
+        ExternType,
+        GlobalType as ComponentGlobalType,
+        InstanceType,
+        MemoryType as ComponentMemoryType,
+        TableType as ComponentTableType,
+    },
+    component_value::{
+        ComponentValue,
+        ValType,
+    },
     // Safe memory types - prioritizing these over standard collections
     safe_memory::{
-        MemoryProvider, MemorySafety, MemoryStats, MemoryVerification, SafeMemoryHandler,
-        SafeSlice, SafeStack,
+        MemoryProvider,
+        SafeMemoryHandler,
+        SafeSlice,
+        SafeStack,
     },
     // Core types
-    types::{BlockType, FuncType, GlobalType, Limits, MemoryType, RefType, TableType, ValueType},
-    validation::{BoundedCapacity, Checksummed, Validatable as TypesValidatable},
-    values::{v128, Value, V128},
-    verification::{Checksum, VerificationLevel},
+    types::{
+        BlockType,
+        FuncType,
+        ValueType,
+    },
+    // validation::{Checksummed}, // Not available yet
+    values::{
+        v128,
+        Value,
+        V128,
+    },
+    verification::{
+        Checksum,
+        VerificationLevel,
+    },
 };
-// Re-export from wrt-host (host interface)
-pub use wrt_host::{
-    environment::{Environment, HostEnvironment},
-    host_functions::{HostFunction, HostFunctionRegistry},
-};
-// Re-export behavior traits from wrt-instructions
-pub use wrt_instructions::behavior::{
-    ControlFlow, ControlFlowBehavior, EngineBehavior, FrameBehavior, InstructionExecutor, Label,
-    ModuleBehavior, StackBehavior,
-};
-// Re-export from wrt-instructions (instruction encoding/decoding)
-pub use wrt_instructions::{
-    // Standard instruction exports
-    calls::CallInstruction,
-    control::ControlInstruction,
-    memory_ops::{MemoryArg, MemoryLoad, MemoryStore},
-    numeric::NumericInstruction,
-    // CFI-related exports
-    CfiControlFlowOps,
-    CfiControlFlowProtection,
-    CfiProtectedBranchTarget,
-    CfiProtectionLevel,
-    DefaultCfiControlFlowOps,
-    Instruction,
-};
-// Re-export from wrt-intercept (function interception)
-pub use wrt_intercept::{
-    interceptor::{FunctionInterceptor, InterceptorRegistry},
-    strategies::{DefaultInterceptStrategy, InterceptStrategy},
-};
+// Note: wrt-host exports would go here if available
+// Note: wrt-instructions behavior exports would go here if available
+// Note: wrt-instructions exports would go here if available
+// Note: wrt-intercept exports would go here if available
 // Re-export from wrt-platform (platform-specific implementations)
 pub use wrt_platform::{
-    BranchTargetIdentification, BtiExceptionLevel, BtiMode, CfiExceptionMode, ControlFlowIntegrity,
+    BranchTargetIdentification,
+    BtiExceptionLevel,
+    BtiMode,
+    CfiExceptionMode,
+    ControlFlowIntegrity,
+};
+// Capability-based engine (when available)
+#[cfg(any(feature = "std", feature = "alloc"))]
+pub use wrt_runtime::engine::{
+    CapabilityAwareEngine,
+    CapabilityEngine,
+    EngineBuilder,
+    EnginePreset,
+    InstanceHandle,
+    ModuleHandle,
 };
 // Re-export from wrt-runtime (runtime execution)
+// Selectively re-export working components to avoid compilation issues
 pub use wrt_runtime::{
-    // Standard runtime exports
-    component::{Component, Host, InstanceValue},
-    execution::ExecutionStats,
-    func::Function,
-    global::Global,
-    memory::Memory,
-    module::{
-        Data, Element, Export, ExportItem, ExportKind, Function as RuntimeFunction, Import, Module,
-        OtherExport,
-    },
+    // Module types
+    module::Module,
     module_instance::ModuleInstance,
+    // Stackless engine
     stackless::{
-        StacklessCallbackRegistry, StacklessEngine, StacklessExecutionState, StacklessFrame,
+        StacklessEngine,
+        StacklessExecutionState,
+        StacklessFrame,
     },
-    table::Table,
-    // CFI-related exports
-    CfiEngineStatistics,
-    CfiExecutionEngine,
-    CfiExecutionResult,
-    CfiViolationPolicy,
-    CfiViolationType,
-    ExecutionResult,
 };
-// Re-export from wrt-sync (synchronization primitives)
-pub use wrt_sync::{concurrency::ThreadSafe, sync_primitives::SyncAccess};
+// Note: wrt-sync exports would go here if available
 // Import synchronization primitives for no_std
 #[cfg(not(feature = "std"))]
 pub use wrt_sync::{
-    WrtMutex as Mutex, WrtMutexGuard as MutexGuard, WrtRwLock as RwLock,
-    WrtRwLockReadGuard as RwLockReadGuard, WrtRwLockWriteGuard as RwLockWriteGuard,
+    WrtMutex as Mutex,
+    WrtMutexGuard as MutexGuard,
+    WrtRwLock as RwLock,
+    WrtRwLockReadGuard as RwLockReadGuard,
+    WrtRwLockWriteGuard as RwLockWriteGuard,
 };
 
-// Re-export CFI integration types from main wrt crate (std only currently)
-#[cfg(feature = "std")]
-pub use crate::cfi_integration::{
-    CfiConfiguration, CfiEngineStatistics as CfiIntegrationStatistics,
-    CfiExecutionResult as CfiIntegrationResult, CfiHardwareFeatures, CfiProtectedEngine,
-    CfiProtectedModule,
-};
+// Re-export CFI integration types from main wrt crate (std only currently) -
+// temporarily disabled #[cfg(feature = "std")]
+// pub use crate::cfi_integration::{
+//     CfiConfiguration, CfiEngineStatistics as CfiIntegrationStatistics,
+//     CfiExecutionResult as CfiIntegrationResult, CfiHardwareFeatures,
+// CfiProtectedEngine,     CfiProtectedModule,
+// };

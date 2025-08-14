@@ -18,19 +18,29 @@ For complete contribution guidelines, please see our comprehensive documentation
 ### Quick Commands
 
 ```bash
+# Install cargo-wrt
+cargo install --path cargo-wrt
+
 # Setup development environment
-just build
-cargo xtask run-tests
+cargo-wrt setup --check             # Check tool dependencies
+cargo-wrt setup --all               # Install tools and setup git hooks
+cargo-wrt build
+cargo-wrt test
+
+# Tool version management
+cargo-wrt tool-versions check       # Verify tool versions
+cargo-wrt tool-versions check --verbose  # Detailed version information
 
 # Before submitting PR
-just fmt
-just ci-main
+cargo-wrt check
+cargo-wrt ci
 
-# Additional xtask commands
-cargo xtask verify-no-std          # Verify no_std compatibility
-cargo xtask fmt-check              # Check code formatting
-cargo xtask coverage               # Generate test coverage
-cargo xtask validate-docs          # Validate documentation
+# Additional development commands
+cargo-wrt no-std                   # Verify no_std compatibility
+cargo-wrt check --strict            # Check code formatting and linting
+cargo-wrt coverage --html           # Generate test coverage
+cargo-wrt docs --private            # Build and validate documentation
+cargo-wrt verify-matrix --report    # Run comprehensive verification
 ```
 
 ## Code of Conduct

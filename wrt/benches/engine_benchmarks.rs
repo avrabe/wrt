@@ -1,158 +1,204 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use wrt::{new_stackless_engine, FuncType, Function, Instruction, Module, Value, ValueType};
+use std::{
+    fs,
+    sync::Arc,
+};
 
-fn create_test_module() -> Module {
-    let mut module = Module::new();
+use criterion::{
+    black_box,
+    criterion_group,
+    criterion_main,
+    Criterion,
+};
+// Import the current execution components
+use wrt_decoder::decoder::decode_module;
+use wrt_error::Result;
+use wrt_foundation::values::Value;
+use wrt_runtime::{
+    module::Module,
+    module_instance::ModuleInstance,
+    stackless::StacklessEngine,
+};
 
-    // Add a simple function type (i32, i32) -> i32
-    let func_type =
-        FuncType { params: vec![ValueType::I32, ValueType::I32], results: vec![ValueType::I32] };
-    module.types.push(func_type);
+/// Helper function to load the real test WASM module
+fn load_test_module() -> Result<Module> {
+    let wasm_bytes = fs::read("test_add.wasm")
+        .map_err(|_| wrt_error::Error::system_io_error("Failed to read test_add.wasm"))?;
 
-    // Add a simple add function
-    let function = Function {
-        type_idx: 0,
-        locals: vec![],
-        code: vec![Instruction::LocalGet(0), Instruction::LocalGet(1), Instruction::I32Add],
-    };
-    module.functions.push(function);
-
-    module
+    let decoded = decode_module(&wasm_bytes)?;
+    Module::from_wrt_module(&decoded)
 }
 
-fn create_complex_module() -> Vec<u8> {
-    // Create a module that takes a number n and:
-    // 1. Adds 5 to n
-    // 2. Adds n to itself
-    // 3. Subtracts original n
-    // Result: n + 5 + n - n = n + 5
-    wat::parse_str(
-        r#"(module
-            (func (export "compute") (param i32) (result i32)
-                local.get 0     ;; get n
-                i32.const 5     ;; push 5
-                i32.add        ;; n + 5
-                local.get 0     ;; get n again
-                i32.add        ;; (n + 5) + n
-                local.get 0     ;; get n one more time
-                i32.sub        ;; ((n + 5) + n) - n = n + 5
-            )
-        )"#,
-    )
-    .unwrap()
+/// Helper function to create test arguments
+fn create_test_args(a: i32, b: i32) -> Vec<Value> {
+    vec![Value::I32(a), Value::I32(b)]
 }
 
-fn create_memory_module() -> Module {
-    let mut module = Module::new();
+fn benchmark_module_loading(c: &mut Criterion) {
+    let mut group = c.benchmark_group("wasm_module_loading");
 
-    // Function type (i32, i32) -> i32
-    let func_type =
-        FuncType { params: vec![ValueType::I32, ValueType::I32], results: vec![ValueType::I32] };
-    module.types.push(func_type);
-
-    // Create a function that performs memory operations
-    let function = Function {
-        type_idx: 0,
-        locals: vec![ValueType::I32], // Local variable for sum
-        code: vec![
-            // Initialize sum to 0
-            Instruction::I32Const(0),
-            Instruction::LocalSet(2),
-            // Store first parameter at address 0
-            Instruction::I32Const(0),
-            Instruction::LocalGet(0),
-            Instruction::I32Store(0, 0),
-            // Store second parameter at address 4
-            Instruction::I32Const(4),
-            Instruction::LocalGet(1),
-            Instruction::I32Store(0, 0),
-            // Load both values and add them
-            Instruction::I32Const(0),
-            Instruction::I32Load(0, 0),
-            Instruction::I32Const(4),
-            Instruction::I32Load(0, 0),
-            Instruction::I32Add,
-        ],
-    };
-    module.functions.push(function);
-
-    module
-}
-
-fn benchmark_engine_loading(c: &mut Criterion) {
-    let module = create_test_module();
-
-    let mut group = c.benchmark_group("wasm_component_loading");
-
-    group.bench_function("stackless_engine", |b| {
-        b.iter(|| {
-            let mut engine = new_stackless_engine();
-            black_box(engine.instantiate(module.clone())).unwrap();
+    if let Ok(wasm_bytes) = fs::read("test_add.wasm") {
+        group.bench_function("decode_module", |b| {
+            b.iter(|| {
+                let decoded = decode_module(black_box(&wasm_bytes)).unwrap();
+                black_box(decoded)
+            })
         });
-    });
+
+        group.bench_function("convert_to_runtime", |b| {
+            let decoded = decode_module(&wasm_bytes).unwrap();
+            b.iter(|| {
+                let runtime_module = Module::from_wrt_module(black_box(&decoded)).unwrap();
+                black_box(runtime_module)
+            })
+        });
+    }
+
+    group.finish();
+}
+
+fn benchmark_engine_instantiation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("engine_instantiation");
+
+    if let Ok(runtime_module) = load_test_module() {
+        group.bench_function("stackless_engine_creation", |b| {
+            b.iter(|| {
+                let engine = StacklessEngine::new();
+                black_box(engine)
+            })
+        });
+
+        group.bench_function("module_instance_creation", |b| {
+            b.iter(|| {
+                let instance = ModuleInstance::new(runtime_module.clone(), 0).unwrap();
+                black_box(instance)
+            })
+        });
+
+        group.bench_function("full_instantiation", |b| {
+            b.iter(|| {
+                let mut engine = StacklessEngine::new();
+                let instance = ModuleInstance::new(runtime_module.clone(), 0).unwrap();
+                let instance_arc = Arc::new(instance);
+                let instance_idx = engine.set_current_module(instance_arc).unwrap();
+                black_box(instance_idx)
+            })
+        });
+    }
 
     group.finish();
 }
 
 fn benchmark_simple_execution(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Simple Module Execution");
+    let mut group = c.benchmark_group("simple_execution");
 
-    // Create a simple module that adds two numbers
-    let module = create_test_module();
+    if let Ok(runtime_module) = load_test_module() {
+        group.bench_function("single_add_execution", |b| {
+            let mut engine = StacklessEngine::new();
+            let instance = ModuleInstance::new(runtime_module.clone(), 0).unwrap();
+            let instance_arc = Arc::new(instance);
+            let instance_idx = engine.set_current_module(instance_arc).unwrap();
 
-    group.bench_function("stackless_engine", |b| {
-        b.iter(|| {
-            let mut engine = wrt::new_stackless_engine();
-            let instance_idx = engine.instantiate(module.clone()).unwrap();
-            engine.execute(instance_idx, 0, vec![Value::I32(5), Value::I32(3)]).unwrap()
-        })
-    });
+            b.iter(|| {
+                let args = create_test_args(black_box(5), black_box(3));
+                let results = engine.execute(instance_idx, 0, args).unwrap();
+                black_box(results)
+            })
+        });
 
-    group.finish();
-}
+        group.bench_function("execution_with_setup", |b| {
+            b.iter(|| {
+                let mut engine = StacklessEngine::new();
+                let instance = ModuleInstance::new(runtime_module.clone(), 0).unwrap();
+                let instance_arc = Arc::new(instance);
+                let instance_idx = engine.set_current_module(instance_arc).unwrap();
 
-fn benchmark_complex_execution(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Complex Module Execution");
-
-    // Create a complex module with multiple functions and control flow
-    let wasm_bytes = create_complex_module();
-
-    // Create an empty module and load it from binary
-    let module = Module::new().load_from_binary(&wasm_bytes).unwrap();
-
-    group.bench_function("stackless_engine", |b| {
-        b.iter(|| {
-            let mut engine = wrt::new_stackless_engine();
-            let instance_idx = engine.instantiate(module.clone()).unwrap();
-            engine.execute(instance_idx, 0, vec![Value::I32(10)]).unwrap()
-        })
-    });
+                let args = create_test_args(black_box(5), black_box(3));
+                let results = engine.execute(instance_idx, 0, args).unwrap();
+                black_box(results)
+            })
+        });
+    }
 
     group.finish();
 }
 
-fn benchmark_memory_operations(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Memory Operations");
+fn benchmark_repeated_execution(c: &mut Criterion) {
+    let mut group = c.benchmark_group("repeated_execution");
 
-    // Create a module that performs memory operations
-    let module = create_memory_module();
+    if let Ok(runtime_module) = load_test_module() {
+        let mut engine = StacklessEngine::new();
+        let instance = ModuleInstance::new(runtime_module, 0).unwrap();
+        let instance_arc = Arc::new(instance);
+        let instance_idx = engine.set_current_module(instance_arc).unwrap();
 
-    group.bench_function("stackless_engine", |b| {
-        b.iter(|| {
-            let mut engine = wrt::new_stackless_engine();
-            let instance_idx = engine.instantiate(module.clone()).unwrap();
-            engine.execute(instance_idx, 0, vec![Value::I32(5), Value::I32(3)]).unwrap()
-        })
-    });
+        group.bench_function("10_executions", |b| {
+            b.iter(|| {
+                let mut total = 0;
+                for i in 0..10 {
+                    let args = create_test_args(i, i * 2);
+                    let results = engine.execute(instance_idx, 0, args).unwrap();
+                    if let Some(Value::I32(result)) = results.get(0) {
+                        total += result;
+                    }
+                }
+                black_box(total)
+            })
+        });
+
+        group.bench_function("100_executions", |b| {
+            b.iter(|| {
+                let mut total = 0;
+                for i in 0..100 {
+                    let args = create_test_args(i, i * 2);
+                    let results = engine.execute(instance_idx, 0, args).unwrap();
+                    if let Some(Value::I32(result)) = results.get(0) {
+                        total += result;
+                    }
+                }
+                black_box(total)
+            })
+        });
+    }
+
+    group.finish();
+}
+
+fn benchmark_memory_patterns(c: &mut Criterion) {
+    let mut group = c.benchmark_group("memory_patterns");
+
+    if let Ok(runtime_module) = load_test_module() {
+        group.bench_function("module_cloning", |b| {
+            b.iter(|| {
+                let cloned = runtime_module.clone();
+                black_box(cloned)
+            })
+        });
+
+        group.bench_function("arc_creation", |b| {
+            let instance = ModuleInstance::new(runtime_module.clone(), 0).unwrap();
+            b.iter(|| {
+                let instance_arc = Arc::new(instance.clone());
+                black_box(instance_arc)
+            })
+        });
+
+        group.bench_function("value_creation", |b| {
+            b.iter(|| {
+                let args = create_test_args(black_box(42), black_box(24));
+                black_box(args)
+            })
+        });
+    }
 
     group.finish();
 }
 
 criterion_group!(
     benches,
-    benchmark_engine_loading,
+    benchmark_module_loading,
+    benchmark_engine_instantiation,
     benchmark_simple_execution,
-    benchmark_complex_execution,
-    benchmark_memory_operations
+    benchmark_repeated_execution,
+    benchmark_memory_patterns
 );
 criterion_main!(benches);

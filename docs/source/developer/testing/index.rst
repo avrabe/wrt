@@ -12,6 +12,8 @@ Comprehensive testing strategies and requirements for WRT development.
    wasm_test_suite
    wast_quick_reference
    coverage_reports
+   formal_verification_guide
+   mcdc_coverage
 
 Testing Strategy
 ================
@@ -21,8 +23,9 @@ WRT employs a multi-layered testing approach:
 1. **Unit Tests**: Test individual components in isolation
 2. **Integration Tests**: Test component interactions
 3. **WASM Test Suite**: Validate WebAssembly specification compliance
-4. **Property Tests**: Verify system properties using formal methods
-5. **Performance Tests**: Benchmark critical paths
+4. **Formal Verification**: Mathematical proofs using KANI (29 properties)
+5. **Property Tests**: Verify system properties using formal methods
+6. **Performance Tests**: Benchmark critical paths
 
 Test Categories
 ===============
@@ -85,8 +88,8 @@ Generate Coverage Reports
 
 .. code-block:: bash
 
-   # Generate coverage with xtask
-   cargo xtask coverage
+   # Generate coverage with cargo-wrt
+   cargo-wrt coverage --html
 
    # Generate coverage directly
    cargo llvm-cov --html --output-dir coverage
@@ -100,15 +103,23 @@ Advanced Testing
 Formal Verification
 -------------------
 
-Kani proofs for critical properties:
+KANI formal verification for mathematical proof of safety properties:
 
 .. code-block:: bash
 
-   # Run Kani proofs
-   cargo xtask ci-advanced-tests
+   # Run all formal verification (29 properties)
+   cargo kani -p wrt-integration-tests --features kani
 
-   # Run specific proof
-   cargo kani --harness proof_name
+   # Run with specific ASIL profile
+   cargo-wrt kani-verify --asil-profile c
+
+   # Run specific proof harness
+   cargo kani --harness kani_verify_memory_budget_never_exceeded
+
+   # Simulate CI workflow locally
+   cargo-wrt simulate-ci
+
+For complete formal verification documentation, see :doc:`../../safety/formal_verification`.
 
 Memory Safety Testing
 ---------------------
@@ -190,13 +201,13 @@ Local CI Simulation
 .. code-block:: bash
 
    # Run main CI checks
-   just ci-main
+   cargo-wrt ci
 
-   # Run full CI suite
-   just ci-full
+   # Run full test suite
+   cargo-wrt test
 
-   # Run specific test category
-   cargo xtask ci-advanced-tests
+   # Run comprehensive verification
+   cargo-wrt verify-matrix --report
 
 Continuous Integration
 ----------------------

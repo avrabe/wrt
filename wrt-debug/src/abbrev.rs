@@ -4,14 +4,24 @@
 
 //! DWARF abbreviation table parsing
 
-use wrt_error::{codes, Error, ErrorCategory, Result};
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+    Result,
+};
 use wrt_foundation::{
-    bounded::{BoundedVec, MAX_DWARF_ABBREV_CACHE},
+    bounded::{
+        BoundedVec,
+        MAX_DWARF_ABBREV_CACHE,
+    },
     NoStdProvider,
 };
 
-use crate::cursor::DwarfCursor;
-
+use crate::{
+    bounded_debug_infra,
+    cursor::DwarfCursor,
+};
 /// DWARF attribute form constants
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AttributeForm {
@@ -90,25 +100,28 @@ pub struct AttributeSpec {
 #[derive(Debug, Clone)]
 pub struct Abbreviation {
     /// Abbreviation code
-    pub code: u32,
+    pub code:         u32,
     /// DIE tag
-    pub tag: u16,
+    pub tag:          u16,
     /// Has children flag
     pub has_children: bool,
     /// Attribute specifications
-    pub attributes: BoundedVec<AttributeSpec, 32, NoStdProvider<1024>>,
+    pub attributes:   BoundedVec<AttributeSpec, 32, crate::bounded_debug_infra::DebugProvider>,
 }
 
 /// DWARF abbreviation table
 pub struct AbbreviationTable {
     /// Cached abbreviations
-    entries: BoundedVec<Abbreviation, MAX_DWARF_ABBREV_CACHE, NoStdProvider<1024>>,
+    entries:
+        BoundedVec<Abbreviation, MAX_DWARF_ABBREV_CACHE, crate::bounded_debug_infra::DebugProvider>,
 }
 
 impl AbbreviationTable {
     /// Create a new abbreviation table
     pub fn new() -> Self {
-        Self { entries: BoundedVec::new(NoStdProvider) }
+        Self {
+            entries: BoundedVec::new(NoStdProvider),
+        }
     }
 
     /// Parse abbreviations from data
@@ -143,26 +156,26 @@ impl AbbreviationTable {
                     break;
                 }
 
-                let attr_spec = AttributeSpec { name, form: AttributeForm::from_u16(form) };
+                let attr_spec = AttributeSpec {
+                    name,
+                    form: AttributeForm::from_u16(form),
+                };
 
-                attributes.push(attr_spec).map_err(|_| {
-                    Error::new(
-                        ErrorCategory::Capacity,
-                        codes::CAPACITY_EXCEEDED,
-                        "Too many attributes in abbreviation",
-                    )
-                })?;
+                attributes
+                    .push(attr_spec)
+                    .map_err(|_| Error::capacity_exceeded("Too many attributes in abbreviation"))?;
             }
 
-            let abbrev = Abbreviation { code, tag, has_children, attributes };
+            let abbrev = Abbreviation {
+                code,
+                tag,
+                has_children,
+                attributes,
+            };
 
-            self.entries.push(abbrev).map_err(|_| {
-                Error::new(
-                    ErrorCategory::Capacity,
-                    codes::CAPACITY_EXCEEDED,
-                    "Abbreviation cache full",
-                )
-            })?;
+            self.entries
+                .push(abbrev)
+                .map_err(|_| Error::capacity_exceeded("Abbreviation cache full"))?;
         }
 
         Ok(())

@@ -7,21 +7,28 @@
 //! This module provides utilities for encoding and decoding custom name
 //! sections in WebAssembly Component Model binaries.
 
-use wrt_error::{codes, Error, ErrorCategory, Result};
-use wrt_foundation::NoStdProvider;
-
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+    Result,
+};
+#[cfg(feature = "std")]
+use wrt_format::binary::with_alloc::{
+    read_leb128_u32,
+    read_string,
+};
 #[cfg(feature = "std")]
 use wrt_format::component::Sort;
-
 #[cfg(feature = "std")]
-use wrt_format::{write_string, write_leb128_u32};
-#[cfg(feature = "std")]
-use wrt_format::binary::with_alloc::{read_string, read_leb128_u32};
-
+use wrt_format::{
+    write_leb128_u32,
+    write_string,
+};
 #[cfg(not(feature = "std"))]
-use wrt_format::binary::{read_leb128_u32};
+use wrt_foundation::bounded::BoundedVec;
 #[cfg(not(feature = "std"))]
-use wrt_foundation::bounded::{BoundedString, BoundedVec};
+use wrt_foundation::safe_memory::NoStdProvider;
 
 use crate::prelude::*;
 
@@ -30,17 +37,17 @@ use crate::prelude::*;
 #[derive(Default, Debug, Clone)]
 pub struct ComponentNameSection {
     /// Component name
-    pub component_name: Option<String>,
+    pub component_name:  Option<String>,
     /// Names for each sort (function, instance, etc.)
-    pub sort_names: Vec<(Sort, Vec<(u32, String)>)>,
+    pub sort_names:      Vec<(Sort, Vec<(u32, String)>)>,
     /// Import names
-    pub import_names: Vec<(u32, String)>,
+    pub import_names:    Vec<(u32, String)>,
     /// Export names
-    pub export_names: Vec<(u32, String)>,
+    pub export_names:    Vec<(u32, String)>,
     /// Canonical function names
     pub canonical_names: Vec<(u32, String)>,
     /// Type names
-    pub type_names: Vec<(u32, String)>,
+    pub type_names:      Vec<(u32, String)>,
 }
 
 /// Component name section (no_std version - simplified)
@@ -48,17 +55,17 @@ pub struct ComponentNameSection {
 #[derive(Default, Debug, Clone)]
 pub struct ComponentNameSection {
     /// Component name (simplified for no_std)
-    pub component_name: Option<&'static str>,
+    pub component_name:  Option<&'static str>,
     /// Simplified names for no_std - only sort IDs
-    pub sort_names: (),
+    pub sort_names:      (),
     /// Import names (disabled in no_std)
-    pub import_names: (),
+    pub import_names:    (),
     /// Export names (disabled in no_std)
-    pub export_names: (),
+    pub export_names:    (),
     /// Canonical function names (disabled in no_std)
     pub canonical_names: (),
     /// Type names (disabled in no_std)
-    pub type_names: (),
+    pub type_names:      (),
 }
 
 /// Name subsection IDs
@@ -127,7 +134,7 @@ pub fn generate_component_name_section(section: &ComponentNameSection) -> Result
                 _ => {
                     // Skip unknown sorts
                     continue;
-                }
+                },
             };
             sort_data.push(sort_id);
 
@@ -158,7 +165,11 @@ pub fn generate_component_name_section(section: &ComponentNameSection) -> Result
 
     // Write canonical names
     if !section.canonical_names.is_empty() {
-        write_name_map(&mut result, subsection::CANONICAL_NAMES, &section.canonical_names);
+        write_name_map(
+            &mut result,
+            subsection::CANONICAL_NAMES,
+            &section.canonical_names,
+        );
     }
 
     // Write type names
@@ -170,33 +181,33 @@ pub fn generate_component_name_section(section: &ComponentNameSection) -> Result
 }
 
 /// Generate binary data for a component name section (no_std version)
-/// 
+///
 /// # Safety Requirements
 /// - Uses bounded allocation with compile-time limits
-/// - Fails gracefully when limits are exceeded  
+/// - Fails gracefully when limits are exceeded
 /// - No heap allocation or dynamic memory
 #[cfg(not(feature = "std"))]
-pub fn generate_component_name_section(section: &ComponentNameSection) -> Result<BoundedVec<u8, 1024, NoStdProvider<2048>>> {
-    use wrt_foundation::safe_memory::NoStdProvider;
-    let provider = NoStdProvider::<2048>::new();
-    let mut result = BoundedVec::new(provider).map_err(|_| Error::new(
-        ErrorCategory::Memory,
-        codes::MEMORY_ALLOCATION_FAILED,
-        "Failed to create result buffer"
-    ))?;
+pub fn generate_component_name_section(
+    section: &ComponentNameSection,
+) -> Result<BoundedVec<u8, 1024, NoStdProvider<2048>>> {
+    let provider = wrt_foundation::safe_managed_alloc!(
+        2048,
+        wrt_foundation::budget_aware_provider::CrateId::Decoder
+    )?;
+    let mut result = BoundedVec::new(provider).map_err(|_| {
+        wrt_error::Error::platform_memory_allocation_failed("Failed to create result buffer")
+    })?;
 
     // Write component name if present (simplified for no_std)
     if let Some(name) = &section.component_name {
-        result.push(subsection::COMPONENT_NAME).map_err(|_| Error::new(
-            ErrorCategory::Memory,
-            codes::MEMORY_ALLOCATION_FAILED,
-            "Name section buffer overflow"
-        ))?;
-        
+        result.push(subsection::COMPONENT_NAME).map_err(|_| {
+            wrt_error::Error::platform_memory_allocation_failed("Name section buffer overflow")
+        })?;
+
         // In no_std mode, use simplified string writing
         let name_bytes = name.as_bytes();
         let name_len = name_bytes.len() as u32;
-        
+
         // Simple LEB128 encoding for length (simplified for no_std)
         let mut length_data = [0u8; 5]; // Max 5 bytes for u32 LEB128
         let mut len_bytes_count = 0;
@@ -208,23 +219,19 @@ pub fn generate_component_name_section(section: &ComponentNameSection) -> Result
         }
         length_data[len_bytes_count] = value as u8;
         len_bytes_count += 1;
-        
+
         // Write length data
         for i in 0..len_bytes_count {
-            result.push(length_data[i]).map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_FAILED,
-                "Name section buffer overflow"
-            ))?;
+            result.push(length_data[i]).map_err(|_| {
+                wrt_error::Error::platform_memory_allocation_failed("Name section buffer overflow")
+            })?;
         }
-        
+
         // Write name data
         for byte in name_bytes.iter() {
-            result.push(*byte).map_err(|_| Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ALLOCATION_FAILED,
-                "Name section buffer overflow"
-            ))?;
+            result.push(*byte).map_err(|_| {
+                wrt_error::Error::platform_memory_allocation_failed("Name section buffer overflow")
+            })?;
         }
     }
 
@@ -251,9 +258,7 @@ pub fn parse_component_name_section(data: &[u8]) -> Result<ComponentNameSection>
 
         let subsection_end = pos + subsection_size as usize;
         if subsection_end > data.len() {
-            return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::PARSE_ERROR,
+            return Err(Error::parse_error(
                 "Subsection extends beyond end of name section data",
             ));
         }
@@ -263,14 +268,10 @@ pub fn parse_component_name_section(data: &[u8]) -> Result<ComponentNameSection>
                 // Parse component name
                 let (name, bytes_read) = read_string(&data[pos..subsection_end], 0)?;
                 if bytes_read != subsection_size as usize {
-                    return Err(Error::new(
-                        ErrorCategory::Parse,
-                        codes::PARSE_ERROR,
-                        "Invalid component name format",
-                    ));
+                    return Err(Error::parse_error("Invalid component name format"));
                 }
                 result.component_name = Some(name);
-            }
+            },
             subsection::SORT_NAMES => {
                 // Parse sort names
                 let mut subsection_pos = pos;
@@ -282,9 +283,7 @@ pub fn parse_component_name_section(data: &[u8]) -> Result<ComponentNameSection>
                 for _ in 0..num_sorts {
                     // Read sort ID
                     if subsection_pos >= subsection_end {
-                        return Err(Error::new(
-                            ErrorCategory::Parse,
-                            codes::PARSE_ERROR,
+                        return Err(Error::parse_error(
                             "Unexpected end of sort names subsection",
                         ));
                     }
@@ -302,15 +301,14 @@ pub fn parse_component_name_section(data: &[u8]) -> Result<ComponentNameSection>
                         sort_type::INSTANCE => Sort::Instance,
                         _ => {
                             return Err(Error::parse_error("Unknown sort ID"));
-                        }
+                        },
                     };
-                    
+
                     #[cfg(not(feature = "std"))]
                     let sort = sort_id; // Just use the raw sort ID for no_std
 
                     // Read number of names
-                    let (num_names, bytes_read) =
-                        read_leb128_u32(&data[subsection_pos..], 0)?;
+                    let (num_names, bytes_read) = read_leb128_u32(&data[subsection_pos..], 0)?;
                     subsection_pos += bytes_read;
 
                     let mut names = Vec::new();
@@ -318,8 +316,7 @@ pub fn parse_component_name_section(data: &[u8]) -> Result<ComponentNameSection>
                     // Read each name
                     for _ in 0..num_names {
                         // Read index
-                        let (idx, bytes_read) =
-                            read_leb128_u32(&data[subsection_pos..], 0)?;
+                        let (idx, bytes_read) = read_leb128_u32(&data[subsection_pos..], 0)?;
                         subsection_pos += bytes_read;
 
                         // Read name
@@ -331,22 +328,22 @@ pub fn parse_component_name_section(data: &[u8]) -> Result<ComponentNameSection>
 
                     result.sort_names.push((sort, names));
                 }
-            }
+            },
             subsection::IMPORT_NAMES => {
                 result.import_names = read_name_map(&data[pos..subsection_end])?;
-            }
+            },
             subsection::EXPORT_NAMES => {
                 result.export_names = read_name_map(&data[pos..subsection_end])?;
-            }
+            },
             subsection::CANONICAL_NAMES => {
                 result.canonical_names = read_name_map(&data[pos..subsection_end])?;
-            }
+            },
             subsection::TYPE_NAMES => {
                 result.type_names = read_name_map(&data[pos..subsection_end])?;
-            }
+            },
             _ => {
                 // Skip unknown subsections
-            }
+            },
         }
 
         pos = subsection_end;
@@ -355,7 +352,8 @@ pub fn parse_component_name_section(data: &[u8]) -> Result<ComponentNameSection>
     Ok(result)
 }
 
-/// Parse a component name section from binary data (no_std version - simplified)
+/// Parse a component name section from binary data (no_std version -
+/// simplified)
 #[cfg(not(feature = "std"))]
 pub fn parse_component_name_section(_data: &[u8]) -> Result<ComponentNameSection> {
     // Simplified parsing for no_std - only basic functionality

@@ -7,14 +7,20 @@
 //! The stackless engine uses a state machine approach to track execution state
 //! and allows for pausing and resuming execution at any point.
 
-mod engine;
+pub mod engine;
 pub mod extensions;
 mod frame;
 
 #[cfg(feature = "std")]
 pub mod tail_call;
 
+#[cfg(test)]
+mod engine_tests;
+
 pub use engine::{
-    StacklessCallbackRegistry, StacklessEngine, StacklessExecutionState, StacklessStack,
+    StacklessCallbackRegistry,
+    StacklessEngine,
+    StacklessExecutionState,
+    StacklessStack,
 };
 pub use frame::StacklessFrame;

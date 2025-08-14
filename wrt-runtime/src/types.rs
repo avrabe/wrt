@@ -1,10 +1,14 @@
 //! Type aliases for `no_std` compatibility in wrt-runtime
 
+use wrt_foundation::{
+    BoundedMap,
+    BoundedVec,
+};
+
 use crate::prelude::*;
-use wrt_foundation::{BoundedVec, BoundedMap};
 
 /// Platform-aware memory provider for runtime types
-type RuntimeProvider = wrt_foundation::safe_memory::NoStdProvider<8192>;  // 8KB for runtime operations
+pub(crate) type RuntimeProvider = crate::bounded_runtime_infra::RuntimeProvider;
 
 // Runtime execution limits
 /// Maximum recursion depth for function calls
@@ -123,7 +127,8 @@ pub type MemoriesVec = BoundedVec<crate::memory::Memory, MAX_MEMORIES, RuntimePr
 pub type ElementsVec = Vec<wrt_foundation::types::ElementSegment>;
 /// Element segments vector type for `no_std` environments
 #[cfg(not(feature = "std"))]
-pub type ElementsVec = BoundedVec<wrt_foundation::types::ElementSegment, MAX_ELEMENTS, RuntimeProvider>;
+pub type ElementsVec =
+    BoundedVec<wrt_foundation::types::ElementSegment, MAX_ELEMENTS, RuntimeProvider>;
 
 /// Data segments vector type for std environments
 #[cfg(feature = "std")]
@@ -155,14 +160,16 @@ pub type BranchTargetsVec = BoundedVec<u32, MAX_BRANCH_TABLE_TARGETS, RuntimePro
 pub type ModuleInstanceVec = Vec<crate::module_instance::ModuleInstance>;
 /// Module instances vector type for `no_std` environments
 #[cfg(not(feature = "std"))]
-pub type ModuleInstanceVec = BoundedVec<crate::module_instance::ModuleInstance, MAX_MODULE_INSTANCES, RuntimeProvider>;
+pub type ModuleInstanceVec =
+    BoundedVec<crate::module_instance::ModuleInstance, MAX_MODULE_INSTANCES, RuntimeProvider>;
 
 /// Function bodies vector type for std environments
 #[cfg(feature = "std")]
 pub type FunctionBodiesVec = Vec<Vec<u8>>;
 /// Function bodies vector type for `no_std` environments
 #[cfg(not(feature = "std"))]
-pub type FunctionBodiesVec = BoundedVec<BoundedVec<u8, 65536, RuntimeProvider>, MAX_FUNCTION_BODIES, RuntimeProvider>;
+pub type FunctionBodiesVec =
+    BoundedVec<BoundedVec<u8, 65536, RuntimeProvider>, MAX_FUNCTION_BODIES, RuntimeProvider>;
 
 // Memory and table data
 /// Memory data vector type for std environments
@@ -177,7 +184,8 @@ pub type MemoryDataVec = BoundedVec<u8, { 64 * 1024 * 1024 }, RuntimeProvider>;
 pub type TableDataVec = Vec<Option<crate::prelude::RefValue>>;
 /// Table data vector type for `no_std` environments
 #[cfg(not(feature = "std"))]
-pub type TableDataVec = BoundedVec<Option<crate::prelude::RefValue>, MAX_TABLE_ENTRIES, RuntimeProvider>;
+pub type TableDataVec =
+    BoundedVec<Option<crate::prelude::RefValue>, MAX_TABLE_ENTRIES, RuntimeProvider>;
 
 // String type for runtime
 /// Runtime string type for std environments
@@ -229,7 +237,8 @@ pub type CfiCheckVec = BoundedVec<crate::cfi_engine::CfiCheck, MAX_CFI_CHECKS, R
 pub type InstrumentationVec = Vec<crate::execution::InstrumentationPoint>;
 /// Instrumentation points vector type for `no_std` environments
 #[cfg(not(feature = "std"))]
-pub type InstrumentationVec = BoundedVec<crate::execution::InstrumentationPoint, MAX_INSTRUMENTATION_POINTS, RuntimeProvider>;
+pub type InstrumentationVec =
+    BoundedVec<crate::execution::InstrumentationPoint, MAX_INSTRUMENTATION_POINTS, RuntimeProvider>;
 
 // Generic byte vector for raw data
 /// Byte vector type for std environments

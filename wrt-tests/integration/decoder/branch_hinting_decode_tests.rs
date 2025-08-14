@@ -26,7 +26,7 @@ fn test_decode_br_on_null() -> Result<()> {
     }
     
     // Verify correct number of bytes consumed
-    assert_eq!(consumed, 2);
+    assert_eq!(consumed, 2;
     
     Ok(())
 }
@@ -44,13 +44,13 @@ fn test_decode_br_on_non_null() -> Result<()> {
     // Verify correct instruction was parsed
     match instruction {
         Instruction::BrOnNonNull(label) => {
-            assert_eq!(label, 5);
+            assert_eq!(label, 5;
         }
         _ => panic!("Expected BrOnNonNull instruction, got {:?}", instruction),
     }
     
     // Verify correct number of bytes consumed
-    assert_eq!(consumed, 2);
+    assert_eq!(consumed, 2;
     
     Ok(())
 }
@@ -134,13 +134,13 @@ fn test_decode_return_call() -> Result<()> {
     // Verify correct instruction was parsed
     match instruction {
         Instruction::ReturnCall(func_idx) => {
-            assert_eq!(func_idx, 10);
+            assert_eq!(func_idx, 10;
         }
         _ => panic!("Expected ReturnCall instruction, got {:?}", instruction),
     }
     
     // Verify correct number of bytes consumed
-    assert_eq!(consumed, 2);
+    assert_eq!(consumed, 2;
     
     Ok(())
 }
@@ -158,14 +158,14 @@ fn test_decode_return_call_indirect() -> Result<()> {
     // Verify correct instruction was parsed
     match instruction {
         Instruction::ReturnCallIndirect(type_idx, table_idx) => {
-            assert_eq!(type_idx, 3);
+            assert_eq!(type_idx, 3;
             assert_eq!(table_idx, 0);
         }
         _ => panic!("Expected ReturnCallIndirect instruction, got {:?}", instruction),
     }
     
     // Verify correct number of bytes consumed
-    assert_eq!(consumed, 3);
+    assert_eq!(consumed, 3;
     
     Ok(())
 }
@@ -179,11 +179,11 @@ fn test_decode_large_label_indices() -> Result<()> {
     
     match instruction1 {
         Instruction::BrOnNull(label) => {
-            assert_eq!(label, 127);
+            assert_eq!(label, 127;
         }
         _ => panic!("Expected BrOnNull instruction"),
     }
-    assert_eq!(consumed1, 2);
+    assert_eq!(consumed1, 2;
     
     // br_on_non_null with larger label index (128, which requires 2 bytes LEB128)
     let bytecode2 = &[0xD6, 0x80, 0x01];
@@ -191,11 +191,11 @@ fn test_decode_large_label_indices() -> Result<()> {
     
     match instruction2 {
         Instruction::BrOnNonNull(label) => {
-            assert_eq!(label, 128);
+            assert_eq!(label, 128;
         }
         _ => panic!("Expected BrOnNonNull instruction"),
     }
-    assert_eq!(consumed2, 3);
+    assert_eq!(consumed2, 3;
     
     Ok(())
 }
@@ -205,12 +205,12 @@ fn test_decode_large_label_indices() -> Result<()> {
 fn test_invalid_opcodes() {
     // Test unrecognized opcode 0xD4 (reserved)
     let bytecode = &[0xD4];
-    let result = parse_instruction(bytecode);
+    let result = parse_instruction(bytecode;
     assert!(result.is_err(), "Expected error for reserved opcode 0xD4");
     
     // Test incomplete instruction (br_on_null without operand)
     let bytecode = &[0xD5];
-    let result = parse_instruction(bytecode);
+    let result = parse_instruction(bytecode;
     assert!(result.is_err(), "Expected error for incomplete br_on_null");
 }
 
@@ -230,25 +230,25 @@ fn test_decode_instruction_sequence() -> Result<()> {
     // Parse ref.is_null
     let (instr1, consumed1) = parse_instruction(&bytecode[offset..])?;
     offset += consumed1;
-    assert!(matches!(instr1, Instruction::RefIsNull));
+    assert!(matches!(instr1, Instruction::RefIsNull);
     
     // Parse br_on_null
     let (instr2, consumed2) = parse_instruction(&bytecode[offset..])?;
     offset += consumed2;
-    assert!(matches!(instr2, Instruction::BrOnNull(1)));
+    assert!(matches!(instr2, Instruction::BrOnNull(1));
     
     // Parse ref.as_non_null
     let (instr3, consumed3) = parse_instruction(&bytecode[offset..])?;
     offset += consumed3;
-    assert!(matches!(instr3, Instruction::RefAsNonNull));
+    assert!(matches!(instr3, Instruction::RefAsNonNull);
     
     // Parse br_on_non_null
     let (instr4, consumed4) = parse_instruction(&bytecode[offset..])?;
     offset += consumed4;
-    assert!(matches!(instr4, Instruction::BrOnNonNull(2)));
+    assert!(matches!(instr4, Instruction::BrOnNonNull(2));
     
     // Verify we consumed all bytes
-    assert_eq!(offset, bytecode.len());
+    assert_eq!(offset, bytecode.len();
     
     Ok(())
 }
@@ -276,13 +276,13 @@ fn test_decode_performance() -> Result<()> {
         count += 1;
         
         // Verify each instruction is correct
-        assert!(matches!(instruction, Instruction::BrOnNull(0)));
+        assert!(matches!(instruction, Instruction::BrOnNull(0));
     }
     
-    let duration = start.elapsed();
+    let duration = start.elapsed);
     
     // Verify we decoded the expected number of instructions
-    assert_eq!(count, 1000);
+    assert_eq!(count, 1000;
     
     // Performance check: should decode 1000 instructions quickly
     println!("Decoded {} branch hinting instructions in {:?}", count, duration);

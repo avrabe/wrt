@@ -1,8 +1,14 @@
 //! Example demonstrating safe memory usage in wrt-decoder
 
-use wrt_decoder::{module::decode_module, SafeSlice};
+use wrt_decoder::{
+    module::decode_module,
+    SafeSlice,
+};
 use wrt_error::Result;
-use wrt_foundation::{safe_memory::SafeMemoryHandler, verification::VerificationLevel};
+use wrt_foundation::{
+    safe_memory::SafeMemoryHandler,
+    verification::VerificationLevel,
+};
 
 // Sample minimal WebAssembly module (empty module)
 const MINIMAL_WASM: [u8; 8] = [0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00];

@@ -1,9 +1,8 @@
 //! Consolidated no_std compatibility tests for all WRT crates
 //!
-//! This module consolidates all the no_std_compatibility_test.rs files from across all crates
-//! into a single comprehensive test suite. Each crate's no_std functionality is thoroughly tested.
-
-#![cfg_attr(not(feature = "std"), no_std)]
+//! This module consolidates all the no_std_compatibility_test.rs files from
+//! across all crates into a single comprehensive test suite. Each crate's
+//! no_std functionality is thoroughly tested.
 
 // External crate imports for no_std environment
 extern crate alloc;
@@ -11,26 +10,36 @@ extern crate alloc;
 #[cfg(test)]
 mod tests {
     // Import necessary types for no_std environment
-        use std::{format, string::String, vec};
-    
+    use std::{
+        format,
+        string::String,
+        vec,
+    };
     #[cfg(feature = "std")]
-    use std::{format, string::String, vec};
+    use std::{
+        format,
+        string::String,
+        vec,
+    };
 
     // ===========================================
     // WRT-ERROR NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_error_tests {
+        use wrt_error::{
+            codes,
+            kinds,
+            Error,
+            ErrorCategory,
+            Result,
+        };
+
         use super::*;
-        use wrt_error::{codes, kinds, Error, ErrorCategory, Result};
 
         #[test]
         fn test_error_creation() {
-            let error = Error::new(
-                ErrorCategory::Core, 
-                codes::INVALID_MEMORY_ACCESS, 
-                "Invalid memory access"
-            );
+            let error = Error::core_invalid_memory_access("Invalid memory access");
 
             assert_eq!(error.category, ErrorCategory::Core);
             assert_eq!(error.code, codes::INVALID_MEMORY_ACCESS);
@@ -42,11 +51,7 @@ mod tests {
             assert!(ok_result.is_ok());
             assert_eq!(ok_result.unwrap(), 42);
 
-            let error = Error::new(
-                ErrorCategory::Core, 
-                codes::INVALID_MEMORY_ACCESS, 
-                "Invalid memory access"
-            );
+            let error = Error::core_invalid_memory_access("Invalid memory access");
             let err_result: Result<i32> = Err(error);
             assert!(err_result.is_err());
 
@@ -80,13 +85,15 @@ mod tests {
     }
 
     // ===========================================
-    // WRT-FOUNDATION NO_STD TESTS  
+    // WRT-FOUNDATION NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_foundation_tests {
-        use super::*;
-        use wrt_foundation::prelude::*;
         use core::mem;
+
+        use wrt_foundation::prelude::*;
+
+        use super::*;
 
         #[test]
         fn test_bounded_vec_no_alloc() {
@@ -190,7 +197,7 @@ mod tests {
             assert!(matches!(level, VerificationLevel::Off));
         }
 
-        #[cfg(not(any(feature = "std", )))]
+        #[cfg(not(any(feature = "std",)))]
         #[test]
         fn test_simple_hashmap_no_alloc() {
             use wrt_foundation::BoundedMap;
@@ -217,10 +224,14 @@ mod tests {
     // ===========================================
     // WRT-SYNC NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_sync_tests {
+        use wrt_sync::{
+            WrtMutex as Mutex,
+            WrtRwLock as RwLock,
+        };
+
         use super::*;
-        use wrt_sync::{WrtMutex as Mutex, WrtRwLock as RwLock};
 
         #[test]
         fn test_mutex_operations() {
@@ -284,19 +295,33 @@ mod tests {
     // ===========================================
     // WRT-PLATFORM NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_platform_tests {
-        use super::*;
-        use wrt_platform::{PageAllocator, FutexLike, WASM_PAGE_SIZE};
-        use wrt_platform::sync::{SpinFutex, SpinFutexBuilder};
-        use wrt_platform::memory::{NoStdProvider, NoStdProviderBuilder, VerificationLevel};
         use core::time::Duration;
+
+        use wrt_foundation::{
+            budget_aware_provider::CrateId,
+            WrtProviderFactory,
+        };
+        use wrt_platform::{
+            memory::{
+                NoStdProvider,
+                VerificationLevel,
+            },
+            sync::{
+                SpinFutex,
+                SpinFutexBuilder,
+            },
+            FutexLike,
+            PageAllocator,
+            WASM_PAGE_SIZE,
+        };
+
+        use super::*;
 
         #[test]
         fn test_spin_futex_no_std() {
-            let futex = SpinFutexBuilder::new()
-                .with_initial_value(42)
-                .build();
+            let futex = SpinFutexBuilder::new().with_initial_value(42).build();
 
             assert_eq!(futex.get(), 42);
             futex.set(100);
@@ -313,13 +338,12 @@ mod tests {
 
         #[test]
         fn test_nostd_memory_provider() {
-            let provider = NoStdProviderBuilder::new()
-                .with_size(2048)
-                .with_verification_level(VerificationLevel::Standard)
-                .build();
+            let provider =
+                safe_managed_alloc!(2048, CrateId::Platform).expect("Failed to create provider");
 
             assert_eq!(provider.verification_level(), VerificationLevel::Standard);
-            assert!(provider.capacity() <= 4096); // Capped at 4096 in stub implementation
+            assert!(provider.capacity() <= 4096); // Capped at 4096 in stub
+                                                  // implementation
         }
 
         #[test]
@@ -331,18 +355,27 @@ mod tests {
     // ===========================================
     // WRT-RUNTIME NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_runtime_tests {
+        use wrt_foundation::{
+            values::Value,
+            ValueType,
+        };
+        use wrt_runtime::{
+            global::Global,
+            Memory,
+            MemoryType as RuntimeMemoryType,
+            Table,
+        };
+
         use super::*;
-        use wrt_runtime::{Memory, Table, global::Global, MemoryType as RuntimeMemoryType};
-        use wrt_foundation::{ValueType, values::Value};
 
         #[test]
         fn test_memory_no_std() {
             let mem_type = RuntimeMemoryType {
                 minimum: 1,
                 maximum: Some(2),
-                shared: false,
+                shared:  false,
             };
 
             let memory = Memory::new(mem_type).unwrap();
@@ -370,10 +403,11 @@ mod tests {
     // ===========================================
     // WRT-INSTRUCTIONS NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_instructions_tests {
-        use super::*;
         use wrt_instructions::opcodes::Opcode;
+
+        use super::*;
 
         #[test]
         fn test_opcodes_no_std() {
@@ -386,7 +420,7 @@ mod tests {
         #[test]
         fn test_opcode_serialization() {
             let opcode = Opcode::I32Const;
-            
+
             // Test that opcodes have consistent representation
             assert_eq!(core::mem::size_of::<Opcode>(), 1);
         }
@@ -395,21 +429,22 @@ mod tests {
     // ===========================================
     // WRT-DECODER NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_decoder_tests {
-        use super::*;
         use wrt_decoder::conversion::{
             format_limits_to_types_limits,
             types_limits_to_format_limits,
         };
 
+        use super::*;
+
         #[test]
         fn test_limits_conversion_no_std() {
             let format_limits = wrt_format::Limits {
-                min: 1,
-                max: Some(2),
+                min:      1,
+                max:      Some(2),
                 memory64: false,
-                shared: false,
+                shared:   false,
             };
 
             let types_limits = format_limits_to_types_limits(format_limits);
@@ -430,13 +465,14 @@ mod tests {
     // ===========================================
     // WRT-FORMAT NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_format_tests {
-        use super::*;
         use wrt_format::{
             module::Module as FormatModule,
             section::Section,
         };
+
+        use super::*;
 
         #[test]
         fn test_format_module_creation() {
@@ -449,7 +485,7 @@ mod tests {
             // Test section type discrimination in no_std
             let type_section = Section::Type(vec![]);
             let function_section = Section::Function(vec![]);
-            
+
             assert!(matches!(type_section, Section::Type(_)));
             assert!(matches!(function_section, Section::Function(_)));
         }
@@ -458,11 +494,11 @@ mod tests {
     // ===========================================
     // WRT-HOST NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_host_tests {
         use super::*;
         // Note: wrt-host may not have extensive no_std functionality yet
-        
+
         #[test]
         fn test_host_no_std_basic() {
             // Basic test to ensure the crate compiles in no_std
@@ -473,10 +509,14 @@ mod tests {
     // ===========================================
     // WRT-LOGGING NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_logging_tests {
+        use wrt_logging::{
+            Level,
+            Operation,
+        };
+
         use super::*;
-        use wrt_logging::{Level, Operation};
 
         #[test]
         fn test_log_levels_no_std() {
@@ -499,7 +539,7 @@ mod tests {
     // ===========================================
     // WRT-INTERCEPT NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_intercept_tests {
         use super::*;
         // Basic intercept functionality tests for no_std
@@ -507,14 +547,15 @@ mod tests {
         #[test]
         fn test_intercept_no_std_basic() {
             // Basic test to ensure the crate compiles in no_std
-            // More specific tests would be added based on wrt-intercept's no_std API
+            // More specific tests would be added based on wrt-intercept's
+            // no_std API
         }
     }
 
     // ===========================================
     // WRT-COMPONENT NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_component_tests {
         use super::*;
         // Note: Component model typically requires more features
@@ -529,7 +570,7 @@ mod tests {
     // ===========================================
     // WRT-TEST-REGISTRY NO_STD TESTS
     // ===========================================
-    
+
     mod wrt_test_registry_tests {
         use super::*;
         // Test that the test registry itself works in no_std
@@ -537,28 +578,28 @@ mod tests {
         #[test]
         fn test_registry_no_std_basic() {
             // Test basic registry functionality in no_std
-            // This ensures our testing infrastructure itself is no_std compatible
+            // This ensures our testing infrastructure itself is no_std
+            // compatible
         }
     }
 
     // ===========================================
     // CROSS-CRATE INTEGRATION TESTS
     // ===========================================
-    
+
     mod integration_tests {
         use super::*;
 
         #[test]
         fn test_error_with_foundation_types() {
-            use wrt_error::{Error, ErrorCategory};
+            use wrt_error::{
+                Error,
+                ErrorCategory,
+            };
             use wrt_foundation::ValueType;
 
             // Test that we can use error handling with foundation types
-            let error = Error::new(
-                ErrorCategory::Validation,
-                1,
-                "Invalid value type",
-            );
+            let error = Error::runtime_execution_error("Test error message");
 
             let _value_type = ValueType::I32;
             assert_eq!(error.category, ErrorCategory::Validation);
@@ -566,9 +607,11 @@ mod tests {
 
         #[test]
         fn test_platform_with_foundation_memory() {
+            use wrt_foundation::{
+                bounded::BoundedVec,
+                NoStdProvider,
+            };
             use wrt_platform::WASM_PAGE_SIZE;
-            use wrt_foundation::bounded::BoundedVec;
-            use wrt_foundation::NoStdProvider;
 
             // Test integration between platform and foundation
             assert_eq!(WASM_PAGE_SIZE, 65536);

@@ -8,7 +8,7 @@
 //! standard and `no_std` environments.
 
 // WRT - wrt-logging
-// Module: Logging Infrastructure  
+// Module: Logging Infrastructure
 // SW-REQ-ID: REQ_017
 //
 // Copyright (c) 2024 Ralf Anton Beier
@@ -28,7 +28,10 @@ extern crate alloc;
 // Currently not needed at crate level - specific modules import as needed
 
 // Reexports for convenience
-pub use wrt_error::{Error, Result};
+pub use wrt_error::{
+    Error,
+    Result,
+};
 pub use wrt_host::CallbackRegistry;
 
 /// Logging handlers for processing log messages.
@@ -36,6 +39,9 @@ pub use wrt_host::CallbackRegistry;
 /// This module contains the trait and implementations for log handlers,
 /// which process log messages from WebAssembly components.
 pub mod handler;
+
+/// Bounded infrastructure for logging collections
+pub mod bounded_log_infra;
 
 /// Log level definitions for categorizing message severity.
 ///
@@ -62,22 +68,37 @@ pub mod minimal_handler;
 pub mod bounded_logging;
 
 // Reexport types
-pub use handler::{LogHandler, LoggingExt};
-pub use level::LogLevel;
-// Reexport minimal_handler types for pure no_std environments
-#[cfg(not(any(feature = "std", )))]
-pub use minimal_handler::{MinimalLogHandler, MinimalLogMessage};
-// Binary std/no_std choice
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "std", ))))]
-pub use minimal_handler::{MinimalLogHandler, MinimalLogMessage};
-pub use operation::LogOperation;
-
 // Re-export Agent C deliverables
 pub use bounded_logging::{
-    BoundedLogBuffer, BoundedLogEntry, BoundedLogger, BoundedLoggingLimits, BoundedLoggingManager,
-    BoundedLoggingStatistics, ComponentLoggingId, LogMetadata, LoggerId,
+    BoundedLogBuffer,
+    BoundedLogEntry,
+    BoundedLogger,
+    BoundedLoggingLimits,
+    BoundedLoggingManager,
+    BoundedLoggingStatistics,
+    ComponentLoggingId,
+    LogMetadata,
+    LoggerId,
 };
+pub use handler::{
+    LogHandler,
+    LoggingExt,
+};
+pub use level::LogLevel;
+// Reexport minimal_handler types for pure no_std environments
+#[cfg(not(any(feature = "std",)))]
+pub use minimal_handler::{
+    MinimalLogHandler,
+    MinimalLogMessage,
+};
+// Binary std/no_std choice
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "std",))))]
+pub use minimal_handler::{
+    MinimalLogHandler,
+    MinimalLogMessage,
+};
+pub use operation::LogOperation;
 
 // Include verification module when the kani feature is enabled
 #[cfg(feature = "kani")]
@@ -86,8 +107,8 @@ pub mod verify;
 
 // Panic handler disabled to avoid conflicts with other crates
 // // Provide a panic handler only when wrt-logging is being tested in isolation
-// #[cfg(all(not(feature = "std"), not(test), not(feature = "disable-panic-handler")))]
-// #[panic_handler]
+// #[cfg(all(not(feature = "std"), not(test), not(feature =
+// "disable-panic-handler")))] #[panic_handler]
 // fn panic(_info: &core::panic::PanicInfo) -> ! {
 //     loop {}
 // }

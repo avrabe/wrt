@@ -82,12 +82,12 @@ pub enum IsolationLevel {
 impl<P> Default for PlatformConfig<P> {
     fn default() -> Self {
         Self {
-            max_pages: 1024,
-            guard_pages: true,
+            max_pages:              1024,
+            guard_pages:            true,
             static_allocation_size: None,
-            rt_priority: None,
-            isolation_level: None,
-            _paradigm: PhantomData,
+            rt_priority:            None,
+            isolation_level:        None,
+            _paradigm:              PhantomData,
         }
     }
 }
@@ -164,8 +164,8 @@ mod posix_impl {
     #[cfg(all(feature = "platform-linux", target_os = "linux"))]
     impl PlatformAbstraction<paradigm::Posix> for UnifiedPlatform<paradigm::Posix> {
         type Allocator = crate::LinuxAllocator;
-        type Synchronizer = crate::LinuxFutex;
         type Config = PlatformConfig<paradigm::Posix>;
+        type Synchronizer = crate::LinuxFutex;
 
         #[inline(always)] // Zero-cost: compiles to direct constructor call
         fn create_allocator(config: &Self::Config) -> Result<Self::Allocator, Error> {
@@ -185,8 +185,8 @@ mod posix_impl {
     #[cfg(all(feature = "platform-macos", target_os = "macos"))]
     impl PlatformAbstraction<paradigm::Posix> for UnifiedPlatform<paradigm::Posix> {
         type Allocator = crate::MacOsAllocator;
-        type Synchronizer = crate::MacOsFutex;
         type Config = PlatformConfig<paradigm::Posix>;
+        type Synchronizer = crate::MacOsFutex;
 
         #[inline(always)]
         fn create_allocator(config: &Self::Config) -> Result<Self::Allocator, Error> {
@@ -206,8 +206,8 @@ mod posix_impl {
     #[cfg(all(feature = "platform-qnx", target_os = "nto"))]
     impl PlatformAbstraction<paradigm::Posix> for UnifiedPlatform<paradigm::Posix> {
         type Allocator = crate::QnxAllocator;
-        type Synchronizer = crate::QnxFutex;
         type Config = PlatformConfig<paradigm::Posix>;
+        type Synchronizer = crate::QnxFutex;
 
         #[inline(always)]
         fn create_allocator(config: &Self::Config) -> Result<Self::Allocator, Error> {
@@ -227,8 +227,8 @@ mod posix_impl {
     #[cfg(all(feature = "platform-vxworks", target_os = "vxworks"))]
     impl PlatformAbstraction<paradigm::Posix> for UnifiedPlatform<paradigm::Posix> {
         type Allocator = crate::VxWorksAllocator;
-        type Synchronizer = crate::VxWorksFutex;
         type Config = PlatformConfig<paradigm::Posix>;
+        type Synchronizer = crate::VxWorksFutex;
 
         #[inline(always)]
         fn create_allocator(config: &Self::Config) -> Result<Self::Allocator, Error> {
@@ -242,8 +242,7 @@ mod posix_impl {
 
         #[inline(always)]
         fn create_synchronizer(_config: &Self::Config) -> Result<Self::Synchronizer, Error> {
-            crate::VxWorksFutexBuilder::new(crate::vxworks_memory::VxWorksContext::Rtp)
-                .build()
+            crate::VxWorksFutexBuilder::new(crate::vxworks_memory::VxWorksContext::Rtp).build()
         }
     }
 }
@@ -260,8 +259,8 @@ mod realtime_impl {
     #[cfg(feature = "platform-zephyr")]
     impl PlatformAbstraction<paradigm::RealTime> for UnifiedPlatform<paradigm::RealTime> {
         type Allocator = crate::ZephyrAllocator;
-        type Synchronizer = crate::ZephyrFutex;
         type Config = PlatformConfig<paradigm::RealTime>;
+        type Synchronizer = crate::ZephyrFutex;
 
         #[inline(always)] // Zero-cost: compiles to direct Zephyr calls
         fn create_allocator(config: &Self::Config) -> Result<Self::Allocator, Error> {
@@ -289,8 +288,8 @@ mod realtime_impl {
     #[cfg(all(feature = "platform-vxworks", target_os = "vxworks"))]
     impl PlatformAbstraction<paradigm::RealTime> for UnifiedPlatform<paradigm::RealTime> {
         type Allocator = crate::VxWorksAllocator;
-        type Synchronizer = crate::VxWorksFutex;
         type Config = PlatformConfig<paradigm::RealTime>;
+        type Synchronizer = crate::VxWorksFutex;
 
         #[inline(always)] // Zero-cost: compiles to direct VxWorks calls
         fn create_allocator(config: &Self::Config) -> Result<Self::Allocator, Error> {
@@ -311,8 +310,7 @@ mod realtime_impl {
 
         #[inline(always)]
         fn create_synchronizer(_config: &Self::Config) -> Result<Self::Synchronizer, Error> {
-            crate::VxWorksFutexBuilder::new(crate::vxworks_memory::VxWorksContext::Lkm)
-                .build()
+            crate::VxWorksFutexBuilder::new(crate::vxworks_memory::VxWorksContext::Lkm).build()
         }
     }
 }
@@ -324,8 +322,8 @@ mod security_impl {
 
     impl PlatformAbstraction<paradigm::SecurityFirst> for UnifiedPlatform<paradigm::SecurityFirst> {
         type Allocator = crate::TockAllocator;
-        type Synchronizer = crate::TockFutex;
         type Config = PlatformConfig<paradigm::SecurityFirst>;
+        type Synchronizer = crate::TockFutex;
 
         #[inline(always)] // Zero-cost: compiles to direct Tock calls
         fn create_allocator(config: &Self::Config) -> Result<Self::Allocator, Error> {
@@ -336,7 +334,7 @@ mod security_impl {
                     Some(IsolationLevel::Process) => crate::VerificationLevel::Standard,
                     Some(IsolationLevel::Hardware | IsolationLevel::Verified) => {
                         crate::VerificationLevel::Full
-                    }
+                    },
                     None => crate::VerificationLevel::Full,
                 });
 
@@ -415,8 +413,9 @@ mod tests {
 
     #[test]
     fn test_config_creation() {
-        let config =
-            PlatformConfig::<paradigm::Posix>::new().with_max_pages(2048).with_guard_pages(true);
+        let config = PlatformConfig::<paradigm::Posix>::new()
+            .with_max_pages(2048)
+            .with_guard_pages(true);
 
         assert_eq!(config.max_pages, 2048);
         assert!(config.guard_pages);
@@ -436,8 +435,9 @@ mod tests {
 
     #[test]
     fn test_realtime_config() {
-        let config =
-            PlatformConfig::<paradigm::RealTime>::new().with_max_pages(512).with_rt_priority(10);
+        let config = PlatformConfig::<paradigm::RealTime>::new()
+            .with_max_pages(512)
+            .with_rt_priority(10);
 
         assert_eq!(config.max_pages, 512);
         assert_eq!(config.rt_priority, Some(10));
@@ -453,8 +453,8 @@ mod tests {
         let platform = PosixPlatform::new(PlatformConfig::new());
 
         // Binary std/no_std choice
-        let _allocator = platform.allocator();
-        let _synchronizer = platform.synchronizer();
+        let _config = platform.config();
+        assert_eq!(_config.max_pages, 1024);
     }
 
     #[cfg(feature = "platform-zephyr")]
@@ -463,7 +463,7 @@ mod tests {
         let platform = RealtimePlatform::new(PlatformConfig::new().with_rt_priority(5));
 
         // Binary std/no_std choice
-        let _allocator = platform.allocator();
-        let _synchronizer = platform.synchronizer();
+        let _config = platform.config();
+        assert_eq!(_config.rt_priority, Some(5));
     }
 }

@@ -4,6 +4,11 @@ Requirements Allocation Matrix
 
 **Teaching Point**: Every requirement must be allocated to at least one architectural component. This ensures complete coverage and traceability.
 
+.. warning::
+   **Allocation vs Implementation**: This matrix shows requirement allocation to components.
+   Allocation does not mean implementation is complete. See :doc:`../test_coverage` for 
+   actual implementation status (currently <5% coverage).
+
 Allocation Overview
 -------------------
 
@@ -28,23 +33,23 @@ Component Allocation Summary
    * - Runtime Core (ARCH_COMP_001)
      - REQ_001, REQ_002, REQ_CORE_001, REQ_EXEC_001
      - 4
-     - 100%
+     - Allocated (not implemented)
    * - Memory Manager (ARCH_COMP_002)
      - REQ_MEM_001, REQ_MEM_SAFETY_001, REQ_BOUNDED_001
      - 3
-     - 100%
+     - Mostly implemented
    * - Component Runtime (ARCH_COMP_003)
      - REQ_COMP_001, REQ_COMP_002, REQ_COMP_IF_001
      - 3
-     - 100%
+     - Allocated (partial impl)
    * - Binary Decoder (ARCH_COMP_004)
      - REQ_DECODE_001, REQ_VALIDATE_001
      - 2
-     - 100%
+     - Partially implemented
    * - Platform Layer (ARCH_COMP_005)
      - REQ_PLATFORM_001, REQ_PLATFORM_002, REQ_OS_001
      - 3
-     - 100%
+     - Mostly implemented
 
 Environment-Specific Allocations
 --------------------------------

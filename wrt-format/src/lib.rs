@@ -77,20 +77,27 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-// Binary std/no_std choice - use our own memory management
+// Standard library imports (grouped by feature flags)
 #[cfg(feature = "std")]
-use std::{format, string::String, vec::Vec};
+use std::{
+    format,
+    string::String,
+    vec::Vec,
+};
 
-// In no_std mode, use our own bounded collections from wrt-foundation
+pub use wrt_error::Result;
+// External crates
+pub use wrt_error::{
+    Error,
+    ErrorCategory,
+};
+// Internal crates (wrt_* imports)
 #[cfg(not(feature = "std"))]
-use wrt_foundation::bounded::{BoundedString, BoundedVec};
-
-// Re-export error types directly from wrt-error
-pub use wrt_error::{Error, ErrorCategory};
-// Re-export resource types from wrt-foundation
+use wrt_foundation::bounded::{
+    BoundedString,
+    BoundedVec,
+};
 pub use wrt_foundation::resource::ResourceRepresentation;
-// Re-export Result type from wrt-foundation
-pub use wrt_foundation::Result;
 // Re-export core types from wrt-foundation (note: these now have generic parameters)
 // BlockType, FuncType, RefType, ValueType now require MemoryProvider parameters
 // These will be re-exported as type aliases with default providers
@@ -99,7 +106,10 @@ pub use wrt_foundation::Result;
 
 // Binary std/no_std choice
 #[cfg(not(any(feature = "std")))]
-pub use wrt_foundation::{BoundedMap, BoundedSet};
+pub use wrt_foundation::{
+    BoundedMap,
+    BoundedSet,
+};
 
 // Type aliases for pure no_std mode
 #[cfg(not(any(feature = "std")))]
@@ -108,7 +118,7 @@ pub type WasmString<P> = BoundedString<MAX_WASM_STRING_SIZE, P>;
 pub type WasmVec<T, P> = BoundedVec<T, 1024, P>; // General purpose bounded vector
                                                  // Module type aliases for pure no_std mode
 #[cfg(not(any(feature = "std")))]
-pub type ModuleFunctions<P> = BoundedVec<crate::module::Function<P>, MAX_MODULE_FUNCTIONS, P>;
+pub type ModuleFunctions<P> = BoundedVec<crate::module::Function, MAX_MODULE_FUNCTIONS, P>;
 #[cfg(not(any(feature = "std")))]
 pub type ModuleImports<P> = BoundedVec<crate::module::Import<P>, MAX_MODULE_IMPORTS, P>;
 #[cfg(not(any(feature = "std")))]
@@ -120,7 +130,7 @@ pub type ModuleElements<P> = BoundedVec<crate::module::Element<P>, MAX_MODULE_EL
 #[cfg(not(any(feature = "std")))]
 pub type ModuleData<P> = BoundedVec<crate::module::Data<P>, MAX_MODULE_DATA, P>;
 #[cfg(not(any(feature = "std")))]
-pub type ModuleCustomSections<P> = BoundedVec<crate::section::CustomSection<P>, 64, P>;
+pub type ModuleCustomSections<P> = BoundedVec<crate::section::CustomSection, 64, P>;
 
 // Type aliases for HashMap
 #[cfg(not(feature = "std"))]
@@ -144,7 +154,7 @@ pub type WasmVec<T> = Vec<T>;
 // Helper macro for conditional type usage
 #[macro_export]
 macro_rules! collection_type {
-    (Vec<$t:ty>) => {
+    (Vec < $t:ty >) => {
         #[cfg(feature = "std")]
         type VecType = Vec<$t>;
         #[cfg(not(any(feature = "std")))]
@@ -160,26 +170,26 @@ macro_rules! collection_type {
 
 // Compile-time capacity constants for bounded collections
 // Increased limits for better no_std usability
-pub const MAX_MODULE_TYPES: usize = 512;        // was 256
-pub const MAX_MODULE_FUNCTIONS: usize = 4096;   // was 1024
-pub const MAX_MODULE_IMPORTS: usize = 512;      // was 256
-pub const MAX_MODULE_EXPORTS: usize = 512;      // was 256
-pub const MAX_MODULE_GLOBALS: usize = 512;      // was 256
-pub const MAX_MODULE_TABLES: usize = 128;       // was 64
-pub const MAX_MODULE_MEMORIES: usize = 128;     // was 64
-pub const MAX_MODULE_ELEMENTS: usize = 512;     // was 256
-pub const MAX_MODULE_DATA: usize = 512;         // was 256
-pub const MAX_WASM_STRING_SIZE: usize = 1024;   // was 256
+pub const MAX_MODULE_TYPES: usize = 512; // was 256
+pub const MAX_MODULE_FUNCTIONS: usize = 4096; // was 1024
+pub const MAX_MODULE_IMPORTS: usize = 512; // was 256
+pub const MAX_MODULE_EXPORTS: usize = 512; // was 256
+pub const MAX_MODULE_GLOBALS: usize = 512; // was 256
+pub const MAX_MODULE_TABLES: usize = 128; // was 64
+pub const MAX_MODULE_MEMORIES: usize = 128; // was 64
+pub const MAX_MODULE_ELEMENTS: usize = 512; // was 256
+pub const MAX_MODULE_DATA: usize = 512; // was 256
+pub const MAX_WASM_STRING_SIZE: usize = 1024; // was 256
 pub const MAX_BINARY_SIZE: usize = 4 * 1024 * 1024; // 4MB max module size, was 1MB
 pub const MAX_LEB128_BUFFER: usize = 10; // Max bytes for LEB128 u64
 pub const MAX_INSTRUCTION_OPERANDS: usize = 32; // was 16
-pub const MAX_STACK_DEPTH: usize = 2048;        // was 1024
+pub const MAX_STACK_DEPTH: usize = 2048; // was 1024
 
 // Component model constants (increased for better support)
 pub const MAX_COMPONENT_INSTANCES: usize = 256; // was 128
-pub const MAX_COMPONENT_TYPES: usize = 512;     // was 256
-pub const MAX_COMPONENT_IMPORTS: usize = 512;   // was 256
-pub const MAX_COMPONENT_EXPORTS: usize = 512;   // was 256
+pub const MAX_COMPONENT_TYPES: usize = 512; // was 256
+pub const MAX_COMPONENT_IMPORTS: usize = 512; // was 256
+pub const MAX_COMPONENT_EXPORTS: usize = 512; // was 256
 
 // Additional no_std specific constants
 pub const MAX_SECTION_SIZE_NO_STD: usize = 256 * 1024; // 256KB, was 64KB
@@ -206,14 +216,11 @@ macro_rules! format {
 pub mod ast_simple;
 #[cfg(feature = "std")]
 pub use ast_simple as ast;
-/// Incremental parser for efficient WIT re-parsing
-#[cfg(feature = "std")]
-pub mod incremental_parser;
-/// Basic LSP (Language Server Protocol) infrastructure
-#[cfg(all(any(feature = "std"), feature = "lsp"))]
-pub mod lsp_server;
 /// WebAssembly binary format parsing and access
 pub mod binary;
+/// Bounded infrastructure for static memory allocation
+#[cfg(not(feature = "std"))]
+pub mod bounded_format_infra;
 /// WebAssembly canonical format
 #[cfg(feature = "std")]
 pub mod canonical;
@@ -229,17 +236,28 @@ pub mod compression;
 pub mod conversion;
 /// Error utilities for working with wrt-error types
 pub mod error;
+/// Incremental parser for efficient WIT re-parsing
+#[cfg(feature = "std")]
+pub mod incremental_parser;
+/// Interface demonstration (clean separation)
+pub mod interface_demo;
+/// Basic LSP (Language Server Protocol) infrastructure
+#[cfg(all(feature = "std", feature = "lsp"))]
+pub mod lsp_server;
+/// Safety-critical memory limits
+#[cfg(feature = "safety-critical")]
+pub mod memory_limits;
 /// WebAssembly module format
 pub mod module;
 /// Common imports for convenience
 pub mod prelude;
-/// Resource handle management for Component Model
-#[cfg(feature = "std")]
-pub mod resource_handle;
+/// Pure format representation types
+pub mod pure_format_types;
+/// Runtime bridge interface
+pub mod runtime_bridge;
 /// Safe memory operations
 pub mod safe_memory;
 pub mod section;
-pub mod state;
 /// Streaming parser for no_std environments
 pub mod streaming;
 /// Type storage system for Component Model
@@ -254,8 +272,13 @@ pub mod valtype_builder;
 pub mod verify;
 pub mod version;
 // Binary std/no_std choice
-#[cfg(feature = "std")]
-pub mod wit_parser;
+// Temporarily disabled - causes circular dependency issues
+// #[cfg(feature = "std")]
+// pub mod wit_parser_types;
+// #[cfg(feature = "std")]
+// pub mod wit_parser_traits;
+// #[cfg(feature = "std")]
+// pub mod wit_parser;
 // Bounded WIT parser for no_std environments
 #[cfg(feature = "wit-parsing")]
 pub mod wit_parser_bounded;
@@ -277,28 +300,20 @@ pub mod bounded_wit_parser;
 mod ast_simple_tests;
 
 // Re-export binary constants (always available)
-pub use binary::{
-    COMPONENT_CORE_SORT_FUNC, COMPONENT_CORE_SORT_GLOBAL, COMPONENT_CORE_SORT_INSTANCE,
-    COMPONENT_CORE_SORT_MEMORY, COMPONENT_CORE_SORT_MODULE, COMPONENT_CORE_SORT_TABLE,
-    COMPONENT_CORE_SORT_TYPE, COMPONENT_MAGIC, COMPONENT_SORT_COMPONENT, COMPONENT_SORT_CORE,
-    COMPONENT_SORT_FUNC, COMPONENT_SORT_INSTANCE, COMPONENT_SORT_TYPE, COMPONENT_SORT_VALUE,
-    COMPONENT_VERSION, WASM_MAGIC, WASM_VERSION,
-};
-
-// Re-export binary parsing functions
-// Core parsing functions available in all configurations
-pub use binary::{
-    read_leb128_i32, read_leb128_i64, read_leb128_u32, read_leb128_u64, read_u32, read_u8,
-};
-
 // Binary std/no_std choice
+// Pure format parsing functions (recommended)
 #[cfg(feature = "std")]
 pub use binary::with_alloc::{
-    read_name, read_string,
+    parse_data_pure,
+    parse_element_segment_pure,
+};
+#[cfg(feature = "std")]
+pub use binary::with_alloc::{
+    read_name,
+    read_string,
     // is_valid_wasm_header, parse_block_type,
     // read_vector, validate_utf8, BinaryFormat,
 };
-
 // Always available functions
 // pub use binary::{
 //     read_f32, read_f64, read_name,
@@ -307,64 +322,148 @@ pub use binary::with_alloc::{
 // Binary std/no_std choice
 #[cfg(feature = "std")]
 pub use binary::with_alloc::{
-    write_leb128_i32, write_leb128_i64, write_leb128_u32, write_leb128_u64, write_string,
+    write_leb128_i32,
+    write_leb128_i64,
+    write_leb128_u32,
+    write_leb128_u64,
+    write_string,
 };
-
+// Re-export binary parsing functions
+// Core parsing functions available in all configurations
+pub use binary::{
+    read_leb128_i32,
+    read_leb128_i64,
+    read_leb128_u32,
+    read_leb128_u64,
+    read_u32,
+    read_u8,
+};
 // Re-export no_std write functions
 #[cfg(not(any(feature = "std")))]
 pub use binary::{
-    write_leb128_u32_bounded, write_leb128_u32_to_slice, write_string_bounded,
+    write_leb128_u32_bounded,
+    write_leb128_u32_to_slice,
+    write_string_bounded,
     write_string_to_slice,
+};
+pub use binary::{
+    COMPONENT_CORE_SORT_FUNC,
+    COMPONENT_CORE_SORT_GLOBAL,
+    COMPONENT_CORE_SORT_INSTANCE,
+    COMPONENT_CORE_SORT_MEMORY,
+    COMPONENT_CORE_SORT_MODULE,
+    COMPONENT_CORE_SORT_TABLE,
+    COMPONENT_CORE_SORT_TYPE,
+    COMPONENT_MAGIC,
+    COMPONENT_SORT_COMPONENT,
+    COMPONENT_SORT_CORE,
+    COMPONENT_SORT_FUNC,
+    COMPONENT_SORT_INSTANCE,
+    COMPONENT_SORT_TYPE,
+    COMPONENT_SORT_VALUE,
+    COMPONENT_VERSION,
+    WASM_MAGIC,
+    WASM_VERSION,
 };
 #[cfg(feature = "std")]
 pub use component::Component;
 pub use compression::CompressionType;
 #[cfg(feature = "std")]
-pub use compression::{rle_decode, rle_encode};
+pub use compression::{
+    rle_decode,
+    rle_encode,
+};
 // Re-export conversion utilities
 pub use conversion::{
-    block_type_to_format_block_type, format_block_type_to_block_type, format_limits_to_wrt_limits,
+    block_type_to_format_block_type,
+    format_block_type_to_block_type,
+    format_limits_to_wrt_limits,
     wrt_limits_to_format_limits,
 };
 pub use error::{
-    parse_error, wrt_runtime_error as runtime_error, wrt_type_error as type_error,
+    parse_error,
+    wrt_runtime_error as runtime_error,
+    wrt_type_error as type_error,
     wrt_validation_error as validation_error,
 };
-pub use module::{Data, DataMode, Element, ElementInit, ElementMode, Module};
+// Note: Data, DataMode, ElementMode are deprecated - use pure_format_types instead
+#[deprecated(note = "Use pure_format_types::PureDataSegment for clean separation")]
+pub use module::Data;
+pub use module::{
+    Element,
+    ElementInit,
+    Module,
+};
+// New pure format types (recommended)
+pub use pure_format_types::{
+    PureDataMode,
+    PureDataSegment,
+    PureElementMode,
+    PureElementSegment,
+};
+// DataMode and ElementMode exports removed - use pure_format_types instead
 
-// Type aliases for compatibility
-pub type DataSegment = module::Data;
-pub type ElementSegment = module::Element;
+// Type aliases for compatibility (recommended to use pure_format_types
+// directly)
+pub type DataSegment = pure_format_types::PureDataSegment;
+pub type ElementSegment = pure_format_types::PureElementSegment;
+// Legacy aliases (deprecated)
+#[deprecated(note = "Use pure_format_types::PureDataSegment directly")]
+pub type LegacyDataSegment = module::Data;
+#[deprecated(note = "Use pure_format_types::PureElementSegment directly")]
+pub type LegacyElementSegment = module::Element;
 // Re-export safe memory utilities
+// Re-export enhanced bounded WIT parser (Agent C)
+pub use bounded_wit_parser::{
+    parse_wit_embedded,
+    parse_wit_linux,
+    parse_wit_qnx,
+    parse_wit_with_limits,
+    BoundedWitParser as EnhancedBoundedWitParser,
+    WarningSeverity,
+    WitParseMetadata,
+    WitParseResult,
+    WitParseWarning,
+    WitParsingLimits,
+};
 pub use safe_memory::safe_slice;
-pub use section::{CustomSection, Section};
-#[cfg(feature = "std")]
-pub use state::{create_state_section, extract_state_section, is_state_section_name, StateSection};
+pub use section::{
+    CustomSection,
+    Section,
+};
 // Use the conversion module versions for consistency
-pub use types::{FormatBlockType, Limits, MemoryIndexType};
+pub use types::{
+    FormatBlockType,
+    Limits,
+    MemoryIndexType,
+};
 pub use validation::Validatable;
 pub use version::{
-    ComponentModelFeature, ComponentModelVersion, FeatureStatus, VersionInfo, STATE_VERSION,
+    ComponentModelFeature,
+    ComponentModelVersion,
+    FeatureStatus,
+    VersionInfo,
+    STATE_VERSION,
 };
 // Binary std/no_std choice
-#[cfg(feature = "std")]
-pub use wit_parser::{
-    WitEnum, WitExport, WitFlags, WitFunction, WitImport, WitInterface, WitItem, WitParam,
-    WitParseError, WitParser, WitRecord, WitResult, WitType, WitTypeDef, WitVariant, WitWorld,
-};
+// Temporarily disabled - causes circular dependency issues
+// #[cfg(feature = "std")]
+// pub use wit_parser::{
+//     WitEnum, WitExport, WitFlags, WitFunction, WitImport, WitInterface, WitItem, WitParam,
+//     WitParseError, WitParser, WitRecord, WitResult, WitType, WitTypeDef, WitVariant,
+// WitWorld, };
 // Re-export bounded WIT parser (for no_std environments)
 #[cfg(feature = "wit-parsing")]
 pub use wit_parser_bounded::{
-    BoundedWitParser, BoundedWitWorld, BoundedWitInterface, BoundedWitFunction, 
-    BoundedWitType, BoundedWitImport, BoundedWitExport, parse_wit_bounded,
+    parse_wit_bounded,
+    BoundedWitExport,
+    BoundedWitFunction,
+    BoundedWitImport,
+    BoundedWitInterface,
+    BoundedWitParser,
+    BoundedWitType,
+    BoundedWitWorld,
     HAS_BOUNDED_WIT_PARSING_NO_STD,
-};
-
-// Re-export enhanced bounded WIT parser (Agent C)
-pub use bounded_wit_parser::{
-    BoundedWitParser as EnhancedBoundedWitParser, WitParsingLimits, WitParseResult,
-    WitParseMetadata, WitParseWarning, WarningSeverity, parse_wit_with_limits,
-    parse_wit_embedded, parse_wit_qnx, parse_wit_linux,
 };
 
 // Public functions for feature detection
@@ -390,23 +489,11 @@ pub fn uses_experimental_features(binary: &[u8]) -> bool {
     info.detect_experimental_features(binary)
 }
 
-// Deprecated: use conversion utilities instead
-#[deprecated(
-    since = "0.2.0",
-    note = "Use conversion::parse_value_type instead for better type conversion"
-)]
-pub use types::parse_value_type;
-#[deprecated(
-    since = "0.2.0",
-    note = "Use conversion::value_type_to_byte instead for better type conversion"
-)]
-pub use types::value_type_to_byte;
-
 // For formal verification when the 'kani' feature is enabled
 #[cfg(feature = "kani")]
 pub mod verification {
     /// Verify LEB128 encoding and decoding
-    #[cfg(all(kani, any(feature = "std")))]
+    #[cfg(all(kani, feature = "std"))]
     #[kani::proof]
     fn verify_leb128_roundtrip() {
         let value: u32 = kani::any();
@@ -430,7 +517,10 @@ pub mod no_std_demo {
     /// Example showing TypeRef system working
     #[cfg(feature = "std")]
     pub fn demo_type_system() -> wrt_error::Result<()> {
-        use crate::component::{FormatValType, TypeRegistry};
+        use crate::component::{
+            FormatValType,
+            TypeRegistry,
+        };
 
         // Create a type registry
         let mut registry = TypeRegistry::new();
@@ -449,10 +539,13 @@ pub mod no_std_demo {
     }
 
     /// Example showing bounded string working
-    pub fn demo_bounded_string() -> wrt_error::Result<()> {
-        let wasm_str =
-            WasmString::<NoStdProvider<1024>>::from_str("hello", NoStdProvider::<1024>::default())
-                .map_err(|_| wrt_foundation::bounded::CapacityError)?;
+    pub fn demo_bounded_string() -> Result<()> {
+        let provider = wrt_foundation::safe_managed_alloc!(
+            1024,
+            wrt_foundation::budget_aware_provider::CrateId::Format
+        )?;
+        let wasm_str = WasmString::<NoStdProvider<1024>>::from_str("hello", provider)
+            .map_err(|_| wrt_foundation::bounded::CapacityError)?;
         assert_eq!(wasm_str.as_str().unwrap(), "hello");
         Ok(())
     }
@@ -481,7 +574,10 @@ pub mod no_std_demo {
         ];
 
         // Create streaming parser with bounded memory
-        let provider = NoStdProvider::<1024>::default();
+        let provider = wrt_foundation::safe_managed_alloc!(
+            1024,
+            wrt_foundation::budget_aware_provider::CrateId::Format
+        )?;
         let mut parser = StreamingParser::new(provider)?;
 
         // Process the WebAssembly data
@@ -492,24 +588,25 @@ pub mod no_std_demo {
             crate::streaming::ParseResult::Complete(_) => {
                 assert_eq!(parser.bytes_processed(), 8); // 4 magic + 4 version bytes
                 Ok(())
-            }
-            _ => Err(crate::Error::new(
-                crate::ErrorCategory::Validation,
-                wrt_error::codes::PARSE_ERROR,
-                "Parsing did not complete as expected",
+            },
+            _ => Err(crate::Error::runtime_execution_error(
+                "Unexpected parse result",
             )),
         }
     }
 
     /// Example showing module creation in pure no_std mode
     #[cfg(feature = "std")]
-    pub fn demo_module_creation() -> Result<(), wrt_foundation::bounded::CapacityError> {
+    pub fn demo_module_creation() -> Result<()> {
         use wrt_foundation::NoStdProvider;
 
         use crate::module::Module;
 
         // This demonstrates that the Module type system works in pure no_std
-        let provider = NoStdProvider::<1024>::default();
+        let provider = wrt_foundation::safe_managed_alloc!(
+            1024,
+            wrt_foundation::budget_aware_provider::CrateId::Format
+        )?;
         let _module = Module::<NoStdProvider<1024>>::default();
 
         // Binary std/no_std choice
@@ -519,8 +616,8 @@ pub mod no_std_demo {
 
 // Panic handler disabled to avoid conflicts with other crates
 // // Provide a panic handler only when wrt-format is being tested in isolation
-// #[cfg(all(not(feature = "std"), not(test), not(feature = "disable-panic-handler")))]
-// #[panic_handler]
+// #[cfg(all(not(feature = "std"), not(test), not(feature =
+// "disable-panic-handler")))] #[panic_handler]
 // fn panic(_info: &core::panic::PanicInfo) -> ! {
 //     loop {}
 // }

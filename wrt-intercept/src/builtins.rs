@@ -3,14 +3,23 @@
 //! This module provides facilities for intercepting built-in function calls
 //! in the WebAssembly Component Model implementation.
 
-use crate::prelude::{BuiltinType, Debug, str, Value};
-use wrt_error::{Error, Result};
-
 #[cfg(feature = "std")]
-use std::{sync::{Arc, RwLock}, collections::HashSet};
+use std::sync::Arc;
 
+use wrt_error::Error;
 #[cfg(feature = "std")]
-use wrt_foundation::component_value::{ComponentValue, ValType};
+use wrt_foundation::component_value::{
+    ComponentValue,
+    ValType,
+};
+#[cfg(feature = "std")]
+use wrt_foundation::values::Value;
+
+use crate::prelude::{
+    str,
+    BuiltinType,
+    Debug,
+};
 
 /// Context for built-in interception
 ///
@@ -26,16 +35,16 @@ pub struct InterceptContext {
     #[cfg(not(feature = "std"))]
     pub component_name: &'static str,
     /// The built-in function being called
-    pub builtin_type: BuiltinType,
+    pub builtin_type:   BuiltinType,
     /// The host environment's unique identifier
     #[cfg(feature = "std")]
-    pub host_id: String,
+    pub host_id:        String,
     /// The host environment's unique identifier (static in `no_std`)
     #[cfg(not(feature = "std"))]
-    pub host_id: &'static str,
+    pub host_id:        &'static str,
     /// Additional context data (if any)
     #[cfg(feature = "std")]
-    pub context_data: std::collections::BTreeMap<String, Value>,
+    pub context_data:   std::collections::BTreeMap<String, Value>,
 }
 
 impl InterceptContext {
@@ -50,7 +59,8 @@ impl InterceptContext {
     /// # Returns
     ///
     /// A new `InterceptContext` instance
-    #[must_use] pub fn new(_component_name: &str, builtin_type: BuiltinType, _host_id: &str) -> Self {
+    #[must_use]
+    pub fn new(_component_name: &str, builtin_type: BuiltinType, _host_id: &str) -> Self {
         Self {
             #[cfg(feature = "std")]
             component_name: _component_name.to_string(),
@@ -99,7 +109,7 @@ impl BuiltinSerialization {
     /// A `Result` containing the serialized bytes or an error
     pub fn serialize(
         values: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<Vec<u8>> {
+    ) -> wrt_error::Result<Vec<u8>> {
         // Simple implementation for now - convert to bytes
         let mut result = Vec::new();
         for value in values {
@@ -109,12 +119,10 @@ impl BuiltinSerialization {
                 ComponentValue::F32(v) => v.0.to_le_bytes().to_vec(),
                 ComponentValue::F64(v) => v.0.to_le_bytes().to_vec(),
                 _ => {
-                    return Err(Error::new(
-                        wrt_error::ErrorCategory::Type,
-                        wrt_error::codes::INVALID_TYPE,
-                        "Unsupported value type for serialization",
+                    return Err(Error::runtime_execution_error(
+                        "unsupported component value type for serialization",
                     ))
-                }
+                },
             };
             result.extend(bytes);
         }
@@ -134,7 +142,7 @@ impl BuiltinSerialization {
     pub fn deserialize(
         bytes: &[u8],
         types: &[ValType<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>> {
+    ) -> wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>> {
         let mut result = Vec::new();
         let mut offset = 0;
 
@@ -145,33 +153,31 @@ impl BuiltinSerialization {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Parse,
                             wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for i32",
+                            "insufficient bytes for S32 deserialization",
                         ));
                     }
                     let mut buf = [0u8; 4];
                     buf.copy_from_slice(&bytes[offset..offset + 4]);
                     result.push(ComponentValue::S32(i32::from_le_bytes(buf)));
                     offset += 4;
-                }
+                },
                 ValType::S64 => {
                     if offset + 8 > bytes.len() {
-                        return Err(Error::new(
-                            wrt_error::ErrorCategory::Parse,
-                            wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for i64",
+                        return Err(Error::runtime_execution_error(
+                            "insufficient bytes for S64 deserialization",
                         ));
                     }
                     let mut buf = [0u8; 8];
                     buf.copy_from_slice(&bytes[offset..offset + 8]);
                     result.push(ComponentValue::S64(i64::from_le_bytes(buf)));
                     offset += 8;
-                }
+                },
                 ValType::F32 => {
                     if offset + 4 > bytes.len() {
                         return Err(Error::new(
                             wrt_error::ErrorCategory::Parse,
                             wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for f32",
+                            "insufficient bytes for F32 deserialization",
                         ));
                     }
                     let mut buf = [0u8; 4];
@@ -180,13 +186,11 @@ impl BuiltinSerialization {
                         f32::from_le_bytes(buf).to_bits(),
                     )));
                     offset += 4;
-                }
+                },
                 ValType::F64 => {
                     if offset + 8 > bytes.len() {
-                        return Err(Error::new(
-                            wrt_error::ErrorCategory::Parse,
-                            wrt_error::codes::PARSE_ERROR,
-                            "Insufficient bytes for f64",
+                        return Err(Error::runtime_execution_error(
+                            "insufficient bytes for F64 deserialization",
                         ));
                     }
                     let mut buf = [0u8; 8];
@@ -195,14 +199,14 @@ impl BuiltinSerialization {
                         f64::from_le_bytes(buf).to_bits(),
                     )));
                     offset += 8;
-                }
+                },
                 _ => {
                     return Err(Error::new(
                         wrt_error::ErrorCategory::Type,
                         wrt_error::codes::INVALID_TYPE,
-                        "Unsupported value type for deserialization",
+                        "unsupported value type for deserialization",
                     ))
-                }
+                },
             }
         }
 
@@ -226,38 +230,34 @@ impl BuiltinSerialization {
     // Some(ty) => match ty {
     // ValType::S32 => {
     // if let Some(ComponentValue::S32(val)) = args.get(index) {
-    // bytes.extend_from_slice(&val.to_le_bytes());
+    // bytes.extend_from_slice(&val.to_le_bytes);
     // }
     // }
     // ValType::S64 => {
     // if let Some(ComponentValue::S64(val)) = args.get(index) {
-    // bytes.extend_from_slice(&val.to_le_bytes());
+    // bytes.extend_from_slice(&val.to_le_bytes);
     // }
     // }
     // ValType::F32 => {
     // if let Some(ComponentValue::F32(val)) = args.get(index) {
-    // bytes.extend_from_slice(&val.to_le_bytes());
+    // bytes.extend_from_slice(&val.to_le_bytes);
     // }
     // }
     // ValType::F64 => {
     // if let Some(ComponentValue::F64(val)) = args.get(index) {
-    // bytes.extend_from_slice(&val.to_le_bytes());
+    // bytes.extend_from_slice(&val.to_le_bytes);
     // }
     // }
     // _ => {
-    // return Err(Error::new(
-    // wrt_error::ErrorCategory::Type,
-    // wrt_error::codes::INVALID_TYPE,
-    // "Unsupported value type for serialization",
-    // ))
+    // return Err(Error::runtime_execution_error("unsupported value type for
+    // argument serialization" ))
     // }
     // },
     // None => {
     // return Err(Error::new(
     // wrt_error::ErrorCategory::Type,
     // wrt_error::codes::INVALID_TYPE,
-    // "Index out of bounds for serialization",
-    // ))
+    // "missing type information for argument"))
     // }
     // }
     // }
@@ -295,7 +295,7 @@ pub trait BuiltinInterceptor: Send + Sync {
         &self,
         context: &InterceptContext,
         args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-    ) -> Result<BeforeBuiltinResult>;
+    ) -> wrt_error::Result<BeforeBuiltinResult>;
 
     /// Called after a built-in function has been invoked
     ///
@@ -312,8 +312,8 @@ pub trait BuiltinInterceptor: Send + Sync {
         &self,
         context: &InterceptContext,
         args: &[ComponentValue<wrt_foundation::NoStdProvider<64>>],
-        result: Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>,
-    ) -> Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>;
+        result: wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>,
+    ) -> wrt_error::Result<Vec<ComponentValue<wrt_foundation::NoStdProvider<64>>>>;
 
     /// Clone this interceptor
     ///

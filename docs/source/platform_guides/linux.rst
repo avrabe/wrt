@@ -90,8 +90,8 @@ Install Build Tools
 
 .. code-block:: bash
 
-   # Install just (task runner)
-   cargo install just
+   # Install cargo-wrt (unified build tool)
+   # This will be installed from the cloned repository
 
    # Install Dagger (required for CI/testing tasks)
    # Option 1: Using official installer
@@ -114,7 +114,7 @@ Install Build Tools
    # Install cargo-component for WebAssembly components (optional)
    cargo install cargo-component --locked
 
-   # Install additional tools used by xtask
+   # Install additional development tools
    cargo install wasm-tools      # WASM validation and manipulation
    cargo install cargo-llvm-cov  # Code coverage
    cargo install cargo-deny      # Dependency auditing
@@ -128,24 +128,26 @@ Clone and Build WRT
    git clone https://github.com/pulseengine/wrt.git
    cd wrt
 
-   # Build all components
-   just build
+   # Install the unified build tool
+   cargo install --path cargo-wrt
 
-   # Or build individual components:
-   just build-wrt      # Core library
-   just build-wrtd     # Runtime daemon
-   just build-example  # Example WASM component
+   # Build all components
+   cargo-wrt build
+
+   # Or build specific targets:
+   cargo-wrt wrtd      # Runtime daemon
+   cargo build -p wrt  # Core library only
 
 Running Tests
 -------------
 
 .. code-block:: bash
 
-   # Run quick tests (uses Dagger)
-   just ci-test
+   # Run comprehensive test suite
+   cargo-wrt test
 
-   # Run full CI suite (uses Dagger)
-   just ci-full
+   # Run full CI pipeline
+   cargo-wrt ci
 
    # Run specific test (direct cargo)
    cargo test -p wrt -- test_name
@@ -153,18 +155,18 @@ Running Tests
    # Run tests without Dagger
    cargo test --workspace
 
-**Note:** Many CI commands use Dagger for containerized testing:
+**Additional testing commands:**
 
 .. code-block:: bash
 
-   # These commands require Dagger:
-   just ci-integrity-checks  # Linting, formatting, spell check
-   just ci-static-analysis   # Clippy, deny, unused deps
-   just ci-advanced-tests    # Kani, Miri, coverage
-   just ci-doc-check        # Documentation validation
+   # Quality assurance checks:
+   cargo-wrt check          # Format, lint, and static analysis
+   cargo-wrt verify --asil d  # Safety verification
+   cargo-wrt coverage --html  # Test coverage analysis
+   cargo-wrt kani-verify    # Formal verification
    
-   # To see what a command does:
-   just --show ci-test
+   # To see available commands:
+   cargo-wrt --help
 
 Using WRT
 =========
@@ -195,10 +197,10 @@ Example:
 
 .. code-block:: bash
 
-   # Build and run the example component
-   just test-wrtd-example
-
-   # This runs:
+   # Build the example component first
+   cargo-wrt wrtd
+   
+   # Run example with the runtime
    ./target/debug/wrtd --call example:hello/example#hello ./target/wasm32-wasip2/release/example.wasm
 
 Library Usage
@@ -262,11 +264,11 @@ Development Commands
 
 .. code-block:: bash
 
-   # Format code
-   just fmt
+   # Format code and run checks
+   cargo-wrt check
 
-   # Check formatting (uses Dagger)
-   just fmt-check
+   # Check formatting only
+   cargo fmt --check
 
    # Run lints
    cargo clippy --all-features
@@ -274,17 +276,17 @@ Development Commands
    # Generate API documentation
    cargo doc --workspace --open
 
-   # Generate full documentation site (uses Dagger)
-   cargo xtask publish-docs-dagger --output-dir ./docs_output --versions local
+   # Generate documentation with cargo-wrt
+   cargo-wrt docs --open
 
    # Run benchmarks
    cargo bench
 
-   # Generate code coverage (uses Dagger)
-   just coverage
+   # Generate code coverage
+   cargo-wrt coverage --html
 
    # Clean build artifacts
-   just clean
+   cargo-wrt clean
 
 Debugging and Profiling
 =======================
@@ -426,7 +428,7 @@ Build Issues
    rm -rf ~/.cache/dagger
    
    # Run with debug logging
-   RUST_LOG=debug,dagger_sdk=debug cargo xtask ci-test
+   RUST_LOG=debug cargo-wrt test
 
 Runtime Issues
 --------------

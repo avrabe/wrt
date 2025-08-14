@@ -41,8 +41,8 @@ pub mod annotations {
     /// Assert that a pointer is valid and aligned
     #[cfg(kani)]
     pub fn assert_valid_ptr<T>(ptr: *const T) {
-        kani::assume(!ptr.is_null());
-        kani::assume(ptr.is_aligned());
+        kani::assume(!ptr.is_null);
+        kani::assume(ptr.is_aligned);
     }
 
     /// Assert that a memory region is valid
@@ -114,7 +114,7 @@ pub mod memory_verification {
         //     // Verify alignment
         //     #[cfg(kani)]
         //     kani::assert(ptr.as_ptr() as usize % WASM_PAGE_SIZE == 0, "Page
-        // alignment");
+        // alignment";
         //
         // Binary std/no_std choice
         // }
@@ -157,7 +157,10 @@ pub mod memory_verification {
         // For now, we verify the mathematical properties
         let total_size = num_pages * WASM_PAGE_SIZE;
         kani::assert(total_size >= WASM_PAGE_SIZE, "Size calculation correct");
-        kani::assert(total_size / WASM_PAGE_SIZE == num_pages, "Size division correct");
+        kani::assert(
+            total_size / WASM_PAGE_SIZE == num_pages,
+            "Size division correct",
+        );
     }
 }
 
@@ -450,13 +453,13 @@ pub mod cbmc_integration {
 
         pub fn cbmc_assert(condition: bool, description: &str) {
             unsafe {
-                __CPROVER_assert(condition, description.as_ptr());
+                __CPROVER_assert(condition, description.as_ptr);
             }
         }
 
         pub fn cbmc_cover(condition: bool, description: &str) {
             unsafe {
-                __CPROVER_cover(condition, description.as_ptr());
+                __CPROVER_cover(condition, description.as_ptr);
             }
         }
     }
@@ -482,7 +485,10 @@ pub mod cbmc_integration {
 
         // Verify no buffer overflow
         let end_ptr = ptr as usize + size;
-        cbmc_assert(end_ptr >= ptr as usize, "No integer overflow in pointer arithmetic");
+        cbmc_assert(
+            end_ptr >= ptr as usize,
+            "No integer overflow in pointer arithmetic",
+        );
 
         cbmc_cover(true, "Memory operation verification complete");
     }
@@ -508,7 +514,10 @@ pub mod verification_harnesses {
     #[kani::proof]
     #[kani::unwind(5)]
     fn verify_concurrent_safety() {
-        use core::sync::atomic::{AtomicU32, Ordering};
+        use core::sync::atomic::{
+            AtomicU32,
+            Ordering,
+        };
 
         let shared_data = AtomicU32::new(0);
 
@@ -546,7 +555,10 @@ pub mod verification_harnesses {
         }
 
         // Verify bounds check works correctly
-        kani::assert(access_valid == (index < buffer_size), "Bounds check logic is correct");
+        kani::assert(
+            access_valid == (index < buffer_size),
+            "Bounds check logic is correct",
+        );
     }
 }
 

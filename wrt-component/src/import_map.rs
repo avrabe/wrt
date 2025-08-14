@@ -28,8 +28,8 @@ impl ImportMap {
 
     /// Add an import to the map
     pub fn add(&mut self, name: &str, import: Arc<Import>) -> Result<()> {
-        self.imports.insert(name.to_string(), import);
-        Ok(())
+        self.imports.insert(name.to_string(), import;
+        Ok(()
     }
 
     /// Get an import by name
@@ -83,13 +83,13 @@ impl SafeImportMap {
             if existing_name == name {
                 // Replace the existing import
                 self.imports.set(i, (name.to_string(), import))?;
-                return Ok(());
+                return Ok();
             }
         }
 
         // Name doesn't exist, add a new entry
         self.imports.push((name.to_string(), import))?;
-        Ok(())
+        Ok(()
     }
 
     /// Get an import by name
@@ -98,7 +98,7 @@ impl SafeImportMap {
         for i in 0..self.imports.len() {
             if let Ok((existing_name, import)) = self.imports.get(i) {
                 if existing_name == name {
-                    return Some(import);
+                    return Some(import;
                 }
             }
         }
@@ -115,7 +115,7 @@ impl SafeImportMap {
                     if let Ok(items) = self.imports.to_vec() {
                         let import = items[i].1.clone();
                         // Create a new vector without the removed item
-                        let mut new_items = Vec::with_capacity(items.len() - 1);
+                        let mut new_items = Vec::with_capacity(items.len() - 1;
                         for (j, item) in items.into_iter().enumerate() {
                             if j != i {
                                 new_items.push(item);
@@ -123,12 +123,12 @@ impl SafeImportMap {
                         }
 
                         // Clear and rebuild the stack
-                        self.imports.clear();
+                        self.imports.clear);
                         for item in new_items {
                             let _ = self.imports.push(item);
                         }
 
-                        return Some(import);
+                        return Some(import;
                     }
                 }
             }
@@ -151,7 +151,7 @@ impl SafeImportMap {
 
     /// Get all import names
     pub fn names(&self) -> Result<Vec<String>> {
-        let mut names = Vec::with_capacity(self.imports.len());
+        let mut names = Vec::with_capacity(self.imports.len();
         for i in 0..self.imports.len() {
             if let Ok((name, _)) = self.imports.get(i) {
                 names.push(name);
@@ -161,7 +161,7 @@ impl SafeImportMap {
     }
 
     /// Get all imports as a Vec of (name, import) pairs
-    pub fn get_all(&self) -> Result<Vec<(String, Arc<Import>)>> {
+    pub fn get_all(&self) -> core::result::Result<Vec<(String, Arc<Import>)>> {
         self.imports.to_vec()
     }
 
@@ -190,6 +190,6 @@ impl SafeImportMap {
         &mut self,
         level: wrt_foundation::verification::VerificationLevel,
     ) {
-        self.imports.set_verification_level(level);
+        self.imports.set_verification_level(level;
     }
 }

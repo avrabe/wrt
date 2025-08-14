@@ -7,7 +7,13 @@
 //! This module provides pure implementations for WebAssembly variable access
 //! instructions, including local and global variable operations.
 
-use crate::prelude::{ConstExprContext, Debug, Error, PureInstruction, Result, Value};
+use crate::prelude::{
+    Debug,
+    Error,
+    PureInstruction,
+    Result,
+    Value,
+};
 
 // ToString is brought in through the prelude for both std and no_std
 // configurations so we don't need explicit imports
@@ -54,71 +60,75 @@ impl<T: VariableContext> PureInstruction<T, Error> for VariableOp {
             Self::LocalGet(index) => {
                 let value = context.get_local(*index)?;
                 context.push_value(value)
-            }
+            },
             Self::LocalSet(index) => {
                 let value = context.pop_value()?;
                 context.set_local(*index, value)
-            }
+            },
             Self::LocalTee(index) => {
                 let value = context.pop_value()?;
                 context.set_local(*index, value.clone())?;
                 context.push_value(value)
-            }
+            },
             Self::GlobalGet(index) => {
                 let value = context.get_global(*index)?;
                 context.push_value(value)
-            }
+            },
             Self::GlobalSet(index) => {
                 let value = context.pop_value()?;
                 context.set_global(*index, value)
-            }
+            },
         }
     }
 }
 
-#[cfg(all(test, any(feature = "std", )))]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     // Import Vec and vec! based on feature flags
-        use std::{vec, vec::Vec};
     #[cfg(feature = "std")]
     use std::vec::Vec;
+    use std::{
+        vec,
+        vec::Vec,
+    };
 
     use super::*;
 
     // Mock variable context for testing
     struct MockVariableContext {
-        locals: Vec<Value>,
+        locals:  Vec<Value>,
         globals: Vec<Value>,
-        stack: Vec<Value>,
+        stack:   Vec<Value>,
     }
 
     impl MockVariableContext {
         fn new() -> Self {
             Self {
-                locals: {
+                locals:  {
                     let mut v = Vec::with_capacity(10);
-                    for _ in 0..10 { v.push(Value::I32(0)); }
+                    for _ in 0..10 {
+                        v.push(Value::I32(0));
+                    }
                     v
                 },
                 globals: {
                     let mut v = Vec::with_capacity(5);
-                    for _ in 0..5 { v.push(Value::I32(0)); }
+                    for _ in 0..5 {
+                        v.push(Value::I32(0));
+                    }
                     v
                 },
-                stack: Vec::new(),
+                stack:   Vec::new(),
             }
         }
     }
 
     impl VariableContext for MockVariableContext {
         fn get_local(&self, index: u32) -> Result<Value> {
-            self.locals.get(index as usize).cloned().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid local index",
-                )
-            })
+            self.locals
+                .get(index as usize)
+                .cloned()
+                .ok_or_else(|| Error::invalid_function_index("Invalid local index"))
         }
 
         fn set_local(&mut self, index: u32, value: Value) -> Result<()> {
@@ -126,22 +136,15 @@ mod tests {
                 *local = value;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid local index",
-                ))
+                Err(Error::invalid_function_index("Invalid local index"))
             }
         }
 
         fn get_global(&self, index: u32) -> Result<Value> {
-            self.globals.get(index as usize).cloned().ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid global index",
-                )
-            })
+            self.globals
+                .get(index as usize)
+                .cloned()
+                .ok_or_else(|| Error::invalid_function_index("Invalid global index"))
         }
 
         fn set_global(&mut self, index: u32, value: Value) -> Result<()> {
@@ -149,11 +152,7 @@ mod tests {
                 *global = value;
                 Ok(())
             } else {
-                Err(Error::new(
-                    ErrorCategory::Resource,
-                    codes::INVALID_FUNCTION_INDEX,
-                    "Invalid global index",
-                ))
+                Err(Error::invalid_function_index("Invalid global index"))
             }
         }
 
@@ -163,9 +162,9 @@ mod tests {
         }
 
         fn pop_value(&mut self) -> Result<Value> {
-            self.stack.pop().ok_or_else(|| {
-                Error::new(ErrorCategory::Runtime, codes::STACK_UNDERFLOW, "Stack underflow")
-            })
+            self.stack
+                .pop()
+                .ok_or_else(|| Error::runtime_stack_underflow("Stack underflow"))
         }
     }
 

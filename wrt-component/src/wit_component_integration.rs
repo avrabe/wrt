@@ -9,13 +9,13 @@ use std::{collections::BTreeMap, vec::Vec};
 use std::{collections::BTreeMap, vec::Vec};
 
 use wrt_foundation::{
-    BoundedString, BoundedVec,
+    bounded::{BoundedString, BoundedVec},
     prelude::*,
 };
 use wrt_error::{Error, Result};
 
 // Platform-aware type aliases for WIT component integration
-type ComponentProvider = wrt_foundation::safe_memory::NoStdProvider<4096>;  // 4KB for component data
+type ComponentProvider = wrt_foundation::budget_provider::BudgetProvider<4096>;  // 4KB for component data
 type WitBoundedString<const N: usize> = BoundedString<N, ComponentProvider>;
 
 // Re-export WIT AST types for convenience
@@ -48,7 +48,7 @@ pub struct WitComponentContext {
 #[derive(Debug, Clone)]
 pub struct InterfaceMapping {
     /// WIT interface name
-    pub wit_name: WitBoundedString<64, NoStdProvider<65536>>,
+    pub wit_name: WitBoundedString<64>,
     
     /// Component interface ID
     pub component_id: u32,
@@ -67,7 +67,7 @@ pub struct InterfaceMapping {
 #[derive(Debug, Clone)]
 pub struct TypeMapping {
     /// WIT type name
-    pub wit_name: WitBoundedString<64, NoStdProvider<65536>>,
+    pub wit_name: WitBoundedString<64>,
     
     /// Component type representation
     pub component_type: ComponentType,
@@ -86,7 +86,7 @@ pub struct TypeMapping {
 #[derive(Debug, Clone)]
 pub struct FunctionMapping {
     /// WIT function name
-    pub wit_name: WitBoundedString<64, NoStdProvider<65536>>,
+    pub wit_name: WitBoundedString<64>,
     
     /// Component function index
     pub function_index: u32,
@@ -144,7 +144,7 @@ pub struct RecordType {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FieldType {
     /// Field name
-    pub name: WitBoundedString<32, NoStdProvider<65536>>,
+    pub name: WitBoundedString<32>,
     /// Field type
     pub field_type: Box<ComponentType>,
 }
@@ -160,7 +160,7 @@ pub struct VariantType {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaseType {
     /// Case name
-    pub name: WitBoundedString<32, NoStdProvider<65536>>,
+    pub name: WitBoundedString<32>,
     /// Optional case type
     pub case_type: Option<Box<ComponentType>>,
 }
@@ -169,21 +169,21 @@ pub struct CaseType {
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumType {
     /// Enum values
-    pub values: Vec<WitBoundedString<32, NoStdProvider<65536>>>,
+    pub values: Vec<WitBoundedString<32>>,
 }
 
 /// Flags type definition
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlagsType {
     /// Flag names
-    pub flags: Vec<WitBoundedString<32, NoStdProvider<65536>>>,
+    pub flags: Vec<WitBoundedString<32>>,
 }
 
 /// Resource type definition
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResourceType {
     /// Resource name
-    pub name: WitBoundedString<64, NoStdProvider<65536>>,
+    pub name: WitBoundedString<64>,
     /// Resource methods
     pub methods: Vec<FunctionType>,
 }
@@ -269,7 +269,7 @@ impl WitComponentContext {
             }
         }
         
-        Ok(())
+        Ok(()
     }
     
     /// Process an interface declaration
@@ -296,8 +296,8 @@ impl WitComponentContext {
         
         // Create interface mapping
         let interface_name = interface.name.name.as_str()
-            .map_err(|_| Error::parse_error("Invalid interface name"))?
-            .to_string();
+            .map_err(|_| Error::parse_error("Error occurred"))?
+            .to_string());
         
         let mapping = InterfaceMapping {
             wit_name: interface.name.name.clone(),
@@ -307,16 +307,16 @@ impl WitComponentContext {
             source_span: interface.span,
         };
         
-        self.interface_mappings.insert(interface_name, mapping);
+        self.interface_mappings.insert(interface_name, mapping;
         
-        Ok(())
+        Ok(()
     }
     
     /// Process a world declaration
     fn process_world(&mut self, _world: &WorldDecl) -> Result<()> {
         // Process world imports and exports
         // This would involve mapping world items to component imports/exports
-        Ok(())
+        Ok(()
     }
     
     /// Process a function declaration
@@ -367,10 +367,10 @@ impl WitComponentContext {
         };
         
         let type_name = type_decl.name.name.as_str()
-            .map_err(|_| Error::parse_error("Invalid type name"))?
-            .to_string();
+            .map_err(|_| Error::parse_error("Error occurred"))?
+            .to_string());
         
-        self.type_mappings.insert(type_name, mapping.clone());
+        self.type_mappings.insert(type_name, mapping.clone();
         
         Ok(mapping)
     }
@@ -398,21 +398,21 @@ impl WitComponentContext {
             TypeExpr::Named(named) => {
                 // Look up named type
                 let type_name = named.name.name.as_str()
-                    .map_err(|_| Error::parse_error("Invalid type name"))?;
+                    .map_err(|_| Error::parse_error("Error occurred"))?;
                 
                 if let Some(mapping) = self.type_mappings.get(type_name) {
-                    Ok(mapping.component_type.clone())
+                    Ok(mapping.component_type.clone()
                 } else {
-                    Err(Error::parse_error(&"Component not found"))
+                    Err(Error::parse_error(&"Component not found")
                 }
             }
             TypeExpr::List(inner) => {
                 let inner_type = self.convert_wit_type(inner)?;
-                Ok(ComponentType::List(Box::new(inner_type)))
+                Ok(ComponentType::List(Box::new(inner_type))
             }
             TypeExpr::Option(inner) => {
                 let inner_type = self.convert_wit_type(inner)?;
-                Ok(ComponentType::Option(Box::new(inner_type)))
+                Ok(ComponentType::Option(Box::new(inner_type))
             }
         }
     }
@@ -457,7 +457,7 @@ impl WitComponentContext {
                 let mut max_alignment = 1u32;
                 for field in &record.fields {
                     if let Some(field_align) = self.calculate_type_alignment(&field.field_type) {
-                        max_alignment = max_alignment.max(field_align);
+                        max_alignment = max_alignment.max(field_align;
                     }
                 }
                 Some(max_alignment)
@@ -509,7 +509,7 @@ impl ComponentLowering {
     /// Lower WIT document to component representation
     #[cfg(feature = "std")]
     pub fn lower_document(document: WitDocument) -> Result<WitComponentContext> {
-        let mut context = WitComponentContext::new(document);
+        let mut context = WitComponentContext::new(document;
         context.build_mappings()?;
         Ok(context)
     }
@@ -517,7 +517,7 @@ impl ComponentLowering {
     /// Lower WIT document with custom configuration
     #[cfg(feature = "std")]
     pub fn lower_document_with_config(document: WitDocument, config: ComponentConfig) -> Result<WitComponentContext> {
-        let mut context = WitComponentContext::with_config(document, config);
+        let mut context = WitComponentContext::with_config(document, config;
         context.build_mappings()?;
         Ok(context)
     }
@@ -534,7 +534,7 @@ impl ComponentLowering {
             Self::validate_function_mapping(name, mapping)?;
         }
         
-        Ok(())
+        Ok(()
     }
     
     /// Validate a single type mapping
@@ -548,11 +548,11 @@ impl ComponentLowering {
                 return Err(Error::validation_error(&format!(
                     "Type {} has inconsistent size {} and alignment {}", 
                     name, size, alignment
-                )));
+                ;
             }
         }
         
-        Ok(())
+        Ok(()
     }
     
     /// Validate a component type
@@ -588,7 +588,7 @@ impl ComponentLowering {
             _ => {} // Primitive types are always valid
         }
         
-        Ok(())
+        Ok(()
     }
     
     /// Validate a function mapping
@@ -596,7 +596,7 @@ impl ComponentLowering {
         // Validate function signature
         // Check parameter and return type consistency
         // This would involve more detailed validation in a real implementation
-        Ok(())
+        Ok(()
     }
 }
 
@@ -616,7 +616,7 @@ mod tests {
             span: SourceSpan::empty(),
         };
         
-        let context = WitComponentContext::new(doc);
+        let context = WitComponentContext::new(doc;
         assert_eq!(context.interfaces().len(), 0);
         assert_eq!(context.types().len(), 0);
         assert_eq!(context.functions().len(), 0);
@@ -629,11 +629,11 @@ mod tests {
             use_items: Vec::new(),
             items: Vec::new(),
             span: SourceSpan::empty(),
-        });
+        };
         
-        assert_eq!(context.calculate_type_size(&ComponentType::U32), Some(4));
-        assert_eq!(context.calculate_type_size(&ComponentType::U64), Some(8));
-        assert_eq!(context.calculate_type_size(&ComponentType::Bool), Some(1));
+        assert_eq!(context.calculate_type_size(&ComponentType::U32), Some(4;
+        assert_eq!(context.calculate_type_size(&ComponentType::U64), Some(8;
+        assert_eq!(context.calculate_type_size(&ComponentType::Bool), Some(1;
         assert_eq!(context.calculate_type_size(&ComponentType::String), None); // Variable size
     }
     
@@ -644,20 +644,20 @@ mod tests {
             use_items: Vec::new(),
             items: Vec::new(),
             span: SourceSpan::empty(),
-        });
+        };
         
-        assert_eq!(context.calculate_type_alignment(&ComponentType::U32), Some(4));
-        assert_eq!(context.calculate_type_alignment(&ComponentType::U64), Some(8));
-        assert_eq!(context.calculate_type_alignment(&ComponentType::Bool), Some(1));
+        assert_eq!(context.calculate_type_alignment(&ComponentType::U32), Some(4;
+        assert_eq!(context.calculate_type_alignment(&ComponentType::U64), Some(8;
+        assert_eq!(context.calculate_type_alignment(&ComponentType::Bool), Some(1;
     }
     
     #[test]
     fn test_component_config() {
-        let config = ComponentConfig::default();
+        let config = ComponentConfig::default());
         assert!(config.debug_info);
         assert!(!config.optimize);
-        assert_eq!(config.memory_limit, Some(1024 * 1024));
-        assert_eq!(config.stack_limit, Some(64 * 1024));
+        assert_eq!(config.memory_limit, Some(1024 * 1024;
+        assert_eq!(config.stack_limit, Some(64 * 1024;
         assert!(!config.async_support);
     }
 }

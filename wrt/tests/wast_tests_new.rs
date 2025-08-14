@@ -1,18 +1,40 @@
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::{
+        Path,
+        PathBuf,
+    },
 };
 
 use wast::{
-    core::{NanPattern, WastArgCore, WastRetCore},
-    parser::{self, ParseBuffer},
-    Wast, WastArg, WastDirective, WastExecute, WastRet,
+    core::{
+        NanPattern,
+        WastArgCore,
+        WastRetCore,
+    },
+    parser::{
+        self,
+        ParseBuffer,
+    },
+    Wast,
+    WastArg,
+    WastDirective,
+    WastExecute,
+    WastRet,
 };
-use wrt::{Error, Module, StacklessEngine, Value};
+use wrt::{
+    Error,
+    Module,
+    StacklessEngine,
+    Value,
+};
 
 // Import the new WAST test runner
 mod wast_test_runner;
-use wast_test_runner::{WastTestRunner, WastTestStats};
+use wast_test_runner::{
+    WastTestRunner,
+    WastTestStats,
+};
 
 fn convert_wast_arg_core(arg: &WastArg) -> Result<Value, Error> {
     match arg {
@@ -69,11 +91,18 @@ fn test_wast_directive(
 
             // Instantiate the module
             let instance_idx = engine.instantiate(loaded_module)?;
-            println!("DEBUG: instantiate called for module with instance index {}", instance_idx);
+            println!(
+                "DEBUG: instantiate called for module with instance index {}",
+                instance_idx
+            );
 
             Ok(())
-        }
-        WastDirective::AssertReturn { span: _, exec, results } => {
+        },
+        WastDirective::AssertReturn {
+            span: _,
+            exec,
+            results,
+        } => {
             match exec {
                 WastExecute::Invoke(invoke) => {
                     let args: Result<Vec<Value>, _> =
@@ -117,10 +146,10 @@ fn test_wast_directive(
                         invoke.name, actual, expected
                     );
                     Ok(())
-                }
+                },
                 _ => Ok(()), // Skip other types of executions for now
             }
-        }
+        },
         _ => Ok(()), // Skip other directives for now
     }
 }
@@ -139,7 +168,7 @@ fn compare_wasm_values(actual: &Value, expected: &Value) -> bool {
                 // Compare with a suitable tolerance for F32
                 (a - e).abs() < 1e-6 // Use tolerance (e.g., 1e-6)
             }
-        }
+        },
         (Value::F64(a), Value::F64(e)) => {
             // Use tolerance for F64 due to observed precision diffs
             if e.is_nan() {
@@ -150,7 +179,7 @@ fn compare_wasm_values(actual: &Value, expected: &Value) -> bool {
                 // Compare with a slightly larger tolerance for F64
                 (a - e).abs() < 1e-9 // Increased tolerance
             }
-        }
+        },
         // For V128, compare byte arrays directly
         (Value::V128(a), Value::V128(e)) => a == e,
         // For other types, use standard equality
@@ -169,7 +198,7 @@ fn test_wast_file(path: &Path) -> Result<(), Error> {
         parser::parse(&buf).map_err(|e| Error::Parse(format!("Failed to parse WAST: {}", e)))?;
 
     let module = Module::new()?;
-    let mut engine = StacklessEngine::new(module);
+    let mut engine = StacklessEngine::new(module)?;
     for mut directive in wast.directives {
         test_wast_directive(&mut engine, &mut directive)?;
     }
@@ -248,23 +277,23 @@ fn test_wast_files() -> Result<(), Error> {
     if !test_dir.exists() {
         println!("No testsuite directory found at: {}", test_dir.display());
         println!("Checking external testsuite...");
-        
+
         // Try the external testsuite path
         let external_dir = workspace_root.join("external/testsuite");
         if !external_dir.exists() {
             println!("No external testsuite found either. Skipping WAST tests.");
-            return Ok(());
+            return Ok();
         }
-        
+
         return test_external_testsuite(&external_dir);
     }
 
     // Print the path and if it exists for debugging
-    println!("Checking testsuite at path: {}", test_dir.display());
-    println!("Directory exists: {}", test_dir.exists());
+    println!("Checking testsuite at path: {}", test_dir.display();
+    println!("Directory exists: {}", test_dir.exists);
 
     // Load the list of passing tests from wast_passed.md
-    let passing_tests = load_passing_tests();
+    let passing_tests = load_passing_tests);
 
     // Create a new WAST test runner
     let mut runner = WastTestRunner::new();
@@ -283,7 +312,7 @@ fn test_wast_files() -> Result<(), Error> {
     for test_path in passing_tests {
         if test_path.exists() && test_path.extension().is_some_and(|ext| ext == "wast") {
             tests_run += 1;
-            
+
             let rel_display_path = test_path
                 .strip_prefix(workspace_root)
                 .map(|p| p.to_path_buf())
@@ -293,20 +322,28 @@ fn test_wast_files() -> Result<(), Error> {
 
             match runner.run_wast_file(&test_path) {
                 Ok(stats) => {
-                    println!("✅ PASS: {} ({} passed, {} failed)", 
-                        rel_display_path.display(), stats.passed, stats.failed);
+                    println!(
+                        "✅ PASS: {} ({} passed, {} failed)",
+                        rel_display_path.display(),
+                        stats.passed,
+                        stats.failed
+                    );
                     if stats.failed == 0 {
                         tests_passed += 1;
                     }
-                }
+                },
                 Err(e) => {
                     println!("❌ FAIL: {} - {}", rel_display_path.display(), e);
-                }
+                },
             }
         }
     }
 
-    println!("Tests completed: {} passed, {} failed", tests_passed, tests_run - tests_passed);
+    println!(
+        "Tests completed: {} passed, {} failed",
+        tests_passed,
+        tests_run - tests_passed
+    );
     println!("Runner stats: {:?}", runner.stats);
 
     Ok(())
@@ -315,48 +352,54 @@ fn test_wast_files() -> Result<(), Error> {
 /// Test the external testsuite with a subset of files
 fn test_external_testsuite(testsuite_dir: &Path) -> Result<(), Error> {
     println!("Testing external testsuite at: {}", testsuite_dir.display());
-    
+
     let mut runner = WastTestRunner::new();
-    
+
     // Basic test files that should work with minimal implementation
     let basic_tests = [
         "nop.wast",
-        "const.wast", 
+        "const.wast",
         "i32.wast",
         "i64.wast",
         "f32.wast",
         "f64.wast",
     ];
-    
+
     let mut tests_run = 0;
     let mut tests_passed = 0;
-    
+
     for test_file in &basic_tests {
         let test_path = testsuite_dir.join(test_file);
         if test_path.exists() {
             tests_run += 1;
             println!("Running external test {}: {}", tests_run, test_file);
-            
+
             match runner.run_wast_file(&test_path) {
                 Ok(stats) => {
-                    println!("✅ {} - {} directives passed, {} failed", 
-                        test_file, stats.passed, stats.failed);
+                    println!(
+                        "✅ {} - {} directives passed, {} failed",
+                        test_file, stats.passed, stats.failed
+                    );
                     if stats.failed == 0 {
                         tests_passed += 1;
                     }
-                }
+                },
                 Err(e) => {
                     println!("❌ {} - Error: {}", test_file, e);
-                }
+                },
             }
         } else {
             println!("⚠️  Test file not found: {}", test_file);
         }
     }
-    
-    println!("External testsuite: {} files passed, {} failed", tests_passed, tests_run - tests_passed);
+
+    println!(
+        "External testsuite: {} files passed, {} failed",
+        tests_passed,
+        tests_run - tests_passed
+    );
     println!("Final runner stats: {:?}", runner.stats);
-    
+
     Ok(())
 }
 
@@ -385,19 +428,25 @@ fn run_basic_wast_tests(runner: &mut WastTestRunner, test_dir: &Path) -> Result<
 
             match runner.run_wast_file(path) {
                 Ok(stats) => {
-                    println!("✅ {} - {} passed, {} failed", 
-                        file_name, stats.passed, stats.failed);
+                    println!(
+                        "✅ {} - {} passed, {} failed",
+                        file_name, stats.passed, stats.failed
+                    );
                     if stats.failed == 0 {
                         tests_passed += 1;
                     }
-                }
+                },
                 Err(e) => {
                     println!("❌ {} - {}", file_name, e);
-                }
+                },
             }
         }
     }
 
-    println!("Basic tests: {} passed, {} failed", tests_passed, tests_run - tests_passed);
+    println!(
+        "Basic tests: {} passed, {} failed",
+        tests_passed,
+        tests_run - tests_passed
+    );
     Ok(())
 }

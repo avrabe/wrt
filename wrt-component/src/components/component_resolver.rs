@@ -4,28 +4,49 @@
 //! during component instantiation and linking.
 
 #[cfg(not(feature = "std"))]
-use std::{collections::BTreeMap, vec::Vec};
+use alloc::{
+    collections::BTreeMap,
+    vec::Vec,
+};
 #[cfg(feature = "std")]
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    vec::Vec,
+};
 
 use wrt_foundation::{
-    bounded_collections::{BoundedString, BoundedVec, MAX_GENERATIVE_TYPES},
+    bounded::{
+        BoundedString,
+        BoundedVec,
+        MAX_GENERATIVE_TYPES,
+    },
+    budget_aware_provider::CrateId,
     prelude::*,
+    safe_managed_alloc,
+    safe_memory::NoStdProvider,
 };
 
 use crate::{
     generative_types::GenerativeTypeRegistry,
-    type_bounds::{RelationKind, TypeBoundsChecker},
-    types::{ComponentError, ComponentInstanceId, TypeId, ValType},
+    type_bounds::{
+        RelationKind,
+        TypeBoundsChecker,
+    },
+    types::{
+        ComponentError,
+        ComponentInstanceId,
+        TypeId,
+        ValType,
+    },
 };
 
 /// Import resolution result
 #[derive(Debug, Clone)]
 pub struct ResolvedImport {
     /// Import name
-    pub name: BoundedString<64, NoStdProvider<65536>>,
+    pub name:     BoundedString<64, NoStdProvider<65536>>,
     /// Resolved value
-    pub value: ImportValue,
+    pub value:    ImportValue,
     /// Type information
     pub val_type: Option<ValType>,
 }
@@ -34,9 +55,9 @@ pub struct ResolvedImport {
 #[derive(Debug, Clone)]
 pub struct ResolvedExport {
     /// Export name
-    pub name: BoundedString<64, NoStdProvider<65536>>,
+    pub name:     BoundedString<64, NoStdProvider<65536>>,
     /// Resolved value
-    pub value: ExportValue,
+    pub value:    ExportValue,
     /// Type information
     pub val_type: Option<ValType>,
 }
@@ -49,13 +70,22 @@ pub enum ImportValue {
     /// Global import
     Global { type_id: TypeId, global_ref: u32 },
     /// Memory import
-    Memory { min_pages: u32, max_pages: Option<u32> },
+    Memory {
+        min_pages: u32,
+        max_pages: Option<u32>,
+    },
     /// Table import
-    Table { min_size: u32, max_size: Option<u32> },
+    Table {
+        min_size: u32,
+        max_size: Option<u32>,
+    },
     /// Instance import
     Instance { instance_id: ComponentInstanceId },
     /// Value import
-    Value { val_type: ValType, value: ComponentValue },
+    Value {
+        val_type: ValType,
+        value:    ComponentValue,
+    },
 }
 
 /// Export value types
@@ -72,7 +102,10 @@ pub enum ExportValue {
     /// Instance export
     Instance { instance_id: ComponentInstanceId },
     /// Value export
-    Value { val_type: ValType, value: ComponentValue },
+    Value {
+        val_type: ValType,
+        value:    ComponentValue,
+    },
 }
 
 /// Component value for imports/exports
@@ -101,34 +134,36 @@ pub enum ComponentValue {
     /// Variant value
     Variant {
         discriminant: u32,
-        value: Option<Box<ComponentValue>>,
+        value:        Option<Box<ComponentValue>>,
     },
     /// Option value
     Option(Option<Box<ComponentValue>>),
     /// Result value
-    Result(Result<Box<ComponentValue>, Box<ComponentValue>>),
+    Result(core::result::Result<Box<ComponentValue>, Box<ComponentValue>>),
 }
 
 /// Component resolver for import/export resolution
 #[derive(Debug)]
 pub struct ComponentResolver {
     /// Type registry
-    type_registry: GenerativeTypeRegistry,
+    type_registry:  GenerativeTypeRegistry,
     /// Type bounds checker
     bounds_checker: TypeBoundsChecker,
     /// Import resolution cache
-    import_cache: BTreeMap<(ComponentInstanceId, BoundedString<64, NoStdProvider<65536>>), ResolvedImport>,
+    import_cache:
+        BTreeMap<(ComponentInstanceId, BoundedString<64, NoStdProvider<65536>>), ResolvedImport>,
     /// Export resolution cache
-    export_cache: BTreeMap<(ComponentInstanceId, BoundedString<64, NoStdProvider<65536>>), ResolvedExport>,
+    export_cache:
+        BTreeMap<(ComponentInstanceId, BoundedString<64, NoStdProvider<65536>>), ResolvedExport>,
 }
 
 impl ComponentResolver {
     pub fn new() -> Self {
         Self {
-            type_registry: GenerativeTypeRegistry::new(),
+            type_registry:  GenerativeTypeRegistry::new(),
             bounds_checker: TypeBoundsChecker::new(),
-            import_cache: BTreeMap::new(),
-            export_cache: BTreeMap::new(),
+            import_cache:   BTreeMap::new(),
+            export_cache:   BTreeMap::new(),
         }
     }
 
@@ -138,7 +173,7 @@ impl ComponentResolver {
         instance_id: ComponentInstanceId,
         import_name: BoundedString<64, NoStdProvider<65536>>,
         provided_value: ImportValue,
-    ) -> Result<ResolvedImport, ComponentError> {
+    ) -> core::result::Result<ResolvedImport, ComponentError> {
         // Check cache first
         let cache_key = (instance_id, import_name.clone());
         if let Some(cached) = self.import_cache.get(&cache_key) {
@@ -148,7 +183,11 @@ impl ComponentResolver {
         // Validate import type compatibility
         let val_type = self.get_import_type(&provided_value)?;
 
-        let resolved = ResolvedImport { name: import_name, value: provided_value, val_type };
+        let resolved = ResolvedImport {
+            name: import_name,
+            value: provided_value,
+            val_type,
+        };
 
         self.import_cache.insert(cache_key, resolved.clone());
         Ok(resolved)
@@ -160,7 +199,7 @@ impl ComponentResolver {
         instance_id: ComponentInstanceId,
         export_name: BoundedString<64, NoStdProvider<65536>>,
         export_value: ExportValue,
-    ) -> Result<ResolvedExport, ComponentError> {
+    ) -> core::result::Result<ResolvedExport, ComponentError> {
         // Check cache first
         let cache_key = (instance_id, export_name.clone());
         if let Some(cached) = self.export_cache.get(&cache_key) {
@@ -170,7 +209,11 @@ impl ComponentResolver {
         // Validate export type
         let val_type = self.get_export_type(&export_value)?;
 
-        let resolved = ResolvedExport { name: export_name, value: export_value, val_type };
+        let resolved = ResolvedExport {
+            name: export_name,
+            value: export_value,
+            val_type,
+        };
 
         self.export_cache.insert(cache_key, resolved.clone());
         Ok(resolved)
@@ -181,37 +224,61 @@ impl ComponentResolver {
         &mut self,
         import: &ResolvedImport,
         export: &ResolvedExport,
-    ) -> Result<bool, ComponentError> {
+    ) -> core::result::Result<bool, ComponentError> {
         match (&import.value, &export.value) {
             (
-                ImportValue::Function { type_id: import_type, .. },
-                ExportValue::Function { type_id: export_type, .. },
+                ImportValue::Function {
+                    type_id: import_type,
+                    ..
+                },
+                ExportValue::Function {
+                    type_id: export_type,
+                    ..
+                },
             ) => self.check_type_compatibility(*import_type, *export_type),
             (
-                ImportValue::Global { type_id: import_type, .. },
-                ExportValue::Global { type_id: export_type, .. },
+                ImportValue::Global {
+                    type_id: import_type,
+                    ..
+                },
+                ExportValue::Global {
+                    type_id: export_type,
+                    ..
+                },
             ) => self.check_type_compatibility(*import_type, *export_type),
             (
-                ImportValue::Memory { min_pages: import_min, max_pages: import_max },
+                ImportValue::Memory {
+                    min_pages: import_min,
+                    max_pages: import_max,
+                },
                 ExportValue::Memory { .. },
             ) => {
                 // Memory compatibility checks would go here
                 Ok(true)
-            }
+            },
             (
-                ImportValue::Table { min_size: import_min, max_size: import_max },
+                ImportValue::Table {
+                    min_size: import_min,
+                    max_size: import_max,
+                },
                 ExportValue::Table { .. },
             ) => {
                 // Table compatibility checks would go here
                 Ok(true)
-            }
+            },
             (ImportValue::Instance { .. }, ExportValue::Instance { .. }) => {
                 // Instance compatibility would check all nested imports/exports
                 Ok(true)
-            }
+            },
             (
-                ImportValue::Value { val_type: import_type, .. },
-                ExportValue::Value { val_type: export_type, .. },
+                ImportValue::Value {
+                    val_type: import_type,
+                    ..
+                },
+                ExportValue::Value {
+                    val_type: export_type,
+                    ..
+                },
             ) => Ok(self.are_types_compatible(import_type, export_type)),
             _ => Ok(false), // Different kinds of imports/exports
         }
@@ -222,7 +289,7 @@ impl ComponentResolver {
         &mut self,
         import_type: TypeId,
         export_type: TypeId,
-    ) -> Result<bool, ComponentError> {
+    ) -> core::result::Result<bool, ComponentError> {
         // Check if export type is a subtype of import type
         let result = self.bounds_checker.check_type_bound(
             export_type,
@@ -261,7 +328,10 @@ impl ComponentResolver {
     }
 
     /// Get the type of an import value
-    fn get_import_type(&self, import: &ImportValue) -> Result<Option<ValType>, ComponentError> {
+    fn get_import_type(
+        &self,
+        import: &ImportValue,
+    ) -> core::result::Result<Option<ValType>, ComponentError> {
         match import {
             ImportValue::Function { .. } => Ok(None), // Function types are handled separately
             ImportValue::Global { .. } => Ok(None),   // Global types are handled separately
@@ -273,7 +343,10 @@ impl ComponentResolver {
     }
 
     /// Get the type of an export value
-    fn get_export_type(&self, export: &ExportValue) -> Result<Option<ValType>, ComponentError> {
+    fn get_export_type(
+        &self,
+        export: &ExportValue,
+    ) -> core::result::Result<Option<ValType>, ComponentError> {
         match export {
             ExportValue::Function { .. } => Ok(None), // Function types are handled separately
             ExportValue::Global { .. } => Ok(None),   // Global types are handled separately
@@ -317,6 +390,28 @@ impl Default for ComponentResolver {
     }
 }
 
+/// Import resolution helper
+#[derive(Debug, Clone)]
+pub struct ImportResolution {
+    /// Import name
+    pub name:           BoundedString<64, NoStdProvider<65536>>,
+    /// Instance ID
+    pub instance_id:    ComponentInstanceId,
+    /// Resolved value
+    pub resolved_value: ComponentValue,
+}
+
+/// Export resolution helper
+#[derive(Debug, Clone)]
+pub struct ExportResolution {
+    /// Export name
+    pub name:           BoundedString<64, NoStdProvider<65536>>,
+    /// Instance ID
+    pub instance_id:    ComponentInstanceId,
+    /// Exported value
+    pub exported_value: ComponentValue,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,8 +429,10 @@ mod tests {
         let instance_id = ComponentInstanceId(1);
         let import_name = BoundedString::from_str("test_import").unwrap();
 
-        let import_value =
-            ImportValue::Value { val_type: ValType::U32, value: ComponentValue::U32(42) };
+        let import_value = ImportValue::Value {
+            val_type: ValType::U32,
+            value:    ComponentValue::U32(42),
+        };
 
         let result = resolver.resolve_import(instance_id, import_name.clone(), import_value);
         assert!(result.is_ok());
@@ -352,7 +449,7 @@ mod tests {
 
         let export_value = ExportValue::Value {
             val_type: ValType::String,
-            value: ComponentValue::String(BoundedString::from_str("hello").unwrap()),
+            value:    ComponentValue::String(BoundedString::from_str("hello").unwrap()),
         };
 
         let result = resolver.resolve_export(instance_id, export_name.clone(), export_value);
@@ -368,14 +465,20 @@ mod tests {
 
         // Create matching import and export
         let import = ResolvedImport {
-            name: BoundedString::from_str("test").unwrap(),
-            value: ImportValue::Value { val_type: ValType::U32, value: ComponentValue::U32(0) },
+            name:     BoundedString::from_str("test").unwrap(),
+            value:    ImportValue::Value {
+                val_type: ValType::U32,
+                value:    ComponentValue::U32(0),
+            },
             val_type: Some(ValType::U32),
         };
 
         let export = ResolvedExport {
-            name: BoundedString::from_str("test").unwrap(),
-            value: ExportValue::Value { val_type: ValType::U32, value: ComponentValue::U32(42) },
+            name:     BoundedString::from_str("test").unwrap(),
+            value:    ExportValue::Value {
+                val_type: ValType::U32,
+                value:    ComponentValue::U32(42),
+            },
             val_type: Some(ValType::U32),
         };
 
@@ -402,7 +505,13 @@ mod tests {
 }
 
 // Implement required traits for BoundedVec compatibility
-use wrt_foundation::traits::{Checksummable, ToBytes, FromBytes, WriteStream, ReadStream};
+use wrt_foundation::traits::{
+    Checksummable,
+    FromBytes,
+    ReadStream,
+    ToBytes,
+    WriteStream,
+};
 
 // Macro to implement basic traits for complex types
 macro_rules! impl_basic_traits {
@@ -441,27 +550,45 @@ impl Default for ComponentValue {
     }
 }
 
-impl Default for ImportResolution {
-    fn default() -> Self {
-        Self {
-            name: BoundedString::new(DefaultMemoryProvider::default()).unwrap(),
+impl ImportResolution {
+    pub fn new() -> Result<Self, ComponentError> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)
+            .map_err(|_| ComponentError::AllocationFailed)?;
+        let name = BoundedString::new(provider).map_err(|_| ComponentError::AllocationFailed)?;
+
+        Ok(Self {
+            name,
             instance_id: ComponentInstanceId(0),
             resolved_value: ComponentValue::default(),
-        }
+        })
+    }
+}
+
+impl Default for ImportResolution {
+    fn default() -> Self {
+        Self::new().expect("ImportResolution allocation should not fail in default construction")
+    }
+}
+
+impl ExportResolution {
+    pub fn new() -> Result<Self, ComponentError> {
+        let provider = safe_managed_alloc!(65536, CrateId::Component)
+            .map_err(|_| ComponentError::AllocationFailed)?;
+        let name = BoundedString::new(provider).map_err(|_| ComponentError::AllocationFailed)?;
+
+        Ok(Self {
+            name,
+            instance_id: ComponentInstanceId(0),
+            exported_value: ComponentValue::default(),
+        })
     }
 }
 
 impl Default for ExportResolution {
     fn default() -> Self {
-        Self {
-            name: BoundedString::new(DefaultMemoryProvider::default()).unwrap(),
-            instance_id: ComponentInstanceId(0),
-            exported_value: ComponentValue::default(),
-        }
+        Self::new().expect("ExportResolution allocation should not fail in default construction")
     }
 }
 
 // Apply macro to types that need traits
-impl_basic_traits!(ComponentValue, ComponentValue::default());
-impl_basic_traits!(ImportResolution, ImportResolution::default());
-impl_basic_traits!(ExportResolution, ExportResolution::default());
+// Note: ComponentValue traits are implemented in wrt-foundation

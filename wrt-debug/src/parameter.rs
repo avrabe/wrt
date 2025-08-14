@@ -1,6 +1,13 @@
 use wrt_foundation::{
-    bounded::{BoundedVec, MAX_DWARF_ABBREV_CACHE},
-    BoundedCapacity, NoStdProvider,
+    bounded::{
+        BoundedVec,
+        MAX_DWARF_ABBREV_CACHE,
+    },
+    budget_aware_provider::CrateId,
+    memory_sizing::LargeProvider,
+    safe_managed_alloc,
+    safe_memory::NoStdProvider,
+    BoundedCapacity,
 };
 
 /// Parameter and type information support
@@ -92,15 +99,15 @@ impl BasicType {
 #[derive(Debug, Clone)]
 pub struct Parameter<'a> {
     /// Parameter name
-    pub name: Option<DebugString<'a>>,
+    pub name:        Option<DebugString<'a>>,
     /// Parameter type
-    pub param_type: BasicType,
+    pub param_type:  BasicType,
     /// Source file index where declared
-    pub file_index: u16,
+    pub file_index:  u16,
     /// Source line where declared
-    pub line: u32,
+    pub line:        u32,
     /// Parameter position (0-based)
-    pub position: u16,
+    pub position:    u16,
     /// Is this a variadic parameter?
     pub is_variadic: bool,
 }
@@ -109,11 +116,11 @@ pub struct Parameter<'a> {
 impl<'a> Default for Parameter<'a> {
     fn default() -> Self {
         Self {
-            name: None,
-            param_type: BasicType::Unknown,
-            file_index: 0,
-            line: 0,
-            position: 0,
+            name:        None,
+            param_type:  BasicType::Unknown,
+            file_index:  0,
+            line:        0,
+            position:    0,
             is_variadic: false,
         }
     }
@@ -153,16 +160,16 @@ impl<'a> wrt_foundation::traits::ToBytes for Parameter<'a> {
         &self,
         writer: &mut wrt_foundation::traits::WriteStream<'b>,
         provider: &P,
-    ) -> wrt_foundation::Result<()> {
+    ) -> wrt_error::Result<()> {
         // Write name option
         match &self.name {
             Some(name) => {
                 writer.write_u8(1)?;
                 name.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             None => {
                 writer.write_u8(0)?;
-            }
+            },
         }
         writer.write_u8(self.param_type.to_u8())?;
         writer.write_u16_le(self.file_index)?;
@@ -177,7 +184,7 @@ impl<'a> wrt_foundation::traits::FromBytes for Parameter<'a> {
     fn from_bytes_with_provider<'b, P: wrt_foundation::MemoryProvider>(
         reader: &mut wrt_foundation::traits::ReadStream<'b>,
         provider: &P,
-    ) -> wrt_foundation::Result<Self> {
+    ) -> wrt_error::Result<Self> {
         let has_name = reader.read_u8()? != 0;
         let name = if has_name {
             Some(DebugString::from_bytes_with_provider(reader, provider)?)
@@ -211,9 +218,13 @@ impl<'a> ParameterList<'a> {
     /// Create a new empty parameter list
     pub fn new() -> Self {
         Self {
-            parameters:
-                BoundedVec::new(NoStdProvider::<{ MAX_DWARF_ABBREV_CACHE * 64 }>::default())
-                    .expect("Failed to create parameters BoundedVec"),
+            parameters: {
+                let provider = safe_managed_alloc!({ MAX_DWARF_ABBREV_CACHE * 64 }, CrateId::Debug)
+                    .unwrap_or_else(|_| {
+                        NoStdProvider::<{ MAX_DWARF_ABBREV_CACHE * 64 }>::default()
+                    });
+                BoundedVec::new(provider).expect("Failed to create parameters BoundedVec")
+            },
         }
     }
 
@@ -224,7 +235,7 @@ impl<'a> ParameterList<'a> {
 
     /// Get all parameters
     pub fn parameters(&self) -> &[Parameter<'a>] {
-        self.parameters.as_slice()
+        self.parameters.as_slice().unwrap_or(&[])
     }
 
     /// Get parameter count
@@ -277,35 +288,35 @@ impl<'a> ParameterList<'a> {
 #[derive(Debug, Clone)]
 pub struct InlinedFunction<'a> {
     /// Name of the inlined function
-    pub name: Option<DebugString<'a>>,
+    pub name:            Option<DebugString<'a>>,
     /// Abstract origin (reference to original function)
     pub abstract_origin: u32,
     /// Low PC (start address in parent)
-    pub low_pc: u32,
+    pub low_pc:          u32,
     /// High PC (end address in parent)
-    pub high_pc: u32,
+    pub high_pc:         u32,
     /// Call site file
-    pub call_file: u16,
+    pub call_file:       u16,
     /// Call site line
-    pub call_line: u32,
+    pub call_line:       u32,
     /// Call site column
-    pub call_column: u16,
+    pub call_column:     u16,
     /// Depth of inlining (0 = directly inlined into parent)
-    pub depth: u8,
+    pub depth:           u8,
 }
 
 // Implement required traits for BoundedVec compatibility
 impl<'a> Default for InlinedFunction<'a> {
     fn default() -> Self {
         Self {
-            name: None,
+            name:            None,
             abstract_origin: 0,
-            low_pc: 0,
-            high_pc: 0,
-            call_file: 0,
-            call_line: 0,
-            call_column: 0,
-            depth: 0,
+            low_pc:          0,
+            high_pc:         0,
+            call_file:       0,
+            call_line:       0,
+            call_column:     0,
+            depth:           0,
         }
     }
 }
@@ -348,16 +359,16 @@ impl<'a> wrt_foundation::traits::ToBytes for InlinedFunction<'a> {
         &self,
         writer: &mut wrt_foundation::traits::WriteStream<'b>,
         provider: &P,
-    ) -> wrt_foundation::Result<()> {
+    ) -> wrt_error::Result<()> {
         // Write name option
         match &self.name {
             Some(name) => {
                 writer.write_u8(1)?;
                 name.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             None => {
                 writer.write_u8(0)?;
-            }
+            },
         }
         writer.write_u32_le(self.abstract_origin)?;
         writer.write_u32_le(self.low_pc)?;
@@ -374,7 +385,7 @@ impl<'a> wrt_foundation::traits::FromBytes for InlinedFunction<'a> {
     fn from_bytes_with_provider<'b, P: wrt_foundation::MemoryProvider>(
         reader: &mut wrt_foundation::traits::ReadStream<'b>,
         provider: &P,
-    ) -> wrt_foundation::Result<Self> {
+    ) -> wrt_error::Result<Self> {
         let has_name = reader.read_u8()? != 0;
         let name = if has_name {
             Some(DebugString::from_bytes_with_provider(reader, provider)?)
@@ -397,6 +408,7 @@ impl<'a> wrt_foundation::traits::FromBytes for InlinedFunction<'a> {
 
 /// Collection of inlined functions
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct InlinedFunctions<'a> {
     /// Inlined function entries
     entries: BoundedVec<
@@ -406,12 +418,17 @@ pub struct InlinedFunctions<'a> {
     >,
 }
 
+#[allow(dead_code)]
 impl<'a> InlinedFunctions<'a> {
     /// Create new inlined functions collection
     pub fn new() -> Self {
         Self {
-            entries: BoundedVec::new(NoStdProvider::<{ MAX_DWARF_ABBREV_CACHE * 128 }>::default())
-                .expect("Failed to create entries BoundedVec"),
+            entries: {
+                let provider =
+                    safe_managed_alloc!({ MAX_DWARF_ABBREV_CACHE * 128 }, CrateId::Debug)
+                        .unwrap_or_else(|_| LargeProvider::default());
+                BoundedVec::new(provider).expect("Failed to create entries BoundedVec")
+            },
         }
     }
 
@@ -462,20 +479,20 @@ mod tests {
 
         // Add some test parameters
         let param1 = Parameter {
-            name: None,
-            param_type: BasicType::SignedInt(4),
-            file_index: 0,
-            line: 0,
-            position: 0,
+            name:        None,
+            param_type:  BasicType::SignedInt(4),
+            file_index:  0,
+            line:        0,
+            position:    0,
             is_variadic: false,
         };
 
         let param2 = Parameter {
-            name: None,
-            param_type: BasicType::Pointer,
-            file_index: 0,
-            line: 0,
-            position: 1,
+            name:        None,
+            param_type:  BasicType::Pointer,
+            file_index:  0,
+            line:        0,
+            position:    1,
             is_variadic: false,
         };
 
@@ -498,14 +515,14 @@ mod tests {
         let mut inlined = InlinedFunctions::new();
 
         let func = InlinedFunction {
-            name: None,
+            name:            None,
             abstract_origin: 0x100,
-            low_pc: 0x1000,
-            high_pc: 0x1100,
-            call_file: 1,
-            call_line: 42,
-            call_column: 8,
-            depth: 0,
+            low_pc:          0x1000,
+            high_pc:         0x1100,
+            call_file:       1,
+            call_line:       42,
+            call_column:     8,
+            depth:           0,
         };
 
         inlined.add(func).unwrap();

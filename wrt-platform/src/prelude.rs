@@ -11,21 +11,31 @@
 //! This module re-exports the core traits and types for convenient use.
 
 // Re-export core error type (already re-exported in lib.rs, but good practice)
-pub use wrt_error::{Error, ErrorCategory, Result};
+pub use wrt_error::{
+    Error,
+    ErrorCategory,
+    Result,
+};
 
 // Platform-specific re-exports based on features and targets
 #[cfg(all(feature = "platform-macos", target_os = "macos"))]
-pub use crate::macos_memory::{MacOsAllocator, MacOsAllocatorBuilder};
+pub use crate::macos_memory::{
+    MacOsAllocator,
+    MacOsAllocatorBuilder,
+};
 #[cfg(all(feature = "platform-macos", target_os = "macos"))]
-pub use crate::macos_sync::{MacOsFutex, MacOsFutexBuilder};
+pub use crate::macos_sync::{
+    MacOsFutex,
+    MacOsFutexBuilder,
+};
 // Binary std/no_std choice
 // Re-export sync trait
 pub use crate::{
     memory::{
-        NoStdProvider, NoStdProviderBuilder, PageAllocator, VerificationLevel, WASM_PAGE_SIZE,
-    },
-    memory_optimizations::{
-        MemoryOptimization, PlatformMemoryOptimizer, PlatformOptimizedProviderBuilder,
+        NoStdProvider,
+        PageAllocator,
+        VerificationLevel,
+        WASM_PAGE_SIZE,
     },
     sync::FutexLike,
 };

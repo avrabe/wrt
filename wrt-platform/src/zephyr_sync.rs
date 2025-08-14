@@ -16,9 +16,18 @@
 //! futex implementation and kernel objects, supporting no_std/no_alloc
 //! environments on embedded systems.
 
-use core::{fmt, sync::atomic::AtomicU32, time::Duration};
+use core::{
+    fmt,
+    sync::atomic::AtomicU32,
+    time::Duration,
+};
 
-use wrt_error::{codes, Error, ErrorCategory, Result};
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+    Result,
+};
 
 use crate::sync::FutexLike;
 
@@ -54,12 +63,16 @@ impl ZephyrTimeout {
 
     /// Create no-wait timeout
     fn no_wait() -> Self {
-        Self { ticks: K_NO_WAIT as i64 }
+        Self {
+            ticks: K_NO_WAIT as i64,
+        }
     }
 
     /// Create forever timeout
     fn forever() -> Self {
-        Self { ticks: K_FOREVER as i64 }
+        Self {
+            ticks: K_FOREVER as i64,
+        }
     }
 
     /// Get timeout value for Zephyr APIs
@@ -100,11 +113,11 @@ extern "C" {
 #[derive(Debug)]
 pub struct ZephyrFutex {
     /// The atomic value used for synchronization
-    value: AtomicU32,
+    value:     AtomicU32,
     /// Binary std/no_std choice
     futex_obj: *mut ZephyrFutexHandle,
     /// Padding to ensure cache line alignment
-    _padding: [u8; 56], // Adjust for embedded cache line sizes
+    _padding:  [u8; 56], // Adjust for embedded cache line sizes
 }
 
 // Safety: ZephyrFutex contains only atomic values and Zephyr kernel objects
@@ -120,7 +133,11 @@ impl ZephyrFutex {
         // object)
         let futex_obj = core::ptr::null_mut();
 
-        let futex = Self { value: AtomicU32::new(initial_value), futex_obj, _padding: [0; 56] };
+        let futex = Self {
+            value: AtomicU32::new(initial_value),
+            futex_obj,
+            _padding: [0; 56],
+        };
 
         // Initialize the Zephyr futex object
         // SAFETY: In real usage, futex_obj would point to valid kernel object memory
@@ -152,22 +169,16 @@ impl ZephyrFutex {
 
         match result {
             0 => Ok(()), // Success - woken up
-            ETIMEDOUT => {
-                Err(Error::new(ErrorCategory::System, 1, "Timeout expired"))
-            }
+            ETIMEDOUT => Err(Error::runtime_execution_error("Futex wait timeout")),
             EAGAIN => {
                 // Value changed before we could wait - this is success
                 Ok(())
-            }
+            },
             EINTR => {
                 // Interrupted - treat as spurious wakeup
                 Ok(())
-            }
-            _ => Err(Error::new(
-                ErrorCategory::System,
-                1,
-                "Futex wait operation failed",
-            )),
+            },
+            _ => Err(Error::new(ErrorCategory::System, 1, "Futex wait failed")),
         }
     }
 
@@ -186,11 +197,7 @@ impl ZephyrFutex {
             if timeout_ticks != i64::MAX {
                 let elapsed = unsafe { k_uptime_ticks() } - start_time;
                 if elapsed >= timeout_ticks {
-                    return Err(Error::new(
-                        ErrorCategory::System,
-                        1,
-                        "Futex wait timed out",
-                    ));
+                    return Err(Error::runtime_execution_error("Zephyr mutex lock timeout"));
                 }
             }
 
@@ -217,7 +224,7 @@ impl ZephyrFutex {
             Err(Error::new(
                 ErrorCategory::System,
                 1,
-                "Futex wake operation failed",
+                "Failed to wake futex waiters",
             ))
         }
     }
@@ -270,7 +277,11 @@ impl FutexLike for ZephyrFutex {
 
 impl fmt::Display for ZephyrFutex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ZephyrFutex({})", self.value.load(core::sync::atomic::Ordering::Relaxed))
+        write!(
+            f,
+            "ZephyrFutex({})",
+            self.value.load(core::sync::atomic::Ordering::Relaxed)
+        )
     }
 }
 
@@ -285,11 +296,11 @@ impl Drop for ZephyrFutex {
 #[derive(Debug)]
 pub struct ZephyrSemaphoreFutex {
     /// The atomic value used for synchronization
-    value: AtomicU32,
+    value:     AtomicU32,
     /// Binary std/no_std choice
     semaphore: *mut u8, // Placeholder for k_sem structure
     /// Padding for alignment
-    _padding: [u8; 60],
+    _padding:  [u8; 60],
 }
 
 // Safety: Same as ZephyrFutex
@@ -300,9 +311,9 @@ impl ZephyrSemaphoreFutex {
     /// Create a new semaphore-based futex
     pub fn new(initial_value: u32) -> Self {
         Self {
-            value: AtomicU32::new(initial_value),
+            value:     AtomicU32::new(initial_value),
             semaphore: core::ptr::null_mut(), // Would point to actual k_sem object
-            _padding: [0; 60],
+            _padding:  [0; 60],
         }
     }
 }
@@ -327,10 +338,8 @@ impl FutexLike for ZephyrSemaphoreFutex {
             if timeout_ticks != i64::MAX {
                 let elapsed = unsafe { k_uptime_ticks() } - start_time;
                 if elapsed >= timeout_ticks {
-                    return Err(Error::new(
-                        ErrorCategory::System,
-                        1,
-                        "Semaphore wait timed out",
+                    return Err(Error::runtime_execution_error(
+                        "Zephyr semaphore wait timeout",
                     ));
                 }
             }

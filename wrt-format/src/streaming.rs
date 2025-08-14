@@ -4,35 +4,48 @@
 //! binaries in bounded memory without requiring heap allocation. It's designed
 //! for pure no_std environments where memory usage must be deterministic.
 
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+#[cfg(not(any(feature = "std")))]
+use core::marker::PhantomData;
 #[cfg(feature = "std")]
 use std::vec::Vec;
 
 #[cfg(not(any(feature = "std")))]
-use core::marker::PhantomData;
-
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+};
+#[cfg(feature = "std")]
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+};
 #[cfg(not(any(feature = "std")))]
-use wrt_foundation::{MemoryProvider, NoStdProvider, traits::BoundedCapacity};
-
-#[cfg(not(any(feature = "std")))]
-use wrt_error::{codes, Error, ErrorCategory};
-
-#[cfg(not(any(feature = "std")))]
-use crate::{WasmVec, WasmString};
-
-#[cfg(not(any(feature = "std")))]
-use crate::binary::{WASM_MAGIC, WASM_VERSION, read_leb128_u32, read_string};
+use wrt_foundation::{
+    traits::BoundedCapacity,
+    MemoryProvider,
+    NoStdProvider,
+};
 
 #[cfg(feature = "std")]
 use crate::binary::WASM_MAGIC;
-
-#[cfg(feature = "std")]
-use wrt_error::{codes, Error, ErrorCategory};
-
+#[cfg(not(any(feature = "std")))]
+use crate::binary::{
+    read_leb128_u32,
+    read_string,
+    WASM_MAGIC,
+    WASM_VERSION,
+};
+#[cfg(not(any(feature = "std")))]
+use crate::{
+    WasmString,
+    WasmVec,
+};
 
 /// Maximum size of a section that can be processed in memory
 pub const MAX_SECTION_SIZE: usize = 64 * 1024; // 64KB
@@ -50,7 +63,10 @@ pub enum ParserState {
     /// Expecting section header
     SectionHeader,
     /// Processing section content
-    SectionContent { section_id: u8, remaining_bytes: u32 },
+    SectionContent {
+        section_id:      u8,
+        remaining_bytes: u32,
+    },
     /// Parsing complete
     Complete,
     /// Error state
@@ -61,9 +77,9 @@ pub enum ParserState {
 #[derive(Debug, Clone)]
 pub struct SectionInfo {
     /// Section ID
-    pub id: u8,
+    pub id:        u8,
     /// Section size in bytes
-    pub size: u32,
+    pub size:      u32,
     /// Bytes processed so far
     pub processed: u32,
 }
@@ -73,17 +89,17 @@ pub struct SectionInfo {
 #[derive(Debug)]
 pub struct StreamingParser<P: MemoryProvider + Clone + Default + Eq = NoStdProvider<1024>> {
     /// Current parser state
-    state: ParserState,
+    state:           ParserState,
     /// Memory provider for bounded collections
-    provider: P,
+    provider:        P,
     /// Bytes processed so far
     bytes_processed: usize,
     /// Current section being processed
     current_section: Option<SectionInfo>,
     /// Buffer for collecting section data
-    section_buffer: WasmVec<u8, P>,
+    section_buffer:  WasmVec<u8, P>,
     /// Phantom marker for generic parameter
-    _phantom: PhantomData<P>,
+    _phantom:        PhantomData<P>,
 }
 
 /// Binary std/no_std choice
@@ -92,13 +108,13 @@ pub struct StreamingParser<P: MemoryProvider + Clone + Default + Eq = NoStdProvi
 #[allow(dead_code)] // Stub implementation for future streaming functionality
 pub struct StreamingParser {
     /// Current parser state
-    state: ParserState,
+    state:           ParserState,
     /// Bytes processed so far
     bytes_processed: usize,
     /// Current section being processed
     current_section: Option<SectionInfo>,
     /// Buffer for collecting section data
-    section_buffer: Vec<u8>,
+    section_buffer:  Vec<u8>,
 }
 
 /// Parser result for streaming operations
@@ -116,13 +132,8 @@ pub enum ParseResult<T> {
 impl<P: MemoryProvider + Clone + Default + Eq> StreamingParser<P> {
     /// Create a new streaming parser
     pub fn new(provider: P) -> core::result::Result<Self, Error> {
-        let section_buffer = WasmVec::new(provider.clone()).map_err(|_| {
-            Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ERROR,
-                "Failed to create section buffer",
-            )
-        })?;
+        let section_buffer = WasmVec::new(provider.clone())
+            .map_err(|_| Error::memory_error("Failed to create section buffer"))?;
 
         Ok(Self {
             state: ParserState::Magic,
@@ -152,27 +163,26 @@ impl<P: MemoryProvider + Clone + Default + Eq> StreamingParser<P> {
             match self.state {
                 ParserState::Magic => {
                     offset = self.process_magic(chunk, offset)?;
-                }
+                },
                 ParserState::Version => {
                     offset = self.process_version(chunk, offset)?;
-                }
+                },
                 ParserState::SectionHeader => {
                     offset = self.process_section_header(chunk, offset)?;
-                }
-                ParserState::SectionContent { section_id, remaining_bytes } => {
+                },
+                ParserState::SectionContent {
+                    section_id,
+                    remaining_bytes,
+                } => {
                     offset =
                         self.process_section_content(chunk, offset, section_id, remaining_bytes)?;
-                }
+                },
                 ParserState::Complete => {
                     return Ok(ParseResult::Complete(()));
-                }
+                },
                 ParserState::Error => {
-                    return Err(Error::new(
-                        ErrorCategory::Validation,
-                        codes::PARSE_ERROR,
-                        "Parser in error state",
-                    ));
-                }
+                    return Err(Error::validation_parse_error("Parser in error state"));
+                },
             }
         }
 
@@ -195,9 +205,7 @@ impl<P: MemoryProvider + Clone + Default + Eq> StreamingParser<P> {
         for i in 0..magic_bytes_needed {
             if chunk[offset + i] != WASM_MAGIC[magic_start + i] {
                 self.state = ParserState::Error;
-                return Err(Error::new(
-                    ErrorCategory::Validation,
-                    codes::PARSE_ERROR,
+                return Err(Error::validation_parse_error(
                     "Invalid WebAssembly magic bytes",
                 ));
             }
@@ -209,7 +217,11 @@ impl<P: MemoryProvider + Clone + Default + Eq> StreamingParser<P> {
     }
 
     /// Process version bytes
-    fn process_version(&mut self, chunk: &[u8], offset: usize) -> core::result::Result<usize, Error> {
+    fn process_version(
+        &mut self,
+        chunk: &[u8],
+        offset: usize,
+    ) -> core::result::Result<usize, Error> {
         let version_bytes_needed = 4 - ((self.bytes_processed - 4) % 4);
         let available = chunk.len() - offset;
 
@@ -223,9 +235,7 @@ impl<P: MemoryProvider + Clone + Default + Eq> StreamingParser<P> {
         for i in 0..version_bytes_needed {
             if chunk[offset + i] != WASM_VERSION[version_start + i] {
                 self.state = ParserState::Error;
-                return Err(Error::new(
-                    ErrorCategory::Validation,
-                    codes::PARSE_ERROR,
+                return Err(Error::validation_parse_error(
                     "Unsupported WebAssembly version",
                 ));
             }
@@ -237,7 +247,11 @@ impl<P: MemoryProvider + Clone + Default + Eq> StreamingParser<P> {
     }
 
     /// Process section header
-    fn process_section_header(&mut self, chunk: &[u8], offset: usize) -> core::result::Result<usize, Error> {
+    fn process_section_header(
+        &mut self,
+        chunk: &[u8],
+        offset: usize,
+    ) -> core::result::Result<usize, Error> {
         if offset >= chunk.len() {
             return Ok(offset);
         }
@@ -249,9 +263,16 @@ impl<P: MemoryProvider + Clone + Default + Eq> StreamingParser<P> {
         if let Ok((size, consumed)) = read_leb128_u32(&chunk[offset + 1..], 0) {
             if offset + 1 + consumed <= chunk.len() {
                 // Complete section header read
-                self.current_section = Some(SectionInfo { id: section_id, size, processed: 0 });
+                self.current_section = Some(SectionInfo {
+                    id: section_id,
+                    size,
+                    processed: 0,
+                });
 
-                self.state = ParserState::SectionContent { section_id, remaining_bytes: size };
+                self.state = ParserState::SectionContent {
+                    section_id,
+                    remaining_bytes: size,
+                };
 
                 self.bytes_processed += 1 + consumed;
                 return Ok(offset + 1 + consumed);
@@ -276,11 +297,7 @@ impl<P: MemoryProvider + Clone + Default + Eq> StreamingParser<P> {
         // Add data to section buffer
         for i in 0..to_read {
             if let Err(_) = self.section_buffer.push(chunk[offset + i]) {
-                return Err(Error::new(
-                    ErrorCategory::Memory,
-                    codes::MEMORY_ERROR,
-                    "Section buffer overflow",
-                ));
+                return Err(Error::memory_error("Section buffer overflow"));
             }
         }
 
@@ -299,7 +316,10 @@ impl<P: MemoryProvider + Clone + Default + Eq> StreamingParser<P> {
             let _ = self.section_buffer.clear();
         } else {
             // Update remaining bytes
-            self.state = ParserState::SectionContent { section_id, remaining_bytes: new_remaining };
+            self.state = ParserState::SectionContent {
+                section_id,
+                remaining_bytes: new_remaining,
+            };
         }
 
         Ok(offset + to_read)
@@ -318,14 +338,14 @@ impl<P: MemoryProvider + Clone + Default + Eq> StreamingParser<P> {
     }
 
     /// Copy section buffer to a slice
-    pub fn copy_section_buffer_to_slice(&self, dest: &mut [u8]) -> core::result::Result<usize, Error> {
-        let src = self.section_buffer.as_internal_slice().map_err(|_e| {
-            Error::new(
-                ErrorCategory::Memory,
-                codes::MEMORY_ERROR,
-                "Failed to access section buffer",
-            )
-        })?;
+    pub fn copy_section_buffer_to_slice(
+        &self,
+        dest: &mut [u8],
+    ) -> core::result::Result<usize, Error> {
+        let src = self
+            .section_buffer
+            .as_internal_slice()
+            .map_err(|_e| Error::memory_error("Failed to access section buffer"))?;
         let src_ref = src.as_ref();
         let copy_len = core::cmp::min(dest.len(), src_ref.len());
         dest[..copy_len].copy_from_slice(&src_ref[..copy_len]);
@@ -344,12 +364,14 @@ impl<P: MemoryProvider + Clone + Default + Eq> Default for StreamingParser<P> {
 #[cfg(feature = "std")]
 impl StreamingParser {
     /// Create a new streaming parser
-    pub fn new<P: wrt_foundation::MemoryProvider + Clone + Default + Eq>(_provider: P) -> core::result::Result<Self, Error> {
+    pub fn new<P: wrt_foundation::MemoryProvider + Clone + Default + Eq>(
+        _provider: P,
+    ) -> core::result::Result<Self, Error> {
         Ok(Self {
-            state: ParserState::Magic,
+            state:           ParserState::Magic,
             bytes_processed: 0,
             current_section: None,
-            section_buffer: Vec::new(),
+            section_buffer:  Vec::new(),
         })
     }
 
@@ -377,7 +399,7 @@ impl StreamingParser {
 #[cfg(feature = "std")]
 pub struct SectionParser {
     /// Section data buffer
-    buffer: Vec<u8>,
+    buffer:   Vec<u8>,
     /// Current parsing position
     position: usize,
 }
@@ -385,9 +407,11 @@ pub struct SectionParser {
 #[cfg(feature = "std")]
 impl SectionParser {
     /// Create a new section parser
-    pub fn new<P: wrt_foundation::MemoryProvider + Clone + Default + Eq>(_provider: P) -> core::result::Result<Self, Error> {
+    pub fn new<P: wrt_foundation::MemoryProvider + Clone + Default + Eq>(
+        _provider: P,
+    ) -> core::result::Result<Self, Error> {
         Ok(Self {
-            buffer: Vec::new(),
+            buffer:   Vec::new(),
             position: 0,
         })
     }
@@ -400,7 +424,7 @@ pub struct SectionParser<P: MemoryProvider + Clone + Default + Eq = NoStdProvide
     /// Memory provider
     provider: P,
     /// Section data buffer
-    buffer: WasmVec<u8, P>,
+    buffer:   WasmVec<u8, P>,
     /// Current parsing position
     position: usize,
 }
@@ -409,11 +433,14 @@ pub struct SectionParser<P: MemoryProvider + Clone + Default + Eq = NoStdProvide
 impl<P: MemoryProvider + Clone + Default + Eq> SectionParser<P> {
     /// Create a new section parser
     pub fn new(provider: P) -> core::result::Result<Self, Error> {
-        let buffer = WasmVec::new(provider.clone()).map_err(|_| {
-            Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Failed to create parser buffer")
-        })?;
+        let buffer = WasmVec::new(provider.clone())
+            .map_err(|_| Error::memory_error("Failed to create parser buffer"))?;
 
-        Ok(Self { provider, buffer, position: 0 })
+        Ok(Self {
+            provider,
+            buffer,
+            position: 0,
+        })
     }
 
     /// Load section data for parsing
@@ -422,9 +449,9 @@ impl<P: MemoryProvider + Clone + Default + Eq> SectionParser<P> {
         self.position = 0;
 
         for &byte in data {
-            self.buffer.push(byte).map_err(|_| {
-                Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Section data too large")
-            })?;
+            self.buffer
+                .push(byte)
+                .map_err(|_| Error::memory_error("Section data too large"))?;
         }
 
         Ok(())
@@ -432,25 +459,26 @@ impl<P: MemoryProvider + Clone + Default + Eq> SectionParser<P> {
 
     /// Parse a string from current position
     pub fn parse_string(&mut self) -> core::result::Result<WasmString<P>, Error> {
-        let buffer_slice = self.buffer.as_internal_slice().map_err(|_| {
-            Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Failed to access buffer")
-        })?;
+        let buffer_slice = self
+            .buffer
+            .as_internal_slice()
+            .map_err(|_| Error::memory_error("Failed to access buffer"))?;
         let (str_bytes, consumed) = read_string(buffer_slice.as_ref(), self.position)?;
         self.position += consumed;
 
-        let str_content = core::str::from_utf8(str_bytes).map_err(|_| {
-            Error::new(ErrorCategory::Validation, codes::PARSE_ERROR, "Invalid UTF-8 string")
-        })?;
+        let str_content = core::str::from_utf8(str_bytes)
+            .map_err(|_| Error::validation_parse_error("Invalid UTF-8 string"))?;
 
         WasmString::from_str(str_content, self.provider.clone())
-            .map_err(|_| Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "String too large"))
+            .map_err(|_| Error::memory_error("String too large"))
     }
 
     /// Parse a LEB128 u32 from current position
     pub fn parse_u32(&mut self) -> core::result::Result<u32, Error> {
-        let buffer_slice = self.buffer.as_internal_slice().map_err(|_| {
-            Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Failed to access buffer")
-        })?;
+        let buffer_slice = self
+            .buffer
+            .as_internal_slice()
+            .map_err(|_| Error::memory_error("Failed to access buffer"))?;
         let (value, consumed) = read_leb128_u32(buffer_slice.as_ref(), self.position)?;
         self.position += consumed;
         Ok(value)
@@ -460,16 +488,13 @@ impl<P: MemoryProvider + Clone + Default + Eq> SectionParser<P> {
     pub fn parse_byte(&mut self) -> core::result::Result<u8, Error> {
         let buffer_len = self.buffer.capacity(); // BoundedVec uses capacity() instead of len()
         if self.position >= buffer_len {
-            return Err(Error::new(
-                ErrorCategory::Validation,
-                codes::PARSE_ERROR,
-                "Unexpected end of section",
-            ));
+            return Err(Error::validation_parse_error("Unexpected end of section"));
         }
 
-        let byte = self.buffer.get(self.position).map_err(|_| {
-            Error::new(ErrorCategory::Memory, codes::MEMORY_ERROR, "Buffer access failed")
-        })?;
+        let byte = self
+            .buffer
+            .get(self.position)
+            .map_err(|_| Error::memory_error("Buffer access failed"))?;
         self.position += 1;
         Ok(byte)
     }
@@ -498,7 +523,11 @@ mod tests {
 
     #[test]
     fn test_streaming_parser_creation() {
-        let provider: NoStdProvider<1024> = NoStdProvider::default();
+        let provider = wrt_foundation::safe_managed_alloc!(
+            1024,
+            wrt_foundation::budget_aware_provider::CrateId::Format
+        )
+        .unwrap();
         let parser = StreamingParser::new(provider);
         assert!(parser.is_ok());
 
@@ -509,7 +538,11 @@ mod tests {
 
     #[test]
     fn test_magic_bytes_processing() {
-        let provider: NoStdProvider<1024> = NoStdProvider::default();
+        let provider = wrt_foundation::safe_managed_alloc!(
+            1024,
+            wrt_foundation::budget_aware_provider::CrateId::Format
+        )
+        .unwrap();
         let mut parser = StreamingParser::new(provider).unwrap();
 
         // Process magic bytes
@@ -520,7 +553,11 @@ mod tests {
 
     #[test]
     fn test_section_parser_creation() {
-        let provider: NoStdProvider<1024> = NoStdProvider::default();
+        let provider = wrt_foundation::safe_managed_alloc!(
+            1024,
+            wrt_foundation::budget_aware_provider::CrateId::Format
+        )
+        .unwrap();
         let parser = SectionParser::new(provider);
         assert!(parser.is_ok());
     }

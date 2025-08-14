@@ -1,39 +1,62 @@
-//! Execution related structures and functions
+//! WebAssembly Execution Context and Statistics
 //!
-//! This module provides types and utilities for tracking execution statistics
-//! and managing WebAssembly execution.
+//! This module provides the core execution context for WebAssembly modules,
+//! including execution statistics tracking, resource monitoring, and execution
+//! state management.
+//!
+//! # Core Components
+//!
+//! - `ExecutionContext`: Main execution state including value stack and call
+//!   frames
+//! - `ExecutionStatistics`: Performance metrics and resource usage tracking
+//! - Stack depth management with configurable limits
+//! - Integration with the interpreter for instruction execution
+//!
+//! # Safety
+//!
+//! All execution operations are bounds-checked and memory-safe, preventing
+//! stack overflows and maintaining WebAssembly's sandboxing guarantees.
 
-extern crate alloc;
+// alloc is imported in lib.rs with proper feature gates
 
-use crate::prelude::{Debug, Error, ErrorCategory, Ord, Result, codes, str};
-
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+use alloc::format;
 // Import format! macro for string formatting
 #[cfg(feature = "std")]
 use std::format;
-#[cfg(not(feature = "std"))]
-use alloc::format;
+
+use crate::prelude::{
+    str,
+    Debug,
+    Error,
+    ErrorCategory,
+    Ord,
+    Result,
+};
 
 /// Structure to track execution statistics
 #[derive(Debug, Default, Clone)]
 pub struct ExecutionStats {
     /// Number of instructions executed
-    pub instructions_executed: u64,
+    pub instructions_executed:    u64,
     /// Memory usage in bytes
-    pub memory_usage: usize,
+    pub memory_usage:             usize,
     /// Maximum stack depth reached
-    pub max_stack_depth: usize,
+    pub max_stack_depth:          usize,
     /// Number of function calls
-    pub function_calls: u64,
+    pub function_calls:           u64,
     /// Number of memory reads
-    pub memory_reads: u64,
+    pub memory_reads:             u64,
     /// Number of memory writes
-    pub memory_writes: u64,
+    pub memory_writes:            u64,
     /// Execution time in microseconds
-    pub execution_time_us: u64,
+    pub execution_time_us:        u64,
     /// Gas used (if metering is enabled)
-    pub gas_used: u64,
+    pub gas_used:                 u64,
     /// Gas limit (if metering is enabled)
-    pub gas_limit: u64,
+    pub gas_limit:                u64,
+    /// Number of SIMD operations executed
+    pub simd_operations_executed: u64,
 }
 
 impl ExecutionStats {
@@ -84,7 +107,8 @@ impl ExecutionStats {
     }
 
     /// Check if gas limit is exceeded
-    #[must_use] pub fn is_gas_exceeded(&self) -> bool {
+    #[must_use]
+    pub fn is_gas_exceeded(&self) -> bool {
         self.gas_limit > 0 && self.gas_used >= self.gas_limit
     }
 
@@ -93,11 +117,7 @@ impl ExecutionStats {
         self.gas_used = self.gas_used.saturating_add(amount);
 
         if self.is_gas_exceeded() {
-            return Err(Error::new(
-                ErrorCategory::Runtime,
-                codes::GAS_LIMIT_EXCEEDED,
-"Gas limit exceeded",
-            ));
+            return Err(Error::runtime_execution_error("Gas limit exceeded"));
         }
 
         Ok(())
@@ -113,18 +133,19 @@ impl ExecutionStats {
 #[derive(Debug, Clone)]
 pub struct ExecutionContext {
     /// Execution statistics
-    pub stats: ExecutionStats,
+    pub stats:              ExecutionStats,
     /// Whether execution is currently trapped
-    pub trapped: bool,
+    pub trapped:            bool,
     /// Current function depth
-    pub function_depth: usize,
+    pub function_depth:     usize,
     /// Maximum allowed function depth
     pub max_function_depth: usize,
 }
 
 impl ExecutionContext {
     /// Create a new execution context
-    #[must_use] pub fn new(max_function_depth: usize) -> Self {
+    #[must_use]
+    pub fn new(max_function_depth: usize) -> Self {
         Self {
             stats: ExecutionStats::default(),
             trapped: false,
@@ -132,15 +153,17 @@ impl ExecutionContext {
             max_function_depth,
         }
     }
-    
+
     /// Create execution context with platform-aware limits
-    #[must_use] pub fn new_with_limits(max_function_depth: usize) -> Self {
+    #[must_use]
+    pub fn new_with_limits(max_function_depth: usize) -> Self {
         Self::new(max_function_depth)
     }
-    
+
     /// Create execution context from platform limits
-    #[must_use] pub fn from_platform_limits(platform_limits: &crate::platform_stubs::ComprehensivePlatformLimits) -> Self {
-        let max_depth = platform_limits.max_stack_bytes / (8 * 64); // Estimate stack depth
+    #[must_use]
+    pub fn from_platform_limits(platform_limits: &wrt_foundation::PlatformLimits) -> Self {
+        let max_depth = platform_limits.max_stack / (8 * 64); // Estimate stack depth
         Self::new(max_depth.max(16)) // Minimum depth of 16
     }
 
@@ -152,8 +175,8 @@ impl ExecutionContext {
             self.trapped = true;
             return Err(Error::new(
                 ErrorCategory::Runtime,
-                codes::CALL_STACK_EXHAUSTED,
-"Call stack exhausted",
+                wrt_error::codes::CALL_STACK_EXHAUSTED,
+                "Function call depth exceeded maximum limit",
             ));
         }
 
@@ -171,7 +194,8 @@ impl ExecutionContext {
     }
 
     /// Check if execution is trapped
-    #[must_use] pub fn is_trapped(&self) -> bool {
+    #[must_use]
+    pub fn is_trapped(&self) -> bool {
         self.trapped
     }
 
@@ -187,14 +211,15 @@ pub struct CallFrame {
     /// Function index
     pub function_index: u32,
     /// Program counter
-    pub pc: usize,
+    pub pc:             usize,
     /// Local variables count
-    pub locals_count: u32,
+    pub locals_count:   u32,
 }
 
 impl CallFrame {
     /// Create a new call frame
-    #[must_use] pub fn new(function_index: u32, pc: usize, locals_count: u32) -> Self {
+    #[must_use]
+    pub fn new(function_index: u32, pc: usize, locals_count: u32) -> Self {
         Self {
             function_index,
             pc,
@@ -207,21 +232,31 @@ impl CallFrame {
 #[derive(Debug, Clone)]
 pub struct InstrumentationPoint {
     /// Location in code
-    pub location: usize,
+    pub location:   usize,
     /// Type of instrumentation
-    pub point_type: wrt_foundation::bounded::BoundedString<64, wrt_foundation::safe_memory::NoStdProvider<1024>>,
+    pub point_type: wrt_foundation::bounded::BoundedString<
+        64,
+        wrt_foundation::safe_memory::NoStdProvider<1024>,
+    >,
 }
 
 impl InstrumentationPoint {
     /// Create a new instrumentation point
-    #[must_use] pub fn new(location: usize, point_type: &str) -> Self {
-        let bounded_point_type: wrt_foundation::bounded::BoundedString<64, wrt_foundation::safe_memory::NoStdProvider<1024>> = wrt_foundation::bounded::BoundedString::from_str_truncate(
-            point_type,
-            wrt_foundation::safe_memory::NoStdProvider::<1024>::default()
-        ).unwrap_or_else(|_| wrt_foundation::bounded::BoundedString::from_str_truncate("", wrt_foundation::safe_memory::NoStdProvider::<1024>::default()).unwrap());
-        Self {
+    pub fn new(location: usize, point_type: &str) -> Result<Self> {
+        let provider = wrt_foundation::safe_managed_alloc!(
+            1024,
+            wrt_foundation::budget_aware_provider::CrateId::Runtime
+        )?;
+        let bounded_point_type: wrt_foundation::bounded::BoundedString<
+            64,
+            wrt_foundation::safe_memory::NoStdProvider<1024>,
+        > = wrt_foundation::bounded::BoundedString::from_str_truncate(point_type, provider.clone())
+            .unwrap_or_else(|_| {
+                wrt_foundation::bounded::BoundedString::from_str_truncate("", provider).unwrap()
+            });
+        Ok(Self {
             location,
             point_type: bounded_point_type,
-        }
+        })
     }
 }

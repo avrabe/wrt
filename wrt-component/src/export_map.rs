@@ -3,13 +3,49 @@
 //! This module provides functionality to map between different export
 //! representations.
 
-use crate::{export::Export, prelude::*};
 
-/// Map of export names to exports
-#[derive(Debug, Default)]
-pub struct ExportMap {
-    /// Name-to-export mapping
-    exports: HashMap<String, Arc<Export>>,
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+use crate::{export::Export, prelude::*};
+use wrt_foundation::bounded::{BoundedMap, BoundedString};
+use wrt_foundation::budget_aware_provider::CrateId;
+use wrt_foundation::capabilities::{CapabilityAwareProvider, MemoryCapabilityContext};
+use wrt_error::{Error, ErrorCategory, codes};
+
+/// Maximum number of exports in a component
+const MAX_EXPORTS: usize = 512;
+
+/// Maximum length for export names
+const MAX_EXPORT_NAME_LEN: usize = 128;
+
+/// Helper function to create component provider using capability-driven design
+fn create_component_provider() -> Result<CapabilityAwareProvider<wrt_foundation::safe_memory::NoStdProvider<4096>>> {
+    use wrt_foundation::memory_init::get_global_capability_context;
+    
+    let context = get_global_capability_context()
+        .map_err(|_| Error::initialization_error("Failed to get global capability context for component provider"))?
+    
+    context.create_provider(CrateId::Component, 4096)
+        .map_err(|_| Error::memory_out_of_bounds("Failed to create component provider with 4096 bytes"))?
+}
+
+/// Map of export names to exports using bounded collections
+#[derive(Debug)]
+pub struct ExportMap<P: MemoryProvider + Default + Clone> {
+    /// Name-to-export mapping with bounded capacity
+    exports: BoundedMap<
+        BoundedString<MAX_EXPORT_NAME_LEN, P>, 
+        Arc<Export>, 
+        MAX_EXPORTS, 
+        P
+    >,
+}
+
+impl<P: MemoryProvider + Default + Clone> Default for ExportMap<P> {
+    fn default() -> Self {
+        Self::new().expect("Failed to create default ExportMap")
+    }
 }
 
 /// Map of export names to exports using SafeMemory
@@ -20,51 +56,75 @@ pub struct SafeExportMap {
     exports: wrt_foundation::safe_memory::SafeStack<(String, Arc<Export>)>,
 }
 
-impl ExportMap {
+impl<P: MemoryProvider + Default + Clone> ExportMap<P> {
     /// Create a new empty export map
-    pub fn new() -> Self {
-        Self { exports: HashMap::new() }
+    pub fn new() -> Result<Self> {
+        let provider = P::default());
+        let exports = BoundedMap::new(provider)?;
+        Ok(Self { exports })
     }
 
     /// Add an export to the map
     pub fn add(&mut self, name: &str, export: Arc<Export>) -> Result<()> {
-        self.exports.insert(name.to_string(), export);
+        let bounded_name = BoundedString::from_str(name, self.exports.provider().clone())?;
+        self.exports.insert(bounded_name, export)?;
         Ok(())
     }
 
     /// Get an export by name
-    pub fn get(&self, name: &str) -> Option<Arc<Export>> {
-        self.exports.get(name).cloned()
+    pub fn get(&self, name: &str) -> Result<Option<Arc<Export>>> {
+        let bounded_name = BoundedString::from_str(name, self.exports.provider().clone())?;
+        Ok(self.exports.get(&bounded_name).cloned())
     }
 
     /// Remove an export by name
-    pub fn remove(&mut self, name: &str) -> Option<Arc<Export>> {
-        self.exports.remove(name)
+    pub fn remove(&mut self, name: &str) -> Result<Option<Arc<Export>>> {
+        let bounded_name = BoundedString::from_str(name, self.exports.provider().clone())?;
+        Ok(self.exports.remove(&bounded_name))
     }
 
     /// Check if an export exists by name
     pub fn contains(&self, name: &str) -> bool {
-        self.exports.contains_key(name)
+        if let Ok(bounded_name) = BoundedString::from_str(name, self.exports.provider().clone()) {
+            self.exports.contains_key(&bounded_name)
+        } else {
+            false
+        }
     }
 
-    /// Get all export names
-    pub fn names(&self) -> Vec<String> {
-        self.exports.keys().cloned().collect()
+    /// Get all export names as bounded strings
+    pub fn names(&self) -> Result<BoundedVec<BoundedString<MAX_EXPORT_NAME_LEN, P>, MAX_EXPORTS, P>> {
+        let mut names = BoundedVec::new(self.exports.provider().clone())?;
+        
+        for (name, _) in self.exports.iter() {
+            if names.push(name.clone()).is_err() {
+                break; // Stop if we can't add more names
+            }
+        }
+        Ok(names)
     }
 
-    /// Get all exports as a Vec of (name, export) pairs
-    pub fn get_all(&self) -> Vec<(String, Arc<Export>)> {
-        self.exports.iter().map(|(name, export)| (name.clone(), export.clone())).collect()
+    /// Get all exports as bounded collection of (name, export) pairs
+    pub fn get_all(&self) -> Result<BoundedVec<(BoundedString<MAX_EXPORT_NAME_LEN, P>, Arc<Export>), MAX_EXPORTS, P>> {
+        let mut pairs = BoundedVec::new(self.exports.provider().clone())?;
+        
+        for (name, export) in self.exports.iter() {
+            if pairs.push((name.clone(), export.clone())).is_err() {
+                break; // Stop if we can't add more pairs
+            }
+        }
+        Ok(pairs)
     }
 
     /// Convert this export map to one using SafeMemory containers
     #[cfg(feature = "safe-memory")]
-    pub fn to_safe_memory(&self) -> SafeExportMap {
+    pub fn to_safe_memory(&self) -> Result<SafeExportMap> {
         let mut result = SafeExportMap::new();
-        for (name, export) in &self.exports {
-            result.add(name, export.clone()).unwrap();
+        for (name, export) in self.exports.iter() {
+            let name_str = name.as_str()?;
+            result.add(name_str, export.clone())?;
         }
-        result
+        Ok(result)
     }
 }
 
@@ -83,13 +143,13 @@ impl SafeExportMap {
             if existing_name == name {
                 // Replace the existing export
                 self.exports.set(i, (name.to_string(), export))?;
-                return Ok(());
+                return Ok();
             }
         }
 
         // Name doesn't exist, add a new entry
         self.exports.push((name.to_string(), export))?;
-        Ok(())
+        Ok(()
     }
 
     /// Get an export by name
@@ -98,7 +158,7 @@ impl SafeExportMap {
         for i in 0..self.exports.len() {
             if let Ok((existing_name, export)) = self.exports.get(i) {
                 if existing_name == name {
-                    return Some(export);
+                    return Some(export;
                 }
             }
         }
@@ -114,21 +174,15 @@ impl SafeExportMap {
                     // Found the name, remove it
                     if let Ok(items) = self.exports.to_vec() {
                         let export = items[i].1.clone();
-                        // Create a new vector without the removed item
-                        let mut new_items = Vec::with_capacity(items.len() - 1);
+                        // Clear and rebuild the stack without the removed item
+                        self.exports.clear);
                         for (j, item) in items.into_iter().enumerate() {
                             if j != i {
-                                new_items.push(item);
+                                let _ = self.exports.push(item);
                             }
                         }
 
-                        // Clear and rebuild the stack
-                        self.exports.clear();
-                        for item in new_items {
-                            let _ = self.exports.push(item);
-                        }
-
-                        return Some(export);
+                        return Some(export;
                     }
                 }
             }
@@ -150,24 +204,31 @@ impl SafeExportMap {
     }
 
     /// Get all export names
-    pub fn names(&self) -> Result<Vec<String>> {
-        let mut names = Vec::with_capacity(self.exports.len());
+    pub fn names(&self) -> Result<BoundedVec<String, MAX_EXPORTS, CapabilityAwareProvider<wrt_foundation::safe_memory::NoStdProvider<4096>>>> {
+        let provider = create_component_provider()?;
+        let mut names = BoundedVec::new(provider)?;
         for i in 0..self.exports.len() {
             if let Ok((name, _)) = self.exports.get(i) {
-                names.push(name);
+                names.push(name)?;
             }
         }
         Ok(names)
     }
 
-    /// Get all exports as a Vec of (name, export) pairs
-    pub fn get_all(&self) -> Result<Vec<(String, Arc<Export>)>> {
-        self.exports.to_vec()
+    /// Get all exports as bounded collection of (name, export) pairs
+    pub fn get_all(&self) -> Result<BoundedVec<(String, Arc<Export>), MAX_EXPORTS, CapabilityAwareProvider<wrt_foundation::safe_memory::NoStdProvider<4096>>>> {
+        let provider = create_component_provider()?;
+        let mut pairs = BoundedVec::new(provider)?;
+        let items = self.exports.to_vec()?;
+        for item in items {
+            pairs.push(item)?;
+        }
+        Ok(pairs)
     }
 
     /// Convert to standard ExportMap
-    pub fn to_standard(&self) -> Result<ExportMap> {
-        let mut result = ExportMap::new();
+    pub fn to_standard<P: MemoryProvider + Default + Clone>(&self) -> Result<ExportMap<P>> {
+        let mut result = ExportMap::new()?;
         let items = self.exports.to_vec()?;
         for (name, export) in items {
             result.add(&name, export)?;
@@ -190,6 +251,6 @@ impl SafeExportMap {
         &mut self,
         level: wrt_foundation::verification::VerificationLevel,
     ) {
-        self.exports.set_verification_level(level);
+        self.exports.set_verification_level(level;
     }
 }

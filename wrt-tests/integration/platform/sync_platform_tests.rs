@@ -4,14 +4,14 @@ use wrt_test_registry::prelude::*;
 
 pub fn run_tests() -> TestResult {
     let mut suite = TestSuite::new("Platform Sync");
-    
+
     suite.add_test("mutex_operations", test_mutex_operations);
     suite.add_test("rwlock_operations", test_rwlock_operations);
     suite.add_test("atomic_operations", test_atomic_operations);
-    
+
     #[cfg(feature = "std")]
     suite.add_test("futex_operations", test_futex_operations);
-    
+
     suite.run().into()
 }
 

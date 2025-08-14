@@ -9,10 +9,20 @@
 //! sections and common structures used in component binary parsing.
 
 use wrt_foundation::{
-    bounded::{BoundedString, MAX_WASM_NAME_LENGTH},
-    traits::{Checksummable, FromBytes, ReadStream, ToBytes, WriteStream},
+    bounded::{
+        BoundedString,
+        MAX_WASM_NAME_LENGTH,
+    },
+    traits::{
+        Checksummable,
+        FromBytes,
+        ReadStream,
+        ToBytes,
+        WriteStream,
+    },
     verification::Checksum,
-    MemoryProvider, NoStdProvider, WrtResult,
+    MemoryProvider,
+    NoStdProvider,
 };
 
 /// Binary std/no_std choice
@@ -24,11 +34,11 @@ pub struct ComponentExport<
     P: MemoryProvider + Clone + PartialEq + Eq + Default = NoStdProvider<1024>,
 > {
     /// Export name
-    pub name: BoundedString<MAX_WASM_NAME_LENGTH, P>,
+    pub name:       BoundedString<MAX_WASM_NAME_LENGTH, P>,
     /// Export type index
     pub type_index: u32,
     /// Export kind
-    pub kind: u8,
+    pub kind:       u8,
 }
 
 /// Binary std/no_std choice
@@ -40,7 +50,7 @@ pub struct ComponentImport<
     P: MemoryProvider + Clone + PartialEq + Eq + Default = NoStdProvider<1024>,
 > {
     /// Import name
-    pub name: BoundedString<MAX_WASM_NAME_LENGTH, P>,
+    pub name:       BoundedString<MAX_WASM_NAME_LENGTH, P>,
     /// Import type index
     pub type_index: u32,
 }
@@ -51,9 +61,9 @@ pub struct ComponentImport<
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentSection {
     /// Section ID
-    pub id: u8,
+    pub id:     u8,
     /// Section size
-    pub size: u32,
+    pub size:   u32,
     /// Section payload offset
     pub offset: usize,
 }
@@ -66,7 +76,7 @@ pub enum ComponentValueType {
     /// Composite types
     Composite = 1,
     /// Resource types
-    Resource = 2,
+    Resource  = 2,
 }
 
 impl From<u8> for ComponentValueType {
@@ -108,7 +118,7 @@ impl<P: MemoryProvider + Clone + PartialEq + Eq + Default> ToBytes for Component
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.name.to_bytes_with_provider(writer, provider)?;
         self.type_index.to_bytes_with_provider(writer, provider)?;
         self.kind.to_bytes_with_provider(writer, provider)?;
@@ -120,11 +130,11 @@ impl<P: MemoryProvider + Clone + PartialEq + Eq + Default> FromBytes for Compone
     fn from_bytes_with_provider<'a, PStream: MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         Ok(Self {
-            name: BoundedString::from_bytes_with_provider(reader, provider)?,
+            name:       BoundedString::from_bytes_with_provider(reader, provider)?,
             type_index: u32::from_bytes_with_provider(reader, provider)?,
-            kind: u8::from_bytes_with_provider(reader, provider)?,
+            kind:       u8::from_bytes_with_provider(reader, provider)?,
         })
     }
 }
@@ -142,7 +152,7 @@ impl<P: MemoryProvider + Clone + PartialEq + Eq + Default> ToBytes for Component
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.name.to_bytes_with_provider(writer, provider)?;
         self.type_index.to_bytes_with_provider(writer, provider)?;
         Ok(())
@@ -153,9 +163,9 @@ impl<P: MemoryProvider + Clone + PartialEq + Eq + Default> FromBytes for Compone
     fn from_bytes_with_provider<'a, PStream: MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         Ok(Self {
-            name: BoundedString::from_bytes_with_provider(reader, provider)?,
+            name:       BoundedString::from_bytes_with_provider(reader, provider)?,
             type_index: u32::from_bytes_with_provider(reader, provider)?,
         })
     }
@@ -175,7 +185,7 @@ impl ToBytes for ComponentSection {
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.id.to_bytes_with_provider(writer, provider)?;
         self.size.to_bytes_with_provider(writer, provider)?;
         (self.offset as u32).to_bytes_with_provider(writer, provider)?;
@@ -187,10 +197,10 @@ impl FromBytes for ComponentSection {
     fn from_bytes_with_provider<'a, PStream: MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         Ok(Self {
-            id: u8::from_bytes_with_provider(reader, provider)?,
-            size: u32::from_bytes_with_provider(reader, provider)?,
+            id:     u8::from_bytes_with_provider(reader, provider)?,
+            size:   u32::from_bytes_with_provider(reader, provider)?,
             offset: u32::from_bytes_with_provider(reader, provider)? as usize,
         })
     }
@@ -208,7 +218,7 @@ impl ToBytes for ComponentType {
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.form.to_bytes_with_provider(writer, provider)
     }
 }
@@ -217,8 +227,10 @@ impl FromBytes for ComponentType {
     fn from_bytes_with_provider<'a, PStream: MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
-        Ok(Self { form: u8::from_bytes_with_provider(reader, provider)? })
+    ) -> wrt_error::Result<Self> {
+        Ok(Self {
+            form: u8::from_bytes_with_provider(reader, provider)?,
+        })
     }
 }
 
@@ -234,7 +246,7 @@ impl ToBytes for ComponentInstance {
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.type_index.to_bytes_with_provider(writer, provider)
     }
 }
@@ -243,8 +255,10 @@ impl FromBytes for ComponentInstance {
     fn from_bytes_with_provider<'a, PStream: MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
-        Ok(Self { type_index: u32::from_bytes_with_provider(reader, provider)? })
+    ) -> wrt_error::Result<Self> {
+        Ok(Self {
+            type_index: u32::from_bytes_with_provider(reader, provider)?,
+        })
     }
 }
 
@@ -266,7 +280,7 @@ impl ToBytes for ComponentValueType {
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         (*self as u8).to_bytes_with_provider(writer, provider)
     }
 }
@@ -275,7 +289,7 @@ impl FromBytes for ComponentValueType {
     fn from_bytes_with_provider<'a, PStream: MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let byte = u8::from_bytes_with_provider(reader, provider)?;
         Ok(Self::from(byte))
     }

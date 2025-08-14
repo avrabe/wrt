@@ -7,14 +7,30 @@
 //! These operations support the WebAssembly branch hinting proposal
 //! and work across std, `no_std+alloc`, and pure `no_std` environments.
 
-use crate::prelude::{Debug, Eq, PartialEq, PureInstruction};
-use wrt_error::{Error, Result};
+use wrt_error::{
+    Error,
+    Result,
+};
 use wrt_foundation::{
-    types::{LabelIdx, ValueType},
+    types::{
+        LabelIdx,
+        ValueType,
+    },
     values::Value,
 };
-use crate::validation::{Validate, ValidationContext};
-use crate::control_ops::ControlContext;
+
+use crate::{
+    control_ops::ControlContext,
+    prelude::{
+        Debug,
+        Eq,
+        PartialEq,
+    },
+    validation::{
+        Validate,
+        ValidationContext,
+    },
+};
 
 /// Branch on null operation - branches if reference is null
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,7 +41,8 @@ pub struct BrOnNull {
 
 impl BrOnNull {
     /// Create a new `br_on_null` instruction
-    #[must_use] pub fn new(label: LabelIdx) -> Self {
+    #[must_use]
+    pub fn new(label: LabelIdx) -> Self {
         Self { label }
     }
 
@@ -36,19 +53,18 @@ impl BrOnNull {
             Value::FuncRef(None) | Value::ExternRef(None) => {
                 // Branch is taken - reference is null
                 Ok(true)
-            }
+            },
             Value::FuncRef(Some(_)) | Value::ExternRef(Some(_)) => {
                 // Branch not taken - reference is non-null
                 Ok(false)
-            }
-            _ => Err(Error::type_error(
-                "br_on_null requires a reference type"
-            )),
+            },
+            _ => Err(Error::type_error("br_on_null requires a reference type")),
         }
     }
 
     /// Get the target label for branching
-    #[must_use] pub fn target_label(&self) -> LabelIdx {
+    #[must_use]
+    pub fn target_label(&self) -> LabelIdx {
         self.label
     }
 }
@@ -62,7 +78,8 @@ pub struct BrOnNonNull {
 
 impl BrOnNonNull {
     /// Create a new `br_on_non_null` instruction
-    #[must_use] pub fn new(label: LabelIdx) -> Self {
+    #[must_use]
+    pub fn new(label: LabelIdx) -> Self {
         Self { label }
     }
 
@@ -74,20 +91,21 @@ impl BrOnNonNull {
             Value::FuncRef(None) | Value::ExternRef(None) => {
                 // Branch not taken - reference is null
                 Ok((false, None))
-            }
+            },
             Value::FuncRef(Some(_)) | Value::ExternRef(Some(_)) => {
                 // Branch is taken - reference is non-null
                 // The reference remains on the stack after branching
                 Ok((true, Some(reference.clone())))
-            }
+            },
             _ => Err(Error::type_error(
-                "br_on_non_null requires a reference type"
+                "br_on_non_null requires a reference type",
             )),
         }
     }
 
     /// Get the target label for branching
-    #[must_use] pub fn target_label(&self) -> LabelIdx {
+    #[must_use]
+    pub fn target_label(&self) -> LabelIdx {
         self.label
     }
 }
@@ -114,7 +132,7 @@ impl BranchHintOp {
                     // If branch not taken, reference stays on stack
                     Ok((false, None, Some(operand.clone())))
                 }
-            }
+            },
             BranchHintOp::BrOnNonNull(op) => {
                 let (branch_taken, ref_value) = op.execute(operand)?;
                 if branch_taken {
@@ -122,7 +140,7 @@ impl BranchHintOp {
                 } else {
                     Ok((false, None, None))
                 }
-            }
+            },
         }
     }
 }
@@ -131,7 +149,7 @@ impl BranchHintOp {
 pub trait BranchHintingContext: ControlContext {
     /// Execute a branch on null operation
     fn execute_br_on_null(&mut self, label: LabelIdx) -> Result<()>;
-    
+
     /// Execute a branch on non-null operation
     fn execute_br_on_non_null(&mut self, label: LabelIdx) -> Result<()>;
 }
@@ -148,10 +166,10 @@ impl Validate for BrOnNull {
                 ValueType::FuncRef | ValueType::ExternRef => {
                     // Validate the branch target
                     ctx.validate_branch_target(self.label)?;
-                    
+
                     // If branch not taken, reference stays on stack
                     ctx.push_type(ref_type)?;
-                }
+                },
                 _ => return Err(Error::type_error("br_on_null expects reference type")),
             }
         }
@@ -169,13 +187,14 @@ impl Validate for BrOnNonNull {
                 ValueType::FuncRef | ValueType::ExternRef => {
                     // Validate the branch target
                     ctx.validate_branch_target(self.label)?;
-                    
+
                     // Note: The typing is complex here because:
-                    // - If branch is taken, the reference is on the stack at the branch target
+                    // - If branch is taken, the reference is on the stack at
+                    //   the branch target
                     // - If branch is not taken, the reference is consumed
-                    // For now, we don't push the type back as the actual behavior
-                    // depends on runtime execution
-                }
+                    // For now, we don't push the type back as the actual
+                    // behavior depends on runtime execution
+                },
                 _ => return Err(Error::type_error("br_on_non_null expects reference type")),
             }
         }
@@ -192,10 +211,14 @@ impl Validate for BranchHintOp {
     }
 }
 
-#[cfg(all(test, any(feature = "std", )))]
+#[cfg(all(test, feature = "std"))]
 mod tests {
+    use wrt_foundation::values::{
+        ExternRef,
+        FuncRef,
+    };
+
     use super::*;
-    use wrt_foundation::values::{FuncRef, ExternRef};
 
     #[test]
     fn test_br_on_null_with_null_funcref() {
@@ -246,7 +269,7 @@ mod tests {
         let ref_value = Value::FuncRef(Some(FuncRef { index: 42 }));
         let (branch_taken, value) = op.execute(&ref_value).unwrap();
         assert!(branch_taken); // Branch should be taken
-        assert_eq!(value, Some(ref_value)); // Reference stays on stack
+        assert_eq!(value, Some(ref_value.clone())); // Reference stays on stack
     }
 
     #[test]
@@ -263,7 +286,7 @@ mod tests {
         let ref_value = Value::ExternRef(Some(ExternRef { index: 123 }));
         let (branch_taken, value) = op.execute(&ref_value).unwrap();
         assert!(branch_taken); // Branch should be taken
-        assert_eq!(value, Some(ref_value)); // Reference stays on stack
+        assert_eq!(value, Some(ref_value.clone())); // Reference stays on stack
     }
 
     #[test]

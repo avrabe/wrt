@@ -34,11 +34,19 @@
 extern crate alloc;
 
 #[cfg(feature = "std")]
-use std::{boxed::Box, vec::Vec};
+use alloc::{
+    boxed::Box,
+    vec::Vec,
+};
 use core::{
     cell::UnsafeCell,
     ptr::NonNull,
-    sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize, Ordering},
+    sync::atomic::{
+        AtomicBool,
+        AtomicPtr,
+        AtomicUsize,
+        Ordering,
+    },
 };
 
 use wrt_error::Error;
@@ -77,11 +85,17 @@ struct Node<T> {
 
 impl<T> Node<T> {
     fn new(data: T) -> Self {
-        Self { next: AtomicPtr::new(core::ptr::null_mut()), data: Some(data) }
+        Self {
+            next: AtomicPtr::new(core::ptr::null_mut()),
+            data: Some(data),
+        }
     }
 
     fn stub() -> Self {
-        Self { next: AtomicPtr::new(core::ptr::null_mut()), data: None }
+        Self {
+            next: AtomicPtr::new(core::ptr::null_mut()),
+            data: None,
+        }
     }
 }
 
@@ -93,7 +107,11 @@ impl<T> LockFreeMpscQueue<T> {
         let stub = Box::new(Node::stub());
         let stub_ptr = Box::as_ref(&stub) as *const Node<T> as *mut Node<T>;
 
-        Self { head: AtomicPtr::new(stub_ptr), tail: AtomicPtr::new(stub_ptr), stub }
+        Self {
+            head: AtomicPtr::new(stub_ptr),
+            tail: AtomicPtr::new(stub_ptr),
+            stub,
+        }
     }
 
     /// Enqueue an item (wait-free, multiple producers)
@@ -171,13 +189,13 @@ unsafe impl<T: Send> Sync for LockFreeMpscQueue<T> {}
 /// Suitable for real-time systems requiring bounded execution time.
 pub struct LockFreeAllocator {
     /// Free list head
-    free_list: AtomicPtr<FreeBlock>,
+    free_list:    AtomicPtr<FreeBlock>,
     /// Total blocks available
     total_blocks: usize,
     /// Block size in bytes
-    block_size: usize,
+    block_size:   usize,
     /// Memory pool base address
-    pool_base: *mut u8,
+    pool_base:    *mut u8,
 }
 
 #[repr(align(8))]
@@ -193,17 +211,15 @@ impl LockFreeAllocator {
     /// `block_size` must be >= size_of::<FreeBlock>().
     pub unsafe fn new(pool: *mut u8, pool_size: usize, block_size: usize) -> Result<Self, Error> {
         if block_size < core::mem::size_of::<FreeBlock>() {
-            return Err(Error::new(
-                wrt_error::ErrorCategory::Validation, 1,
-                "Invalid operation",
-            ));
+            return Err(Error::runtime_execution_error("Block size too small"));
         }
 
         let total_blocks = pool_size / block_size;
         if total_blocks == 0 {
             return Err(Error::new(
-                wrt_error::ErrorCategory::Validation, 1,
-                "Invalid operation",
+                wrt_error::ErrorCategory::Validation,
+                wrt_error::codes::VALIDATION_ERROR,
+                "Pool size too small",
             ));
         }
 
@@ -247,7 +263,7 @@ impl LockFreeAllocator {
                     Ordering::Relaxed,
                 ) {
                     Ok(_) => return NonNull::new(head as *mut u8),
-                    Err(_) => {} // Retry due to contention
+                    Err(_) => {}, // Retry due to contention
                 }
             }
         }
@@ -272,7 +288,7 @@ impl LockFreeAllocator {
                 Ordering::Relaxed,
             ) {
                 Ok(_) => return,
-                Err(_) => {} // Retry due to contention
+                Err(_) => {}, // Retry due to contention
             }
         }
     }
@@ -298,24 +314,24 @@ unsafe impl Sync for LockFreeAllocator {}
 /// tasks.
 pub struct PriorityInheritanceMutex<T> {
     /// Protected data
-    data: UnsafeCell<T>,
+    data:           UnsafeCell<T>,
     /// Current owner's priority
     owner_priority: AtomicUsize,
     /// Lock state (0 = unlocked, 1 = locked)
-    locked: AtomicBool,
+    locked:         AtomicBool,
     /// Waiting queue (simplified - real implementation would use priority
     /// queue)
-    waiters: AtomicUsize,
+    waiters:        AtomicUsize,
 }
 
 impl<T> PriorityInheritanceMutex<T> {
     /// Create a new priority inheritance mutex
     pub const fn new(data: T) -> Self {
         Self {
-            data: UnsafeCell::new(data),
+            data:           UnsafeCell::new(data),
             owner_priority: AtomicUsize::new(0),
-            locked: AtomicBool::new(false),
-            waiters: AtomicUsize::new(0),
+            locked:         AtomicBool::new(false),
+            waiters:        AtomicUsize::new(0),
         }
     }
 
@@ -342,8 +358,11 @@ impl<T> PriorityInheritanceMutex<T> {
                     self.owner_priority.store(current_priority as usize, Ordering::Release);
                     self.waiters.fetch_sub(1, Ordering::AcqRel);
 
-                    return PriorityGuard { mutex: self, original_priority: current_priority };
-                }
+                    return PriorityGuard {
+                        mutex:             self,
+                        original_priority: current_priority,
+                    };
+                },
                 Err(_) => {
                     // Lock is held - implement priority inheritance
                     let owner_priority = self.owner_priority.load(Ordering::Acquire);
@@ -363,7 +382,7 @@ impl<T> PriorityInheritanceMutex<T> {
 
                     // Yield and retry (in real implementation, would use futex or similar)
                     core::hint::spin_loop();
-                }
+                },
             }
         }
     }
@@ -373,8 +392,11 @@ impl<T> PriorityInheritanceMutex<T> {
         match self.locked.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed) {
             Ok(_) => {
                 self.owner_priority.store(current_priority as usize, Ordering::Release);
-                Some(PriorityGuard { mutex: self, original_priority: current_priority })
-            }
+                Some(PriorityGuard {
+                    mutex:             self,
+                    original_priority: current_priority,
+                })
+            },
             Err(_) => None,
         }
     }
@@ -395,7 +417,7 @@ unsafe impl<T: Send> Sync for PriorityInheritanceMutex<T> {}
 
 /// RAII guard for priority inheritance mutex
 pub struct PriorityGuard<'a, T> {
-    mutex: &'a PriorityInheritanceMutex<T>,
+    mutex:             &'a PriorityInheritanceMutex<T>,
     original_priority: Priority,
 }
 
@@ -427,9 +449,9 @@ impl<'a, T> Drop for PriorityGuard<'a, T> {
 /// Writers have priority to prevent writer starvation.
 pub struct AdvancedRwLock<T> {
     /// Protected data
-    data: UnsafeCell<T>,
+    data:           UnsafeCell<T>,
     /// Reader count (negative value indicates writer)
-    readers: AtomicUsize,
+    readers:        AtomicUsize,
     /// Writer waiting flag
     writer_waiting: AtomicBool,
 }
@@ -441,8 +463,8 @@ impl<T> AdvancedRwLock<T> {
     /// Create a new reader-writer lock
     pub const fn new(data: T) -> Self {
         Self {
-            data: UnsafeCell::new(data),
-            readers: AtomicUsize::new(0),
+            data:           UnsafeCell::new(data),
+            readers:        AtomicUsize::new(0),
             writer_waiting: AtomicBool::new(false),
         }
     }
@@ -481,7 +503,7 @@ impl<T> AdvancedRwLock<T> {
                 Ordering::Relaxed,
             ) {
                 Ok(_) => return ReadGuard { lock: self },
-                Err(_) => {}
+                Err(_) => {},
             }
         }
     }
@@ -532,7 +554,7 @@ impl<T> AdvancedRwLock<T> {
                 Ok(_) => {
                     self.writer_waiting.store(false, Ordering::Release);
                     return WriteGuard { lock: self };
-                }
+                },
                 Err(_) => core::hint::spin_loop(),
             }
         }
@@ -542,15 +564,18 @@ impl<T> AdvancedRwLock<T> {
     pub fn try_write(&self) -> Option<WriteGuard<'_, T>> {
         self.writer_waiting.store(true, Ordering::Release);
 
-        match self.readers.compare_exchange(0, WRITER_MASK, Ordering::Acquire, Ordering::Relaxed) {
+        match self
+            .readers
+            .compare_exchange(0, WRITER_MASK, Ordering::Acquire, Ordering::Relaxed)
+        {
             Ok(_) => {
                 self.writer_waiting.store(false, Ordering::Release);
                 Some(WriteGuard { lock: self })
-            }
+            },
             Err(_) => {
                 self.writer_waiting.store(false, Ordering::Release);
                 None
-            }
+            },
         }
     }
 
@@ -624,15 +649,15 @@ impl<'a, T> Drop for WriteGuard<'a, T> {
 #[cfg(feature = "std")]
 pub struct WaitFreeSpscQueue<T> {
     /// Ring buffer storage
-    buffer: Box<[UnsafeCell<Option<T>>]>,
+    buffer:   Box<[UnsafeCell<Option<T>>]>,
     /// Capacity (power of 2)
     capacity: usize,
     /// Capacity mask for fast modulo
-    mask: usize,
+    mask:     usize,
     /// Head index (consumer)
-    head: AtomicUsize,
+    head:     AtomicUsize,
     /// Tail index (producer)  
-    tail: AtomicUsize,
+    tail:     AtomicUsize,
 }
 
 #[cfg(feature = "std")]
@@ -641,8 +666,10 @@ impl<T> WaitFreeSpscQueue<T> {
     #[cfg(feature = "std")]
     pub fn new(capacity: usize) -> Self {
         let capacity = capacity.next_power_of_two();
-        let buffer =
-            (0..capacity).map(|_| UnsafeCell::new(None)).collect::<Vec<_>>().into_boxed_slice();
+        let buffer = (0..capacity)
+            .map(|_| UnsafeCell::new(None))
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
 
         Self {
             buffer,

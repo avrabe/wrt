@@ -14,9 +14,18 @@
 //! This implementation provides wait/notify synchronization using Linux futex
 //! system calls directly, supporting no_std/no_alloc environments.
 
-use core::{fmt, sync::atomic::AtomicU32, time::Duration};
+use core::{
+    fmt,
+    sync::atomic::AtomicU32,
+    time::Duration,
+};
 
-use wrt_error::{codes, Error, ErrorCategory, Result};
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+    Result,
+};
 
 use crate::sync::FutexLike;
 
@@ -44,19 +53,25 @@ const FUTEX_WAKE_PRIVATE: u32 = FUTEX_WAKE | FUTEX_PRIVATE_FLAG;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct TimeSpec {
-    tv_sec: i64,
+    tv_sec:  i64,
     tv_nsec: i64,
 }
 
 impl TimeSpec {
     /// Create a new TimeSpec from Duration
     fn from_duration(duration: Duration) -> Self {
-        Self { tv_sec: duration.as_secs() as i64, tv_nsec: duration.subsec_nanos() as i64 }
+        Self {
+            tv_sec:  duration.as_secs() as i64,
+            tv_nsec: duration.subsec_nanos() as i64,
+        }
     }
 
     /// Create a zero timeout (immediate)
     fn zero() -> Self {
-        Self { tv_sec: 0, tv_nsec: 0 }
+        Self {
+            tv_sec:  0,
+            tv_nsec: 0,
+        }
     }
 }
 
@@ -67,7 +82,7 @@ impl TimeSpec {
 #[derive(Debug)]
 pub struct LinuxFutex {
     /// The atomic value used for synchronization
-    value: AtomicU32,
+    value:    AtomicU32,
     /// Padding to ensure the value is on its own cache line
     _padding: [u8; 60], // 64 - sizeof(AtomicU32)
 }
@@ -80,7 +95,10 @@ unsafe impl Sync for LinuxFutex {}
 impl LinuxFutex {
     /// Creates a new `LinuxFutex` with the given initial value.
     pub fn new(initial_value: u32) -> Self {
-        Self { value: AtomicU32::new(initial_value), _padding: [0; 60] }
+        Self {
+            value:    AtomicU32::new(initial_value),
+            _padding: [0; 60],
+        }
     }
 
     /// Direct syscall implementation of futex
@@ -130,16 +148,21 @@ impl LinuxFutex {
         // Call futex wake
         // SAFETY: We're calling futex wake with valid parameters.
         let result = unsafe {
-            Self::futex(addr, FUTEX_WAKE_PRIVATE, count, core::ptr::null(), core::ptr::null(), 0)
+            Self::futex(
+                addr,
+                FUTEX_WAKE_PRIVATE,
+                count,
+                core::ptr::null(),
+                core::ptr::null(),
+                0,
+            )
         };
 
         if result >= 0 {
             Ok(result as u32) // Number of waiters woken up
         } else {
-            Err(Error::new(
-                ErrorCategory::System,
-                1,
-                "Futex wake operation failed",
+            Err(Error::runtime_execution_error(
+                "Failed to acquire mutex lock",
             ))
         }
     }
@@ -183,7 +206,7 @@ impl FutexLike for LinuxFutex {
             Some(duration) => {
                 let ts = TimeSpec::from_duration(duration);
                 &ts as *const TimeSpec
-            }
+            },
             None => core::ptr::null(),
         };
 
@@ -191,27 +214,36 @@ impl FutexLike for LinuxFutex {
         // SAFETY: We're calling futex with valid parameters. addr points to self.value,
         // which is valid for the lifetime of self.
         let result = unsafe {
-            Self::futex(addr, FUTEX_WAIT_PRIVATE, expected, timeout_ptr, core::ptr::null(), 0)
+            Self::futex(
+                addr,
+                FUTEX_WAIT_PRIVATE,
+                expected,
+                timeout_ptr,
+                core::ptr::null(),
+                0,
+            )
         };
 
         match result {
             0 => Ok(()), // Woken up by notify
             -110 => {
                 // ETIMEDOUT - convert to system error as per trait contract
-                Err(Error::new(ErrorCategory::System, 1, "Timeout expired"))
-            }
+                Err(Error::new(
+                    ErrorCategory::System,
+                    1,
+                    "Linux futex wait timeout",
+                ))
+            },
             -11 => {
                 // EAGAIN - value changed before we could wait, this is success
                 Ok(())
-            }
+            },
             -4 => {
                 // EINTR - interrupted by signal, treat as spurious wakeup
                 Ok(())
-            }
-            _ => Err(Error::new(
-                ErrorCategory::System,
-                1,
-                "Futex wait operation failed",
+            },
+            _ => Err(Error::runtime_execution_error(
+                "Linux futex wait failed with unexpected error",
             )),
         }
     }
@@ -224,6 +256,10 @@ impl FutexLike for LinuxFutex {
 
 impl fmt::Display for LinuxFutex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "LinuxFutex({})", self.value.load(core::sync::atomic::Ordering::Relaxed))
+        write!(
+            f,
+            "LinuxFutex({})",
+            self.value.load(core::sync::atomic::Ordering::Relaxed)
+        )
     }
 }

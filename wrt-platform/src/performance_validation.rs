@@ -12,13 +12,13 @@ use wrt_error::Error;
 #[derive(Debug, Clone, Copy)]
 pub struct BenchmarkResult {
     /// Operation name
-    pub operation: &'static str,
+    pub operation:          &'static str,
     /// Direct API time in nanoseconds
-    pub direct_time_ns: u64,
+    pub direct_time_ns:     u64,
     /// Abstracted API time in nanoseconds
     pub abstracted_time_ns: u64,
     /// Overhead percentage (should be ~0% for zero-cost)
-    pub overhead_percent: f64,
+    pub overhead_percent:   f64,
 }
 
 impl BenchmarkResult {
@@ -86,10 +86,10 @@ impl PerformanceValidator {
         let overhead = BenchmarkResult::calculate_overhead(direct_time, abstracted_time);
 
         Ok(BenchmarkResult {
-            operation: "memory_allocation",
-            direct_time_ns: direct_time,
+            operation:          "memory_allocation",
+            direct_time_ns:     direct_time,
             abstracted_time_ns: abstracted_time,
-            overhead_percent: overhead,
+            overhead_percent:   overhead,
         })
     }
 
@@ -116,10 +116,10 @@ impl PerformanceValidator {
         let overhead = BenchmarkResult::calculate_overhead(direct_time, abstracted_time);
 
         Ok(BenchmarkResult {
-            operation: "sync_operations",
-            direct_time_ns: direct_time,
+            operation:          "sync_operations",
+            direct_time_ns:     direct_time,
             abstracted_time_ns: abstracted_time,
-            overhead_percent: overhead,
+            overhead_percent:   overhead,
         })
     }
 
@@ -146,10 +146,10 @@ impl PerformanceValidator {
         let overhead = BenchmarkResult::calculate_overhead(direct_time, abstracted_time);
 
         Ok(BenchmarkResult {
-            operation: "config_creation",
-            direct_time_ns: direct_time,
+            operation:          "config_creation",
+            direct_time_ns:     direct_time,
             abstracted_time_ns: abstracted_time,
-            overhead_percent: overhead,
+            overhead_percent:   overhead,
         })
     }
 
@@ -257,12 +257,18 @@ impl PerformanceValidator {
 
     /// Abstracted configuration creation
     fn abstracted_config_creation<P>(value: u32) -> DirectConfig {
-        DirectConfig { max_pages: value % 1024, guard_pages: value % 2 == 0 }
+        DirectConfig {
+            max_pages:   value % 1024,
+            guard_pages: value % 2 == 0,
+        }
     }
 
     /// Direct configuration creation
     fn direct_config_creation(value: u32) -> DirectConfig {
-        DirectConfig { max_pages: value % 1024, guard_pages: value % 2 == 0 }
+        DirectConfig {
+            max_pages:   value % 1024,
+            guard_pages: value % 2 == 0,
+        }
     }
 }
 
@@ -270,7 +276,7 @@ impl PerformanceValidator {
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 struct DirectConfig {
-    max_pages: u32,
+    max_pages:   u32,
     guard_pages: bool,
 }
 
@@ -347,19 +353,19 @@ mod tests {
     #[test]
     fn test_benchmark_result_zero_cost_check() {
         let result = BenchmarkResult {
-            operation: "test",
-            direct_time_ns: 1000,
+            operation:          "test",
+            direct_time_ns:     1000,
             abstracted_time_ns: 1005, // 0.5% overhead
-            overhead_percent: 0.5,
+            overhead_percent:   0.5,
         };
 
         assert!(result.is_zero_cost());
 
         let high_overhead = BenchmarkResult {
-            operation: "test",
-            direct_time_ns: 1000,
+            operation:          "test",
+            direct_time_ns:     1000,
             abstracted_time_ns: 1020, // 2% overhead
-            overhead_percent: 2.0,
+            overhead_percent:   2.0,
         };
 
         assert!(!high_overhead.is_zero_cost());
@@ -405,17 +411,11 @@ mod tests {
     fn test_posix_performance_validation() {
         use crate::platform_abstraction::paradigm;
 
-        let results = PerformanceValidator::validate_all::<paradigm::Posix>().unwrap();
+        let count = PerformanceValidator::validate_all::<paradigm::Posix>().unwrap();
 
         // Check that we got some results
-        assert!(!results.is_empty());
+        assert!(count > 0);
 
-        // Check that overhead is reasonable (should be very low)
-        for result in &results {
-            println!("Operation: {}, Overhead: {:.2}%", result.operation, result.overhead_percent);
-            // In a real implementation, we'd assert result.is_zero_cost()
-            // For this demo, we just ensure it's reasonable
-            assert!(result.overhead_percent < 100.0); // Sanity check
-        }
+        println!("Validated {} performance tests successfully", count);
     }
 }

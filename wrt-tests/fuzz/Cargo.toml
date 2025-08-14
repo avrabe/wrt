@@ -5,7 +5,7 @@ edition.workspace = true
 description = "Consolidated fuzz testing for WRT components"
 license.workspace = true
 repository = "https://github.com/pulseengine/wrt"
-keywords = ["wasm", "webassembly", "fuzz", "testing", "safety"]
+keywords = ["wasm", "webassembly", "fuzz", "testing", "safety-asil-b"]
 categories = ["wasm", "development-tools::testing"]
 
 [package.metadata]
@@ -33,6 +33,10 @@ std = [
     "wrt-test-registry/std"]
 
 # Fuzz targets
+safety-asil-b = []
+safety-asil-c = ["safety-asil-b"]
+safety-asil-d = ["safety-asil-c"]
+
 [[bin]]
 name = "fuzz_bounded_vec"
 path = "fuzz_targets/fuzz_bounded_vec.rs"

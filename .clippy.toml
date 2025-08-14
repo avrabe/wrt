@@ -1,20 +1,25 @@
-# Fixed clippy config
-warn-on-all-wildcard-imports = true
-doc-valid-idents = ["WebAssembly", "WASI"]
+# Clippy configuration for PulseEngine code quality
 
-# Lint configurations
-msrv = "1.86.0"  # Minimum supported Rust version
+# Enforce documentation
+missing-docs-in-crate-items = true
 
-# Clippy is strict about the following lints
+# MSRV (Minimum Supported Rust Version)
+msrv = "1.75.0"
+
+# Cognitive complexity threshold
 cognitive-complexity-threshold = 30
-type-complexity-threshold = 500
-too-many-arguments-threshold = 10
-too-many-lines-threshold = 500
 
-# Explicitly disallow some patterns
-disallowed-names = []
-disallowed-methods = []
-disallowed-types = []
+# Function size limits
+too-many-lines-threshold = 100
 
-# Documentation checks
-missing-docs-in-crate-items = true  # Instead of missing-docs-in-private-items
+# Type complexity
+type-complexity-threshold = 250
+
+# Disallowed names
+disallowed-names = ["foo", "bar", "baz", "quux"]
+
+# Allow some common patterns in no_std
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+
+# Note: undocumented-unsafe-blocks lint not available in current Rust version

@@ -4,7 +4,10 @@
 
 //! DWARF line number program implementation
 
-use wrt_error::{codes, Error, ErrorCategory, Result};
+use wrt_error::{
+    Error,
+    Result,
+};
 
 use crate::cursor::DwarfCursor;
 
@@ -12,13 +15,13 @@ use crate::cursor::DwarfCursor;
 #[derive(Clone, Copy, Debug)]
 pub struct LineInfo {
     /// Index into file table
-    pub file_index: u16,
+    pub file_index:   u16,
     /// Source line number
-    pub line: u32,
+    pub line:         u32,
     /// Source column number
-    pub column: u16,
+    pub column:       u16,
     /// Is a statement boundary
-    pub is_stmt: bool,
+    pub is_stmt:      bool,
     /// Marks end of a sequence
     pub end_sequence: bool,
 }
@@ -30,13 +33,16 @@ impl LineInfo {
         &'a self,
         file_table: &'a crate::FileTable<'a>,
     ) -> LocationDisplay<'a> {
-        LocationDisplay { line_info: self, file_table }
+        LocationDisplay {
+            line_info: self,
+            file_table,
+        }
     }
 }
 
 /// Helper for displaying line information with resolved file paths
 pub struct LocationDisplay<'a> {
-    line_info: &'a LineInfo,
+    line_info:  &'a LineInfo,
     file_table: &'a crate::FileTable<'a>,
 }
 
@@ -104,32 +110,34 @@ mod opcodes {
 
     pub const DW_LNE_END_SEQUENCE: u8 = 1;
     pub const DW_LNE_SET_ADDRESS: u8 = 2;
+    #[allow(dead_code)]
     pub const DW_LNE_DEFINE_FILE: u8 = 3;
+    #[allow(dead_code)]
     pub const DW_LNE_SET_DISCRIMINATOR: u8 = 4;
 }
 
 /// Line number program state machine
 pub struct LineNumberState {
     // Standard registers
-    address: u32,
-    file: u16,
-    line: u32,
-    column: u16,
-    is_stmt: bool,
-    basic_block: bool,
-    end_sequence: bool,
-    prologue_end: bool,
+    address:        u32,
+    file:           u16,
+    line:           u32,
+    column:         u16,
+    is_stmt:        bool,
+    basic_block:    bool,
+    end_sequence:   bool,
+    prologue_end:   bool,
     epilogue_begin: bool,
-    isa: u32,
-    discriminator: u32,
+    isa:            u32,
+    discriminator:  u32,
 
     // Header configuration
-    minimum_instruction_length: u8,
+    minimum_instruction_length:  u8,
     maximum_ops_per_instruction: u8,
-    default_is_stmt: bool,
-    line_base: i8,
-    line_range: u8,
-    opcode_base: u8,
+    default_is_stmt:             bool,
+    line_base:                   i8,
+    line_range:                  u8,
+    opcode_base:                 u8,
 
     // Standard opcode lengths (we'll store a few)
     standard_opcode_lengths: [u8; 12],
@@ -180,21 +188,13 @@ impl LineNumberState {
         // Read unit length (32-bit for now, skip 64-bit DWARF)
         let unit_length = cursor.read_u32()?;
         if unit_length == 0xffffffff {
-            return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::PARSE_ERROR,
-                "64-bit DWARF not supported",
-            ));
+            return Err(Error::parse_error("64-bit DWARF not supported"));
         }
 
         // Read version
         let version = cursor.read_u16()?;
         if version < 2 || version > 5 {
-            return Err(Error::new(
-                ErrorCategory::Parse,
-                codes::PARSE_ERROR,
-                "Unsupported DWARF line version",
-            ));
+            return Err(Error::parse_error("Unsupported DWARF line version"));
         }
 
         // Read header length
@@ -252,46 +252,46 @@ impl LineNumberState {
                 self.basic_block = false;
                 self.prologue_end = false;
                 self.epilogue_begin = false;
-            }
+            },
             DW_LNS_ADVANCE_PC => {
                 let advance = cursor.read_uleb128()? as u32;
                 self.address += advance * self.minimum_instruction_length as u32;
-            }
+            },
             DW_LNS_ADVANCE_LINE => {
                 let advance = cursor.read_sleb128()? as i32;
                 self.line = (self.line as i32 + advance) as u32;
-            }
+            },
             DW_LNS_SET_FILE => {
                 self.file = cursor.read_uleb128()? as u16;
-            }
+            },
             DW_LNS_SET_COLUMN => {
                 self.column = cursor.read_uleb128()? as u16;
-            }
+            },
             DW_LNS_NEGATE_STMT => {
                 self.is_stmt = !self.is_stmt;
-            }
+            },
             DW_LNS_SET_BASIC_BLOCK => {
                 self.basic_block = true;
-            }
+            },
             DW_LNS_CONST_ADD_PC => {
                 let adjusted_opcode = 255 - self.opcode_base;
                 let address_increment = (adjusted_opcode / self.line_range) as u32
                     * self.minimum_instruction_length as u32;
                 self.address += address_increment;
-            }
+            },
             DW_LNS_FIXED_ADVANCE_PC => {
                 let advance = cursor.read_u16()? as u32;
                 self.address += advance;
-            }
+            },
             DW_LNS_SET_PROLOGUE_END => {
                 self.prologue_end = true;
-            }
+            },
             DW_LNS_SET_EPILOGUE_BEGIN => {
                 self.epilogue_begin = true;
-            }
+            },
             DW_LNS_SET_ISA => {
                 self.isa = cursor.read_uleb128()? as u32;
-            }
+            },
             _ => {
                 // Unknown opcode, skip its arguments
                 if opcode > 0 && opcode < self.opcode_base {
@@ -304,7 +304,7 @@ impl LineNumberState {
                         cursor.read_uleb128()?;
                     }
                 }
-            }
+            },
         }
 
         Ok(())
@@ -344,7 +344,7 @@ impl LineNumberState {
                     match extended_opcode {
                         opcodes::DW_LNE_END_SEQUENCE => {
                             self.end_sequence = true;
-                        }
+                        },
                         opcodes::DW_LNE_SET_ADDRESS => {
                             // Assume 4-byte addresses for WebAssembly
                             if remaining >= 4 {
@@ -352,30 +352,30 @@ impl LineNumberState {
                             } else {
                                 cursor.skip(remaining as usize)?;
                             }
-                        }
+                        },
                         _ => {
                             // Skip unknown extended opcodes
                             cursor.skip(remaining as usize)?;
-                        }
+                        },
                     }
-                }
+                },
                 1..=12 => {
                     // Standard opcodes
                     self.execute_standard_opcode(opcode, &mut cursor)?;
-                }
+                },
                 _ => {
                     // Special opcode
                     self.execute_special_opcode(opcode)?;
-                }
+                },
             }
 
             // Check if we've found the target
             if self.address <= target_pc && !self.end_sequence {
                 last_line_info = Some(LineInfo {
-                    file_index: self.file,
-                    line: self.line,
-                    column: self.column,
-                    is_stmt: self.is_stmt,
+                    file_index:   self.file,
+                    line:         self.line,
+                    column:       self.column,
+                    is_stmt:      self.is_stmt,
                     end_sequence: self.end_sequence,
                 });
             } else if self.address > target_pc {

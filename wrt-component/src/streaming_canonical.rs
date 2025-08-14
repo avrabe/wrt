@@ -18,7 +18,12 @@ extern crate alloc;
 use alloc::{vec, boxed::Box};
 
 #[cfg(not(feature = "std"))]
-use wrt_foundation::{BoundedVec as Vec, safe_memory::NoStdProvider};
+use wrt_foundation::{
+    BoundedVec as Vec, 
+    safe_memory::NoStdProvider,
+    budget_aware_provider::CrateId,
+    safe_managed_alloc,
+};
 
 use wrt_foundation::{
     bounded::{BoundedVec, BoundedString},
@@ -173,21 +178,31 @@ pub struct StreamingLowerResult {
 
 impl StreamingCanonicalAbi {
     /// Create new streaming canonical ABI
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
             #[cfg(feature = "std")]
             streams: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            streams: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            streams: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    Error::resource_exhausted("Failed to create bounded vector for streaming contexts")
+                })?
+            },
             
             #[cfg(feature = "std")]
             buffer_pool: Vec::new(),
             #[cfg(not(any(feature = "std", )))]
-            buffer_pool: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            buffer_pool: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    Error::resource_exhausted("Failed to create bounded vector for buffer pool")
+                })?
+            },
             
             next_stream_id: 1,
             backpressure_config: BackpressureConfig::default(),
-        }
+        })
     }
 
     /// Create a new streaming context
@@ -206,7 +221,12 @@ impl StreamingCanonicalAbi {
             #[cfg(feature = "std")]
             buffer: self.get_buffer_from_pool(),
             #[cfg(not(any(feature = "std", )))]
-            buffer: BoundedVec::new(DefaultMemoryProvider::default()).unwrap(),
+            buffer: {
+                let provider = safe_managed_alloc!(65536, CrateId::Component)?;
+                BoundedVec::new(provider).map_err(|_| {
+                    Error::resource_exhausted("Failed to create bounded vector for stream buffer")
+                })?
+            },
             bytes_processed: 0,
             direction,
             backpressure: BackpressureState::new(&self.backpressure_config),
@@ -214,10 +234,7 @@ impl StreamingCanonicalAbi {
         };
 
         self.streams.push(context).map_err(|_| {
-            Error::new(
-                ErrorCategory::Resource,
-                wrt_error::codes::RESOURCE_EXHAUSTED,
-                "Too many active streams"
+            Error::resource_exhausted("Failed to add new stream context, maximum concurrent streams reached")
             )
         })?;
 
@@ -240,16 +257,16 @@ impl StreamingCanonicalAbi {
                 bytes_consumed: 0,
                 needs_more_input: false,
                 backpressure_active: true,
-            });
+            };
         }
 
         // Add input to buffer
         let available_capacity = context.backpressure.available_capacity;
-        let bytes_to_consume = input_bytes.len().min(available_capacity);
+        let bytes_to_consume = input_bytes.len().min(available_capacity;
         
         #[cfg(feature = "std")]
         {
-            context.buffer.extend_from_slice(&input_bytes[..bytes_to_consume]);
+            context.buffer.extend_from_slice(&input_bytes[..bytes_to_consume];
         }
         #[cfg(not(any(feature = "std", )))]
         {
@@ -264,7 +281,7 @@ impl StreamingCanonicalAbi {
         let (values, bytes_consumed) = self.parse_values_from_buffer(stream_index)?;
         
         // Update backpressure state
-        context.update_backpressure_state();
+        context.update_backpressure_state);
         context.bytes_processed += bytes_consumed as u64;
 
         Ok(StreamingLiftResult {
@@ -291,14 +308,14 @@ impl StreamingCanonicalAbi {
                 values_consumed: 0,
                 needs_more_input: false,
                 backpressure_active: true,
-            });
+            };
         }
 
         // Serialize values to bytes
         let (bytes, values_consumed) = self.serialize_values_to_buffer(stream_index, input_values)?;
         
         // Update backpressure state
-        context.update_backpressure_state();
+        context.update_backpressure_state);
 
         Ok(StreamingLowerResult {
             bytes,
@@ -311,12 +328,12 @@ impl StreamingCanonicalAbi {
     /// Close a stream and release resources
     pub fn close_stream(&mut self, stream_handle: StreamHandle) -> Result<()> {
         let stream_index = self.find_stream_index(stream_handle)?;
-        let context = self.streams.remove(stream_index);
+        let context = self.streams.remove(stream_index;
 
         // Return buffer to pool if possible
         #[cfg(feature = "std")]
         {
-            self.return_buffer_to_pool(context.buffer);
+            self.return_buffer_to_pool(context.buffer;
         }
 
         Ok(())
@@ -342,7 +359,7 @@ impl StreamingCanonicalAbi {
         
         // Update existing streams
         for context in self.streams.iter_mut() {
-            context.backpressure.update_config(&self.backpressure_config);
+            context.backpressure.update_config(&self.backpressure_config;
         }
     }
 
@@ -353,12 +370,8 @@ impl StreamingCanonicalAbi {
             .iter()
             .position(|ctx| ctx.handle == handle)
             .ok_or_else(|| {
-                Error::new(
-                    ErrorCategory::Runtime,
-                    wrt_error::codes::EXECUTION_ERROR,
-                    "Stream not found"
-                )
-            })
+                Error::runtime_execution_error("Stream handle not found")
+            })?
     }
 
     #[cfg(feature = "std")]
@@ -368,13 +381,13 @@ impl StreamingCanonicalAbi {
 
     #[cfg(feature = "std")]
     fn return_buffer_to_pool(&mut self, mut buffer: Vec<u8>) {
-        buffer.clear();
+        buffer.clear);
         if buffer.capacity() <= MAX_STREAM_BUFFER_SIZE * 2 {
             self.buffer_pool.push(buffer);
         }
     }
 
-    fn parse_values_from_buffer(&mut self, stream_index: usize) -> Result<(Vec<Value>, usize)> {
+    fn parse_values_from_buffer(&mut self, stream_index: usize) -> core::result::Result<(Vec<Value>, usize)> {
         let context = &self.streams[stream_index];
         
         // Simplified parsing - in real implementation would parse according to element type
@@ -391,7 +404,7 @@ impl StreamingCanonicalAbi {
                         if context.buffer.len() >= 4 + len {
                             let string_bytes = &context.buffer[4..4 + len];
                             let string_content = core::str::from_utf8(string_bytes)
-                                .map_err(|_| Error::new(ErrorCategory::Parse, wrt_error::codes::PARSE_ERROR, "Invalid UTF-8"))?;
+                                .map_err(|_| Error::parse_error("Invalid UTF-8"))?;
                             Value::String(BoundedString::from_str(string_content).unwrap_or_default())
                         } else {
                             return Ok((Vec::new(), 0)); // Need more data
@@ -430,25 +443,25 @@ impl StreamingCanonicalAbi {
         }
     }
 
-    fn serialize_values_to_buffer(&mut self, _stream_index: usize, values: &[Value]) -> Result<(Vec<u8>, usize)> {
+    fn serialize_values_to_buffer(&mut self, _stream_index: usize, values: &[Value]) -> core::result::Result<(Vec<u8>, usize)> {
         let mut result_bytes = Vec::new();
         let mut values_consumed = 0;
 
         for value in values {
             match value {
                 Value::U32(n) => {
-                    result_bytes.extend_from_slice(&n.to_le_bytes());
+                    result_bytes.extend_from_slice(&n.to_le_bytes);
                     values_consumed += 1;
                 }
                 Value::String(s) => {
-                    let string_bytes = s.as_str().as_bytes();
-                    result_bytes.extend_from_slice(&(string_bytes.len() as u32).to_le_bytes());
-                    result_bytes.extend_from_slice(string_bytes);
+                    let string_bytes = s.as_str().as_bytes);
+                    result_bytes.extend_from_slice(&(string_bytes.len() as u32).to_le_bytes);
+                    result_bytes.extend_from_slice(string_bytes;
                     values_consumed += 1;
                 }
                 _ => {
                     // Simplified - just serialize as u32
-                    result_bytes.extend_from_slice(&42u32.to_le_bytes());
+                    result_bytes.extend_from_slice(&42u32.to_le_bytes);
                     values_consumed += 1;
                 }
             }
@@ -479,7 +492,7 @@ impl StreamingContext {
             self.backpressure.is_active = false;
         }
 
-        self.backpressure.available_capacity = self.backpressure.high_water_mark.saturating_sub(self.buffer.len());
+        self.backpressure.available_capacity = self.backpressure.high_water_mark.saturating_sub(self.buffer.len();
     }
 }
 
@@ -518,7 +531,9 @@ impl Default for BackpressureConfig {
 
 impl Default for StreamingCanonicalAbi {
     fn default() -> Self {
-        Self::new()
+        // Use new() which properly handles allocation or panic in development
+        // This ensures consistent memory management patterns
+        Self::new().expect("StreamingCanonicalAbi allocation should not fail in default construction")
     }
 }
 
@@ -583,7 +598,7 @@ mod tests {
         
         assert_eq!(handle.0, 1);
         assert_eq!(abi.streams.len(), 1);
-        assert_eq!(abi.next_stream_id, 2);
+        assert_eq!(abi.next_stream_id, 2;
     }
 
     #[test]
@@ -595,12 +610,12 @@ mod tests {
             CanonicalOptions::default(),
         ).unwrap();
 
-        let input_bytes = 42u32.to_le_bytes();
+        let input_bytes = 42u32.to_le_bytes);
         let result = abi.streaming_lift(handle, &input_bytes).unwrap();
 
         assert_eq!(result.values.len(), 1);
-        assert_eq!(result.values[0], Value::U32(42));
-        assert_eq!(result.bytes_consumed, 4);
+        assert_eq!(result.values[0], Value::U32(42;
+        assert_eq!(result.bytes_consumed, 4;
         assert!(!result.backpressure_active);
     }
 
@@ -616,7 +631,7 @@ mod tests {
         let input_values = vec![Value::U32(42)];
         let result = abi.streaming_lower(handle, &input_values).unwrap();
 
-        assert_eq!(result.bytes, 42u32.to_le_bytes());
+        assert_eq!(result.bytes, 42u32.to_le_bytes);
         assert_eq!(result.values_consumed, 1);
         assert!(!result.backpressure_active);
     }
@@ -631,7 +646,7 @@ mod tests {
         ).unwrap();
 
         let stats = abi.get_stream_stats(handle).unwrap();
-        assert_eq!(stats.handle, handle);
+        assert_eq!(stats.handle, handle;
         assert_eq!(stats.bytes_processed, 0);
         assert!(!stats.backpressure_active);
     }
@@ -639,12 +654,12 @@ mod tests {
     #[test]
     fn test_backpressure_config() {
         let mut abi = StreamingCanonicalAbi::new();
-        let mut config = BackpressureConfig::default();
+        let mut config = BackpressureConfig::default());
         config.default_high_water_percent = 90;
         config.default_low_water_percent = 10;
 
-        abi.update_backpressure_config(config);
-        assert_eq!(abi.backpressure_config.default_high_water_percent, 90);
+        abi.update_backpressure_config(config;
+        assert_eq!(abi.backpressure_config.default_high_water_percent, 90;
     }
 
     #[test]
@@ -663,8 +678,8 @@ mod tests {
 
     #[test]
     fn test_stream_direction_display() {
-        assert_eq!(StreamDirection::Lifting.to_string(), "lifting");
-        assert_eq!(StreamDirection::Lowering.to_string(), "lowering");
-        assert_eq!(StreamDirection::Bidirectional.to_string(), "bidirectional");
+        assert_eq!(StreamDirection::Lifting.to_string(), "lifting";
+        assert_eq!(StreamDirection::Lowering.to_string(), "lowering";
+        assert_eq!(StreamDirection::Bidirectional.to_string(), "bidirectional";
     }
 }

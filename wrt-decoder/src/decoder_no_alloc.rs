@@ -34,8 +34,16 @@
 //! }
 //! ```
 
-use wrt_error::{codes, Error, ErrorCategory, Result};
-use wrt_foundation::{safe_memory::NoStdProvider, verification::VerificationLevel};
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+    Result,
+};
+use wrt_foundation::{
+    safe_memory::NoStdProvider,
+    verification::VerificationLevel,
+};
 
 use crate::prelude::*;
 
@@ -177,7 +185,8 @@ pub fn verify_wasm_header(bytes: &[u8]) -> Result<()> {
 ///
 /// # Returns
 ///
-/// * `Result<NoStdProvider<MAX_MODULE_SIZE>>` - Memory provider initialized with the bytes
+/// * `Result<NoStdProvider<MAX_MODULE_SIZE>>` - Memory provider initialized
+///   with the bytes
 pub fn create_memory_provider(
     bytes: &[u8],
     _level: VerificationLevel,
@@ -195,7 +204,10 @@ pub fn create_memory_provider(
     // Write the bytes to the provider
     use wrt_foundation::safe_memory::Provider;
     provider.write_data(0, bytes).map_err(|_| {
-        create_error(NoAllocErrorCode::MemoryProviderError, "Failed to initialize memory provider")
+        create_error(
+            NoAllocErrorCode::MemoryProviderError,
+            "Failed to initialize memory provider",
+        )
     })?;
 
     Ok(provider)
@@ -206,33 +218,33 @@ pub fn create_memory_provider(
 #[repr(u8)]
 pub enum SectionId {
     /// Custom section (0)
-    Custom = 0,
+    Custom    = 0,
     /// Type section (1)
-    Type = 1,
+    Type      = 1,
     /// Import section (2)
-    Import = 2,
+    Import    = 2,
     /// Function section (3)
-    Function = 3,
+    Function  = 3,
     /// Table section (4)
-    Table = 4,
+    Table     = 4,
     /// Memory section (5)
-    Memory = 5,
+    Memory    = 5,
     /// Global section (6)
-    Global = 6,
+    Global    = 6,
     /// Export section (7)
-    Export = 7,
+    Export    = 7,
     /// Start section (8)
-    Start = 8,
+    Start     = 8,
     /// Element section (9)
-    Element = 9,
+    Element   = 9,
     /// Code section (10)
-    Code = 10,
+    Code      = 10,
     /// Data section (11)
-    Data = 11,
+    Data      = 11,
     /// Data count section (12)
     DataCount = 12,
     /// Unknown section
-    Unknown = 255,
+    Unknown   = 255,
 }
 
 impl From<u8> for SectionId {
@@ -260,9 +272,9 @@ impl From<u8> for SectionId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SectionInfo {
     /// Section ID
-    pub id: SectionId,
+    pub id:     SectionId,
     /// Section size in bytes
-    pub size: u32,
+    pub size:   u32,
     /// Offset of the section data in the binary
     pub offset: usize,
 }
@@ -277,44 +289,44 @@ pub struct SectionInfo {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WasmModuleHeader {
     /// WebAssembly binary format version
-    pub version: u32,
+    pub version:            u32,
     /// Size of the binary in bytes
-    pub size: usize,
+    pub size:               usize,
     /// Number of sections detected in the module
-    pub section_count: u8,
+    pub section_count:      u8,
     /// Whether the module contains a code section
-    pub has_code_section: bool,
+    pub has_code_section:   bool,
     /// Whether the module contains a data section
-    pub has_data_section: bool,
+    pub has_data_section:   bool,
     /// Whether the module contains a custom name section
-    pub has_name_section: bool,
+    pub has_name_section:   bool,
     /// Whether the module contains a start function
     pub has_start_function: bool,
     /// Whether the module uses memory
-    pub uses_memory: bool,
+    pub uses_memory:        bool,
     /// Whether the module uses tables
-    pub uses_tables: bool,
+    pub uses_tables:        bool,
     /// Verification level used for validation
     pub verification_level: VerificationLevel,
     /// Section information
-    pub sections: [Option<SectionInfo>; MAX_SECTIONS],
+    pub sections:           [Option<SectionInfo>; MAX_SECTIONS],
 }
 
 impl WasmModuleHeader {
     /// Creates a new WasmModuleHeader with default values
     pub fn new() -> Self {
         Self {
-            version: 0,
-            size: 0,
-            section_count: 0,
-            has_code_section: false,
-            has_data_section: false,
-            has_name_section: false,
+            version:            0,
+            size:               0,
+            section_count:      0,
+            has_code_section:   false,
+            has_data_section:   false,
+            has_name_section:   false,
             has_start_function: false,
-            uses_memory: false,
-            uses_tables: false,
+            uses_memory:        false,
+            uses_tables:        false,
             verification_level: VerificationLevel::Standard,
-            sections: [None; MAX_SECTIONS],
+            sections:           [None; MAX_SECTIONS],
         }
     }
 
@@ -446,8 +458,8 @@ pub fn decode_module_header(
 
         // Save section info
         header.sections[section_index] = Some(SectionInfo {
-            id: section_id_enum,
-            size: section_size,
+            id:     section_id_enum,
+            size:   section_size,
             offset: section_data_offset,
         });
 
@@ -465,23 +477,23 @@ pub fn decode_module_header(
                 {
                     header.has_name_section = true;
                 }
-            }
+            },
             SectionId::Memory => {
                 header.uses_memory = true;
-            }
+            },
             SectionId::Table => {
                 header.uses_tables = true;
-            }
+            },
             SectionId::Start => {
                 header.has_start_function = true;
-            }
+            },
             SectionId::Code => {
                 header.has_code_section = true;
-            }
+            },
             SectionId::Data => {
                 header.has_data_section = true;
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         // Move to next section

@@ -1,0 +1,64 @@
+[package]
+name = "cargo-wrt"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+description = "WRT build system CLI - the new unified build tool for WebAssembly Runtime"
+documentation = "https://docs.rs/cargo-wrt"
+readme = "README.md"
+homepage = "https://github.com/pulseengine/wrt"
+categories = ["development-tools", "embedded", "wasm"]
+keywords = ["webassembly", "wasm", "runtime", "build-tool", "safety-critical"]
+
+[[bin]]
+name = "cargo-wrt"
+path = "src/main.rs"
+
+[features]
+default = ["std"]
+std = ["wrt-build-core/std"]
+
+[dependencies]
+# Core build system
+wrt-build-core = { path = "../wrt-build-core" }
+wrt-decoder = { path = "../wrt-decoder" }
+wrt-foundation = { path = "../wrt-foundation" }
+
+# CLI framework
+clap = { version = "4.5.4", features = ["derive", "env"] }
+anyhow = { workspace = true }
+
+# Output formatting
+colored = "3.0.0"
+serde_json = "1.0"
+glob = "0.3"
+
+# Environment detection
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "macros"] }
+chrono = { version = "0.4", features = ["serde"] }
+atty = "0.2"
+
+# Configuration and validation
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+which = "6.0"
+
+# GitHub integration
+reqwest = { version = "0.11", features = ["json"] }
+
+# Async trait support
+async-trait = "0.1"
+
+# Performance optimization
+num_cpus = "1.0"
+
+[dev-dependencies]
+# Testing utilities
+tempfile = "3.0"
+criterion = "0.5"
+
+[lints]
+workspace = true

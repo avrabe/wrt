@@ -50,13 +50,16 @@
 //!
 //! ```
 //! // Binary std/no_std choice
-//! use wrt_error::{Error, kinds};
+//! use wrt_error::{
+//!     kinds,
+//!     Error,
+//! };
 //!
 //! // Using helper functions for common errors
 //! let error = Error::new(
 //!     wrt_error::ErrorCategory::Core,
 //!     wrt_error::codes::INVALID_FUNCTION_INDEX,
-//!     "Invalid function index: 42"
+//!     "Invalid function index: 42",
 //! );
 //!
 //! // Using kind functions for common errors
@@ -64,7 +67,7 @@
 //! let memory_error = kinds::memory_access_error("Memory access out of bounds");
 //! ```
 
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)] // Rule 2
 #![deny(clippy::all)]
 #![deny(clippy::perf)]
@@ -80,6 +83,9 @@
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 /// Error codes for wrt
 pub mod codes;
 /// Error and error handling types
@@ -91,13 +97,26 @@ pub mod kinds;
 pub mod context;
 pub mod helpers;
 pub mod prelude;
+pub mod recovery;
+
+// ASIL safety support (enabled for ASIL-B and above)
+#[cfg(any(feature = "asil-b", feature = "asil-c", feature = "asil-d"))]
+pub mod asil;
+
+// Macros for ASIL-aware error handling
+#[macro_use]
+pub mod macros;
 
 // Include verification module conditionally, but exclude during coverage builds
 #[cfg(all(not(coverage), doc))]
 pub mod verify;
 
 // Re-export key types
-pub use errors::{Error, ErrorCategory, ErrorSource};
+pub use errors::{
+    Error,
+    ErrorCategory,
+    ErrorSource,
+};
 
 /// A specialized `Result` type for WRT operations.
 ///
@@ -108,9 +127,22 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 // Re-export error kinds for convenience
 pub use kinds::{
-    component_error, invalid_type, out_of_bounds_error, parse_error, poisoned_lock_error,
-    resource_error, runtime_error, validation_error, ComponentError, InvalidType, OutOfBoundsError,
-    ParseError, PoisonedLockError, ResourceError, RuntimeError, ValidationError,
+    component_error,
+    invalid_type,
+    out_of_bounds_error,
+    parse_error,
+    poisoned_lock_error,
+    resource_error,
+    runtime_error,
+    validation_error,
+    ComponentError,
+    InvalidType,
+    OutOfBoundsError,
+    ParseError,
+    PoisonedLockError,
+    ResourceError,
+    RuntimeError,
+    ValidationError,
 };
 
 /// Error conversion trait for converting between error types
@@ -133,6 +165,16 @@ pub trait ToErrorCategory {
 }
 
 // Re-export additional helpers
+#[cfg(feature = "asil-d")]
+pub use asil::validate_error_consistency;
+#[cfg(any(feature = "asil-c", feature = "asil-d"))]
+pub use asil::SafetyMonitor;
+// Re-export ASIL types when enabled
+#[cfg(any(feature = "asil-b", feature = "asil-c", feature = "asil-d"))]
+pub use asil::{
+    AsilErrorContext,
+    AsilLevel,
+};
 pub use helpers::*;
 
 /// A placeholder function.
@@ -140,8 +182,8 @@ pub const fn placeholder() {}
 
 // Panic handler disabled to avoid conflicts with other crates
 // The main wrt crate should provide the panic handler
-// #[cfg(all(not(feature = "std"), not(test), not(feature = "disable-panic-handler")))]
-// #[panic_handler]
+// #[cfg(all(not(feature = "std"), not(test), not(feature =
+// "disable-panic-handler")))] #[panic_handler]
 // fn panic(_info: &core::panic::PanicInfo) -> ! {
 //     loop {}
 // }

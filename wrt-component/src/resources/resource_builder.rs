@@ -3,8 +3,10 @@
 // Licensed under the MIT license.
 // SPDX-License-Identifier: MIT
 
-use super::{MemoryStrategy, VerificationLevel};
-use crate::prelude::*;
+use super::{
+    MemoryStrategy,
+    VerificationLevel,
+};
 
 /// Builder for creating Resource instances
 #[derive(Clone, Debug)]
@@ -13,13 +15,13 @@ where
     T: Clone + Send + Sync + 'static,
 {
     /// Resource type index
-    type_idx: u32,
+    type_idx:           u32,
     /// Resource data
-    data: T,
+    data:               T,
     /// Optional debug name
-    name: Option<String>,
+    name:               Option<String>,
     /// Memory strategy for this resource
-    memory_strategy: MemoryStrategy,
+    memory_strategy:    MemoryStrategy,
     /// Verification level
     verification_level: VerificationLevel,
 }
@@ -71,7 +73,8 @@ where
     }
 
     /// Build the resource (no_std version)
-        pub fn build(self) -> (super::Resource, MemoryStrategy, VerificationLevel) {
+    #[cfg(not(feature = "std"))]
+    pub fn build(self) -> (super::Resource, MemoryStrategy, VerificationLevel) {
         // Create the resource
         let resource = if let Some(name) = self.name {
             super::Resource::new_with_name(self.type_idx, Box::new(self.data), &name)
@@ -87,22 +90,22 @@ where
 #[derive(Clone, Debug)]
 pub struct ResourceTableBuilder {
     /// Maximum allowed resources
-    max_resources: usize,
+    max_resources:              usize,
     /// Default memory strategy
-    default_memory_strategy: MemoryStrategy,
+    default_memory_strategy:    MemoryStrategy,
     /// Default verification level
     default_verification_level: VerificationLevel,
     /// Whether to use optimized memory
-    use_optimized_memory: bool,
+    use_optimized_memory:       bool,
 }
 
 impl Default for ResourceTableBuilder {
     fn default() -> Self {
         Self {
-            max_resources: 64, // Default to MAX_RESOURCES value
-            default_memory_strategy: MemoryStrategy::default(),
+            max_resources:              64, // Default to MAX_RESOURCES value
+            default_memory_strategy:    MemoryStrategy::default(),
             default_verification_level: VerificationLevel::Critical,
-            use_optimized_memory: false,
+            use_optimized_memory:       false,
         }
     }
 }
@@ -156,7 +159,7 @@ impl ResourceTableBuilder {
     }
 
     /// Build the ResourceTable (no_std version)
-        pub fn build(self) -> super::ResourceTable {
+    pub fn build(self) -> super::ResourceTable {
         // In no_std there's only one implementation
         super::ResourceTable::new()
     }
@@ -166,22 +169,22 @@ impl ResourceTableBuilder {
 #[derive(Clone, Debug)]
 pub struct ResourceManagerBuilder<'a> {
     /// Component instance ID
-    instance_id: &'a str,
+    instance_id:                &'a str,
     /// Default memory strategy
-    default_memory_strategy: MemoryStrategy,
+    default_memory_strategy:    MemoryStrategy,
     /// Default verification level
     default_verification_level: VerificationLevel,
     /// Whether to use optimized memory
-    use_optimized_memory: bool,
+    use_optimized_memory:       bool,
 }
 
 impl<'a> Default for ResourceManagerBuilder<'a> {
     fn default() -> Self {
         Self {
-            instance_id: "default-instance",
-            default_memory_strategy: MemoryStrategy::default(),
+            instance_id:                "default-instance",
+            default_memory_strategy:    MemoryStrategy::default(),
             default_verification_level: VerificationLevel::Critical,
-            use_optimized_memory: false,
+            use_optimized_memory:       false,
         }
     }
 }
@@ -237,7 +240,7 @@ impl<'a> ResourceManagerBuilder<'a> {
     }
 
     /// Build the ResourceManager (no_std version)
-        pub fn build<'b>(self, table: &'b Mutex<super::ResourceTable>) -> super::ResourceManager<'b>
+    pub fn build<'b>(self, table: &'b Mutex<super::ResourceTable>) -> super::ResourceManager<'b>
     where
         'a: 'b,
     {
@@ -295,11 +298,15 @@ mod tests {
 
         assert_eq!(manager.instance_id(), "test-instance");
         assert_eq!(manager.default_memory_strategy(), MemoryStrategy::Copy);
-        assert_eq!(manager.default_verification_level(), VerificationLevel::Critical);
+        assert_eq!(
+            manager.default_verification_level(),
+            VerificationLevel::Critical
+        );
     }
 
     #[test]
-        fn test_resource_manager_builder_no_std() {
+    #[cfg(not(feature = "std"))]
+    fn test_resource_manager_builder_no_std() {
         let table = Mutex::new(ResourceTable::new());
 
         let manager = ResourceManagerBuilder::new()
@@ -310,6 +317,9 @@ mod tests {
 
         assert_eq!(manager.instance_id(), "test-instance");
         assert_eq!(manager.default_memory_strategy(), MemoryStrategy::Copy);
-        assert_eq!(manager.default_verification_level(), VerificationLevel::Critical);
+        assert_eq!(
+            manager.default_verification_level(),
+            VerificationLevel::Critical
+        );
     }
 }

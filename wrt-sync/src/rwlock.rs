@@ -7,8 +7,14 @@ use core::{
     cell::UnsafeCell,
     fmt,
     hint::spin_loop,
-    ops::{Deref, DerefMut},
-    sync::atomic::{AtomicUsize, Ordering},
+    ops::{
+        Deref,
+        DerefMut,
+    },
+    sync::atomic::{
+        AtomicUsize,
+        Ordering,
+    },
 };
 // REMOVED: #[cfg(feature = "std")]
 // REMOVED: use std::borrow::Cow; // Unused import
@@ -23,7 +29,12 @@ use std::sync::Arc;
 use std::vec::Vec;
 
 #[cfg(feature = "std")] // Gate this import as it's only used by parking_impl (std-gated)
-use wrt_error::{codes, Error, ErrorCategory, Result}; // Keep this top-level import
+use wrt_error::{
+    codes,
+    Error,
+    ErrorCategory,
+    Result,
+}; // Keep this top-level import
 
 /// A simple, `no_std` compatible Read-Write Lock using atomics.
 ///
@@ -72,7 +83,7 @@ pub struct WrtRwLock<T: ?Sized> {
     /// - `usize::MAX`: Write-locked
     /// - n (`1..usize::MAX - 1`): Read-locked by n readers
     state: AtomicUsize,
-    data: UnsafeCell<T>,
+    data:  UnsafeCell<T>,
 }
 
 /// A guard that provides read access to the data protected by a `WrtRwLock`.
@@ -109,7 +120,7 @@ impl<T> WrtRwLock<T> {
     pub const fn new(data: T) -> Self {
         WrtRwLock {
             state: AtomicUsize::new(0), // Start unlocked
-            data: UnsafeCell::new(data),
+            data:  UnsafeCell::new(data),
         }
     }
 }
@@ -158,7 +169,7 @@ impl<T: ?Sized> WrtRwLock<T> {
                         spin_loop();
                     }
                     // Continue loop regardless to retry compare_exchange
-                }
+                },
             }
         }
     }
@@ -208,6 +219,7 @@ impl<T: ?Sized> WrtRwLock<T> {
 
 impl<T: ?Sized> Deref for WrtRwLockReadGuard<'_, T> {
     type Target = T;
+
     #[inline]
     fn deref(&self) -> &Self::Target {
         // Safety: Guard ensures read lock is held.
@@ -234,6 +246,7 @@ impl<T: ?Sized> Drop for WrtRwLockReadGuard<'_, T> {
 
 impl<T: ?Sized> Deref for WrtRwLockWriteGuard<'_, T> {
     type Target = T;
+
     #[inline]
     fn deref(&self) -> &Self::Target {
         // Safety: Guard ensures write lock is held.
@@ -296,17 +309,34 @@ impl<T: ?Sized + fmt::Debug> fmt::Debug for WrtRwLock<T> {
 pub mod parking_impl {
     // Replace wildcard import with explicit imports
     // Removed Cow from this list as it is no longer used.
-    use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering}; // Use Ordering directly
+    use core::sync::atomic::{
+        AtomicBool,
+        AtomicUsize,
+        Ordering,
+    }; // Use Ordering directly
     use core::{
         cell::UnsafeCell as CoreUnsafeCell,
         fmt as CoreFmt,
-        ops::{Deref as CoreDeref, DerefMut as CoreDerefMut},
+        ops::{
+            Deref as CoreDeref,
+            DerefMut as CoreDerefMut,
+        },
     };
     // std specific items, now directly used because of cfg(feature = "std") on the module
     use std::sync::RwLock as StdRwLock;
-    use std::thread::{self, Thread};
+    use std::thread::{
+        self,
+        Thread,
+    };
 
-    use super::{codes, Arc, Error, ErrorCategory, Result, Vec}; // Keep alias for clarity if preferred
+    use super::{
+        codes,
+        Arc,
+        Error,
+        ErrorCategory,
+        Result,
+        Vec,
+    }; // Keep alias for clarity if preferred
 
     const UNLOCKED: usize = 0;
     // REMOVED: const WRITE_LOCKED as it was unused and outer module's
@@ -315,16 +345,16 @@ pub mod parking_impl {
 
     /// A `RwLock` that uses `std::thread::park` for blocking.
     pub struct WrtParkingRwLock<T: ?Sized> {
-        state: AtomicUsize,
+        state:          AtomicUsize,
         writer_waiting: AtomicBool, // True if a writer is parked, waiting for the lock
-        waiters: Arc<WaitQueue>,
-        data: CoreUnsafeCell<T>,
+        waiters:        Arc<WaitQueue>,
+        data:           CoreUnsafeCell<T>,
     }
 
     #[derive(CoreFmt::Debug)] // Add Debug derive for WaitQueue
     struct WaitQueue {
         readers: StdRwLock<Vec<Thread>>,
-        writer: StdRwLock<Option<Thread>>,
+        writer:  StdRwLock<Option<Thread>>,
     }
 
     // Static error messages - Corrected syntax
@@ -337,7 +367,10 @@ pub mod parking_impl {
 
     impl WaitQueue {
         fn new() -> Self {
-            Self { readers: StdRwLock::new(Vec::new()), writer: StdRwLock::new(None) }
+            Self {
+                readers: StdRwLock::new(Vec::new()),
+                writer:  StdRwLock::new(None),
+            }
         }
 
         fn register_reader(&self) -> Result<()> {
@@ -473,10 +506,10 @@ pub mod parking_impl {
         /// ```
         pub fn new(data: T) -> Self {
             WrtParkingRwLock {
-                state: AtomicUsize::new(UNLOCKED),
+                state:          AtomicUsize::new(UNLOCKED),
                 writer_waiting: AtomicBool::new(false),
-                waiters: Arc::new(WaitQueue::new()),
-                data: CoreUnsafeCell::new(data),
+                waiters:        Arc::new(WaitQueue::new()),
+                data:           CoreUnsafeCell::new(data),
             }
         }
     }
@@ -536,7 +569,7 @@ pub mod parking_impl {
                 ) {
                     Ok(_) => {
                         return Ok(WrtParkingRwLockWriteGuard { lock: self });
-                    }
+                    },
                     Err(_current_state) => {
                         if !self.waiters.register_writer()? {
                             thread::park();
@@ -547,7 +580,7 @@ pub mod parking_impl {
                             continue;
                         }
                         thread::park();
-                    }
+                    },
                 }
             }
         }
@@ -589,6 +622,7 @@ pub mod parking_impl {
 
     impl<T: ?Sized> CoreDeref for WrtParkingRwLockReadGuard<'_, T> {
         type Target = T;
+
         #[inline]
         fn deref(&self) -> &Self::Target {
             // # Safety
@@ -612,6 +646,7 @@ pub mod parking_impl {
 
     impl<T: ?Sized> CoreDeref for WrtParkingRwLockWriteGuard<'_, T> {
         type Target = T;
+
         #[inline]
         fn deref(&self) -> &Self::Target {
             // # Safety
@@ -660,10 +695,16 @@ pub mod parking_impl {
 
     #[cfg(test)]
     mod internal_parking_tests {
-        use std::{sync::Arc, thread};
+        use std::{
+            sync::Arc,
+            thread,
+        };
 
         use super::WrtParkingRwLock;
-        use crate::prelude::{AtomicBool, Ordering};
+        use crate::prelude::{
+            AtomicBool,
+            Ordering,
+        };
 
         #[test]
         fn test_parking_rwlock_basic() {
@@ -810,7 +851,10 @@ mod tests {
             assert_eq!(*r_guard, 5);
             assert!(lock.try_write().is_none());
         } else {
-            panic!("try_read failed when it should succeed");
+            #[allow(clippy::assertions_on_constants)]
+            {
+                assert!(false, "try_read failed when it should succeed");
+            }
         }
 
         if let Some(mut w_guard) = lock.try_write() {
@@ -818,16 +862,25 @@ mod tests {
             assert!(lock.try_read().is_none());
             assert!(lock.try_write().is_none());
         } else {
-            panic!("try_write failed when it should succeed");
+            #[allow(clippy::assertions_on_constants)]
+            {
+                assert!(false, "try_write failed when it should succeed");
+            }
         }
         assert_eq!(*lock.read(), 10);
 
         let r_guard = lock.read();
-        assert!(lock.try_write().is_none(), "try_write should fail when read lock is held");
+        assert!(
+            lock.try_write().is_none(),
+            "try_write should fail when read lock is held"
+        );
         drop(r_guard);
 
         let w_guard = lock.write();
-        assert!(lock.try_read().is_none(), "try_read should fail when write lock is held");
+        assert!(
+            lock.try_read().is_none(),
+            "try_read should fail when write lock is held"
+        );
         drop(w_guard);
     }
 }

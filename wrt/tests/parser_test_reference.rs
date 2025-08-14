@@ -1,7 +1,8 @@
 //! Parser test reference for wrt
 //!
-//! Parser tests for wrt have been consolidated into wrt-tests/integration/parser/
-//! This eliminates duplication and provides comprehensive testing in a single location.
+//! Parser tests for wrt have been consolidated into
+//! wrt-tests/integration/parser/ This eliminates duplication and provides
+//! comprehensive testing in a single location.
 //!
 //! To run parser tests:
 //! ```

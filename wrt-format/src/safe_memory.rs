@@ -11,10 +11,15 @@ pub use wrt_foundation::safe_memory::StdProvider as StdMemoryProvider;
 #[cfg(not(feature = "std"))]
 pub use wrt_foundation::NoStdProvider as NoStdMemoryProvider;
 // Re-export common memory types always
-pub use wrt_foundation::{BoundedStack as SafeStack, MemoryProvider, SafeMemoryHandler, SafeSlice};
+pub use wrt_foundation::{
+    BoundedStack as SafeStack,
+    MemoryProvider,
+    SafeMemoryHandler,
+    SafeSlice,
+};
 
 /// Create a safe slice from binary data
-pub fn safe_slice(data: &[u8]) -> wrt_foundation::Result<wrt_foundation::SafeSlice<'_>> {
+pub fn safe_slice(data: &[u8]) -> wrt_error::Result<wrt_foundation::SafeSlice<'_>> {
     wrt_foundation::SafeSlice::new(data)
 }
 

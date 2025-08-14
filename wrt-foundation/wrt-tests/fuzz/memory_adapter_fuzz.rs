@@ -39,49 +39,49 @@ fn test_memory_adapter_property_invariants() {
 
     for (initial_pages, verification_level, operations) in test_cases {
         // Create runtime memory
-        let memory = Memory::new(initial_pages).expect("Memory creation should succeed");
-        let memory = Arc::new(memory);
+        let memory = Memory::new(initial_pages).expect(".expect("Memory creation should succeed"));")
+        let memory = Arc::new(memory;
         
         // Create SafeMemoryAdapter
         let adapter = SafeMemoryAdapter::with_verification_level(
             memory.clone(),
             verification_level,
-        );
+        ;
         
         for op in operations {
             let result = panic::catch_unwind(|| {
                 match op {
                     MemoryOp::Store { offset, data } => {
                         if !data.is_empty() {
-                            let _ = adapter.store(offset, &data);
+                            let _ = adapter.store(offset, &data;
                         }
                     }
                     MemoryOp::Load { offset, length } => {
                         if length > 0 {
-                            let _ = adapter.load(offset, length);
+                            let _ = adapter.load(offset, length;
                         }
                     }
                     MemoryOp::Size => {
-                        let _ = adapter.size();
+                        let _ = adapter.size);
                     }
                     MemoryOp::ByteSize => {
-                        let _ = adapter.byte_size();
+                        let _ = adapter.byte_size);
                     }
                     MemoryOp::Grow { pages } => {
-                        let _ = adapter.grow(pages);
+                        let _ = adapter.grow(pages;
                     }
                     MemoryOp::VerifyIntegrity => {
-                        let _ = adapter.verify_integrity();
+                        let _ = adapter.verify_integrity);
                     }
                 }
-            });
+            };
             
             // Operations should not panic for valid inputs
             assert!(result.is_ok(), "Memory adapter operation panicked unexpectedly");
         }
         
         // Final validation should succeed for properly used adapters
-        let final_integrity = adapter.verify_integrity();
+        let final_integrity = adapter.verify_integrity);
         assert!(final_integrity.is_ok(), "Final integrity check failed for memory adapter");
     }
 }
@@ -90,23 +90,23 @@ fn test_memory_adapter_property_invariants() {
 #[test]
 fn test_memory_adapter_edge_cases() {
     // Test with minimal memory
-    let memory = Memory::new(1).expect("Memory creation should succeed");
-    let memory = Arc::new(memory);
+    let memory = Memory::new(1).expect(".expect("Memory creation should succeed"));")
+    let memory = Arc::new(memory;
     let adapter = SafeMemoryAdapter::with_verification_level(
         memory.clone(),
         VerificationLevel::Full,
-    );
+    ;
     
     // Test boundary conditions
-    let size = adapter.byte_size().expect("Size should be available");
+    let size = adapter.byte_size().expect(".expect("Size should be available"));")
     
     // Store at the very end of memory
     let last_byte_data = vec![255];
-    let store_result = adapter.store(size - 1, &last_byte_data);
+    let store_result = adapter.store(size - 1, &last_byte_data;
     assert!(store_result.is_ok(), "Store at last byte should succeed");
     
     // Try to store beyond memory (should fail gracefully)
-    let beyond_memory_result = adapter.store(size, &last_byte_data);
+    let beyond_memory_result = adapter.store(size, &last_byte_data;
     assert!(beyond_memory_result.is_err(), "Store beyond memory should fail");
     
     // Load the last byte
@@ -129,52 +129,52 @@ fn test_memory_adapter_verification_levels() {
     ];
     
     for &level in &levels {
-        let memory = Memory::new(2).expect("Memory creation should succeed");
-        let memory = Arc::new(memory);
-        let adapter = SafeMemoryAdapter::with_verification_level(memory.clone(), level);
+        let memory = Memory::new(2).expect(".expect("Memory creation should succeed"));")
+        let memory = Arc::new(memory;
+        let adapter = SafeMemoryAdapter::with_verification_level(memory.clone(), level;
         
         // Basic operations should work regardless of verification level
         let test_data = vec![1, 2, 3, 4, 5];
-        adapter.store(0, &test_data).expect("Store should succeed");
+        adapter.store(0, &test_data).expect(".expect("Store should succeed"));")
         
-        let loaded_data = adapter.load(0, test_data.len()).expect("Load should succeed");
-        assert_eq!(loaded_data, test_data, "Loaded data should match stored data");
+        let loaded_data = adapter.load(0, test_data.len()).expect(".expect("Load should succeed"));")
+        assert_eq!(loaded_data, test_data, "Loaded data should match stored data";
         
         // Integrity check should succeed for proper usage
-        adapter.verify_integrity().expect("Integrity check should succeed");
+        adapter.verify_integrity().expect(".expect("Integrity check should succeed"));")
     }
 }
 
 /// Test memory growth scenarios
 #[test]
 fn test_memory_adapter_growth() {
-    let memory = Memory::new(1).expect("Memory creation should succeed");
-    let memory = Arc::new(memory);
+    let memory = Memory::new(1).expect(".expect("Memory creation should succeed"));")
+    let memory = Arc::new(memory;
     let adapter = SafeMemoryAdapter::with_verification_level(
         memory.clone(),
         VerificationLevel::Standard,
-    );
+    ;
     
-    let initial_size = adapter.size().expect("Size should be available");
-    let initial_byte_size = adapter.byte_size().expect("Byte size should be available");
+    let initial_size = adapter.size().expect(".expect("Size should be available"));")
+    let initial_byte_size = adapter.byte_size().expect(".expect("Byte size should be available"));")
     
     // Grow memory by 2 pages
-    let grow_result = adapter.grow(2);
+    let grow_result = adapter.grow(2;
     assert!(grow_result.is_ok(), "Memory growth should succeed");
     
-    let new_size = adapter.size().expect("Size should be available after growth");
-    let new_byte_size = adapter.byte_size().expect("Byte size should be available after growth");
+    let new_size = adapter.size().expect(".expect("Size should be available after growth"));")
+    let new_byte_size = adapter.byte_size().expect(".expect("Byte size should be available after growth"));")
     
     assert!(new_size > initial_size, "Size should increase after growth");
     assert!(new_byte_size > initial_byte_size, "Byte size should increase after growth");
     
     // Should be able to store data in the new memory region
     let test_data = vec![42; 100];
-    let store_result = adapter.store(initial_byte_size, &test_data);
+    let store_result = adapter.store(initial_byte_size, &test_data;
     assert!(store_result.is_ok(), "Store in new memory region should succeed");
     
     // Integrity should still be maintained
-    adapter.verify_integrity().expect("Integrity check should succeed after growth");
+    adapter.verify_integrity().expect(".expect("Integrity check should succeed after growth"));")
 }
 
 // Operation enum for test cases

@@ -4,19 +4,40 @@
 // SPDX-License-Identifier: MIT
 
 // ToString comes from prelude
-use wrt_error::ErrorCategory;
+use core::fmt::Debug;
+
+use wrt_error::{
+    ErrorCategory,
+    Result,
+};
 
 #[cfg(feature = "std")]
 use crate::component_type_store::TypeRef;
 // --- Traits needed for BoundedVec items ---
-use crate::traits::{FromBytes, ReadStream, SerializationError, ToBytes, WriteStream};
+use crate::traits::{
+    FromBytes,
+    ReadStream,
+    SerializationError,
+    ToBytes,
+    WriteStream,
+};
 use crate::{
-    bounded::{BoundedVec, WasmName, MAX_WASM_NAME_LENGTH},
+    bounded::{
+        BoundedVec,
+        WasmName,
+        MAX_WASM_NAME_LENGTH,
+    },
     codes,
     prelude::*,
     traits::Checksummable,
-    types::{FuncType, GlobalType, MemoryType, TableType},
-    Error, MemoryProvider, WrtResult,
+    types::{
+        FuncType,
+        GlobalType,
+        MemoryType,
+        TableType,
+    },
+    Error,
+    MemoryProvider,
 };
 
 // Binary std/no_std choice
@@ -44,7 +65,7 @@ impl ToBytes for TypeRef {
         &self,
         writer: &mut WriteStream,
         provider: &P,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.0.to_bytes_with_provider(writer, provider)
     }
 }
@@ -54,7 +75,7 @@ impl FromBytes for TypeRef {
     fn from_bytes_with_provider<P: MemoryProvider>(
         reader: &mut ReadStream,
         provider: &P,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let index = u32::from_bytes_with_provider(reader, provider)?;
         Ok(Self(index))
     }
@@ -84,60 +105,70 @@ use core::marker::PhantomData;
 
 /// Represents the type of a WebAssembly component.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct ComponentType<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
-    pub imports: BoundedVec<Import<P>, MAX_COMPONENT_IMPORTS, P>,
-    pub exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>,
-    pub aliases: BoundedVec<ComponentAlias<P>, MAX_COMPONENT_ALIASES, P>,
-    pub instances: BoundedVec<ComponentInstance<P>, MAX_COMPONENT_INSTANCES, P>,
-    pub core_instances: BoundedVec<CoreInstance<P>, MAX_CORE_INSTANCES, P>,
+pub struct ComponentType<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
+    pub imports:         BoundedVec<Import<P>, MAX_COMPONENT_IMPORTS, P>,
+    pub exports:         BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>,
+    pub aliases:         BoundedVec<ComponentAlias<P>, MAX_COMPONENT_ALIASES, P>,
+    pub instances:       BoundedVec<ComponentInstance<P>, MAX_COMPONENT_INSTANCES, P>,
+    pub core_instances:  BoundedVec<CoreInstance<P>, MAX_CORE_INSTANCES, P>,
     pub component_types: BoundedVec<TypeRef, MAX_COMPONENT_TYPES, P>,
-    pub core_types: BoundedVec<CoreType<P>, MAX_CORE_TYPES, P>,
+    pub core_types:      BoundedVec<CoreType<P>, MAX_CORE_TYPES, P>,
 }
 
 /// Represents an import for a component or core module.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Import<P: MemoryProvider + Default + Clone + PartialEq + Eq>
+pub struct Import<P>
 where
-    P: Clone + Default, // For WasmName default and BoundedVec usage if this struct becomes Default
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug, /* For WasmName default and
+                                                                  * BoundedVec usage if this
+                                                                  * struct becomes Default */
 {
     pub key: ImportKey<P>,
-    pub ty: ExternType<P>,
+    pub ty:  ExternType<P>,
 }
 
 /// Represents an export from a component or core module.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Export<P: MemoryProvider + Default + Clone + PartialEq + Eq>
+pub struct Export<P>
 where
-    P: Clone + Default, // For WasmName default and BoundedVec usage
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug, /* For WasmName default and
+                                                                  * BoundedVec usage */
 {
     pub name: WasmName<MAX_NAME_LEN, P>,
-    pub ty: ExternType<P>,
+    pub ty:   ExternType<P>,
     pub desc: Option<WasmName<MAX_NAME_LEN, P>>,
 }
 
 /// Key for an import, consisting of a namespace and a name.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)] // Hash might be problematic if P is not fixed
-pub struct ImportKey<P: MemoryProvider + Default + Clone + PartialEq + Eq>
+pub struct ImportKey<P>
 where
-    P: Clone + Default, // For WasmName default and Namespace default
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug, /* For WasmName default and
+                                                                  * Namespace default */
 {
     pub namespace: Namespace<P>,
-    pub name: WasmName<MAX_NAME_LEN, P>,
+    pub name:      WasmName<MAX_NAME_LEN, P>,
 }
 
 /// Namespace for imports.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Namespace<P: MemoryProvider + Default + Clone + PartialEq + Eq>
+pub struct Namespace<P>
 where
-    P: Clone + Default, // For BoundedVec default
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug, // For BoundedVec default
 {
     pub elements: BoundedVec<WasmName<MAX_NAME_LEN, P>, MAX_NAMESPACE_ELEMENTS, P>,
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Namespace<P> {
+impl<P> Namespace<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     /// Creates a namespace from a string like "namespace:name".
     /// The provider P must be supplied to construct WasmName instances.
-    pub fn from_str(s: &str, provider: P) -> WrtResult<Self>
+    pub fn from_str(s: &str, provider: P) -> wrt_error::Result<Self>
     where
         P: Clone,
     {
@@ -154,7 +185,10 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Namespace<P> {
 
 /// External types that can be imported or exported.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ExternType<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
+pub enum ExternType<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     Func(FuncType<P>),
     Table(TableType),
     Memory(MemoryType),
@@ -169,9 +203,10 @@ pub enum ExternType<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
 
 /// Type definition for a core module.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct CoreModuleType<P: MemoryProvider + Default + Clone + PartialEq + Eq>
+pub struct CoreModuleType<P>
 where
-    P: Clone + Default, // For BoundedVec default on its fields
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug, /* For BoundedVec default on
+                                                                  * its fields */
 {
     pub imports: BoundedVec<Import<P>, MAX_COMPONENT_IMPORTS, P>,
     pub exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>,
@@ -179,50 +214,60 @@ where
 
 /// Represents an instance type for a component.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct InstanceType<P: MemoryProvider + Default + Clone + PartialEq + Eq>
+pub struct InstanceType<P>
 where
-    P: Clone + Default, // For BoundedVec default on its fields
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug, /* For BoundedVec default on
+                                                                  * its fields */
 {
     pub exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>,
 }
 
 /// Represents an alias in a component.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ComponentAlias<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
+pub enum ComponentAlias<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     InstanceExport(ComponentAliasInstanceExport<P>),
     CoreInstanceExport(ComponentAliasCoreInstanceExport<P>),
     Outer(ComponentAliasOuter),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ComponentAliasInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
+pub struct ComponentAliasInstanceExport<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     pub instance_idx: u32,
-    pub name: WasmName<MAX_NAME_LEN, P>,
-    pub kind: ComponentAliasExportKind,
+    pub name:         WasmName<MAX_NAME_LEN, P>,
+    pub kind:         ComponentAliasExportKind,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ComponentAliasCoreInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
+pub struct ComponentAliasCoreInstanceExport<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     pub core_instance_idx: u32,
-    pub name: WasmName<MAX_NAME_LEN, P>,
+    pub name:              WasmName<MAX_NAME_LEN, P>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, Hash)]
 pub struct ComponentAliasOuter {
     pub count: u32, // Number of levels to go up
     pub index: u32, // Index in the outer component's items (types, instances etc)
-    pub kind: ComponentAliasOuterKind,
+    pub kind:  ComponentAliasOuterKind,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Copy, Hash, Default)]
 #[repr(u8)]
 pub enum ComponentAliasExportKind {
     #[default]
-    Func = 0,
-    Table = 1,
-    Memory = 2,
-    Global = 3,
-    TypeDef = 4,
+    Func     = 0,
+    Table    = 1,
+    Memory   = 2,
+    Global   = 3,
+    TypeDef  = 4,
     Resource = 5, // Added for resource aliasing
 }
 
@@ -230,9 +275,9 @@ pub enum ComponentAliasExportKind {
 #[repr(u8)]
 pub enum ComponentAliasOuterKind {
     #[default]
-    Type = 0,
-    Component = 1,
-    CoreType = 2,
+    Type       = 0,
+    Component  = 1,
+    CoreType   = 2,
     CoreModule = 3,
 }
 
@@ -247,7 +292,7 @@ impl ToBytes for ComponentAliasOuterKind {
         &self,
         writer: &mut WriteStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         writer.write_u8(*self as u8)
     }
 }
@@ -256,17 +301,15 @@ impl FromBytes for ComponentAliasOuterKind {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let byte = reader.read_u8()?;
         match byte {
             0 => Ok(Self::Type),
             1 => Ok(Self::Component),
             2 => Ok(Self::CoreType),
             3 => Ok(Self::CoreModule),
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid byte for ComponentAliasOuterKind",
+            _ => Err(Error::runtime_execution_error(
+                "Invalid component kind discriminant",
             )),
         }
     }
@@ -274,17 +317,23 @@ impl FromBytes for ComponentAliasOuterKind {
 
 /// Represents a component instance declaration within a component.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct ComponentInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
+pub struct ComponentInstance<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     pub kind: ComponentInstanceKind<P>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub enum ComponentInstanceKind<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
+pub enum ComponentInstanceKind<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     #[default]
     Unknown,
     Instantiate {
         component_idx: u32,
-        args: BoundedVec<ComponentInstantiationArg<P>, MAX_COMPONENT_IMPORTS, P>,
+        args:          BoundedVec<ComponentInstantiationArg<P>, MAX_COMPONENT_IMPORTS, P>,
     },
     FromExports {
         exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>,
@@ -292,25 +341,34 @@ pub enum ComponentInstanceKind<P: MemoryProvider + Default + Clone + PartialEq +
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct ComponentInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
-    pub name: WasmName<MAX_NAME_LEN, P>,
+pub struct ComponentInstantiationArg<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
+    pub name:  WasmName<MAX_NAME_LEN, P>,
     pub index: u32, // Index of the item being passed as argument (e.g. func_idx, table_idx)
-    pub kind: ExternKind, // The kind of the item being passed
+    pub kind:  ExternKind, // The kind of the item being passed
 }
 
 /// Represents a core WebAssembly module instance declaration.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct CoreInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
+pub struct CoreInstance<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     pub kind: CoreInstanceKind<P>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub enum CoreInstanceKind<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
+pub enum CoreInstanceKind<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     #[default]
     Unknown,
     Instantiate {
         module_idx: u32, // Index of the core module type
-        args: BoundedVec<CoreInstantiationArg<P>, MAX_COMPONENT_IMPORTS, P>,
+        args:       BoundedVec<CoreInstantiationArg<P>, MAX_COMPONENT_IMPORTS, P>,
     },
     FromExports {
         exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>,
@@ -318,15 +376,21 @@ pub enum CoreInstanceKind<P: MemoryProvider + Default + Clone + PartialEq + Eq> 
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct CoreInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
-    pub name: WasmName<MAX_NAME_LEN, P>,
+pub struct CoreInstantiationArg<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
+    pub name:  WasmName<MAX_NAME_LEN, P>,
     pub index: u32,
-    pub kind: ExternKind,
+    pub kind:  ExternKind,
 }
 
 /// Represents a core type definition (func, table, memory, global, tag).
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub enum CoreType<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
+pub enum CoreType<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     #[default]
     Unknown,
     Func(FuncType<P>),
@@ -341,16 +405,16 @@ pub enum CoreType<P: MemoryProvider + Default + Clone + PartialEq + Eq> {
 #[repr(u8)]
 pub enum ExternKind {
     #[default]
-    Func = 0,
-    Table = 1,
-    Memory = 2,
-    Global = 3,
-    Tag = 4,
-    Component = 5,
-    Instance = 6,
+    Func       = 0,
+    Table      = 1,
+    Memory     = 2,
+    Global     = 3,
+    Tag        = 4,
+    Component  = 5,
+    Instance   = 6,
     CoreModule = 7,
-    TypeDef = 8,
-    Resource = 9,
+    TypeDef    = 8,
+    Resource   = 9,
 }
 
 impl Checksummable for ExternKind {
@@ -364,7 +428,7 @@ impl ToBytes for ExternKind {
         &self,
         writer: &mut WriteStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         writer.write_u8(*self as u8)
     }
 }
@@ -373,7 +437,7 @@ impl FromBytes for ExternKind {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let byte = reader.read_u8()?;
         match byte {
             0 => Ok(Self::Func),
@@ -389,7 +453,7 @@ impl FromBytes for ExternKind {
             _ => Err(Error::new(
                 ErrorCategory::Parse,
                 codes::INVALID_VALUE,
-                "Invalid byte for ExternKind",
+                "Invalid enum value",
             )),
         }
     }
@@ -419,10 +483,10 @@ impl<P: MemoryProvider> Default for ResourceType<P> {
 //     ExternType<P>: Checksummable, // This will be complex for an enum
 // {
 //     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
-//         self.name.update_checksum(checksum);
-//         self.ty.update_checksum(checksum);
+//         self.name.update_checksum(checksum;
+//         self.ty.update_checksum(checksum;
 //         if let Some(desc) = &self.desc {
-//             desc.update_checksum(checksum);
+//             desc.update_checksum(checksum;
 //         } else {
 //             // Handle None case for checksum, perhaps a specific byte pattern
 //             checksum.consume(&[0u8]); // Example
@@ -437,24 +501,33 @@ impl<P: MemoryProvider> Default for ResourceType<P> {
 // --- Default Implementations ---
 
 // Default for Import<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for Import<P> {
+impl<P> Default for Import<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn default() -> Self {
         // Assumes ImportKey<P> and ExternType<P> have correct Default impls
         // that satisfy their own P bounds (including Eq if needed by their fields like
         // WasmName).
-        Self { key: ImportKey::default(), ty: ExternType::default() }
+        Self {
+            key: ImportKey::default(),
+            ty:  ExternType::default(),
+        }
     }
 }
 
 // TODO: Implement Checksummable, ToBytes, FromBytes for Import<P>
 
 // Default for Export<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for Export<P> {
+impl<P> Default for Export<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn default() -> Self {
         // Assumes WasmName<P> and ExternType<P> have correct Default impls.
         Self {
             name: WasmName::default(),
-            ty: ExternType::default(),
+            ty:   ExternType::default(),
             desc: None, // Option<WasmName> can be None by default
         }
     }
@@ -463,14 +536,23 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for Export<P>
 // TODO: Implement Checksummable, ToBytes, FromBytes for Export<P>
 
 // Default for ImportKey<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for ImportKey<P> {
+impl<P> Default for ImportKey<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn default() -> Self {
-        Self { namespace: Namespace::default(), name: WasmName::default() }
+        Self {
+            namespace: Namespace::default(),
+            name:      WasmName::default(),
+        }
     }
 }
 
 // Default for Namespace<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for Namespace<P> {
+impl<P> Default for Namespace<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn default() -> Self {
         Self {
             elements: BoundedVec::default(), // BoundedVec is now Default
@@ -479,7 +561,10 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for Namespace
 }
 
 // Default for ExternType<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for ExternType<P> {
+impl<P> Default for ExternType<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn default() -> Self {
         // Defaulting to a simple variant, e.g., TypeDef with a default TypeRef.
         // FuncType<P> would require P: Debug for its Default, which is specific.
@@ -489,7 +574,10 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for ExternTyp
 }
 
 // Default for ComponentAlias<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for ComponentAlias<P> {
+impl<P> Default for ComponentAlias<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn default() -> Self {
         // Preferring the more specific default from Outer variant if that's intended
         // Or, provide a more sensible default based on typical usage.
@@ -499,32 +587,34 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for Component
 }
 
 // Default for ComponentAliasCoreInstanceExport<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default
-    for ComponentAliasCoreInstanceExport<P>
+impl<P> Default for ComponentAliasCoreInstanceExport<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
 {
     fn default() -> Self {
         Self {
             core_instance_idx: 0,
-            name: WasmName::default(), // Assuming WasmName has a suitable default
+            name:              WasmName::default(), // Assuming WasmName has a suitable default
         }
     }
 }
 
 // Default for ComponentAliasInstanceExport<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default
-    for ComponentAliasInstanceExport<P>
+impl<P> Default for ComponentAliasInstanceExport<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
 {
     fn default() -> Self {
         Self {
             instance_idx: 0,
-            name: WasmName::default(), // Assuming WasmName also has a sensible Default
-            kind: ComponentAliasExportKind::default(),
+            name:         WasmName::default(), // Assuming WasmName also has a sensible Default
+            kind:         ComponentAliasExportKind::default(),
         }
     }
 }
 
 // Default for CoreModuleType<P>
-// impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for
+// impl<P> Default for
 // CoreModuleType<P> { fn default() -> Self {
 // Self {
 // imports: BoundedVec::default(),
@@ -535,7 +625,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default
 
 // TODO: Implement Checksummable, ToBytes, FromBytes for CoreModuleType<P>
 
-// impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Default for
+// impl<P> Default for
 // InstanceType<P> { fn default() -> Self {
 // Self {
 // exports: BoundedVec::default(),
@@ -604,7 +694,7 @@ macro_rules! impl_tobytes_struct {
                 &self,
                 writer: &mut WriteStream<'a>,
                 provider: &PStream,
-            ) -> WrtResult<()> {
+            ) -> wrt_error::Result<()> {
                 $( self.$field.to_bytes_with_provider(writer, provider)?; )+
                 Ok(())
             }
@@ -617,7 +707,7 @@ macro_rules! impl_tobytes_struct {
                 &self,
                 writer: &mut WriteStream<'a>,
                 provider: &PStream,
-            ) -> WrtResult<()> {
+            ) -> wrt_error::Result<()> {
                 $( self.$field.to_bytes_with_provider(writer, provider)?; )+
                 Ok(())
             }
@@ -630,7 +720,7 @@ macro_rules! impl_tobytes_struct {
                 &self,
                 writer: &mut WriteStream<'a>,
                 provider: &PStream,
-            ) -> WrtResult<()> {
+            ) -> wrt_error::Result<()> {
                 $( self.$field.to_bytes_with_provider(writer, provider)?; )+
                 Ok(())
             }
@@ -646,7 +736,7 @@ macro_rules! impl_frombytes_struct {
             fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
                 reader: &mut ReadStream<'a>,
                 provider: &PStream,
-            ) -> WrtResult<Self> {
+            ) -> wrt_error::Result<Self> {
                 $(
                     let $field = <$fieldtype>::from_bytes_with_provider(reader, provider)?;
                 )+
@@ -660,7 +750,7 @@ macro_rules! impl_frombytes_struct {
             fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
                 reader: &mut ReadStream<'a>,
                 provider: &PStream,
-            ) -> WrtResult<Self> {
+            ) -> wrt_error::Result<Self> {
                 $(
                     let $field = <$fieldtype>::from_bytes_with_provider(reader, provider)?;
                 )+
@@ -674,7 +764,7 @@ macro_rules! impl_frombytes_struct {
             fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
                 reader: &mut ReadStream<'a>,
                 provider: &PStream,
-            ) -> WrtResult<Self> {
+            ) -> wrt_error::Result<Self> {
                 $(
                     let $field = <$fieldtype>::from_bytes_with_provider(reader, provider)?;
                 )+
@@ -686,12 +776,15 @@ macro_rules! impl_frombytes_struct {
 }
 
 // Import<P>
-impl_checksummable_struct!(Import<P: MemoryProvider + Default + Clone + PartialEq + Eq>, key, ty);
-impl_tobytes_struct!(Import<P: MemoryProvider + Default + Clone + PartialEq + Eq>, key, ty);
-impl_frombytes_struct!(Import<P: MemoryProvider + Default + Clone + PartialEq + Eq>, key: ImportKey<P>, ty: ExternType<P>);
+impl_checksummable_struct!(Import<P: MemoryProvider + Clone + Default + Eq + Debug>, key, ty);
+impl_tobytes_struct!(Import<P: MemoryProvider + Clone + Default + Eq + Debug>, key, ty);
+impl_frombytes_struct!(Import<P: MemoryProvider + Clone + Default + Eq + Debug>, key: ImportKey<P>, ty: ExternType<P>);
 
 // Export<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Export<P> {
+impl<P> Checksummable for Export<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
         self.name.update_checksum(checksum);
         self.ty.update_checksum(checksum);
@@ -699,12 +792,15 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Exp
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ToBytes for Export<P> {
+impl<P> ToBytes for Export<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn to_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.name.to_bytes_with_provider(writer, provider)?;
         self.ty.to_bytes_with_provider(writer, provider)?;
         self.desc.to_bytes_with_provider(writer, provider)?;
@@ -713,11 +809,14 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ToBytes for Export<P>
     // to_bytes is provided by the trait
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for Export<P> {
+impl<P> FromBytes for Export<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let name = WasmName::<MAX_NAME_LEN, P>::from_bytes_with_provider(reader, provider)?;
         let ty = ExternType::<P>::from_bytes_with_provider(reader, provider)?;
         let desc = Option::<WasmName<MAX_NAME_LEN, P>>::from_bytes_with_provider(reader, provider)?;
@@ -727,19 +826,22 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for Export<
 }
 
 // ImportKey<P>
-impl_checksummable_struct!(ImportKey<P: MemoryProvider + Default + Clone + PartialEq + Eq>, namespace, name);
-impl_tobytes_struct!(ImportKey<P: MemoryProvider + Default + Clone + PartialEq + Eq>, namespace, name);
-impl_frombytes_struct!(ImportKey<P: MemoryProvider + Default + Clone + PartialEq + Eq>, namespace: Namespace<P>, name: WasmName<MAX_NAME_LEN, P>);
+impl_checksummable_struct!(ImportKey<P: MemoryProvider + Clone + Default + Eq + Debug>, namespace, name);
+impl_tobytes_struct!(ImportKey<P: MemoryProvider + Clone + Default + Eq + Debug>, namespace, name);
+impl_frombytes_struct!(ImportKey<P: MemoryProvider + Clone + Default + Eq + Debug>, namespace: Namespace<P>, name: WasmName<MAX_NAME_LEN, P>);
 
 // Namespace<P>
-impl_checksummable_struct!(Namespace<P: MemoryProvider + Default + Clone + PartialEq + Eq>, elements);
-impl_tobytes_struct!(Namespace<P: MemoryProvider + Default + Clone + PartialEq + Eq>, elements);
-impl_frombytes_struct!(Namespace<P: MemoryProvider + Default + Clone + PartialEq + Eq>,
+impl_checksummable_struct!(Namespace<P: MemoryProvider + Clone + Default + Eq + Debug>, elements);
+impl_tobytes_struct!(Namespace<P: MemoryProvider + Clone + Default + Eq + Debug>, elements);
+impl_frombytes_struct!(Namespace<P: MemoryProvider + Clone + Default + Eq + Debug>,
     elements: BoundedVec<WasmName<MAX_NAME_LEN, P>, MAX_NAMESPACE_ELEMENTS, P>
 );
 
 // ExternType<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for ExternType<P> {
+impl<P> Checksummable for ExternType<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
         let discriminant_byte = match self {
             ExternType::Func(_) => 0u8,
@@ -770,99 +872,123 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Ext
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ToBytes for ExternType<P> {
+impl<P> ToBytes for ExternType<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn to_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         match self {
             ExternType::Func(ft) => {
                 writer.write_u8(0)?;
                 ft.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ExternType::Table(tt) => {
                 writer.write_u8(1)?;
                 tt.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ExternType::Memory(mt) => {
                 writer.write_u8(2)?;
                 mt.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ExternType::Global(gt) => {
                 writer.write_u8(3)?;
                 gt.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ExternType::Tag(ty) => {
                 // Was FuncType<P>
                 writer.write_u8(4)?;
                 ty.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ExternType::Component(ct) => {
                 writer.write_u8(5)?;
                 ct.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ExternType::Instance(it) => {
                 writer.write_u8(6)?;
                 it.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ExternType::CoreModule(cmt) => {
                 writer.write_u8(7)?;
                 cmt.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ExternType::TypeDef(tdt) => {
                 // This is TypeRef
                 writer.write_u8(8)?;
                 tdt.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ExternType::Resource(rt) => {
                 // This is ResourceType<P>
                 writer.write_u8(9)?;
                 rt.to_bytes_with_provider(writer, provider)?;
-            }
+            },
         }
         Ok(())
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for ExternType<P> {
+impl<P> FromBytes for ExternType<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let variant_tag = reader.read_u8()?;
         match variant_tag {
-            0 => Ok(Self::Func(FuncType::<P>::from_bytes_with_provider(reader, provider)?)),
-            1 => Ok(Self::Table(TableType::from_bytes_with_provider(reader, provider)?)),
-            2 => Ok(Self::Memory(MemoryType::from_bytes_with_provider(reader, provider)?)),
-            3 => Ok(Self::Global(GlobalType::from_bytes_with_provider(reader, provider)?)),
-            4 => Ok(Self::Tag(FuncType::<P>::from_bytes_with_provider(reader, provider)?)), /* Was FuncType<P> */
-            5 => Ok(Self::Component(TypeRef::from_bytes_with_provider(reader, provider)?)),
-            6 => Ok(Self::Instance(TypeRef::from_bytes_with_provider(reader, provider)?)),
-            7 => Ok(Self::CoreModule(TypeRef::from_bytes_with_provider(reader, provider)?)),
-            8 => Ok(Self::TypeDef(TypeRef::from_bytes_with_provider(reader, provider)?)), /* This is TypeRef */
-            9 => Ok(Self::Resource(ResourceType::<P>::from_bytes_with_provider(reader, provider)?)), /* This is ResourceType<P> */
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
-                "Invalid variant tag for ExternType",
+            0 => Ok(Self::Func(FuncType::<P>::from_bytes_with_provider(
+                reader, provider,
+            )?)),
+            1 => Ok(Self::Table(TableType::from_bytes_with_provider(
+                reader, provider,
+            )?)),
+            2 => Ok(Self::Memory(MemoryType::from_bytes_with_provider(
+                reader, provider,
+            )?)),
+            3 => Ok(Self::Global(GlobalType::from_bytes_with_provider(
+                reader, provider,
+            )?)),
+            4 => Ok(Self::Tag(FuncType::<P>::from_bytes_with_provider(
+                reader, provider,
+            )?)), // Was FuncType<P>
+            5 => Ok(Self::Component(TypeRef::from_bytes_with_provider(
+                reader, provider,
+            )?)),
+            6 => Ok(Self::Instance(TypeRef::from_bytes_with_provider(
+                reader, provider,
+            )?)),
+            7 => Ok(Self::CoreModule(TypeRef::from_bytes_with_provider(
+                reader, provider,
+            )?)),
+            8 => Ok(Self::TypeDef(TypeRef::from_bytes_with_provider(
+                reader, provider,
+            )?)), // This is TypeRef
+            9 => Ok(Self::Resource(ResourceType::<P>::from_bytes_with_provider(
+                reader, provider,
+            )?)), // This is ResourceType<P>
+            _ => Err(Error::runtime_execution_error(
+                "Invalid component type kind discriminant",
             )),
         }
     }
 }
 
 // CoreModuleType<P>
-impl_checksummable_struct!(CoreModuleType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports);
-impl_tobytes_struct!(CoreModuleType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports);
-impl_frombytes_struct!(CoreModuleType<P: MemoryProvider + Default + Clone + PartialEq + Eq>,
+impl_checksummable_struct!(CoreModuleType<P: MemoryProvider + Clone + Default + Eq + Debug>, imports, exports);
+impl_tobytes_struct!(CoreModuleType<P: MemoryProvider + Clone + Default + Eq + Debug>, imports, exports);
+impl_frombytes_struct!(CoreModuleType<P: MemoryProvider + Clone + Default + Eq + Debug>,
     imports: BoundedVec<Import<P>, MAX_COMPONENT_IMPORTS, P>,
     exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>
 );
 
 // InstanceType<P>
-impl_checksummable_struct!(InstanceType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, exports);
-impl_tobytes_struct!(InstanceType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, exports);
-impl_frombytes_struct!(InstanceType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>);
+impl_checksummable_struct!(InstanceType<P: MemoryProvider + Clone + Default + Eq + Debug>, exports);
+impl_tobytes_struct!(InstanceType<P: MemoryProvider + Clone + Default + Eq + Debug>, exports);
+impl_frombytes_struct!(InstanceType<P: MemoryProvider + Clone + Default + Eq + Debug>, exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>);
 
 // ResourceType<P>
 impl<P: MemoryProvider> Checksummable for ResourceType<P> {
@@ -876,7 +1002,7 @@ impl<P: MemoryProvider> ToBytes for ResourceType<P> {
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream, // Pass provider along to u32's method
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.0.to_bytes_with_provider(writer, provider)
     }
     // to_bytes is provided by the trait
@@ -886,7 +1012,7 @@ impl<P: MemoryProvider> FromBytes for ResourceType<P> {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream, // Pass provider along to u32's method
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let val = u32::from_bytes_with_provider(reader, provider)?;
         Ok(ResourceType(val, PhantomData))
     }
@@ -905,7 +1031,7 @@ impl ToBytes for ComponentAliasExportKind {
         &self,
         writer: &mut WriteStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         writer.write_u8(*self as u8)
     }
 }
@@ -914,7 +1040,7 @@ impl FromBytes for ComponentAliasExportKind {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         _provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let byte = reader.read_u8()?;
         match byte {
             0 => Ok(Self::Func),
@@ -926,24 +1052,27 @@ impl FromBytes for ComponentAliasExportKind {
             _ => Err(Error::new(
                 ErrorCategory::Parse,
                 codes::INVALID_VALUE,
-                "Invalid byte for ComponentAliasExportKind",
+                "Invalid enum value",
             )),
         }
     }
 }
 
 // ComponentAliasCoreInstanceExport<P>
-impl_checksummable_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, core_instance_idx, name);
-impl_tobytes_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, core_instance_idx, name);
-impl_frombytes_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, core_instance_idx: u32, name: WasmName<MAX_NAME_LEN, P>);
+impl_checksummable_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Clone + Default + Eq + Debug>, core_instance_idx, name);
+impl_tobytes_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Clone + Default + Eq + Debug>, core_instance_idx, name);
+impl_frombytes_struct!(ComponentAliasCoreInstanceExport<P: MemoryProvider + Clone + Default + Eq + Debug>, core_instance_idx: u32, name: WasmName<MAX_NAME_LEN, P>);
 
 // ComponentAliasInstanceExport<P>
-impl_checksummable_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, instance_idx, name, kind);
-impl_tobytes_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, instance_idx, name, kind);
-impl_frombytes_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Default + Clone + PartialEq + Eq>, instance_idx: u32, name: WasmName<MAX_NAME_LEN, P>, kind: ComponentAliasExportKind);
+impl_checksummable_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Clone + Default + Eq + Debug>, instance_idx, name, kind);
+impl_tobytes_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Clone + Default + Eq + Debug>, instance_idx, name, kind);
+impl_frombytes_struct!(ComponentAliasInstanceExport<P: MemoryProvider + Clone + Default + Eq + Debug>, instance_idx: u32, name: WasmName<MAX_NAME_LEN, P>, kind: ComponentAliasExportKind);
 
 // ComponentAlias<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for ComponentAlias<P> {
+impl<P> Checksummable for ComponentAlias<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
         let discriminant_byte = match self {
             ComponentAlias::InstanceExport(_) => 0u8,
@@ -959,56 +1088,60 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Com
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ToBytes for ComponentAlias<P> {
+impl<P> ToBytes for ComponentAlias<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn to_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         match self {
             ComponentAlias::InstanceExport(e) => {
                 writer.write_u8(0)?;
                 e.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ComponentAlias::CoreInstanceExport(e) => {
                 writer.write_u8(1)?;
                 e.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ComponentAlias::Outer(e) => {
                 writer.write_u8(2)?;
                 e.to_bytes_with_provider(writer, provider)?;
-            }
+            },
         }
         Ok(())
     }
     // to_bytes is provided by the trait
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for ComponentAlias<P> {
+impl<P> FromBytes for ComponentAlias<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let variant_idx = reader.read_u8()?;
         match variant_idx {
             0 => {
                 let inner =
                     ComponentAliasInstanceExport::<P>::from_bytes_with_provider(reader, provider)?;
                 Ok(ComponentAlias::InstanceExport(inner))
-            }
+            },
             1 => {
                 let inner = ComponentAliasCoreInstanceExport::<P>::from_bytes_with_provider(
                     reader, provider,
                 )?;
                 Ok(ComponentAlias::CoreInstanceExport(inner))
-            }
+            },
             2 => {
                 let inner = ComponentAliasOuter::from_bytes_with_provider(reader, provider)?;
                 Ok(ComponentAlias::Outer(inner))
-            }
-            _ => Err(Error::new(
-                ErrorCategory::Parse,
-                codes::INVALID_VALUE,
+            },
+            _ => Err(Error::runtime_execution_error(
                 "Invalid variant index for ComponentAlias",
             )),
         }
@@ -1017,8 +1150,9 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for Compone
 }
 
 // ComponentInstanceKind<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable
-    for ComponentInstanceKind<P>
+impl<P> Checksummable for ComponentInstanceKind<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
 {
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
         let discriminant_byte = match self {
@@ -1029,76 +1163,91 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable
         discriminant_byte.update_checksum(checksum);
 
         match self {
-            ComponentInstanceKind::Unknown => {} // No data to checksum
-            ComponentInstanceKind::Instantiate { component_idx, args } => {
+            ComponentInstanceKind::Unknown => {}, // No data to checksum
+            ComponentInstanceKind::Instantiate {
+                component_idx,
+                args,
+            } => {
                 component_idx.update_checksum(checksum);
                 args.update_checksum(checksum);
-            }
+            },
             ComponentInstanceKind::FromExports { exports } => {
                 exports.update_checksum(checksum);
-            }
+            },
         }
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ToBytes for ComponentInstanceKind<P> {
+impl<P> ToBytes for ComponentInstanceKind<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn to_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         match self {
             ComponentInstanceKind::Unknown => {
                 writer.write_u8(0)?;
-            }
-            ComponentInstanceKind::Instantiate { component_idx, args } => {
+            },
+            ComponentInstanceKind::Instantiate {
+                component_idx,
+                args,
+            } => {
                 writer.write_u8(1)?;
                 writer.write_u32_le(*component_idx)?;
                 args.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             ComponentInstanceKind::FromExports { exports } => {
                 writer.write_u8(2)?;
                 exports.to_bytes_with_provider(writer, provider)?;
-            }
+            },
         }
         Ok(())
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for ComponentInstanceKind<P> {
+impl<P> FromBytes for ComponentInstanceKind<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let discriminant = reader.read_u8()?;
         match discriminant {
             0 => Ok(ComponentInstanceKind::Unknown),
             1 => {
                 let component_idx = reader.read_u32_le()?;
                 let args = BoundedVec::<ComponentInstantiationArg<P>, MAX_COMPONENT_IMPORTS, P>::from_bytes_with_provider(reader, provider)?;
-                Ok(ComponentInstanceKind::Instantiate { component_idx, args })
-            }
+                Ok(ComponentInstanceKind::Instantiate {
+                    component_idx,
+                    args,
+                })
+            },
             2 => {
                 let exports =
                     BoundedVec::<Export<P>, MAX_COMPONENT_EXPORTS, P>::from_bytes_with_provider(
                         reader, provider,
                     )?;
                 Ok(ComponentInstanceKind::FromExports { exports })
-            }
+            },
             _ => Err(SerializationError::InvalidFormat.into()),
         }
     }
 }
 
 // ComponentInstance<P>
-impl_checksummable_struct!(ComponentInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind);
-impl_tobytes_struct!(ComponentInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind);
-impl_frombytes_struct!(ComponentInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind: ComponentInstanceKind<P>);
+impl_checksummable_struct!(ComponentInstance<P: MemoryProvider + Clone + Default + Eq + Debug>, kind);
+impl_tobytes_struct!(ComponentInstance<P: MemoryProvider + Clone + Default + Eq + Debug>, kind);
+impl_frombytes_struct!(ComponentInstance<P: MemoryProvider + Clone + Default + Eq + Debug>, kind: ComponentInstanceKind<P>);
 
 // ComponentType<P>
-impl_checksummable_struct!(ComponentType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports, aliases, instances, core_instances, component_types, core_types);
-impl_tobytes_struct!(ComponentType<P: MemoryProvider + Default + Clone + PartialEq + Eq>, imports, exports, aliases, instances, core_instances, component_types, core_types);
-impl_frombytes_struct!(ComponentType<P: MemoryProvider + Default + Clone + PartialEq + Eq>,
+impl_checksummable_struct!(ComponentType<P: MemoryProvider + Clone + Default + Eq + Debug>, imports, exports, aliases, instances, core_instances, component_types, core_types);
+impl_tobytes_struct!(ComponentType<P: MemoryProvider + Clone + Default + Eq + Debug>, imports, exports, aliases, instances, core_instances, component_types, core_types);
+impl_frombytes_struct!(ComponentType<P: MemoryProvider + Clone + Default + Eq + Debug>,
     imports: BoundedVec<Import<P>, MAX_COMPONENT_IMPORTS, P>,
     exports: BoundedVec<Export<P>, MAX_COMPONENT_EXPORTS, P>,
     aliases: BoundedVec<ComponentAlias<P>, MAX_COMPONENT_ALIASES, P>,
@@ -1109,7 +1258,10 @@ impl_frombytes_struct!(ComponentType<P: MemoryProvider + Default + Clone + Parti
 );
 
 // CoreInstanceKind<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for CoreInstanceKind<P> {
+impl<P> Checksummable for CoreInstanceKind<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
         let discriminant_byte = match self {
             CoreInstanceKind::Unknown => 0u8,
@@ -1119,47 +1271,53 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Cor
         discriminant_byte.update_checksum(checksum);
 
         match self {
-            CoreInstanceKind::Unknown => {} // No data to checksum
+            CoreInstanceKind::Unknown => {}, // No data to checksum
             CoreInstanceKind::Instantiate { module_idx, args } => {
                 module_idx.update_checksum(checksum);
                 args.update_checksum(checksum);
-            }
+            },
             CoreInstanceKind::FromExports { exports } => {
                 exports.update_checksum(checksum);
-            }
+            },
         }
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ToBytes for CoreInstanceKind<P> {
+impl<P> ToBytes for CoreInstanceKind<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn to_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         match self {
             CoreInstanceKind::Unknown => {
                 writer.write_u8(0)?;
-            }
+            },
             CoreInstanceKind::Instantiate { module_idx, args } => {
                 writer.write_u8(1)?;
                 writer.write_u32_le(*module_idx)?;
                 args.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             CoreInstanceKind::FromExports { exports } => {
                 writer.write_u8(2)?;
                 exports.to_bytes_with_provider(writer, provider)?;
-            }
+            },
         }
         Ok(())
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for CoreInstanceKind<P> {
+impl<P> FromBytes for CoreInstanceKind<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let discriminant = reader.read_u8()?;
         match discriminant {
             0 => Ok(CoreInstanceKind::Unknown),
@@ -1167,26 +1325,29 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for CoreIns
                 let module_idx = reader.read_u32_le()?;
                 let args = BoundedVec::<CoreInstantiationArg<P>, MAX_COMPONENT_IMPORTS, P>::from_bytes_with_provider(reader, provider)?;
                 Ok(CoreInstanceKind::Instantiate { module_idx, args })
-            }
+            },
             2 => {
                 let exports =
                     BoundedVec::<Export<P>, MAX_COMPONENT_EXPORTS, P>::from_bytes_with_provider(
                         reader, provider,
                     )?;
                 Ok(CoreInstanceKind::FromExports { exports })
-            }
+            },
             _ => Err(SerializationError::InvalidFormat.into()),
         }
     }
 }
 
 // CoreInstance<P>
-impl_checksummable_struct!(CoreInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind);
-impl_tobytes_struct!(CoreInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind);
-impl_frombytes_struct!(CoreInstance<P: MemoryProvider + Default + Clone + PartialEq + Eq>, kind: CoreInstanceKind<P>);
+impl_checksummable_struct!(CoreInstance<P: MemoryProvider + Clone + Default + Eq + Debug>, kind);
+impl_tobytes_struct!(CoreInstance<P: MemoryProvider + Clone + Default + Eq + Debug>, kind);
+impl_frombytes_struct!(CoreInstance<P: MemoryProvider + Clone + Default + Eq + Debug>, kind: CoreInstanceKind<P>);
 
 // CoreType<P>
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for CoreType<P> {
+impl<P> Checksummable for CoreType<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn update_checksum(&self, checksum: &mut crate::verification::Checksum) {
         let discriminant_byte = match self {
             CoreType::Unknown => 0u8,
@@ -1200,7 +1361,7 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Cor
         discriminant_byte.update_checksum(checksum);
 
         match self {
-            CoreType::Unknown => {} // No data
+            CoreType::Unknown => {}, // No data
             CoreType::Func(ft) => ft.update_checksum(checksum),
             CoreType::Table(tt) => tt.update_checksum(checksum),
             CoreType::Memory(mt) => mt.update_checksum(checksum),
@@ -1210,70 +1371,76 @@ impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> Checksummable for Cor
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> ToBytes for CoreType<P> {
+impl<P> ToBytes for CoreType<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn to_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         match self {
             CoreType::Unknown => {
                 writer.write_u8(0)?;
-            }
+            },
             CoreType::Func(ft) => {
                 writer.write_u8(1)?;
                 ft.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             CoreType::Table(tt) => {
                 writer.write_u8(2)?;
                 tt.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             CoreType::Memory(mt) => {
                 writer.write_u8(3)?;
                 mt.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             CoreType::Global(gt) => {
                 writer.write_u8(4)?;
                 gt.to_bytes_with_provider(writer, provider)?;
-            }
+            },
             CoreType::Tag(tag_ft) => {
                 // Assuming Tag is a FuncType variant for now
                 writer.write_u8(5)?;
                 tag_ft.to_bytes_with_provider(writer, provider)?;
-            }
+            },
         }
         Ok(())
     }
 }
 
-impl<P: MemoryProvider + Default + Clone + PartialEq + Eq> FromBytes for CoreType<P> {
+impl<P> FromBytes for CoreType<P>
+where
+    P: MemoryProvider + Clone + Default + Eq + core::fmt::Debug,
+{
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let discriminant = reader.read_u8()?;
         match discriminant {
             0 => Ok(CoreType::Unknown),
             1 => {
                 let ft = FuncType::<P>::from_bytes_with_provider(reader, provider)?;
                 Ok(CoreType::Func(ft))
-            }
+            },
             2 => {
                 let tt = TableType::from_bytes_with_provider(reader, provider)?;
                 Ok(CoreType::Table(tt))
-            }
+            },
             3 => {
                 let mt = MemoryType::from_bytes_with_provider(reader, provider)?;
                 Ok(CoreType::Memory(mt))
-            }
+            },
             4 => {
                 let gt = GlobalType::from_bytes_with_provider(reader, provider)?;
                 Ok(CoreType::Global(gt))
-            }
+            },
             5 => {
                 let tag_ft = FuncType::<P>::from_bytes_with_provider(reader, provider)?;
                 Ok(CoreType::Tag(tag_ft))
-            }
+            },
             _ => Err(SerializationError::InvalidFormat.into()),
         }
     }
@@ -1294,7 +1461,7 @@ impl ToBytes for ComponentAliasOuter {
         &self,
         writer: &mut WriteStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<()> {
+    ) -> wrt_error::Result<()> {
         self.count.to_bytes_with_provider(writer, provider)?;
         self.index.to_bytes_with_provider(writer, provider)?;
         self.kind.to_bytes_with_provider(writer, provider)?;
@@ -1306,7 +1473,7 @@ impl FromBytes for ComponentAliasOuter {
     fn from_bytes_with_provider<'a, PStream: crate::MemoryProvider>(
         reader: &mut ReadStream<'a>,
         provider: &PStream,
-    ) -> WrtResult<Self> {
+    ) -> wrt_error::Result<Self> {
         let count = u32::from_bytes_with_provider(reader, provider)?;
         let index = u32::from_bytes_with_provider(reader, provider)?;
         let kind = ComponentAliasOuterKind::from_bytes_with_provider(reader, provider)?;
@@ -1316,11 +1483,11 @@ impl FromBytes for ComponentAliasOuter {
 }
 
 // ComponentInstantiationArg<P>
-impl_checksummable_struct!(ComponentInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind);
-impl_tobytes_struct!(ComponentInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind);
-impl_frombytes_struct!(ComponentInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name: WasmName<MAX_NAME_LEN, P>, index: u32, kind: ExternKind);
+impl_checksummable_struct!(ComponentInstantiationArg<P: MemoryProvider + Clone + Default + Eq + Debug>, name, index, kind);
+impl_tobytes_struct!(ComponentInstantiationArg<P: MemoryProvider + Clone + Default + Eq + Debug>, name, index, kind);
+impl_frombytes_struct!(ComponentInstantiationArg<P: MemoryProvider + Clone + Default + Eq + Debug>, name: WasmName<MAX_NAME_LEN, P>, index: u32, kind: ExternKind);
 
 // CoreInstantiationArg<P>
-impl_checksummable_struct!(CoreInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind);
-impl_tobytes_struct!(CoreInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name, index, kind);
-impl_frombytes_struct!(CoreInstantiationArg<P: MemoryProvider + Default + Clone + PartialEq + Eq>, name: WasmName<MAX_NAME_LEN, P>, index: u32, kind: ExternKind);
+impl_checksummable_struct!(CoreInstantiationArg<P: MemoryProvider + Clone + Default + Eq + Debug>, name, index, kind);
+impl_tobytes_struct!(CoreInstantiationArg<P: MemoryProvider + Clone + Default + Eq + Debug>, name, index, kind);
+impl_frombytes_struct!(CoreInstantiationArg<P: MemoryProvider + Clone + Default + Eq + Debug>, name: WasmName<MAX_NAME_LEN, P>, index: u32, kind: ExternKind);

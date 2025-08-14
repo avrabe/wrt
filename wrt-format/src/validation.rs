@@ -2,15 +2,18 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-#[cfg(feature = "std")]
-use std::vec::Vec;
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+#[cfg(feature = "std")]
+use std::vec::Vec;
 
 use wrt_error::Result;
 // For pure no_std mode, we'll make validation work with bounded collections
 #[cfg(not(any(feature = "std")))]
-use wrt_foundation::{BoundedCapacity, BoundedVec};
+use wrt_foundation::{
+    BoundedCapacity,
+    BoundedVec,
+};
 
 /// Trait for types that can be validated
 pub trait Validatable {
@@ -40,7 +43,7 @@ impl<T: Validatable> Validatable for Vec<T> {
 }
 
 /// Simple validation helper for BoundedVec<T> where T is Validatable
-#[cfg(not(any(feature = "std", )))]
+#[cfg(not(any(feature = "std",)))]
 impl<T, const N: usize, P> Validatable for BoundedVec<T, N, P>
 where
     T: Validatable

@@ -8,25 +8,42 @@
 
 //! Provides traits and implementations for platform-specific synchronization.
 
-use core::fmt::Debug;
-
-// Re-export Duration for platform use
-pub use core::time::Duration;
-
-use crate::prelude::Result;
-
-// Re-export atomic types for platform use
-pub use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
+extern crate alloc;
 
 // Binary std/no_std choice
 #[cfg(feature = "std")]
-pub use std::sync::{Arc, Mutex, RwLock, MutexGuard, Condvar};
+pub use alloc::sync::Arc;
+#[cfg(not(feature = "std"))]
+pub use alloc::sync::Arc;
+use core::fmt::Debug;
+// Re-export atomic types for platform use
+pub use core::sync::atomic::{
+    AtomicU32,
+    AtomicU64,
+    AtomicUsize,
+    Ordering,
+};
+// Re-export Duration for platform use
+pub use core::time::Duration;
+#[cfg(feature = "std")]
+pub use std::sync::{
+    Condvar,
+    Mutex,
+    MutexGuard,
+    RwLock,
+};
 
 #[cfg(not(feature = "std"))]
-pub use wrt_sync::{WrtMutex as Mutex, WrtRwLock as RwLock, WrtMutexGuard as MutexGuard};
+pub use wrt_sync::{
+    WrtMutex as Mutex,
+    WrtMutexGuard as MutexGuard,
+    WrtRwLock as RwLock,
+};
+
+use crate::prelude::Result;
 
 /// Provide a simple Condvar alternative for non-std builds
-/// 
+///
 /// This is a minimal implementation that provides the Condvar API
 /// but returns errors for operations that require std functionality.
 #[cfg(not(feature = "std"))]
@@ -38,19 +55,17 @@ impl Condvar {
     pub fn new() -> Self {
         Self
     }
-    
+
     /// Wait on the condition variable (not supported in no_std)
     pub fn wait<'a, T>(&self, _guard: MutexGuard<'a, T>) -> Result<MutexGuard<'a, T>> {
-        Err(wrt_error::Error::new(
-            wrt_error::ErrorCategory::Runtime,
-            wrt_error::codes::NOT_IMPLEMENTED,
-            "Condvar not supported in no_std"
+        Err(wrt_error::Error::runtime_not_implemented(
+            "Condvar not supported in no_std",
         ))
     }
-    
+
     /// Notify one waiting thread (no-op in no_std)
     pub fn notify_one(&self) {}
-    
+
     /// Notify all waiting threads (no-op in no_std)
     pub fn notify_all(&self) {}
 }
@@ -116,7 +131,7 @@ pub enum TimeoutResult {
 #[derive(Debug)]
 pub struct SpinFutex {
     /// The atomic value used for synchronization
-    value: core::sync::atomic::AtomicU32,
+    value:    core::sync::atomic::AtomicU32,
     /// Padding to ensure the value is on its own cache line
     _padding: [u8; 60], // 64 - sizeof(AtomicU32)
 }
@@ -124,7 +139,10 @@ pub struct SpinFutex {
 impl SpinFutex {
     /// Creates a new `SpinFutex` with the given initial value.
     pub fn new(initial_value: u32) -> Self {
-        Self { value: core::sync::atomic::AtomicU32::new(initial_value), _padding: [0; 60] }
+        Self {
+            value:    core::sync::atomic::AtomicU32::new(initial_value),
+            _padding: [0; 60],
+        }
     }
 
     /// Gets the current value.
@@ -185,7 +203,7 @@ impl FutexLike for SpinFutex {
                 // Rough estimate: 1000 iterations ~= 1ms on a typical system
                 // This is obviously not accurate but gives us some scaling
                 (duration.as_micros() as u64) * 1000 / 1000
-            }
+            },
             None => u64::MAX, // Effectively infinite
         };
 
@@ -226,7 +244,10 @@ impl FutexLike for SpinFutex {
 mod tests {
     use core::time::Duration;
 
-    use wrt_error::{ErrorCategory, ErrorSource};
+    use wrt_error::{
+        ErrorCategory,
+        ErrorSource,
+    };
 
     use super::*;
 

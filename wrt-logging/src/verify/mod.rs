@@ -48,8 +48,9 @@ fn verify_logging_ext() {
     #[cfg(feature = "std")]
     {
         use wrt_host::CallbackRegistry;
+
         use crate::handler::LoggingExt;
-        
+
         // Create a registry
         let mut registry = CallbackRegistry::new();
 
@@ -61,6 +62,9 @@ fn verify_logging_ext() {
         };
 
         // Verify that we can log
-        registry_with_handler.handle_log(LogOperation::new(LogLevel::Info, "test message".to_string()));
+        registry_with_handler.handle_log(LogOperation::new(
+            LogLevel::Info,
+            "test message".to_string(),
+        ));
     }
 }

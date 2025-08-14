@@ -1,5 +1,5 @@
-// Runtime stubs for Agent C independent development  
-// These will be replaced with real implementations during integration
+// Runtime stubs for component module development
+// These provide the interface to the runtime module's types
 
 use crate::foundation_stubs::{SmallVec, MediumVec, LargeVec, SafetyContext};
 use crate::platform_stubs::ComprehensivePlatformLimits;
@@ -35,8 +35,8 @@ impl ExecutionContext {
 
 // Memory adapter stub
 pub trait UnifiedMemoryAdapter: Send + Sync {
-    fn allocate(&mut self, size: usize) -> Result<&mut [u8], wrt_error::Error>;
-    fn deallocate(&mut self, ptr: &mut [u8]) -> Result<(), wrt_error::Error>;
+    fn allocate(&mut self, size: usize) -> core::result::Result<&mut [u8], wrt_error::Error>;
+    fn deallocate(&mut self, ptr: &mut [u8]) -> core::result::Result<(), wrt_error::Error>;
     fn available_memory(&self) -> usize;
     fn total_memory(&self) -> usize;
 }
@@ -47,7 +47,7 @@ pub struct GenericMemoryAdapter {
 }
 
 impl GenericMemoryAdapter {
-    pub fn new(total_memory: usize) -> Result<Self, wrt_error::Error> {
+    pub fn new(total_memory: usize) -> core::result::Result<Self, wrt_error::Error> {
         Ok(Self {
             total_memory,
             allocated: 0,
@@ -56,17 +56,17 @@ impl GenericMemoryAdapter {
 }
 
 impl UnifiedMemoryAdapter for GenericMemoryAdapter {
-    fn allocate(&mut self, size: usize) -> Result<&mut [u8], wrt_error::Error> {
+    fn allocate(&mut self, size: usize) -> core::result::Result<&mut [u8], wrt_error::Error> {
         if self.allocated + size > self.total_memory {
-            return Err(wrt_error::Error::OUT_OF_MEMORY);
+            return Err(wrt_error::Error::OUT_OF_MEMORY;
         }
         self.allocated += size;
         // This is a stub - real implementation would return actual memory
-        Err(wrt_error::Error::Unsupported("Memory allocation stub".into()))
+        Err(wrt_error::Error::Unsupported("Memory allocation stub".into())
     }
     
-    fn deallocate(&mut self, _ptr: &mut [u8]) -> Result<(), wrt_error::Error> {
-        Ok(())
+    fn deallocate(&mut self, _ptr: &mut [u8]) -> core::result::Result<(), wrt_error::Error> {
+        Ok(()
     }
     
     fn available_memory(&self) -> usize {
@@ -86,7 +86,7 @@ pub struct Function {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FunctionId(pub u32);
+pub struct FunctionId(pub u32;
 
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
@@ -105,10 +105,10 @@ pub enum ValueType {
 
 // Component and instance identifiers
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ComponentId(pub u32);
+pub struct ComponentId(pub u32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InstanceId(pub u32);
+pub struct InstanceId(pub u32;
 
 // CFI engine stub
 pub struct CfiEngine {
@@ -116,18 +116,18 @@ pub struct CfiEngine {
 }
 
 impl CfiEngine {
-    pub fn new(_limits: &ExecutionLimits) -> Result<Self, wrt_error::Error> {
+    pub fn new(_limits: &ExecutionLimits) -> core::result::Result<Self, wrt_error::Error> {
         Ok(Self {
             validation_enabled: true,
         })
     }
     
-    pub fn validate_call(&self, _function: &Function) -> Result<(), wrt_error::Error> {
+    pub fn validate_call(&self, _function: &Function) -> core::result::Result<(), wrt_error::Error> {
         if self.validation_enabled {
             // Stub validation always passes
-            Ok(())
+            Ok(()
         } else {
-            Ok(())
+            Ok(()
         }
     }
 }
@@ -168,8 +168,8 @@ pub struct CallFrame {
 }
 
 impl ExecutionEngine {
-    pub fn new(platform_limits: &ComprehensivePlatformLimits) -> Result<Self, wrt_error::Error> {
-        let limits = ExecutionLimits::from_platform(platform_limits);
+    pub fn new(platform_limits: &ComprehensivePlatformLimits) -> core::result::Result<Self, wrt_error::Error> {
+        let limits = ExecutionLimits::from_platform(platform_limits;
         let cfi_engine = CfiEngine::new(&limits)?;
         
         Ok(Self {
@@ -181,17 +181,17 @@ impl ExecutionEngine {
         })
     }
     
-    pub fn execute_function(&mut self, function: &Function, args: &[Value]) -> Result<alloc::vec::Vec<Value>, wrt_error::Error> {
+    pub fn execute_function(&mut self, function: &Function, args: &[Value]) -> core::result::Result<alloc::vec::Vec<Value>, wrt_error::Error> {
         // Validate execution against limits
         if self.call_stack.len() >= self.limits.max_stack_depth {
-            return Err(wrt_error::Error::StackOverflow);
+            return Err(wrt_error::Error::StackOverflow;
         }
         
         // CFI validation
         self.cfi_engine.validate_call(function)?;
         
         // Stub execution - just return empty result
-        Ok(alloc::vec::Vec::new())
+        Ok(alloc::vec::Vec::new()
     }
 }
 

@@ -11,11 +11,21 @@
 //! macOS-specific `PageAllocator` implementation using direct syscalls without
 //! libc.
 
-use core::ptr::{self, NonNull};
+use core::ptr::{
+    self,
+    NonNull,
+};
 
-use wrt_error::{Error, ErrorCategory, Result};
+use wrt_error::{
+    Error,
+    ErrorCategory,
+    Result,
+};
 
-use crate::memory::{PageAllocator, WASM_PAGE_SIZE};
+use crate::memory::{
+    PageAllocator,
+    WASM_PAGE_SIZE,
+};
 
 /// Constants for macOS mmap syscall
 const SYSCALL_MMAP: usize = 197;
@@ -32,14 +42,23 @@ const MAP_ANON: usize = 0x1000;
 /// A `PageAllocator` implementation for macOS using direct syscalls.
 #[derive(Debug)]
 pub struct MacOsAllocator {
-    base_ptr: Option<NonNull<u8>>,
-    total_reserved_bytes: usize,    // Total bytes reserved
+    base_ptr:                Option<NonNull<u8>>,
+    total_reserved_bytes:    usize, // Total bytes reserved
     current_committed_bytes: usize, // Bytes currently committed
-    max_capacity_bytes: usize,      // Maximum bytes this instance can manage
+    max_capacity_bytes:      usize, // Maximum bytes this instance can manage
 }
 
+// Safety: MacOsAllocator can be shared between threads safely because:
+// 1. All operations use atomic syscalls
+// 2. Memory is properly synchronized through the OS
+// 3. NonNull is used safely for owned memory regions
+unsafe impl Send for MacOsAllocator {}
+unsafe impl Sync for MacOsAllocator {}
+
 impl MacOsAllocator {
-    const DEFAULT_MAX_PAGES: u32 = 65536; // Corresponds to 4GiB, a common Wasm limit
+    const DEFAULT_MAX_PAGES: u32 = 65536;
+
+    // Corresponds to 4GiB, a common Wasm limit
 
     /// Creates a new `MacOsAllocator`.
     pub fn new(maximum_pages: Option<u32>) -> Self {
@@ -54,13 +73,10 @@ impl MacOsAllocator {
     }
 
     fn pages_to_bytes(pages: u32) -> Result<usize> {
-        pages.checked_mul(WASM_PAGE_SIZE as u32).map(|b| b as usize).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Page count results in byte overflow",
-            )
-        })
+        pages
+            .checked_mul(WASM_PAGE_SIZE as u32)
+            .map(|b| b as usize)
+            .ok_or_else(|| Error::memory_error("Page count results in byte overflow"))
     }
 
     /// Performs the mmap syscall directly without libc
@@ -134,14 +150,18 @@ impl MacOsAllocator {
 /// Builder for `MacOsAllocator` to provide a fluent configuration API.
 #[derive(Debug)]
 pub struct MacOsAllocatorBuilder {
-    maximum_pages: Option<u32>,
-    guard_pages: bool,
+    maximum_pages:  Option<u32>,
+    guard_pages:    bool,
     memory_tagging: bool,
 }
 
 impl Default for MacOsAllocatorBuilder {
     fn default() -> Self {
-        Self { maximum_pages: None, guard_pages: false, memory_tagging: false }
+        Self {
+            maximum_pages:  None,
+            guard_pages:    false,
+            memory_tagging: false,
+        }
     }
 }
 
@@ -191,19 +211,13 @@ impl PageAllocator for MacOsAllocator {
         maximum_pages: Option<u32>,
     ) -> Result<(NonNull<u8>, usize)> {
         if self.base_ptr.is_some() {
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "Allocator has already allocated memory",
+            return Err(Error::runtime_execution_error(
+                "Memory allocation failed: out of memory",
             ));
         }
 
         if initial_pages == 0 {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Initial pages cannot be zero",
-            ));
+            return Err(Error::memory_error("Cannot allocate zero pages"));
         }
 
         let initial_bytes = Self::pages_to_bytes(initial_pages)?;
@@ -211,9 +225,7 @@ impl PageAllocator for MacOsAllocator {
         let reserve_bytes = Self::pages_to_bytes(max_pages_hint)?.max(initial_bytes);
 
         if reserve_bytes > self.max_capacity_bytes {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
+            return Err(Error::memory_error(
                 "Requested reservation size exceeds allocator's maximum capacity",
             ));
         }
@@ -234,21 +246,12 @@ impl PageAllocator for MacOsAllocator {
 
         // Check for mapping failure (mmap returns MAP_FAILED which is -1 as pointer)
         if ptr as isize == -1 {
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "Memory mapping failed due to OS error",
-            ));
+            return Err(Error::runtime_execution_error("mmap syscall failed"));
         }
 
         // Convert raw pointer to NonNull
-        let base_ptr = NonNull::new(ptr).ok_or_else(|| {
-            Error::new(
-                ErrorCategory::System, 1,
-                
-                "Memory mapping returned null pointer",
-            )
-        })?;
+        let base_ptr = NonNull::new(ptr)
+            .ok_or_else(|| Error::new(ErrorCategory::System, 1, "mmap returned null pointer"))?;
 
         self.base_ptr = Some(base_ptr);
         self.total_reserved_bytes = reserve_bytes;
@@ -258,11 +261,9 @@ impl PageAllocator for MacOsAllocator {
     }
 
     fn grow(&mut self, current_pages: u32, additional_pages: u32) -> Result<()> {
-        let Some(base_ptr) = self.base_ptr else {
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
-                "No memory allocated to grow",
+        let Some(_base_ptr) = self.base_ptr else {
+            return Err(Error::runtime_execution_error(
+                "Grow called before allocate",
             ));
         };
 
@@ -272,11 +273,7 @@ impl PageAllocator for MacOsAllocator {
 
         let current_bytes_from_arg = Self::pages_to_bytes(current_pages)?;
         if current_bytes_from_arg != self.current_committed_bytes {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "Inconsistent current_pages argument for grow operation",
-            ));
+            return Err(Error::memory_error("Current page count mismatch"));
         }
 
         let new_total_pages = current_pages
@@ -286,9 +283,7 @@ impl PageAllocator for MacOsAllocator {
         let new_committed_bytes = Self::pages_to_bytes(new_total_pages)?;
 
         if new_committed_bytes > self.total_reserved_bytes {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
+            return Err(Error::memory_error(
                 "Grow request exceeds total reserved memory space",
             ));
         }
@@ -302,18 +297,12 @@ impl PageAllocator for MacOsAllocator {
     unsafe fn deallocate(&mut self, ptr: NonNull<u8>, size: usize) -> Result<()> {
         // Validate that ptr matches our base_ptr
         let Some(base_ptr) = self.base_ptr.take() else {
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
-                "No memory allocated to deallocate",
-            ));
+            return Err(Error::memory_error("No memory allocated to deallocate"));
         };
 
         if ptr.as_ptr() != base_ptr.as_ptr() {
             self.base_ptr = Some(base_ptr); // Restore base_ptr
-            return Err(Error::new(
-                ErrorCategory::Memory, 1,
-                
+            return Err(Error::memory_error(
                 "Attempted to deallocate with mismatched pointer",
             ));
         }
@@ -324,9 +313,7 @@ impl PageAllocator for MacOsAllocator {
         if result != 0 {
             // munmap failed, need to restore base_ptr
             self.base_ptr = Some(base_ptr);
-            return Err(Error::new(
-                ErrorCategory::System, 1,
-                
+            return Err(Error::runtime_execution_error(
                 "Memory unmapping failed due to OS error",
             ));
         }

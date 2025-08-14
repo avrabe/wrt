@@ -8,15 +8,26 @@
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::String,
+    vec::Vec,
+};
 #[cfg(feature = "std")]
-use std::{string::String, vec::Vec};
+use std::{
+    string::String,
+    vec::Vec,
+};
+
+// Import the prelude for conditional imports
+#[cfg(not(any(feature = "std")))]
+use wrt_foundation::{
+    traits::BoundedCapacity,
+    MemoryProvider,
+    NoStdProvider,
+};
 
 #[cfg(not(any(feature = "std")))]
 use crate::WasmVec;
-// Import the prelude for conditional imports
-#[cfg(not(any(feature = "std")))]
-use wrt_foundation::{MemoryProvider, NoStdProvider, traits::BoundedCapacity};
 
 /// WebAssembly section ID constants
 pub const CUSTOM_ID: u8 = 0;
@@ -37,29 +48,29 @@ pub const DATA_COUNT_ID: u8 = 12;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SectionId {
     /// Custom section
-    Custom = 0,
+    Custom    = 0,
     /// Type section
-    Type = 1,
+    Type      = 1,
     /// Import section
-    Import = 2,
+    Import    = 2,
     /// Function section
-    Function = 3,
+    Function  = 3,
     /// Table section
-    Table = 4,
+    Table     = 4,
     /// Memory section
-    Memory = 5,
+    Memory    = 5,
     /// Global section
-    Global = 6,
+    Global    = 6,
     /// Export section
-    Export = 7,
+    Export    = 7,
     /// Start section
-    Start = 8,
+    Start     = 8,
     /// Element section
-    Element = 9,
+    Element   = 9,
     /// Code section
-    Code = 10,
+    Code      = 10,
     /// Data section
-    Data = 11,
+    Data      = 11,
     /// Data count section
     DataCount = 12,
 }
@@ -118,96 +129,108 @@ pub enum Section {
     DataCount(Vec<u8>),
 }
 
-/// WebAssembly section (no_std version)
-#[cfg(not(any(feature = "std")))]
+/// WebAssembly section (clean architecture version)
+#[cfg(not(feature = "std"))]
 #[derive(Debug, Clone)]
-pub enum Section<P: MemoryProvider + Clone + Default + Eq = NoStdProvider<1024>> {
+pub enum Section {
     /// Custom section
-    Custom(CustomSection<P>),
+    Custom(CustomSection),
     /// Type section
-    Type(WasmVec<u8, P>),
+    Type(alloc::vec::Vec<u8>),
     /// Import section
-    Import(WasmVec<u8, P>),
+    Import(alloc::vec::Vec<u8>),
     /// Function section
-    Function(WasmVec<u8, P>),
+    Function(alloc::vec::Vec<u8>),
     /// Table section
-    Table(WasmVec<u8, P>),
+    Table(alloc::vec::Vec<u8>),
     /// Memory section
-    Memory(WasmVec<u8, P>),
+    Memory(alloc::vec::Vec<u8>),
     /// Global section
-    Global(WasmVec<u8, P>),
+    Global(alloc::vec::Vec<u8>),
     /// Export section
-    Export(WasmVec<u8, P>),
+    Export(alloc::vec::Vec<u8>),
     /// Start section
-    Start(WasmVec<u8, P>),
+    Start(alloc::vec::Vec<u8>),
     /// Element section
-    Element(WasmVec<u8, P>),
+    Element(alloc::vec::Vec<u8>),
     /// Code section
-    Code(WasmVec<u8, P>),
+    Code(alloc::vec::Vec<u8>),
     /// Data section
-    Data(WasmVec<u8, P>),
+    Data(alloc::vec::Vec<u8>),
     /// Data count section
-    DataCount(WasmVec<u8, P>),
+    DataCount(alloc::vec::Vec<u8>),
 }
 
-/// WebAssembly custom section - Pure No_std Version
-#[cfg(not(any(feature = "std")))]
+/// WebAssembly custom section - Clean architecture version
+#[cfg(not(feature = "std"))]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CustomSection<
-    P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq = wrt_foundation::NoStdProvider<1024>,
-> {
+pub struct CustomSection {
     /// Section name
-    pub name: crate::WasmString<P>,
+    pub name: alloc::string::String,
     /// Section data
-    pub data: crate::WasmVec<u8, P>,
+    pub data: alloc::vec::Vec<u8>,
 }
 
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> Default for CustomSection<P> {
+#[cfg(not(feature = "std"))]
+impl Default for CustomSection {
     fn default() -> Self {
         Self {
-            name: crate::WasmString::from_str("", P::default()).unwrap_or_default(),
-            data: crate::WasmVec::new(P::default()).unwrap_or_default(),
+            name: alloc::string::String::new(),
+            data: alloc::vec::Vec::new(),
         }
     }
 }
 
-// Implement Checksummable for CustomSection - no_std version
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_foundation::traits::Checksummable for CustomSection<P> {
+// Implement Checksummable for CustomSection - clean version
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::Checksummable for CustomSection {
     fn update_checksum(&self, checksum: &mut wrt_foundation::verification::Checksum) {
-        self.name.update_checksum(checksum);
-        self.data.update_checksum(checksum);
+        checksum.update_slice(self.name.as_bytes());
+        checksum.update_slice(&self.data);
     }
 }
 
-// Implement ToBytes for CustomSection - no_std version
-#[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_foundation::traits::ToBytes for CustomSection<P> {
+// Implement ToBytes for CustomSection - clean version
+#[cfg(not(feature = "std"))]
+impl wrt_foundation::traits::ToBytes for CustomSection {
     fn serialized_size(&self) -> usize {
-        self.name.serialized_size() + self.data.serialized_size()
+        self.name.len() + self.data.len() + 8 // 4 bytes each for lengths
     }
 
     fn to_bytes_with_provider<PStream: wrt_foundation::MemoryProvider>(
         &self,
         stream: &mut wrt_foundation::traits::WriteStream,
-        provider: &PStream,
-    ) -> wrt_foundation::Result<()> {
-        self.name.to_bytes_with_provider(stream, provider)?;
-        self.data.to_bytes_with_provider(stream, provider)?;
+        _provider: &PStream,
+    ) -> wrt_error::Result<()> {
+        // Write name length and name
+        stream.write_all(&(self.name.len() as u32).to_le_bytes())?;
+        stream.write_all(self.name.as_bytes())?;
+        // Write data length and data
+        stream.write_all(&(self.data.len() as u32).to_le_bytes())?;
+        stream.write_all(&self.data)?;
         Ok(())
     }
 }
 
 // Implement FromBytes for CustomSection - no_std version
 #[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + PartialEq + Eq> wrt_foundation::traits::FromBytes for CustomSection<P> {
+impl wrt_foundation::traits::FromBytes for CustomSection {
     fn from_bytes_with_provider<'a, PStream: wrt_foundation::MemoryProvider>(
         reader: &mut wrt_foundation::traits::ReadStream<'a>,
-        provider: &PStream,
-    ) -> wrt_foundation::Result<Self> {
-        let name = crate::WasmString::from_bytes_with_provider(reader, provider)?;
-        let data = crate::WasmVec::from_bytes_with_provider(reader, provider)?;
+        _provider: &PStream,
+    ) -> wrt_error::Result<Self> {
+        // Read name length
+        let name_len = reader.read_u32_le()?;
+        let mut name_bytes = alloc::vec![0u8; name_len as usize];
+        reader.read_exact(&mut name_bytes)?;
+        let name = alloc::string::String::from_utf8(name_bytes)
+            .map_err(|_| wrt_error::Error::parse_error("Invalid UTF-8 in custom section name"))?;
+
+        // Read data length
+        let data_len = reader.read_u32_le()?;
+        let mut data = alloc::vec![0u8; data_len as usize];
+        reader.read_exact(&mut data)?;
+
         Ok(Self { name, data })
     }
 }
@@ -241,7 +264,10 @@ impl CustomSection {
 
     /// Create a new custom section from raw bytes
     pub fn from_bytes(name: String, data: &[u8]) -> Self {
-        Self { name, data: data.to_vec() }
+        Self {
+            name,
+            data: data.to_vec(),
+        }
     }
 
     /// Serialize the custom section to binary
@@ -269,41 +295,30 @@ impl CustomSection {
 }
 
 #[cfg(not(any(feature = "std")))]
-impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> CustomSection<P> {
+impl CustomSection {
     /// Create a new custom section
-    pub fn new(name: crate::WasmString<P>, data: crate::WasmVec<u8, P>) -> Self {
+    pub fn new(name: alloc::string::String, data: alloc::vec::Vec<u8>) -> Self {
         Self { name, data }
     }
 
     /// Create a new custom section from raw bytes
-    pub fn from_bytes(name: &str, data: &[u8], provider: P) -> wrt_foundation::Result<Self> {
-        let bounded_name =
-            crate::WasmString::<P>::from_str(name, provider.clone()).map_err(|_| {
-                wrt_foundation::Error::new(
-                    wrt_error::ErrorCategory::Memory,
-                    wrt_error::codes::MEMORY_ERROR,
-                    "Failed to create bounded string",
-                )
-            })?;
-
-        let mut bounded_data = crate::WasmVec::<u8, P>::new(provider)?;
-        bounded_data.extend_from_slice(data)?;
-
-        Ok(Self { name: bounded_name, data: bounded_data })
+    pub fn from_bytes(name: &str, data: &[u8]) -> Self {
+        Self {
+            name: alloc::string::String::from(name),
+            data: data.to_vec(),
+        }
     }
 
     /// Get section data length
-    pub fn data_len(&self) -> wrt_foundation::Result<usize> {
-        Ok(self.data.len())
+    pub fn data_len(&self) -> usize {
+        self.data.len()
     }
 
     /// Copy section data to a slice
-    pub fn copy_data_to_slice(&self, dest: &mut [u8]) -> wrt_foundation::Result<usize> {
-        let src = self.data.as_internal_slice()?;
-        let src_ref = src.as_ref();
-        let copy_len = core::cmp::min(dest.len(), src_ref.len());
-        dest[..copy_len].copy_from_slice(&src_ref[..copy_len]);
-        Ok(copy_len)
+    pub fn copy_data_to_slice(&self, dest: &mut [u8]) -> usize {
+        let copy_len = core::cmp::min(dest.len(), self.data.len());
+        dest[..copy_len].copy_from_slice(&self.data[..copy_len]);
+        copy_len
     }
 }
 
@@ -311,31 +326,31 @@ impl<P: wrt_foundation::MemoryProvider + Clone + Default + Eq> CustomSection<P> 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ComponentSectionType {
     /// Custom section - for metadata, debug info, etc.
-    Custom = 0,
+    Custom       = 0,
     /// Core module section - contains WebAssembly modules
-    CoreModule = 1,
+    CoreModule   = 1,
     /// Core instance section - contains core WebAssembly instances
     CoreInstance = 2,
     /// Core type section - contains core WebAssembly types
-    CoreType = 3,
+    CoreType     = 3,
     /// Component section - contains nested components
-    Component = 4,
+    Component    = 4,
     /// Component instance section - contains component instances
-    Instance = 5,
+    Instance     = 5,
     /// Alias section - contains aliases
-    Alias = 6,
+    Alias        = 6,
     /// Type section - contains component types
-    Type = 7,
+    Type         = 7,
     /// Canonical section - contains canonical function conversions
-    Canon = 8,
+    Canon        = 8,
     /// Start section - contains the component start function
-    Start = 9,
+    Start        = 9,
     /// Import section - contains imports
-    Import = 10,
+    Import       = 10,
     /// Export section - contains exports
-    Export = 11,
+    Export       = 11,
     /// Value section - contains component values
-    Value = 12,
+    Value        = 12,
 }
 
 impl ComponentSectionType {
@@ -371,7 +386,7 @@ pub struct ComponentSectionHeader {
     /// Section type
     pub section_type: ComponentSectionType,
     /// Section size in bytes (excluding the header)
-    pub size: u32,
+    pub size:         u32,
 }
 
 /// Parse a component section header from binary data
@@ -380,7 +395,9 @@ pub fn parse_component_section_header(
     pos: usize,
 ) -> wrt_error::Result<(ComponentSectionHeader, usize)> {
     if pos >= bytes.len() {
-        return Err(wrt_error::Error::validation_error("Unexpected end of input"));
+        return Err(wrt_error::Error::validation_error(
+            "Unexpected end of input",
+        ));
     }
 
     let section_id = bytes[pos];
@@ -423,8 +440,13 @@ where
 
 #[cfg(test)]
 mod tests {
-        #[cfg(all(not(feature = "std")))]
-    use std::{string::ToString, vec};
+    #[cfg(not(feature = "std"))]
+    extern crate alloc;
+    #[cfg(not(feature = "std"))]
+    use alloc::{
+        string::ToString,
+        vec,
+    };
     #[cfg(feature = "std")]
     use std::string::ToString;
     #[cfg(feature = "std")]
@@ -454,19 +476,58 @@ mod tests {
 
     #[test]
     fn test_component_section_type_conversion() {
-        assert_eq!(ComponentSectionType::from_u8(0), Some(ComponentSectionType::Custom));
-        assert_eq!(ComponentSectionType::from_u8(1), Some(ComponentSectionType::CoreModule));
-        assert_eq!(ComponentSectionType::from_u8(2), Some(ComponentSectionType::CoreInstance));
-        assert_eq!(ComponentSectionType::from_u8(3), Some(ComponentSectionType::CoreType));
-        assert_eq!(ComponentSectionType::from_u8(4), Some(ComponentSectionType::Component));
-        assert_eq!(ComponentSectionType::from_u8(5), Some(ComponentSectionType::Instance));
-        assert_eq!(ComponentSectionType::from_u8(6), Some(ComponentSectionType::Alias));
-        assert_eq!(ComponentSectionType::from_u8(7), Some(ComponentSectionType::Type));
-        assert_eq!(ComponentSectionType::from_u8(8), Some(ComponentSectionType::Canon));
-        assert_eq!(ComponentSectionType::from_u8(9), Some(ComponentSectionType::Start));
-        assert_eq!(ComponentSectionType::from_u8(10), Some(ComponentSectionType::Import));
-        assert_eq!(ComponentSectionType::from_u8(11), Some(ComponentSectionType::Export));
-        assert_eq!(ComponentSectionType::from_u8(12), Some(ComponentSectionType::Value));
+        assert_eq!(
+            ComponentSectionType::from_u8(0),
+            Some(ComponentSectionType::Custom)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(1),
+            Some(ComponentSectionType::CoreModule)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(2),
+            Some(ComponentSectionType::CoreInstance)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(3),
+            Some(ComponentSectionType::CoreType)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(4),
+            Some(ComponentSectionType::Component)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(5),
+            Some(ComponentSectionType::Instance)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(6),
+            Some(ComponentSectionType::Alias)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(7),
+            Some(ComponentSectionType::Type)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(8),
+            Some(ComponentSectionType::Canon)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(9),
+            Some(ComponentSectionType::Start)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(10),
+            Some(ComponentSectionType::Import)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(11),
+            Some(ComponentSectionType::Export)
+        );
+        assert_eq!(
+            ComponentSectionType::from_u8(12),
+            Some(ComponentSectionType::Value)
+        );
         assert_eq!(ComponentSectionType::from_u8(13), None);
     }
 
@@ -568,7 +629,7 @@ mod tests {
         // Create an invalid section ID
         let mut header_bytes = Vec::new();
         header_bytes.push(255); // Invalid section ID
-        // Use a manual LEB128 encoding for 42
+                                // Use a manual LEB128 encoding for 42
         header_bytes.push(42); // 42 fits in one byte for LEB128
 
         // Parse should fail

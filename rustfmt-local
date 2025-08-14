@@ -1,0 +1,5 @@
+#!/bin/bash
+# Wrapper script to use pre-built local rustfmt binary
+# Sets library path for the specific nightly toolchain that rustfmt was built with
+export DYLD_LIBRARY_PATH="$HOME/.rustup/toolchains/nightly-2025-04-02-aarch64-apple-darwin/lib:$HOME/.rustup/toolchains/nightly-2025-04-02-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/lib:$DYLD_LIBRARY_PATH"
+exec /Users/r/git/rustfmt/target/release/rustfmt "$@"
